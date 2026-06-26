@@ -47,6 +47,7 @@ class Rules:
     session_patterns: dict[str, dict[str, Any]]
     player_profiles: dict[str, "PlayerProfile"]
     scenarios: dict[str, "Scenario"]
+    regression_gates: dict[str, dict[str, Any]]
 
 
 @dataclass

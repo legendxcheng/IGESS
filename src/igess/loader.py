@@ -93,6 +93,7 @@ class ConfigLoader:
             session_patterns=dict(sorted(data.get("session_patterns", {}).items())),
             player_profiles=profiles,
             scenarios=scenarios,
+            regression_gates=dict(sorted(data.get("regression_gates", {}).items())),
         )
 
     @classmethod

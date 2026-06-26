@@ -9,6 +9,7 @@ from igess.metrics import extract_metrics
 from igess.outputs import OutputWriter
 from igess.scan import parse_scan_parameter, run_scan
 from igess.simulator import Simulator
+from igess.gates import evaluate_gates
 
 
 CONFIG = "examples/shelldiver_v0/economy.yaml"
@@ -139,3 +140,66 @@ def test_cli_scan_generates_summary(tmp_path):
     assert result.returncode == 0, result.stderr
     assert "Wrote scan summary" in result.stdout
     assert (out_dir / "scan.json").exists()
+
+
+def _write_gate_config(tmp_path, threshold):
+    config_text = open(CONFIG, encoding="utf-8").read()
+    path = tmp_path / "gate.yaml"
+    path.write_text(
+        config_text
+        + f"""
+
+regression_gates:
+  day_1_progression:
+    max_payback_seconds:
+      generator:fisherman: {threshold}
+""",
+        encoding="utf-8",
+        newline="\n",
+    )
+    return path
+
+
+def test_evaluate_gates_writes_pass_and_fail_results(tmp_path):
+    base = _write_sample_run(tmp_path, "base")
+    candidate = _write_sample_run(tmp_path, "candidate")
+
+    passing = evaluate_gates(base, candidate, _write_gate_config(tmp_path, 999999), tmp_path / "pass")
+    failing = evaluate_gates(base, candidate, _write_gate_config(tmp_path, 0), tmp_path / "fail")
+
+    assert passing.ok
+    assert not failing.ok
+    assert "generator:fisherman" in failing.failures[0]["key"]
+    assert (tmp_path / "fail" / "gate_results.json").exists()
+    assert "FAILED" in (tmp_path / "fail" / "gate_results.md").read_text(encoding="utf-8")
+
+
+def test_cli_gate_uses_exit_code_for_threshold_failures(tmp_path):
+    base = _write_sample_run(tmp_path, "base")
+    candidate = _write_sample_run(tmp_path, "candidate")
+    config_path = _write_gate_config(tmp_path, 0)
+    out_dir = tmp_path / "gate-cli"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "igess.cli",
+            "gate",
+            "--base",
+            str(base),
+            "--candidate",
+            str(candidate),
+            "--config",
+            str(config_path),
+            "--out",
+            str(out_dir),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert "Regression gates failed" in result.stdout
+    assert (out_dir / "gate_results.json").exists()

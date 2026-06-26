@@ -6,6 +6,7 @@ import sys
 from .builder import ModelBuilder
 from .compare import compare_runs
 from .dashboard import serve_dashboard
+from .gates import evaluate_gates
 from .linter import ConfigError, ConfigLinter
 from .loader import ConfigLoader
 from .luban_exporter import export_registered_workbooks
@@ -36,6 +37,11 @@ def build_parser() -> argparse.ArgumentParser:
     scan.add_argument("--scenario", required=True)
     scan.add_argument("--param", required=True)
     scan.add_argument("--out", required=True)
+    gate = subparsers.add_parser("gate")
+    gate.add_argument("--base", required=True)
+    gate.add_argument("--candidate", required=True)
+    gate.add_argument("--config", required=True)
+    gate.add_argument("--out", required=True)
     dashboard = subparsers.add_parser("dashboard")
     dashboard.add_argument("--project", default=".")
     dashboard.add_argument("--config", default="examples/shelldiver_v0/economy.yaml")
@@ -73,6 +79,13 @@ def main(argv: list[str] | None = None) -> int:
             summary = run_scan(args.config, args.tables, args.scenario, args.param, args.out)
             print(f"Wrote scan summary to {summary}")
             return 0
+        if args.command == "gate":
+            result = evaluate_gates(args.base, args.candidate, args.config, args.out)
+            if result.ok:
+                print(f"Regression gates passed; wrote results to {result.output_dir}")
+                return 0
+            print(f"Regression gates failed; wrote results to {result.output_dir}")
+            return 1
         if args.command == "dashboard":
             serve_dashboard(
                 project=args.project,
