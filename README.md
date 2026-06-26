@@ -32,6 +32,7 @@ Implemented now:
 - Explicit `number_backend` and a `SimNumber` economy number wrapper.
 - Safe AST formula compilation at load/build time.
 - Config linting for ids, formulas, source types, modifier targets, profiles, policies, and deterministic seed.
+- Resource dimension metadata plus semantic formula-context checks to catch accidental cost/output/prestige parameter mixing.
 - Exponential generator costs, linear production, upgrade modifiers, and the standard modifier pipeline.
 - `casual`, `optimizer`, and `explorer` player profiles in the sample config.
 - `cheap_unlock_first`, `fastest_payback`, and `new_content_bias` behavior policies.

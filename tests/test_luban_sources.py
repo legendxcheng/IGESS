@@ -31,3 +31,18 @@ def test_luban_registry_lists_runtime_tables():
         "milestones",
         "prestige_layers",
     }.issubset(registered)
+
+
+def test_resources_workbook_has_populated_dimension_column():
+    workbook = load_workbook(DATAS / "resources.xlsx", read_only=True, data_only=True)
+    sheet = workbook.active
+    headers = [cell.value for cell in sheet[1]]
+    dimension_index = headers.index("dimension") + 1
+
+    dimensions = [
+        sheet.cell(row=row, column=dimension_index).value
+        for row in range(4, sheet.max_row + 1)
+    ]
+
+    assert dimensions
+    assert all(str(value).strip() for value in dimensions)

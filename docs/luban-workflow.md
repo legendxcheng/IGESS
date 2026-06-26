@@ -43,6 +43,7 @@ Required fields:
 
 - `id`
 - `name`
+- `dimension`
 
 ### generators
 

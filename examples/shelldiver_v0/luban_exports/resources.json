@@ -1,10 +1,12 @@
 [
   {
     "id": "fish",
-    "name": "Fish"
+    "name": "Fish",
+    "dimension": "fish"
   },
   {
     "id": "prestige_point",
-    "name": "Prestige Point"
+    "name": "Prestige Point",
+    "dimension": "prestige"
   }
 ]

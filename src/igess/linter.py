@@ -12,6 +12,11 @@ class ConfigError(ValueError):
 class ConfigLinter:
     ALLOWED_BACKENDS = {"bignum_log", "native_double", "big_int"}
     ALLOWED_POLICY_TYPES = {"cheap_unlock_first", "fastest_payback", "new_content_bias"}
+    FORMULA_CONTEXT_ARGS = {
+        "cost_formula": {"base_cost", "growth", "owned"},
+        "production_formula": {"base_output", "owned", "multiplier"},
+        "prestige_formula": {"progress", "divisor", "exponent"},
+    }
 
     @classmethod
     def validate(cls, raw: RawConfig) -> None:
@@ -25,6 +30,10 @@ class ConfigLinter:
 
         resource_ids = {row.id for row in raw.resources}
         generator_ids = {row.id for row in raw.generators}
+
+        for resource in raw.resources:
+            if resource.dimension is None or not str(resource.dimension).strip():
+                raise ConfigError(f"resource dimension is required for '{resource.id}'")
 
         for formula_id, formula in rules.formulas.items():
             try:
@@ -93,6 +102,18 @@ class ConfigLinter:
             for field in ("cost_formula", "production_formula"):
                 if data.get(field) not in rules.formulas:
                     raise ConfigError(f"generator_type '{generator_type}' unknown {field}")
+                cls._validate_formula_context(
+                    rules.formulas[data[field]],
+                    cls.FORMULA_CONTEXT_ARGS[field],
+                    f"generator_type '{generator_type}' {field}",
+                )
+
+        for prestige in raw.prestige_layers:
+            cls._validate_formula_context(
+                rules.formulas[prestige.formula],
+                cls.FORMULA_CONTEXT_ARGS["prestige_formula"],
+                f"prestige '{prestige.id}' formula",
+            )
 
         for policy_id, policy in rules.behavior_policies.items():
             if policy.get("type") not in cls.ALLOWED_POLICY_TYPES:
@@ -178,3 +199,12 @@ class ConfigLinter:
 
         for generator_id in sorted(graph):
             visit(generator_id, [generator_id])
+
+    @classmethod
+    def _validate_formula_context(
+        cls, formula, allowed_args: set[str], context: str
+    ) -> None:
+        actual_args = set(formula.args)
+        if not actual_args <= allowed_args:
+            extras = ", ".join(sorted(actual_args - allowed_args))
+            raise ConfigError(f"{context} dimension mismatch: unsupported args {extras}")

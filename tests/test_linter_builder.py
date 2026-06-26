@@ -19,6 +19,8 @@ def test_loader_linter_and_builder_accept_sample_config():
 
     assert model.config.model_id == "shelldiver_incremental_v0"
     assert set(model.resources) == {"fish", "prestige_point"}
+    assert model.resources["fish"].dimension == "fish"
+    assert model.resources["prestige_point"].dimension == "prestige"
     assert set(model.generators) == {"fisherman", "boat", "net"}
     assert set(model.milestones) == {"first_boat", "small_fleet"}
     assert set(model.prestige_layers) == {"reef_renown"}
@@ -50,6 +52,52 @@ def test_linter_rejects_formula_arg_mismatch():
 
     with pytest.raises(ConfigError, match="unknown formula name"):
         ConfigLinter.validate(broken)
+
+
+def test_linter_rejects_formula_dimension_role_mismatch():
+    raw = ConfigLoader.load(CONFIG, TABLES)
+    broken = copy.deepcopy(raw)
+    broken.rules.formulas["mixed_cost"] = copy.deepcopy(broken.rules.formulas["exponential_cost"])
+    broken.rules.formulas["mixed_cost"].args = ["base_cost", "base_output"]
+    broken.rules.formulas["mixed_cost"].expr = "base_cost + base_output"
+    broken.rules.generator_types["building"]["cost_formula"] = "mixed_cost"
+
+    with pytest.raises(ConfigError, match="dimension mismatch"):
+        ConfigLinter.validate(broken)
+
+
+def test_linter_rejects_production_formula_with_cost_args():
+    raw = ConfigLoader.load(CONFIG, TABLES)
+    broken = copy.deepcopy(raw)
+    broken.rules.formulas["mixed_production"] = copy.deepcopy(broken.rules.formulas["generator_output"])
+    broken.rules.formulas["mixed_production"].args = ["base_output", "base_cost"]
+    broken.rules.formulas["mixed_production"].expr = "base_output + base_cost"
+    broken.rules.generator_types["building"]["production_formula"] = "mixed_production"
+
+    with pytest.raises(ConfigError, match="dimension mismatch"):
+        ConfigLinter.validate(broken)
+
+
+def test_linter_rejects_prestige_formula_with_cost_args():
+    raw = ConfigLoader.load(CONFIG, TABLES)
+    broken = copy.deepcopy(raw)
+    broken.rules.formulas["mixed_prestige"] = copy.deepcopy(broken.rules.formulas["prestige_gain"])
+    broken.rules.formulas["mixed_prestige"].args = ["progress", "base_cost"]
+    broken.rules.formulas["mixed_prestige"].expr = "progress + base_cost"
+    broken.prestige_layers[0].formula = "mixed_prestige"
+
+    with pytest.raises(ConfigError, match="dimension mismatch"):
+        ConfigLinter.validate(broken)
+
+
+def test_linter_rejects_resource_without_dimension():
+    raw = ConfigLoader.load(CONFIG, TABLES)
+    for bad_dimension in ["", "   ", None]:
+        broken = copy.deepcopy(raw)
+        broken.resources[0].dimension = bad_dimension
+
+        with pytest.raises(ConfigError, match="resource dimension"):
+            ConfigLinter.validate(broken)
 
 
 def test_linter_rejects_bad_milestone_reward_resource():

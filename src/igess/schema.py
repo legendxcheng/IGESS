@@ -39,6 +39,7 @@ class Rules:
 class ResourceRow:
     id: str
     name: str
+    dimension: str
 
 
 @dataclass

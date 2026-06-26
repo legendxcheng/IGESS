@@ -31,6 +31,7 @@ v0.1 includes:
 - Explicit `number_backend`, with `bignum_log` enabled through a `SimNumber` wrapper.
 - Safe formula compilation from YAML expressions at load/build time.
 - Static config linting for id references, formula parameters, modifier targets, source types, policy/profile references, and deterministic seed declaration.
+- Resource dimension metadata and formula-context checks for cost, production, and prestige formulas.
 - Exponential generator costs and linear generator production.
 - Modifier pipeline: `(base + flat) * (1 + add_pct) * product(mult) ^ exp`.
 - Three behavior policies: `cheap_unlock_first`, `fastest_payback`, `new_content_bias`.

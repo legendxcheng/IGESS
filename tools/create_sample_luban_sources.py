@@ -51,10 +51,10 @@ def main() -> None:
     )
     write_workbook(
         DATAS / "resources.xlsx",
-        ["id", "name"],
-        ["stable resource id", "display name"],
-        ["string", "string"],
-        [["fish", "Fish"], ["prestige_point", "Prestige Point"]],
+        ["id", "name", "dimension"],
+        ["stable resource id", "display name", "quantity dimension"],
+        ["string", "string", "string"],
+        [["fish", "Fish", "fish"], ["prestige_point", "Prestige Point", "prestige"]],
     )
     write_workbook(
         DATAS / "generators.xlsx",
