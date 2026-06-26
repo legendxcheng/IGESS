@@ -12,6 +12,7 @@ from .luban_exporter import export_registered_workbooks
 from .outputs import OutputWriter
 from .reporting.loader import ReportLoadError
 from .reporting.static import generate_static_report
+from .scan import run_scan
 from .simulator import Simulator
 
 
@@ -29,6 +30,12 @@ def build_parser() -> argparse.ArgumentParser:
     compare.add_argument("--base", required=True)
     compare.add_argument("--candidate", required=True)
     compare.add_argument("--out", required=True)
+    scan = subparsers.add_parser("scan")
+    scan.add_argument("--config", required=True)
+    scan.add_argument("--tables", required=True)
+    scan.add_argument("--scenario", required=True)
+    scan.add_argument("--param", required=True)
+    scan.add_argument("--out", required=True)
     dashboard = subparsers.add_parser("dashboard")
     dashboard.add_argument("--project", default=".")
     dashboard.add_argument("--config", default="examples/shelldiver_v0/economy.yaml")
@@ -61,6 +68,10 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "compare":
             index = compare_runs(args.base, args.candidate, args.out)
             print(f"Wrote comparison report to {index}")
+            return 0
+        if args.command == "scan":
+            summary = run_scan(args.config, args.tables, args.scenario, args.param, args.out)
+            print(f"Wrote scan summary to {summary}")
             return 0
         if args.command == "dashboard":
             serve_dashboard(
