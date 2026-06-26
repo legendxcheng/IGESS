@@ -38,7 +38,7 @@ Implemented now:
 - Session-pattern-driven offline reward pulses.
 - Milestone reward claims.
 - Simple prestige conversion and configured resource reset.
-- Fixed tick simulation and an explicit `analytic_leap` placeholder for later.
+- Fixed tick simulation plus analytic next-event stepping for stable intervals.
 - JSON, CSV, and Markdown outputs.
 - Payback, bottleneck, invalid-content, and overpowered-content analysis artifacts.
 - Windows sample runner: `.\scripts\run_sample.ps1`.
@@ -57,4 +57,10 @@ Sample Luban-style source workbooks are under `data-tables/Datas`. They can be r
 
 ```powershell
 .\.venv\Scripts\python tools/create_sample_luban_sources.py
+```
+
+Analytic stepping can be exercised with:
+
+```powershell
+.\.venv\Scripts\python -m igess.cli run --config examples/shelldiver_v0/economy.yaml --tables examples/shelldiver_v0/luban_exports --scenario analytic_smoke --out .tmp/analytic
 ```

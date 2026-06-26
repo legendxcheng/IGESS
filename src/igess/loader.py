@@ -72,6 +72,7 @@ class ConfigLoader:
                 start_state=str(scenario_data["start_state"]),
                 record_interval_seconds=int(scenario_data["record_interval_seconds"]),
                 outputs=list(scenario_data.get("outputs", [])),
+                time_mode=str(scenario_data.get("time_mode", "tick")),
             )
             for scenario_id, scenario_data in sorted(data.get("scenarios", {}).items())
         }

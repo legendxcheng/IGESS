@@ -101,6 +101,7 @@ player_profiles:
 scenarios:
   day_1_progression:
     duration_hours: 0.05
+    time_mode: tick
     profiles: [casual, optimizer, explorer]
     start_state: new_player
     record_interval_seconds: 30
@@ -110,3 +111,13 @@ scenarios:
       - unlock_timeline
       - prestige_timeline
       - bottleneck_report
+  analytic_smoke:
+    duration_hours: 0.05
+    time_mode: analytic
+    profiles: [optimizer]
+    start_state: new_player
+    record_interval_seconds: 30
+    outputs:
+      - resource_curve
+      - purchase_timeline
+      - unlock_timeline

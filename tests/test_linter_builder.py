@@ -83,3 +83,27 @@ def test_linter_rejects_unlock_dependency_cycles():
 
     with pytest.raises(ConfigError, match="unlock dependency cycle"):
         ConfigLinter.validate(broken)
+
+
+def test_linter_rejects_unknown_scenario_time_mode():
+    raw = ConfigLoader.load(CONFIG, TABLES)
+    broken = copy.deepcopy(raw)
+    broken.rules.scenarios["day_1_progression"].time_mode = "warp"
+
+    with pytest.raises(ConfigError, match="unknown time_mode"):
+        ConfigLinter.validate(broken)
+
+
+def test_linter_rejects_non_positive_scenario_timing():
+    raw = ConfigLoader.load(CONFIG, TABLES)
+    broken = copy.deepcopy(raw)
+    broken.rules.scenarios["day_1_progression"].record_interval_seconds = 0
+
+    with pytest.raises(ConfigError, match="record_interval_seconds"):
+        ConfigLinter.validate(broken)
+
+    broken = copy.deepcopy(raw)
+    broken.rules.scenarios["day_1_progression"].duration_hours = 0
+
+    with pytest.raises(ConfigError, match="duration_hours"):
+        ConfigLinter.validate(broken)

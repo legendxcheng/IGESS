@@ -118,3 +118,24 @@ def test_cli_lint_and_run_smoke(tmp_path):
     analysis = json.loads((tmp_path / "analysis.json").read_text(encoding="utf-8"))
     assert analysis["payback_report"]
     assert (tmp_path / "payback.csv").read_text(encoding="utf-8").count("\n") > 1
+
+
+def test_analytic_scenario_jumps_between_events_and_records():
+    model = ModelBuilder.build(ConfigLoader.load(CONFIG, TABLES))
+    assert model.scenarios["analytic_smoke"].time_mode == "analytic"
+    result = Simulator(model).run_scenario("analytic_smoke")
+
+    assert result.timeline[0].time_seconds == 0
+    assert result.timeline[-1].time_seconds == 180
+    assert {row.profile_id for row in result.timeline} == {"optimizer"}
+    assert any(event.kind == "buy_generator" for event in result.events)
+    assert all(0 <= event.time_seconds <= 180 for event in result.events)
+
+
+def test_analytic_mode_does_not_skip_prestige_threshold():
+    raw = ConfigLoader.load(CONFIG, TABLES)
+    raw.rules.scenarios["day_1_progression"].time_mode = "analytic"
+    model = ModelBuilder.build(raw)
+    result = Simulator(model).run_scenario("day_1_progression")
+
+    assert any(event.kind == "prestige_reset" for event in result.events)

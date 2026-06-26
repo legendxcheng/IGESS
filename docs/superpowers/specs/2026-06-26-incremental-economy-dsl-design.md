@@ -36,7 +36,7 @@ v0.1 includes:
 - Three behavior policies: `cheap_unlock_first`, `fastest_payback`, `new_content_bias`.
 - `fastest_payback` lookahead depth 1 by adding immediately-unlocked upgrade value into candidate scoring.
 - Three player profiles in the sample: `casual`, `optimizer`, `explorer`.
-- Fixed tick simulation with an `analytic_leap` interface stub reserved for later.
+- Fixed tick simulation plus analytic next-event stepping for record boundaries, offline pulses, and next affordable purchases.
 - Deterministic JSON or CSV timeline output.
 - Markdown analysis report.
 - Windows PowerShell entrypoint.
@@ -61,7 +61,7 @@ The package is named `igess`.
 - `builder.py`: compiles formulas and builds an `EconomyModel`.
 - `modifiers.py`: computes modifier stacks for generator output targets.
 - `policy.py`: chooses purchase actions for the three v0.1 behavior policies.
-- `time_engine.py`: exposes fixed tick stepping and an explicit `analytic_leap` placeholder interface.
+- `time_engine.py`: exposes fixed tick stepping, affordability timing, and analytic leap interval validation.
 - `simulator.py`: runs scenarios/profile combinations, applies production, purchases, unlocks, and records timelines/events.
 - `analyzer.py`: creates summary metrics and Markdown report content.
 - `outputs.py`: writes deterministic JSON/CSV/Markdown with stable ordering and LF newlines.
@@ -81,7 +81,7 @@ Sample configuration lives under `examples/shelldiver_v0/`:
 2. `ConfigLoader` reads YAML and Luban-export JSON tables.
 3. `ConfigLinter` checks all references and formula targets.
 4. `ModelBuilder` compiles formula ASTs and constructs `EconomyModel`.
-5. `Simulator` runs every requested profile for the scenario using fixed ticks.
+5. `Simulator` runs every requested profile for the scenario using fixed tick or analytic next-event stepping.
 6. `PolicyEngine` chooses purchases after each production step.
 7. `Simulator` applies offline reward pulses, milestone rewards, and simple prestige/reset when configured.
 8. `Analyzer` summarizes output.

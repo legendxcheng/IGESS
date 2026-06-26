@@ -114,6 +114,18 @@ class ConfigLinter:
                     )
 
         for scenario_id, scenario in rules.scenarios.items():
+            if scenario.duration_hours <= 0:
+                raise ConfigError(
+                    f"scenario '{scenario_id}' duration_hours must be positive"
+                )
+            if scenario.record_interval_seconds <= 0:
+                raise ConfigError(
+                    f"scenario '{scenario_id}' record_interval_seconds must be positive"
+                )
+            if scenario.time_mode not in {"tick", "analytic"}:
+                raise ConfigError(
+                    f"scenario '{scenario_id}' unknown time_mode '{scenario.time_mode}'"
+                )
             for profile_id in scenario.profiles:
                 if profile_id not in rules.player_profiles:
                     raise ConfigError(

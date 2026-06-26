@@ -113,6 +113,7 @@ class Scenario:
     start_state: str
     record_interval_seconds: int
     outputs: list[str]
+    time_mode: str = "tick"
 
 
 @dataclass
