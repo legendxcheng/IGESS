@@ -15,4 +15,10 @@ Regenerate them and the matching sample JSON exports with:
 .\.venv\Scripts\python tools/create_sample_luban_sources.py
 ```
 
+To export existing workbook edits without rebuilding the workbooks:
+
+```powershell
+.\.venv\Scripts\python -m igess.cli export-tables --datas data-tables/Datas --out examples/shelldiver_v0/luban_exports
+```
+
 The simulator still reads exported JSON from `examples/shelldiver_v0/luban_exports`; these workbooks are the authoring source/template side of the workflow. The sample export rows include `_source` metadata so reports can point back to workbook rows.

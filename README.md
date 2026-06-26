@@ -10,6 +10,7 @@ The v0.1 scope follows `E:\雨林星\立项\炸鱼佬传说\增量经济模拟DS
 py -3.12 -m venv .venv
 .\.venv\Scripts\python -m pip install -e .[dev]
 .\.venv\Scripts\python -m pytest
+.\.venv\Scripts\python -m igess.cli export-tables --datas data-tables/Datas --out examples/shelldiver_v0/luban_exports
 .\.venv\Scripts\python -m igess.cli lint --config examples/shelldiver_v0/economy.yaml --tables examples/shelldiver_v0/luban_exports
 .\.venv\Scripts\python -m igess.cli run --config examples/shelldiver_v0/economy.yaml --tables examples/shelldiver_v0/luban_exports --scenario day_1_progression --out .tmp/sim
 ```
@@ -58,6 +59,7 @@ Sample Luban-style source workbooks are under `data-tables/Datas`. They can be r
 
 ```powershell
 .\.venv\Scripts\python tools/create_sample_luban_sources.py
+.\.venv\Scripts\python -m igess.cli export-tables --datas data-tables/Datas --out examples/shelldiver_v0/luban_exports
 ```
 
 Analytic stepping can be exercised with:

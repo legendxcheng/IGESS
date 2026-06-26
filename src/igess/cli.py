@@ -6,6 +6,7 @@ import sys
 from .builder import ModelBuilder
 from .linter import ConfigError, ConfigLinter
 from .loader import ConfigLoader
+from .luban_exporter import export_registered_workbooks
 from .outputs import OutputWriter
 from .simulator import Simulator
 
@@ -13,6 +14,9 @@ from .simulator import Simulator
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="igess")
     subparsers = parser.add_subparsers(dest="command", required=True)
+    export = subparsers.add_parser("export-tables")
+    export.add_argument("--datas", required=True)
+    export.add_argument("--out", required=True)
     for command in ("lint", "run"):
         sub = subparsers.add_parser(command)
         sub.add_argument("--config", required=True)
@@ -27,6 +31,10 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
+        if args.command == "export-tables":
+            written = export_registered_workbooks(args.datas, args.out)
+            print(f"Exported {len(written)} tables to {args.out}")
+            return 0
         raw = ConfigLoader.load(args.config, args.tables)
         ConfigLinter.validate(raw)
         if args.command == "lint":

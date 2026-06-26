@@ -21,6 +21,12 @@ Regenerate the sample source workbooks and matching sample JSON exports with:
 .\.venv\Scripts\python tools/create_sample_luban_sources.py
 ```
 
+If the workbooks already exist and only the runtime JSON needs regeneration, use the registry-driven exporter:
+
+```powershell
+.\.venv\Scripts\python -m igess.cli export-tables --datas data-tables/Datas --out examples/shelldiver_v0/luban_exports
+```
+
 For v0.1, the sample runtime data lives in:
 
 ```text
@@ -121,7 +127,9 @@ Optional fields:
 
 ## Export Command Contract
 
-Use the existing project Luban export command and point its JSON output directory at the CLI `--tables` argument.
+For the sample project, `igess.cli export-tables` reads `data-tables/Datas/__tables__.xlsx`, follows each registered workbook path, respects the `##var` / `##` / `##type` marker rows, and writes deterministic JSON with `_source` row metadata. It currently supports registry rows with `mode=map` and `key=id`; unsupported modes or keys fail fast. The exporter also removes stale `.json` files from the target directory when they are no longer registered.
+
+In a production project with a full Luban toolchain, use the existing project Luban export command and point its JSON output directory at the CLI `--tables` argument.
 
 Example placeholder:
 
