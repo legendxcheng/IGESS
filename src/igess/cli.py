@@ -4,6 +4,7 @@ import argparse
 import sys
 
 from .builder import ModelBuilder
+from .compare import compare_runs
 from .dashboard import serve_dashboard
 from .linter import ConfigError, ConfigLinter
 from .loader import ConfigLoader
@@ -24,6 +25,10 @@ def build_parser() -> argparse.ArgumentParser:
     report.add_argument("--run", required=True)
     report.add_argument("--out", required=True)
     report.add_argument("--title")
+    compare = subparsers.add_parser("compare")
+    compare.add_argument("--base", required=True)
+    compare.add_argument("--candidate", required=True)
+    compare.add_argument("--out", required=True)
     dashboard = subparsers.add_parser("dashboard")
     dashboard.add_argument("--project", default=".")
     dashboard.add_argument("--config", default="examples/shelldiver_v0/economy.yaml")
@@ -52,6 +57,10 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "report":
             index = generate_static_report(args.run, args.out, args.title)
             print(f"Wrote static report to {index}")
+            return 0
+        if args.command == "compare":
+            index = compare_runs(args.base, args.candidate, args.out)
+            print(f"Wrote comparison report to {index}")
             return 0
         if args.command == "dashboard":
             serve_dashboard(
