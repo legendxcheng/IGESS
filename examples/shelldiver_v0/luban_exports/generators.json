@@ -1,0 +1,38 @@
+[
+  {
+    "id": "fisherman",
+    "name": "Fisherman",
+    "generator_type": "building",
+    "output_resource": "fish",
+    "source_type": "generator",
+    "base_output": "1",
+    "base_cost": "10",
+    "cost_resource": "fish",
+    "cost_growth": "1.15",
+    "unlock_condition": "always"
+  },
+  {
+    "id": "boat",
+    "name": "Boat",
+    "generator_type": "building",
+    "output_resource": "fish",
+    "source_type": "generator",
+    "base_output": "8",
+    "base_cost": "120",
+    "cost_resource": "fish",
+    "cost_growth": "1.17",
+    "unlock_condition": "owned(fisherman) >= 5"
+  },
+  {
+    "id": "net",
+    "name": "Net",
+    "generator_type": "building",
+    "output_resource": "fish",
+    "source_type": "generator",
+    "base_output": "30",
+    "base_cost": "1800",
+    "cost_resource": "fish",
+    "cost_growth": "1.2",
+    "unlock_condition": "owned(boat) >= 3"
+  }
+]

@@ -1,0 +1,112 @@
+model:
+  id: shelldiver_incremental_v0
+  tick_seconds: 1
+  number_backend: bignum_log
+  random_seed: 20260626
+
+formulas:
+  exponential_cost:
+    args: [base_cost, growth, owned]
+    expr: "base_cost * pow(growth, owned)"
+  generator_output:
+    args: [base_output, owned, multiplier]
+    expr: "base_output * owned * multiplier"
+  prestige_gain:
+    args: [progress, divisor, exponent]
+    expr: "floor(pow(progress / divisor, exponent))"
+
+generator_types:
+  building:
+    cost_formula: exponential_cost
+    production_formula: generator_output
+
+source_types:
+  active:
+    description: "Active player actions"
+  generator:
+    description: "Automatic generator output"
+  offline:
+    description: "Offline reward"
+  milestone:
+    description: "Milestone reward"
+  prestige:
+    description: "Prestige reward"
+
+modifier_pipeline:
+  order: [base, flat, add_pct, mult, exp]
+
+modifier_types:
+  flat:
+    stage: flat
+  add_pct:
+    stage: add_pct
+  multiply:
+    stage: mult
+  exponent:
+    stage: exp
+
+behavior_policies:
+  cheap_unlock_first:
+    type: cheap_unlock_first
+  fastest_payback:
+    type: fastest_payback
+    lookahead_depth: 1
+    include_unlock_chain_value: true
+  new_content_bias:
+    type: new_content_bias
+
+session_patterns:
+  short_sessions:
+    offline_every_seconds: 45
+    offline_duration_seconds: 8
+  long_active:
+    offline_every_seconds: 90
+    offline_duration_seconds: 5
+  medium_sessions:
+    offline_every_seconds: 60
+    offline_duration_seconds: 10
+
+player_profiles:
+  casual:
+    source_efficiency:
+      active: 0.45
+      generator: 0.9
+      offline: 1.2
+      milestone: 0.8
+      prestige: 0.8
+    behavior_policy: cheap_unlock_first
+    session_pattern: short_sessions
+    prestige_policy: conservative
+  optimizer:
+    source_efficiency:
+      active: 1.0
+      generator: 1.05
+      offline: 0.7
+      milestone: 1.1
+      prestige: 1.0
+    behavior_policy: fastest_payback
+    session_pattern: long_active
+    prestige_policy: efficient_reset
+  explorer:
+    source_efficiency:
+      active: 0.7
+      generator: 0.95
+      offline: 0.9
+      milestone: 1.0
+      prestige: 0.9
+    behavior_policy: new_content_bias
+    session_pattern: medium_sessions
+    prestige_policy: milestone_based
+
+scenarios:
+  day_1_progression:
+    duration_hours: 0.05
+    profiles: [casual, optimizer, explorer]
+    start_state: new_player
+    record_interval_seconds: 30
+    outputs:
+      - resource_curve
+      - purchase_timeline
+      - unlock_timeline
+      - prestige_timeline
+      - bottleneck_report

@@ -1,0 +1,14 @@
+[
+  {
+    "id": "reef_renown",
+    "name": "Reef Renown",
+    "trigger_resource": "fish",
+    "reward_resource": "prestige_point",
+    "formula": "prestige_gain",
+    "divisor": "600",
+    "exponent": "0.5",
+    "min_gain": "1",
+    "reset_resources": ["fish"],
+    "unlock_condition": "owned(boat) >= 5"
+  }
+]

@@ -1,0 +1,16 @@
+[
+  {
+    "id": "first_boat",
+    "name": "First Boat",
+    "condition": "owned(boat) >= 1",
+    "reward_resource": "fish",
+    "reward_amount": "200"
+  },
+  {
+    "id": "small_fleet",
+    "name": "Small Fleet",
+    "condition": "owned(boat) >= 3",
+    "reward_resource": "fish",
+    "reward_amount": "500"
+  }
+]

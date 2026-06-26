@@ -1,0 +1,32 @@
+[
+  {
+    "id": "fisherman_double",
+    "name": "Fisherman Double",
+    "target": "generator:fisherman.output",
+    "modifier_type": "multiply",
+    "value": "2",
+    "cost_resource": "fish",
+    "base_cost": "500",
+    "unlock_condition": "owned(fisherman) >= 10"
+  },
+  {
+    "id": "boat_flat_bonus",
+    "name": "Boat Flat Bonus",
+    "target": "generator:boat.output",
+    "modifier_type": "flat",
+    "value": "5",
+    "cost_resource": "fish",
+    "base_cost": "900",
+    "unlock_condition": "owned(boat) >= 2"
+  },
+  {
+    "id": "global_generator_bonus",
+    "name": "Global Generator Bonus",
+    "target": "generator:*.output",
+    "modifier_type": "add_pct",
+    "value": "0.5",
+    "cost_resource": "fish",
+    "base_cost": "1500",
+    "unlock_condition": "owned(fisherman) >= 15"
+  }
+]
