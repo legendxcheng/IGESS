@@ -4,6 +4,7 @@ import argparse
 import sys
 
 from .builder import ModelBuilder
+from .dashboard import serve_dashboard
 from .linter import ConfigError, ConfigLinter
 from .loader import ConfigLoader
 from .luban_exporter import export_registered_workbooks
@@ -23,6 +24,13 @@ def build_parser() -> argparse.ArgumentParser:
     report.add_argument("--run", required=True)
     report.add_argument("--out", required=True)
     report.add_argument("--title")
+    dashboard = subparsers.add_parser("dashboard")
+    dashboard.add_argument("--project", default=".")
+    dashboard.add_argument("--config", default="examples/shelldiver_v0/economy.yaml")
+    dashboard.add_argument("--tables", default="examples/shelldiver_v0/luban_exports")
+    dashboard.add_argument("--runs-root")
+    dashboard.add_argument("--host", default="127.0.0.1")
+    dashboard.add_argument("--port", type=int, default=8765)
     for command in ("lint", "run"):
         sub = subparsers.add_parser(command)
         sub.add_argument("--config", required=True)
@@ -44,6 +52,16 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "report":
             index = generate_static_report(args.run, args.out, args.title)
             print(f"Wrote static report to {index}")
+            return 0
+        if args.command == "dashboard":
+            serve_dashboard(
+                project=args.project,
+                config=args.config,
+                tables=args.tables,
+                runs_root=args.runs_root,
+                host=args.host,
+                port=args.port,
+            )
             return 0
         raw = ConfigLoader.load(args.config, args.tables)
         ConfigLinter.validate(raw)
