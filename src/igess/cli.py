@@ -8,6 +8,8 @@ from .linter import ConfigError, ConfigLinter
 from .loader import ConfigLoader
 from .luban_exporter import export_registered_workbooks
 from .outputs import OutputWriter
+from .reporting.loader import ReportLoadError
+from .reporting.static import generate_static_report
 from .simulator import Simulator
 
 
@@ -17,6 +19,10 @@ def build_parser() -> argparse.ArgumentParser:
     export = subparsers.add_parser("export-tables")
     export.add_argument("--datas", required=True)
     export.add_argument("--out", required=True)
+    report = subparsers.add_parser("report")
+    report.add_argument("--run", required=True)
+    report.add_argument("--out", required=True)
+    report.add_argument("--title")
     for command in ("lint", "run"):
         sub = subparsers.add_parser(command)
         sub.add_argument("--config", required=True)
@@ -35,6 +41,10 @@ def main(argv: list[str] | None = None) -> int:
             written = export_registered_workbooks(args.datas, args.out)
             print(f"Exported {len(written)} tables to {args.out}")
             return 0
+        if args.command == "report":
+            index = generate_static_report(args.run, args.out, args.title)
+            print(f"Wrote static report to {index}")
+            return 0
         raw = ConfigLoader.load(args.config, args.tables)
         ConfigLinter.validate(raw)
         if args.command == "lint":
@@ -45,7 +55,7 @@ def main(argv: list[str] | None = None) -> int:
         OutputWriter.write_all(result, args.out, model)
         print(f"Wrote simulation outputs to {args.out}")
         return 0
-    except (ConfigError, FileNotFoundError, KeyError, ValueError) as exc:
+    except (ConfigError, FileNotFoundError, KeyError, ReportLoadError, ValueError) as exc:
         print(f"igess: {exc}", file=sys.stderr)
         return 1
 
