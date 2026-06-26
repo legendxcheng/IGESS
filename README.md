@@ -45,3 +45,9 @@ Deferred from v0.1:
 - Chart visualization.
 
 See [Luban Workflow](docs/luban-workflow.md) for the authoring/export contract.
+
+Sample Luban-style source workbooks are under `data-tables/Datas`. They can be regenerated with:
+
+```powershell
+.\.venv\Scripts\python tools/create_sample_luban_sources.py
+```

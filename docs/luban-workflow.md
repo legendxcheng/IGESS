@@ -2,6 +2,25 @@
 
 The simulator reads Luban export output, not hand-edited Excel files at runtime.
 
+The sample authoring workbooks live in:
+
+```text
+data-tables/Datas/
+  __tables__.xlsx
+  resources.xlsx
+  generators.xlsx
+  upgrades.xlsx
+  constants.xlsx
+  milestones.xlsx
+  prestige_layers.xlsx
+```
+
+Regenerate the sample source workbooks with:
+
+```powershell
+.\.venv\Scripts\python tools/create_sample_luban_sources.py
+```
+
 For v0.1, the sample runtime data lives in:
 
 ```text
