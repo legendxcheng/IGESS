@@ -155,3 +155,12 @@ def test_linter_rejects_non_positive_scenario_timing():
 
     with pytest.raises(ConfigError, match="duration_hours"):
         ConfigLinter.validate(broken)
+
+
+def test_linter_rejects_unknown_prestige_policy():
+    raw = ConfigLoader.load(CONFIG, TABLES)
+    broken = copy.deepcopy(raw)
+    broken.rules.player_profiles["optimizer"].prestige_policy = "panic_reset"
+
+    with pytest.raises(ConfigError, match="unknown prestige_policy"):
+        ConfigLinter.validate(broken)

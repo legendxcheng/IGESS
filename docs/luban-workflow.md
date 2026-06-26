@@ -15,7 +15,7 @@ data-tables/Datas/
   prestige_layers.xlsx
 ```
 
-Regenerate the sample source workbooks with:
+Regenerate the sample source workbooks and matching sample JSON exports with:
 
 ```powershell
 .\.venv\Scripts\python tools/create_sample_luban_sources.py
@@ -34,6 +34,18 @@ examples/shelldiver_v0/luban_exports/
 ```
 
 These JSON files model the shape expected from a Luban export. In a production project, the source tables should be maintained in the project's normal Luban Excel directory and registered through its `__tables__.xlsx`, with shared beans/enums in `__beans__.xlsx` and `__enums__.xlsx` when needed.
+
+Each exported row must include deterministic source metadata so simulator reports can point back to the editable row:
+
+```json
+"_source": {
+  "table": "generators",
+  "workbook": "generators.xlsx",
+  "row": 4
+}
+```
+
+The runtime loader treats `_source` as required metadata and does not infer source rows from JSON ordering.
 
 ## Required Export Tables
 

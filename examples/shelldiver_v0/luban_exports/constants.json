@@ -1,10 +1,20 @@
 [
   {
     "id": "starting_fish",
-    "value": "100"
+    "value": "100",
+    "_source": {
+      "table": "constants",
+      "workbook": "constants.xlsx",
+      "row": 4
+    }
   },
   {
     "id": "starting_prestige_point",
-    "value": "0"
+    "value": "0",
+    "_source": {
+      "table": "constants",
+      "workbook": "constants.xlsx",
+      "row": 5
+    }
   }
 ]

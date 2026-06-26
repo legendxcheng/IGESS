@@ -118,12 +118,16 @@ class PolicyEngine:
             was_unlocked = self._is_unlocked(upgrade.unlock_condition, state)
             now_unlocked = self._is_unlocked(upgrade.unlock_condition, simulated)
             if not was_unlocked and now_unlocked:
-                target = upgrade.target.removeprefix("generator:").removesuffix(".output")
-                if target == "*":
-                    for generator_id in self.model.generators:
-                        bonus += self.generator_total_output(generator_id, simulated)
-                else:
-                    bonus += self.generator_total_output(target, simulated) * SimNumber.parse(upgrade.value)
+                bonus += self._action_benefit(
+                    Action(
+                        kind="buy_upgrade",
+                        item_id=upgrade_id,
+                        cost_resource=upgrade.cost_resource,
+                        cost=self.model.upgrade_cost(upgrade_id),
+                        score=SimNumber.zero(),
+                    ),
+                    simulated,
+                )
         return bonus
 
     def generator_total_output(self, generator_id: str, state: SimulationState) -> SimNumber:

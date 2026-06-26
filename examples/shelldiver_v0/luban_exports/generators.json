@@ -9,7 +9,12 @@
     "base_cost": "10",
     "cost_resource": "fish",
     "cost_growth": "1.15",
-    "unlock_condition": "always"
+    "unlock_condition": "always",
+    "_source": {
+      "table": "generators",
+      "workbook": "generators.xlsx",
+      "row": 4
+    }
   },
   {
     "id": "boat",
@@ -21,7 +26,12 @@
     "base_cost": "120",
     "cost_resource": "fish",
     "cost_growth": "1.17",
-    "unlock_condition": "owned(fisherman) >= 5"
+    "unlock_condition": "owned(fisherman) >= 5",
+    "_source": {
+      "table": "generators",
+      "workbook": "generators.xlsx",
+      "row": 5
+    }
   },
   {
     "id": "net",
@@ -33,6 +43,11 @@
     "base_cost": "1800",
     "cost_resource": "fish",
     "cost_growth": "1.2",
-    "unlock_condition": "owned(boat) >= 3"
+    "unlock_condition": "owned(boat) >= 3",
+    "_source": {
+      "table": "generators",
+      "workbook": "generators.xlsx",
+      "row": 6
+    }
   }
 ]

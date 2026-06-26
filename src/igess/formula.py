@@ -37,7 +37,7 @@ class FormulaEngine:
     @classmethod
     def compile(cls, formula_id: str, args: list[str] | tuple[str, ...], expr: str) -> CompiledFormula:
         try:
-            tree = ast.parse(expr, mode="eval")
+            tree = ast.parse(cls._normalize_expr(expr), mode="eval")
         except SyntaxError as exc:
             raise FormulaCompileError(f"formula {formula_id} syntax error: {exc}") from exc
         allowed_names = set(args)
@@ -46,8 +46,12 @@ class FormulaEngine:
 
     @classmethod
     def referenced_names(cls, expr: str) -> set[str]:
-        tree = ast.parse(expr, mode="eval")
+        tree = ast.parse(cls._normalize_expr(expr), mode="eval")
         return {node.id for node in ast.walk(tree) if isinstance(node, ast.Name)}
+
+    @staticmethod
+    def _normalize_expr(expr: str) -> str:
+        return expr.replace("^", "**")
 
     @classmethod
     def _validate_node(cls, formula_id: str, node: ast.AST, allowed_names: set[str]) -> None:
@@ -73,14 +77,14 @@ class FormulaEngine:
                     )
                 continue
             if isinstance(child, ast.BinOp):
-                if not isinstance(child.op, ast.Add | ast.Sub | ast.Mult | ast.Div | ast.Pow | ast.BitXor):
+                if not isinstance(child.op, ast.Add | ast.Sub | ast.Mult | ast.Div | ast.Pow):
                     raise FormulaCompileError(f"formula {formula_id} disallows operator")
                 continue
             if isinstance(child, ast.UnaryOp):
                 if not isinstance(child.op, ast.UAdd | ast.USub):
                     raise FormulaCompileError(f"formula {formula_id} disallows unary operator")
                 continue
-            if isinstance(child, ast.Add | ast.Sub | ast.Mult | ast.Div | ast.Pow | ast.BitXor | ast.UAdd | ast.USub):
+            if isinstance(child, ast.Add | ast.Sub | ast.Mult | ast.Div | ast.Pow | ast.UAdd | ast.USub):
                 continue
             raise FormulaCompileError(
                 f"formula {formula_id} disallows syntax {child.__class__.__name__}"
@@ -108,7 +112,7 @@ class FormulaEngine:
                 return left * right
             if isinstance(node.op, ast.Div):
                 return left / right
-            if isinstance(node.op, ast.Pow | ast.BitXor):
+            if isinstance(node.op, ast.Pow):
                 return left ** right
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
             fn = cls.ALLOWED_FUNCTIONS[node.func.id]

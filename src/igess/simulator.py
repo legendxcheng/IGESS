@@ -6,6 +6,7 @@ from .numbers import SimNumber
 from .policy import PolicyEngine
 from .schema import EconomyModel, Event, SimulationResult, SimulationState, TimelineRow
 from .time_engine import TimeEngine
+from .trace import action_formula_trace, prestige_formula_trace
 
 
 class Simulator:
@@ -147,13 +148,15 @@ class Simulator:
         for layer in self.model.prestige_layers.values():
             if not evaluate(layer.unlock_condition, lambda item_id: state.generators_owned.get(item_id, 0)):
                 continue
+            if not self._prestige_policy_ready(profile_id, state):
+                continue
             efficiency = profile.source_efficiency.get("prestige", SimNumber.one())
             if efficiency <= SimNumber.zero():
                 continue
             exponent = SimNumber.parse(layer.exponent)
             if exponent <= SimNumber.zero():
                 continue
-            required_raw_gain = (SimNumber.parse(layer.min_gain) / efficiency).ceil()
+            required_raw_gain = (self._required_prestige_gain(profile_id, layer) / efficiency).ceil()
             threshold = SimNumber.parse(layer.divisor) * (
                 required_raw_gain ** (SimNumber.one() / exponent)
             )
@@ -256,6 +259,12 @@ class Simulator:
             action = self.policy.choose_action(profile_id, state)
             if action is None:
                 return
+            details = {
+                "cost": action.cost.to_decimal_string(),
+                "resource": action.cost_resource,
+                **self.model.source_details(action.kind, action.item_id),
+                "formula_trace": action_formula_trace(self.model, action, state),
+            }
             self.policy.apply_action(action, state)
             events.append(
                 Event(
@@ -264,10 +273,7 @@ class Simulator:
                     time_seconds=current_time,
                     kind=action.kind,
                     item_id=action.item_id,
-                    details={
-                        "cost": action.cost.to_decimal_string(),
-                        "resource": action.cost_resource,
-                    },
+                    details=details,
                 )
             )
             purchases_this_tick += 1
@@ -300,6 +306,7 @@ class Simulator:
                     {
                         "amount": reward.to_decimal_string(),
                         "reward_resource": milestone.reward_resource,
+                        **self.model.source_details("milestone", milestone_id),
                     },
                 )
             )
@@ -325,8 +332,11 @@ class Simulator:
                 }
             )
             gain = gain * efficiency
-            if gain < SimNumber.parse(layer.min_gain):
+            if not self._prestige_policy_ready(profile_id, state):
                 continue
+            if gain < self._required_prestige_gain(profile_id, layer):
+                continue
+            formula_trace = prestige_formula_trace(self.model, layer_id, state)
             for resource_id in layer.reset_resources:
                 state.resources[resource_id] = SimNumber.zero()
             state.resources[layer.reward_resource] = state.resources[layer.reward_resource] + gain
@@ -342,9 +352,24 @@ class Simulator:
                         "gain": gain.to_decimal_string(),
                         "reward_resource": layer.reward_resource,
                         "reset_resources": ",".join(layer.reset_resources),
+                        **self.model.source_details("prestige", layer_id),
+                        "formula_trace": formula_trace,
                     },
                 )
             )
+
+    def _required_prestige_gain(self, profile_id: str, layer) -> SimNumber:
+        required = SimNumber.parse(layer.min_gain)
+        profile = self.model.player_profiles[profile_id]
+        if profile.prestige_policy == "conservative":
+            return required * SimNumber.parse("2")
+        return required
+
+    def _prestige_policy_ready(self, profile_id: str, state: SimulationState) -> bool:
+        profile = self.model.player_profiles[profile_id]
+        if profile.prestige_policy != "milestone_based":
+            return True
+        return set(self.model.milestones).issubset(state.milestones_claimed)
 
     def _update_unlocks(
         self,
@@ -366,7 +391,7 @@ class Simulator:
                         current_time,
                         "unlock_generator",
                         generator_id,
-                        {},
+                        self.model.source_details("generator", generator_id),
                     )
                 )
         for upgrade_id, upgrade in self.model.upgrades.items():
@@ -381,7 +406,7 @@ class Simulator:
                         current_time,
                         "unlock_upgrade",
                         upgrade_id,
-                        {},
+                        self.model.source_details("upgrade", upgrade_id),
                     )
                 )
 
@@ -398,13 +423,8 @@ class Simulator:
             },
             generators_owned={key: state.generators_owned[key] for key in sorted(state.generators_owned)},
             upgrades_purchased=sorted(state.upgrades_purchased),
-            total_cps=self._total_cps(state).to_decimal_string(),
+            total_cps=self._total_cps(profile_id, state).to_decimal_string(),
         )
 
-    def _total_cps(self, state: SimulationState) -> SimNumber:
-        total = SimNumber.zero()
-        for generator_id in self.model.generators:
-            total += ModifierStack.apply_generator_output(
-                self.model, state, generator_id, state.generators_owned[generator_id]
-            )
-        return total
+    def _total_cps(self, profile_id: str, state: SimulationState) -> SimNumber:
+        return sum(self._resource_cps(profile_id, state).values(), SimNumber.zero())

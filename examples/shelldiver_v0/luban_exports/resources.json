@@ -2,11 +2,21 @@
   {
     "id": "fish",
     "name": "Fish",
-    "dimension": "fish"
+    "dimension": "fish",
+    "_source": {
+      "table": "resources",
+      "workbook": "resources.xlsx",
+      "row": 4
+    }
   },
   {
     "id": "prestige_point",
     "name": "Prestige Point",
-    "dimension": "prestige"
+    "dimension": "prestige",
+    "_source": {
+      "table": "resources",
+      "workbook": "resources.xlsx",
+      "row": 5
+    }
   }
 ]

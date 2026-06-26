@@ -41,7 +41,7 @@ Implemented now:
 - Simple prestige conversion and configured resource reset.
 - Fixed tick simulation plus analytic next-event stepping for stable intervals.
 - JSON, CSV, and Markdown outputs.
-- Payback, bottleneck, invalid-content, and overpowered-content analysis artifacts.
+- Payback, bottleneck, invalid-content, and overpowered-content analysis artifacts with source-row and formula traces.
 - Windows sample runner: `.\scripts\run_sample.ps1`.
 
 Deferred from v0.1:

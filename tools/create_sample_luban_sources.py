@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
+from openpyxl import load_workbook
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
 
 
 ROOT = Path(__file__).resolve().parents[1]
 DATAS = ROOT / "data-tables" / "Datas"
+EXPORTS = ROOT / "examples" / "shelldiver_v0" / "luban_exports"
 
 
 def write_workbook(path: Path, headers: list[str], comments: list[str], types: list[str], rows: list[list]):
@@ -32,6 +35,35 @@ def write_workbook(path: Path, headers: list[str], comments: list[str], types: l
         sheet.column_dimensions[column[0].column_letter].width = min(max(max_length + 2, 12), 42)
     path.parent.mkdir(parents=True, exist_ok=True)
     workbook.save(path)
+
+
+def export_workbook_to_json(workbook_path: Path, output_path: Path) -> None:
+    workbook = load_workbook(workbook_path, read_only=True, data_only=True)
+    sheet = workbook.active
+    headers = [cell.value for cell in sheet[1]][1:]
+    types = [cell.value for cell in sheet[3]][1:]
+    rows = []
+    for row_index, values in enumerate(sheet.iter_rows(min_row=4, values_only=True), start=4):
+        payload = {}
+        for header, field_type, value in zip(headers, types, values[1:]):
+            if value is None:
+                value = ""
+            if str(field_type).startswith("(list"):
+                payload[str(header)] = [part for part in str(value).split(";") if part]
+            else:
+                payload[str(header)] = str(value)
+        payload["_source"] = {
+            "table": workbook_path.stem,
+            "workbook": workbook_path.name,
+            "row": row_index,
+        }
+        rows.append(payload)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(
+        json.dumps(rows, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+        newline="\n",
+    )
 
 
 def main() -> None:
@@ -155,6 +187,10 @@ def main() -> None:
         ["string", "string", "string", "string", "string", "string", "string", "string", "(list#sep=;),string", "string"],
         [["reef_renown", "Reef Renown", "fish", "prestige_point", "prestige_gain", "600", "0.5", "1", "fish", "owned(boat) >= 5"]],
     )
+    for workbook_path in sorted(DATAS.glob("*.xlsx")):
+        if workbook_path.name.startswith("__"):
+            continue
+        export_workbook_to_json(workbook_path, EXPORTS / f"{workbook_path.stem}.json")
 
 
 if __name__ == "__main__":

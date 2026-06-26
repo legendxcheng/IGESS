@@ -7,7 +7,12 @@
     "value": "2",
     "cost_resource": "fish",
     "base_cost": "500",
-    "unlock_condition": "owned(fisherman) >= 10"
+    "unlock_condition": "owned(fisherman) >= 10",
+    "_source": {
+      "table": "upgrades",
+      "workbook": "upgrades.xlsx",
+      "row": 4
+    }
   },
   {
     "id": "boat_flat_bonus",
@@ -17,7 +22,12 @@
     "value": "5",
     "cost_resource": "fish",
     "base_cost": "900",
-    "unlock_condition": "owned(boat) >= 2"
+    "unlock_condition": "owned(boat) >= 2",
+    "_source": {
+      "table": "upgrades",
+      "workbook": "upgrades.xlsx",
+      "row": 5
+    }
   },
   {
     "id": "global_generator_bonus",
@@ -27,6 +37,11 @@
     "value": "0.5",
     "cost_resource": "fish",
     "base_cost": "1500",
-    "unlock_condition": "owned(fisherman) >= 15"
+    "unlock_condition": "owned(fisherman) >= 15",
+    "_source": {
+      "table": "upgrades",
+      "workbook": "upgrades.xlsx",
+      "row": 6
+    }
   }
 ]

@@ -12,6 +12,7 @@ class ConfigError(ValueError):
 class ConfigLinter:
     ALLOWED_BACKENDS = {"bignum_log", "native_double", "big_int"}
     ALLOWED_POLICY_TYPES = {"cheap_unlock_first", "fastest_payback", "new_content_bias"}
+    ALLOWED_PRESTIGE_POLICIES = {"conservative", "efficient_reset", "milestone_based"}
     FORMULA_CONTEXT_ARGS = {
         "cost_formula": {"base_cost", "growth", "owned"},
         "production_formula": {"base_output", "owned", "multiplier"},
@@ -127,6 +128,10 @@ class ConfigLinter:
             if profile.session_pattern not in rules.session_patterns:
                 raise ConfigError(
                     f"profile '{profile_id}' unknown session_pattern '{profile.session_pattern}'"
+                )
+            if profile.prestige_policy not in cls.ALLOWED_PRESTIGE_POLICIES:
+                raise ConfigError(
+                    f"profile '{profile_id}' unknown prestige_policy '{profile.prestige_policy}'"
                 )
             for source_type in profile.source_efficiency:
                 if source_type not in rules.source_types:

@@ -21,6 +21,20 @@ class ModelSettings:
     random_seed: int | None
 
 
+@dataclass(frozen=True)
+class SourceRef:
+    table: str
+    workbook: str
+    row: int
+
+    def to_details(self) -> dict[str, str]:
+        return {
+            "source_table": self.table,
+            "source_workbook": self.workbook,
+            "source_row": str(self.row),
+        }
+
+
 @dataclass
 class Rules:
     model: ModelSettings
@@ -40,6 +54,7 @@ class ResourceRow:
     id: str
     name: str
     dimension: str
+    source_ref: SourceRef | None = None
 
 
 @dataclass
@@ -54,6 +69,7 @@ class GeneratorRow:
     cost_resource: str
     cost_growth: str
     unlock_condition: str = "always"
+    source_ref: SourceRef | None = None
 
 
 @dataclass
@@ -66,12 +82,14 @@ class UpgradeRow:
     cost_resource: str
     base_cost: str
     unlock_condition: str = "always"
+    source_ref: SourceRef | None = None
 
 
 @dataclass
 class ConstantRow:
     id: str
     value: str
+    source_ref: SourceRef | None = None
 
 
 @dataclass
@@ -81,6 +99,7 @@ class MilestoneRow:
     condition: str
     reward_resource: str
     reward_amount: str
+    source_ref: SourceRef | None = None
 
 
 @dataclass
@@ -95,6 +114,7 @@ class PrestigeLayerRow:
     min_gain: str
     reset_resources: list[str]
     unlock_condition: str = "always"
+    source_ref: SourceRef | None = None
 
 
 @dataclass
@@ -179,6 +199,22 @@ class EconomyModel:
 
     def upgrade_cost(self, upgrade_id: str) -> SimNumber:
         return SimNumber.parse(self.upgrades[upgrade_id].base_cost)
+
+    def source_details(self, kind: str, item_id: str) -> dict[str, str]:
+        item_kind = kind.removeprefix("buy_").removeprefix("unlock_")
+        if item_kind == "generator":
+            row = self.generators.get(item_id)
+        elif item_kind == "upgrade":
+            row = self.upgrades.get(item_id)
+        elif item_kind == "milestone":
+            row = self.milestones.get(item_id)
+        elif item_kind == "prestige":
+            row = self.prestige_layers.get(item_id)
+        else:
+            row = None
+        if row is None or row.source_ref is None:
+            return {}
+        return row.source_ref.to_details()
 
 
 @dataclass

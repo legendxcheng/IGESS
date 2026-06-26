@@ -4,13 +4,23 @@
     "name": "First Boat",
     "condition": "owned(boat) >= 1",
     "reward_resource": "fish",
-    "reward_amount": "200"
+    "reward_amount": "200",
+    "_source": {
+      "table": "milestones",
+      "workbook": "milestones.xlsx",
+      "row": 4
+    }
   },
   {
     "id": "small_fleet",
     "name": "Small Fleet",
     "condition": "owned(boat) >= 3",
     "reward_resource": "fish",
-    "reward_amount": "500"
+    "reward_amount": "500",
+    "_source": {
+      "table": "milestones",
+      "workbook": "milestones.xlsx",
+      "row": 5
+    }
   }
 ]

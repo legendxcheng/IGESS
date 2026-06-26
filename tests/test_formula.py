@@ -22,6 +22,16 @@ def test_formula_engine_compiles_and_evaluates_exponential_cost():
     assert result.to_decimal_string() == "13.225"
 
 
+def test_formula_engine_treats_caret_as_exponent_with_math_precedence():
+    compiled = FormulaEngine.compile(
+        formula_id="caret_power",
+        args=[],
+        expr="2 + 3 ^ 2",
+    )
+
+    assert compiled({}).to_decimal_string() == "11"
+
+
 @pytest.mark.parametrize(
     "expr",
     [

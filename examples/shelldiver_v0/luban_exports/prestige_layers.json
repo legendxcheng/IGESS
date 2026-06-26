@@ -8,7 +8,14 @@
     "divisor": "600",
     "exponent": "0.5",
     "min_gain": "1",
-    "reset_resources": ["fish"],
-    "unlock_condition": "owned(boat) >= 5"
+    "reset_resources": [
+      "fish"
+    ],
+    "unlock_condition": "owned(boat) >= 5",
+    "_source": {
+      "table": "prestige_layers",
+      "workbook": "prestige_layers.xlsx",
+      "row": 4
+    }
   }
 ]

@@ -107,6 +107,11 @@ class OutputWriter:
             "cost",
             "delta_cps",
             "payback_seconds",
+            "source_table",
+            "source_workbook",
+            "source_row",
+            "source_ref",
+            "formula_trace",
         ]
         with path.open("w", encoding="utf-8", newline="") as handle:
             writer = csv.DictWriter(handle, fieldnames=fieldnames, lineterminator="\n")

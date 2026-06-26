@@ -6,6 +6,7 @@ from .conditions import evaluate
 from .numbers import SimNumber
 from .modifiers import ModifierStack
 from .schema import EconomyModel, SimulationResult, SimulationState, TimelineRow
+from .trace import action_formula_trace, source_ref_label
 
 
 class Analyzer:
@@ -102,7 +103,8 @@ class Analyzer:
         if payback:
             for row in payback[:20]:
                 lines.append(
-                    f"- `{row['profile_id']}` {row['kind']} `{row['item_id']}`: {row['payback_seconds']}s"
+                    f"- `{row['profile_id']}` {row['kind']} `{row['item_id']}`: "
+                    f"{row['payback_seconds']}s, source `{row['source_ref']}`"
                 )
             if len(payback) > 20:
                 lines.append(f"- ... {len(payback) - 20} more")
@@ -145,6 +147,9 @@ class Analyzer:
                         "cost": action.cost.to_decimal_string(),
                         "delta_cps": benefit.to_decimal_string(),
                         "payback_seconds": payback,
+                        **model.source_details(action.kind, action.item_id),
+                        "source_ref": source_ref_label(model, action.kind, action.item_id),
+                        "formula_trace": action_formula_trace(model, action, state),
                     }
                 )
         return sorted(rows, key=lambda row: (row["profile_id"], row["kind"], row["item_id"]))

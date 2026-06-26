@@ -19,6 +19,7 @@ from .schema import (
     ResourceRow,
     Rules,
     Scenario,
+    SourceRef,
     UpgradeRow,
 )
 
@@ -97,7 +98,22 @@ class ConfigLoader:
     @classmethod
     def _load_table(cls, path: Path, row_type: type) -> list:
         rows = json.loads(path.read_text(encoding="utf-8"))
-        return [row_type(**row) for row in sorted(rows, key=lambda item: item["id"])]
+        loaded = []
+        for row in rows:
+            source = row.pop("_source", None)
+            if source is None:
+                raise ValueError(f"{path} row '{row.get('id')}' is missing _source metadata")
+            loaded.append(
+                row_type(
+                    **row,
+                    source_ref=SourceRef(
+                        table=str(source["table"]),
+                        workbook=str(source["workbook"]),
+                        row=int(source["row"]),
+                    ),
+                )
+            )
+        return sorted(loaded, key=lambda item: item.id)
 
     @classmethod
     def _load_optional_table(cls, path: Path, row_type: type) -> list:
