@@ -85,7 +85,7 @@ Sample configuration lives under `examples/shelldiver_v0/`:
 6. `PolicyEngine` chooses purchases after each production step.
 7. `Simulator` applies offline reward pulses, milestone rewards, and simple prestige/reset when configured.
 8. `Analyzer` summarizes output.
-9. `outputs.py` writes deterministic timeline/report artifacts.
+9. `outputs.py` writes deterministic timeline, event, payback, and report artifacts.
 
 ## Error Handling
 
@@ -101,7 +101,8 @@ The implementation follows TDD:
 - `tests/test_formula.py`: safe compile/evaluate behavior and rejection of unsafe expressions.
 - `tests/test_linter_builder.py`: successful sample model build plus id/formula/modifier validation failures.
 - `tests/test_modifiers_policy.py`: modifier pipeline result and policy ordering, including fastest-payback lookahead.
-- `tests/test_simulator_outputs.py`: deterministic run, JSON/CSV/Markdown output, profile differences, and CLI smoke test.
+- `tests/test_simulator_outputs.py`: deterministic run, JSON/CSV/Markdown output, analysis artifacts, profile differences, and CLI smoke test.
+- `tests/test_analyzer.py`: model-backed payback details such as source-efficiency-adjusted marginal CPS.
 
 Full verification command:
 

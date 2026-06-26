@@ -34,7 +34,7 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         model = ModelBuilder.build(raw)
         result = Simulator(model).run_scenario(args.scenario)
-        OutputWriter.write_all(result, args.out)
+        OutputWriter.write_all(result, args.out, model)
         print(f"Wrote simulation outputs to {args.out}")
         return 0
     except (ConfigError, FileNotFoundError, KeyError, ValueError) as exc:

@@ -5,20 +5,24 @@ import json
 from pathlib import Path
 
 from .analyzer import Analyzer
-from .schema import SimulationResult
+from .schema import EconomyModel, SimulationResult
 
 
 class OutputWriter:
     @classmethod
-    def write_all(cls, result: SimulationResult, output_dir: str | Path) -> None:
+    def write_all(
+        cls, result: SimulationResult, output_dir: str | Path, model: EconomyModel | None = None
+    ) -> None:
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
         cls.write_json(result, output_dir / "timeline.json")
         cls.write_csv(result, output_dir / "timeline.csv")
         cls.write_events_json(result, output_dir / "events.json")
         cls.write_events_csv(result, output_dir / "events.csv")
+        cls.write_analysis_json(result, model, output_dir / "analysis.json")
+        cls.write_payback_csv(result, model, output_dir / "payback.csv")
         (output_dir / "analysis.md").write_text(
-            Analyzer.markdown(result), encoding="utf-8", newline="\n"
+            Analyzer.markdown(result, model), encoding="utf-8", newline="\n"
         )
 
     @classmethod
@@ -79,3 +83,33 @@ class OutputWriter:
                 data = event.to_ordered_dict()
                 data["details"] = json.dumps(data["details"], ensure_ascii=False, sort_keys=True)
                 writer.writerow(data)
+
+    @classmethod
+    def write_analysis_json(
+        cls, result: SimulationResult, model: EconomyModel | None, path: Path
+    ) -> None:
+        payload = Analyzer.report(result, model)
+        path.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+
+    @classmethod
+    def write_payback_csv(
+        cls, result: SimulationResult, model: EconomyModel | None, path: Path
+    ) -> None:
+        rows = Analyzer.payback_report(result, model) if model is not None else []
+        fieldnames = [
+            "profile_id",
+            "kind",
+            "item_id",
+            "cost",
+            "delta_cps",
+            "payback_seconds",
+        ]
+        with path.open("w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=fieldnames, lineterminator="\n")
+            writer.writeheader()
+            for row in rows:
+                writer.writerow(row)

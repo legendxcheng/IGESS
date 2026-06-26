@@ -14,7 +14,13 @@ py -3.12 -m venv .venv
 .\.venv\Scripts\python -m igess.cli run --config examples/shelldiver_v0/economy.yaml --tables examples/shelldiver_v0/luban_exports --scenario day_1_progression --out .tmp/sim
 ```
 
-Outputs are deterministic JSON, CSV, and Markdown files.
+Outputs are deterministic JSON, CSV, and Markdown files:
+
+- `timeline.json` / `timeline.csv`
+- `events.json` / `events.csv`
+- `analysis.json`
+- `analysis.md`
+- `payback.csv`
 
 ## v0.1 Scope
 
@@ -34,6 +40,7 @@ Implemented now:
 - Simple prestige conversion and configured resource reset.
 - Fixed tick simulation and an explicit `analytic_leap` placeholder for later.
 - JSON, CSV, and Markdown outputs.
+- Payback, bottleneck, invalid-content, and overpowered-content analysis artifacts.
 - Windows sample runner: `.\scripts\run_sample.ps1`.
 
 Deferred from v0.1:
