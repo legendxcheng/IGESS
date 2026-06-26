@@ -40,6 +40,7 @@ def test_simulator_runs_all_profiles_deterministically(tmp_path):
         "analysis.json",
         "payback.csv",
         "analysis.md",
+        "run_manifest.json",
     ]
     for artifact in artifacts:
         first_bytes = (first_output / artifact).read_bytes()
@@ -97,6 +98,23 @@ def test_simulator_runs_all_profiles_deterministically(tmp_path):
     assert "Never purchased" in report
     assert "purchase share" in report
     assert "casual" in report
+    manifest = json.loads((first_output / "run_manifest.json").read_text(encoding="utf-8"))
+    assert manifest == {
+        "schema_version": 1,
+        "scenario_id": "day_1_progression",
+        "model_id": "shelldiver_incremental_v0",
+        "profiles": ["casual", "explorer", "optimizer"],
+        "artifacts": [
+            "analysis.json",
+            "analysis.md",
+            "events.csv",
+            "events.json",
+            "payback.csv",
+            "timeline.csv",
+            "timeline.json",
+        ],
+        "overrides": [],
+    }
 
 
 def test_cli_lint_and_run_smoke(tmp_path):

@@ -11,7 +11,11 @@ from .schema import EconomyModel, SimulationResult
 class OutputWriter:
     @classmethod
     def write_all(
-        cls, result: SimulationResult, output_dir: str | Path, model: EconomyModel | None = None
+        cls,
+        result: SimulationResult,
+        output_dir: str | Path,
+        model: EconomyModel | None = None,
+        overrides: list[str] | None = None,
     ) -> None:
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -23,6 +27,37 @@ class OutputWriter:
         cls.write_payback_csv(result, model, output_dir / "payback.csv")
         (output_dir / "analysis.md").write_text(
             Analyzer.markdown(result, model), encoding="utf-8", newline="\n"
+        )
+        cls.write_manifest(result, model, output_dir / "run_manifest.json", overrides or [])
+
+    @classmethod
+    def write_manifest(
+        cls,
+        result: SimulationResult,
+        model: EconomyModel | None,
+        path: Path,
+        overrides: list[str],
+    ) -> None:
+        payload = {
+            "schema_version": 1,
+            "scenario_id": result.scenario_id,
+            "model_id": model.config.model_id if model is not None else None,
+            "profiles": sorted({row.profile_id for row in result.timeline}),
+            "artifacts": [
+                "analysis.json",
+                "analysis.md",
+                "events.csv",
+                "events.json",
+                "payback.csv",
+                "timeline.csv",
+                "timeline.json",
+            ],
+            "overrides": list(overrides),
+        }
+        path.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+            newline="\n",
         )
 
     @classmethod
