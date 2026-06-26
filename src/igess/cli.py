@@ -6,6 +6,8 @@ import sys
 from .builder import ModelBuilder
 from .compare import compare_runs
 from .dashboard import serve_dashboard
+from .doctor import format_doctor_report, run_doctor
+from .explain import explain_event, format_event_explanation
 from .gates import evaluate_gates
 from .linter import ConfigError, ConfigLinter
 from .loader import ConfigLoader
@@ -15,6 +17,7 @@ from .reporting.loader import ReportLoadError
 from .reporting.static import generate_static_report
 from .scan import run_scan
 from .simulator import Simulator
+from .templates import init_project
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -42,6 +45,16 @@ def build_parser() -> argparse.ArgumentParser:
     gate.add_argument("--candidate", required=True)
     gate.add_argument("--config", required=True)
     gate.add_argument("--out", required=True)
+    init = subparsers.add_parser("init")
+    init.add_argument("--template", default="incremental-basic")
+    init.add_argument("--out", required=True)
+    doctor = subparsers.add_parser("doctor")
+    doctor.add_argument("--project", default=".")
+    doctor.add_argument("--config", default="examples/shelldiver_v0/economy.yaml")
+    doctor.add_argument("--tables", default="examples/shelldiver_v0/luban_exports")
+    explain = subparsers.add_parser("explain")
+    explain.add_argument("--run", required=True)
+    explain.add_argument("--event", required=True)
     dashboard = subparsers.add_parser("dashboard")
     dashboard.add_argument("--project", default=".")
     dashboard.add_argument("--config", default="examples/shelldiver_v0/economy.yaml")
@@ -86,6 +99,18 @@ def main(argv: list[str] | None = None) -> int:
                 return 0
             print(f"Regression gates failed; wrote results to {result.output_dir}")
             return 1
+        if args.command == "init":
+            path = init_project(args.template, args.out)
+            print(f"Initialized IGESS project at {path}")
+            return 0
+        if args.command == "doctor":
+            report = run_doctor(args.project, args.config, args.tables)
+            print(format_doctor_report(report))
+            return 0 if report.ok else 1
+        if args.command == "explain":
+            explanation = explain_event(args.run, args.event)
+            print(format_event_explanation(explanation))
+            return 0
         if args.command == "dashboard":
             serve_dashboard(
                 project=args.project,
