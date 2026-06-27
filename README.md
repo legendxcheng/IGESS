@@ -5,9 +5,9 @@ simulating, reporting, comparing, and regression-checking idle / incremental gam
 economies from YAML rules plus Luban-export-style data tables.
 
 The original v0.1 scope follows `E:\雨林星\立项\炸鱼佬传说\增量经济模拟DSL交接文档.md`.
-The current implementation is v0.4 and includes Web reports, a local dashboard,
-run comparison, parameter scanning, regression gates, and project ergonomics
-commands.
+The current implementation is v0.5 and includes Web reports, a local dashboard,
+run comparison, parameter scanning, regression gates, project ergonomics
+commands, and Agent Analyst advice artifacts.
 
 ## Quick Start
 
@@ -121,6 +121,37 @@ returns exit code `1` when thresholds fail.
 `explain` traces an event from a run artifact back to source metadata and formula
 details when available.
 
+## v0.5 Agent Analyst
+
+v0.5 adds an Agent-operated analysis loop. Agents can run, review, compare, and
+recommend, while human designers keep ownership of bulk Luban/Excel table edits.
+Agent commands write advice artifacts and YAML proposals; they do not apply table
+changes.
+
+Run the full advice workflow:
+
+```powershell
+.\.venv\Scripts\python -m igess.cli advise --config examples/shelldiver_v0/economy.yaml --tables examples/shelldiver_v0/luban_exports --scenario day_1_progression --out .tmp/advice
+```
+
+Review an existing run without rerunning simulation:
+
+```powershell
+.\.venv\Scripts\python -m igess.cli review-run --run .tmp/advice/run --out .tmp/review
+```
+
+Create and apply a YAML-only plan after human approval:
+
+```powershell
+.\.venv\Scripts\python -m igess.cli yaml-plan --config examples/shelldiver_v0/economy.yaml --intent "Add early regression gates" --out .tmp/yaml_plan
+.\.venv\Scripts\python -m igess.cli yaml-apply --config examples/shelldiver_v0/economy.yaml --plan .tmp/yaml_plan/yaml_plan.json --approve --tables examples/shelldiver_v0/luban_exports
+```
+
+`advice.json` and `advice.md` include findings, artifact evidence, human-only
+table recommendations, and YAML recommendations that require explicit approval.
+The dashboard also exposes an Agent Analyst panel backed by the same advice
+artifacts.
+
 ## Implemented Scope
 
 Implemented now:
@@ -148,6 +179,7 @@ Implemented now:
 - Parameter scanning with `scan`.
 - Regression gates with `gate`.
 - Project initialization, diagnostics, and event explanation with `init`, `doctor`, and `explain`.
+- Agent Analyst workflow with `advise`, `review-run`, `yaml-plan`, and `yaml-apply`.
 - Windows sample runner: `.\scripts\run_sample.ps1`.
 
 Still deferred:

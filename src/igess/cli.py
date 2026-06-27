@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import sys
 
+from .advice import review_run, run_advise
 from .builder import ModelBuilder
 from .compare import compare_runs
 from .dashboard import serve_dashboard
@@ -18,6 +19,7 @@ from .reporting.static import generate_static_report
 from .scan import run_scan
 from .simulator import Simulator
 from .templates import init_project
+from .yaml_plan import PlanValidationError, apply_yaml_plan, create_yaml_plan
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -45,6 +47,25 @@ def build_parser() -> argparse.ArgumentParser:
     gate.add_argument("--candidate", required=True)
     gate.add_argument("--config", required=True)
     gate.add_argument("--out", required=True)
+    advise = subparsers.add_parser("advise")
+    advise.add_argument("--config", required=True)
+    advise.add_argument("--tables", required=True)
+    advise.add_argument("--scenario", required=True)
+    advise.add_argument("--out", required=True)
+    advise.add_argument("--baseline")
+    review = subparsers.add_parser("review-run")
+    review.add_argument("--run", required=True)
+    review.add_argument("--out", required=True)
+    review.add_argument("--baseline")
+    yaml_plan = subparsers.add_parser("yaml-plan")
+    yaml_plan.add_argument("--config", required=True)
+    yaml_plan.add_argument("--intent", required=True)
+    yaml_plan.add_argument("--out", required=True)
+    yaml_apply = subparsers.add_parser("yaml-apply")
+    yaml_apply.add_argument("--config", required=True)
+    yaml_apply.add_argument("--plan", required=True)
+    yaml_apply.add_argument("--approve", action="store_true")
+    yaml_apply.add_argument("--tables")
     init = subparsers.add_parser("init")
     init.add_argument("--template", default="incremental-basic")
     init.add_argument("--out", required=True)
@@ -99,6 +120,22 @@ def main(argv: list[str] | None = None) -> int:
                 return 0
             print(f"Regression gates failed; wrote results to {result.output_dir}")
             return 1
+        if args.command == "advise":
+            advice = run_advise(args.config, args.tables, args.scenario, args.out, args.baseline)
+            print(f"Wrote advice to {args.out} ({advice['status']})")
+            return 0
+        if args.command == "review-run":
+            advice = review_run(args.run, args.out, args.baseline)
+            print(f"Wrote advice to {args.out} ({advice['status']})")
+            return 0
+        if args.command == "yaml-plan":
+            create_yaml_plan(args.config, args.intent, args.out)
+            print(f"Wrote YAML plan to {args.out}")
+            return 0
+        if args.command == "yaml-apply":
+            result = apply_yaml_plan(args.config, args.plan, approve=args.approve, tables=args.tables)
+            print(f"Applied YAML plan to {result['config']}")
+            return 0
         if args.command == "init":
             path = init_project(args.template, args.out)
             print(f"Initialized IGESS project at {path}")
@@ -131,7 +168,14 @@ def main(argv: list[str] | None = None) -> int:
         OutputWriter.write_all(result, args.out, model)
         print(f"Wrote simulation outputs to {args.out}")
         return 0
-    except (ConfigError, FileNotFoundError, KeyError, ReportLoadError, ValueError) as exc:
+    except (
+        ConfigError,
+        FileNotFoundError,
+        KeyError,
+        PlanValidationError,
+        ReportLoadError,
+        ValueError,
+    ) as exc:
         print(f"igess: {exc}", file=sys.stderr)
         return 1
 

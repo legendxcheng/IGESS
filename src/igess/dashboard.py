@@ -12,6 +12,8 @@ from .workflows import WorkflowService
 def render_dashboard_home(service: WorkflowService, config: str | Path, tables: str | Path) -> str:
     lint = service.lint(config, tables)
     runs = service.list_runs()
+    advice = service.latest_advice()
+    advice_html = _advice_panel(advice)
     run_rows = "\n".join(
         "        <tr>"
         f"<td>{_e(record.run_id)}</td>"
@@ -62,6 +64,18 @@ def render_dashboard_home(service: WorkflowService, config: str | Path, tables: 
         <br>
         <button type="submit">Run</button>
       </form>
+    </section>
+    <section>
+      <h2>Agent Analyst</h2>
+      <form action="/advise" method="get">
+        <input type="hidden" name="config" value="{_e(config)}">
+        <input type="hidden" name="tables" value="{_e(tables)}">
+        <label for="advice-scenario">Scenario</label>
+        <input id="advice-scenario" name="scenario" value="day_1_progression">
+        <br>
+        <button type="submit">Run Advice</button>
+      </form>
+      {advice_html}
     </section>
     <section>
       <h2>Run History</h2>
@@ -117,6 +131,16 @@ def _handler(service: WorkflowService, config: str | Path, tables: str | Path):
                 self.send_header("Location", "/")
                 self.end_headers()
                 return
+            if parsed.path == "/advise":
+                query = parse_qs(parsed.query)
+                scenario = query.get("scenario", ["day_1_progression"])[0]
+                run_config = query.get("config", [str(config)])[0]
+                run_tables = query.get("tables", [str(tables)])[0]
+                service.run_advice(run_config, run_tables, scenario)
+                self.send_response(303)
+                self.send_header("Location", "/")
+                self.end_headers()
+                return
             if parsed.path.startswith("/reports/"):
                 self._send_report_file(parsed.path.removeprefix("/reports/"))
                 return
@@ -159,6 +183,30 @@ def _handler(service: WorkflowService, config: str | Path, tables: str | Path):
             self.wfile.write(body)
 
     return DashboardHandler
+
+
+def _advice_panel(advice: dict | None) -> str:
+    if advice is None:
+        return "<p>Latest advice: none yet.</p>"
+    findings = advice.get("findings", [])
+    recommendations = advice.get("table_recommendations", [])
+    finding_items = "".join(
+        f"<li>{_e(item.get('category'))}: {_e(item.get('message'))}</li>" for item in findings[:5]
+    )
+    rec_items = "".join(
+        f"<li>{_e(item.get('workbook'))} {_e(item.get('row_id'))} {_e(item.get('field'))}</li>"
+        for item in recommendations[:5]
+    )
+    if not finding_items:
+        finding_items = "<li>No findings.</li>"
+    if not rec_items:
+        rec_items = "<li>No table recommendations.</li>"
+    return (
+        f"<p>Latest advice: <code>{_e(advice.get('status'))}</code></p>"
+        f"<p>{_e(advice.get('summary'))}</p>"
+        f"<h3>Main findings</h3><ul>{finding_items}</ul>"
+        f"<h3>Human table recommendations</h3><ul>{rec_items}</ul>"
+    )
 
 
 def _e(value) -> str:

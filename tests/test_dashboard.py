@@ -53,6 +53,8 @@ def test_render_dashboard_home_lists_actions_and_history(tmp_path):
     assert record.run_id in html
     assert "Run Scenario" in html
     assert "Diagnostics" in html
+    assert "Agent Analyst" in html
+    assert "Latest advice" in html
 
 
 def test_cli_dashboard_help_exposes_local_server_options():

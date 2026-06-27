@@ -6,11 +6,11 @@ import tomllib
 CONFIG = "examples/shelldiver_v0/economy.yaml"
 
 
-def test_project_metadata_and_readme_document_v04_workflow():
+def test_project_metadata_and_readme_document_v05_workflow():
     metadata = tomllib.loads(open("pyproject.toml", "rb").read().decode("utf-8"))
     readme = open("README.md", encoding="utf-8").read()
 
-    assert metadata["project"]["version"] == "0.4.0"
+    assert metadata["project"]["version"] == "0.5.0"
     for command in [
         "report",
         "dashboard",
@@ -19,9 +19,13 @@ def test_project_metadata_and_readme_document_v04_workflow():
         "gate",
         "doctor",
         "explain",
+        "advise",
+        "review-run",
+        "yaml-plan",
+        "yaml-apply",
     ]:
         assert f"igess.cli {command}" in readme
-    assert "v0.4 Workflow" in readme
+    assert "v0.5 Agent Analyst" in readme
 
 
 def test_documented_v04_cli_flow_runs(tmp_path):
