@@ -142,6 +142,24 @@ def test_linter_rejects_unknown_scenario_time_mode():
         ConfigLinter.validate(broken)
 
 
+def test_linter_rejects_unimplemented_number_backend():
+    raw = ConfigLoader.load(CONFIG, TABLES)
+    broken = copy.deepcopy(raw)
+    broken.rules.model.number_backend = "native_double"
+
+    with pytest.raises(ConfigError, match="number_backend"):
+        ConfigLinter.validate(broken)
+
+
+def test_linter_rejects_unimplemented_scenario_start_state():
+    raw = ConfigLoader.load(CONFIG, TABLES)
+    broken = copy.deepcopy(raw)
+    broken.rules.scenarios["day_1_progression"].start_state = "veteran_player"
+
+    with pytest.raises(ConfigError, match="start_state"):
+        ConfigLinter.validate(broken)
+
+
 def test_linter_rejects_non_positive_scenario_timing():
     raw = ConfigLoader.load(CONFIG, TABLES)
     broken = copy.deepcopy(raw)

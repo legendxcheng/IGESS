@@ -48,3 +48,12 @@ def test_formula_engine_rejects_unsafe_or_unknown_expressions(expr):
             args=["base_cost"],
             expr=expr,
         )
+
+
+def test_formula_engine_rejects_string_constants_at_compile_time():
+    with pytest.raises(FormulaCompileError, match="string constants"):
+        FormulaEngine.compile(
+            formula_id="bad_string",
+            args=[],
+            expr="'123'",
+        )

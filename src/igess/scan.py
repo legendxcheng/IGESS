@@ -15,6 +15,9 @@ from .reporting.static import generate_static_report
 from .simulator import Simulator
 
 
+MAX_SCAN_VARIANTS = 1000
+
+
 @dataclass(frozen=True)
 class ScanParameter:
     table: str
@@ -26,7 +29,7 @@ class ScanParameter:
         return f"{self.table}.{self.row_id}.{self.field}={value}"
 
 
-def parse_scan_parameter(text: str) -> ScanParameter:
+def parse_scan_parameter(text: str, max_variants: int = MAX_SCAN_VARIANTS) -> ScanParameter:
     path, range_text = text.split("=", 1)
     table, row_id, field = path.split(".", 2)
     bounds, step_text = range_text.split(":", 1)
@@ -40,6 +43,8 @@ def parse_scan_parameter(text: str) -> ScanParameter:
     values = []
     current = start
     while current <= end:
+        if len(values) >= max_variants:
+            raise ValueError(f"scan parameter expands to too many variants (>{max_variants})")
         values.append(f"{current:.{precision}f}")
         current += step
     return ScanParameter(table=table, row_id=row_id, field=field, values=values)

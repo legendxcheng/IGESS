@@ -59,7 +59,9 @@ class FormulaEngine:
             if isinstance(child, ast.Expression | ast.Load):
                 continue
             if isinstance(child, ast.Constant):
-                if not isinstance(child.value, int | float | str):
+                if isinstance(child.value, str):
+                    raise FormulaCompileError(f"formula {formula_id} disallows string constants")
+                if not isinstance(child.value, int | float):
                     raise FormulaCompileError(f"formula {formula_id} has unsupported constant")
                 continue
             if isinstance(child, ast.Name):

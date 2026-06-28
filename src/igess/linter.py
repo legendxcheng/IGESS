@@ -10,7 +10,7 @@ class ConfigError(ValueError):
 
 
 class ConfigLinter:
-    ALLOWED_BACKENDS = {"bignum_log", "native_double", "big_int"}
+    ALLOWED_BACKENDS = {"bignum_log"}
     ALLOWED_POLICY_TYPES = {"cheap_unlock_first", "fastest_payback", "new_content_bias"}
     ALLOWED_PRESTIGE_POLICIES = {"conservative", "efficient_reset", "milestone_based"}
     FORMULA_CONTEXT_ARGS = {
@@ -23,7 +23,9 @@ class ConfigLinter:
     def validate(cls, raw: RawConfig) -> None:
         rules = raw.rules
         if rules.model.number_backend not in cls.ALLOWED_BACKENDS:
-            raise ConfigError(f"unknown number_backend '{rules.model.number_backend}'")
+            raise ConfigError(
+                f"number_backend '{rules.model.number_backend}' is not implemented; use bignum_log"
+            )
         if rules.model.random_seed is None:
             raise ConfigError("model.random_seed is required for deterministic simulation")
         if rules.model.tick_seconds <= 0:
@@ -151,6 +153,10 @@ class ConfigLinter:
             if scenario.time_mode not in {"tick", "analytic"}:
                 raise ConfigError(
                     f"scenario '{scenario_id}' unknown time_mode '{scenario.time_mode}'"
+                )
+            if scenario.start_state != "new_player":
+                raise ConfigError(
+                    f"scenario '{scenario_id}' start_state '{scenario.start_state}' is not implemented"
                 )
             for profile_id in scenario.profiles:
                 if profile_id not in rules.player_profiles:

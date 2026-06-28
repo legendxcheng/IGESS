@@ -89,6 +89,15 @@ def test_parse_scan_parameter_expands_inclusive_range():
     assert parameter.values == ["1.14", "1.15"]
 
 
+def test_parse_scan_parameter_rejects_too_many_variants():
+    try:
+        parse_scan_parameter("generators.fisherman.cost_growth=1..1001:1")
+    except ValueError as exc:
+        assert "too many variants" in str(exc)
+    else:
+        raise AssertionError("expected too many variants error")
+
+
 def test_run_scan_writes_variant_runs_and_summary(tmp_path):
     out_dir = tmp_path / "scan"
 
