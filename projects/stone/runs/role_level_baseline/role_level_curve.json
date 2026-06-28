@@ -1,0 +1,2402 @@
+[
+  {
+    "level": 1,
+    "exp_req": "2",
+    "cumulative_exp_to_level_start": "0",
+    "cumulative_exp_to_next_level": "2",
+    "combat_power": "4310",
+    "combat_power_delta": null
+  },
+  {
+    "level": 2,
+    "exp_req": "14",
+    "cumulative_exp_to_level_start": "2",
+    "cumulative_exp_to_next_level": "16",
+    "combat_power": "6170",
+    "combat_power_delta": "1860"
+  },
+  {
+    "level": 3,
+    "exp_req": "25",
+    "cumulative_exp_to_level_start": "16",
+    "cumulative_exp_to_next_level": "41",
+    "combat_power": "8030",
+    "combat_power_delta": "1860"
+  },
+  {
+    "level": 4,
+    "exp_req": "40",
+    "cumulative_exp_to_level_start": "41",
+    "cumulative_exp_to_next_level": "81",
+    "combat_power": "9890",
+    "combat_power_delta": "1860"
+  },
+  {
+    "level": 5,
+    "exp_req": "59",
+    "cumulative_exp_to_level_start": "81",
+    "cumulative_exp_to_next_level": "140",
+    "combat_power": "11750",
+    "combat_power_delta": "1860"
+  },
+  {
+    "level": 6,
+    "exp_req": "81",
+    "cumulative_exp_to_level_start": "140",
+    "cumulative_exp_to_next_level": "221",
+    "combat_power": "13610",
+    "combat_power_delta": "1860"
+  },
+  {
+    "level": 7,
+    "exp_req": "106",
+    "cumulative_exp_to_level_start": "221",
+    "cumulative_exp_to_next_level": "327",
+    "combat_power": "15470",
+    "combat_power_delta": "1860"
+  },
+  {
+    "level": 8,
+    "exp_req": "136",
+    "cumulative_exp_to_level_start": "327",
+    "cumulative_exp_to_next_level": "463",
+    "combat_power": "17330",
+    "combat_power_delta": "1860"
+  },
+  {
+    "level": 9,
+    "exp_req": "196",
+    "cumulative_exp_to_level_start": "463",
+    "cumulative_exp_to_next_level": "659",
+    "combat_power": "19190",
+    "combat_power_delta": "1860"
+  },
+  {
+    "level": 10,
+    "exp_req": "477",
+    "cumulative_exp_to_level_start": "659",
+    "cumulative_exp_to_next_level": "1136",
+    "combat_power": "21050",
+    "combat_power_delta": "1860"
+  },
+  {
+    "level": 11,
+    "exp_req": "484",
+    "cumulative_exp_to_level_start": "1136",
+    "cumulative_exp_to_next_level": "1620",
+    "combat_power": "24909",
+    "combat_power_delta": "3859"
+  },
+  {
+    "level": 12,
+    "exp_req": "571",
+    "cumulative_exp_to_level_start": "1620",
+    "cumulative_exp_to_next_level": "2191",
+    "combat_power": "28777",
+    "combat_power_delta": "3868"
+  },
+  {
+    "level": 13,
+    "exp_req": "664",
+    "cumulative_exp_to_level_start": "2191",
+    "cumulative_exp_to_next_level": "2855",
+    "combat_power": "32621",
+    "combat_power_delta": "3844"
+  },
+  {
+    "level": 14,
+    "exp_req": "765",
+    "cumulative_exp_to_level_start": "2855",
+    "cumulative_exp_to_next_level": "3620",
+    "combat_power": "36488",
+    "combat_power_delta": "3867"
+  },
+  {
+    "level": 15,
+    "exp_req": "874",
+    "cumulative_exp_to_level_start": "3620",
+    "cumulative_exp_to_next_level": "4494",
+    "combat_power": "40347",
+    "combat_power_delta": "3859"
+  },
+  {
+    "level": 16,
+    "exp_req": "990",
+    "cumulative_exp_to_level_start": "4494",
+    "cumulative_exp_to_next_level": "5484",
+    "combat_power": "44215",
+    "combat_power_delta": "3868"
+  },
+  {
+    "level": 17,
+    "exp_req": "1113",
+    "cumulative_exp_to_level_start": "5484",
+    "cumulative_exp_to_next_level": "6597",
+    "combat_power": "48082",
+    "combat_power_delta": "3867"
+  },
+  {
+    "level": 18,
+    "exp_req": "1240",
+    "cumulative_exp_to_level_start": "6597",
+    "cumulative_exp_to_next_level": "7837",
+    "combat_power": "51926",
+    "combat_power_delta": "3844"
+  },
+  {
+    "level": 19,
+    "exp_req": "1570",
+    "cumulative_exp_to_level_start": "7837",
+    "cumulative_exp_to_next_level": "9407",
+    "combat_power": "55785",
+    "combat_power_delta": "3859"
+  },
+  {
+    "level": 20,
+    "exp_req": "7080",
+    "cumulative_exp_to_level_start": "9407",
+    "cumulative_exp_to_next_level": "16487",
+    "combat_power": "59653",
+    "combat_power_delta": "3868"
+  },
+  {
+    "level": 21,
+    "exp_req": "7780",
+    "cumulative_exp_to_level_start": "16487",
+    "cumulative_exp_to_next_level": "24267",
+    "combat_power": "90986",
+    "combat_power_delta": "31333"
+  },
+  {
+    "level": 22,
+    "exp_req": "8530",
+    "cumulative_exp_to_level_start": "24267",
+    "cumulative_exp_to_next_level": "32797",
+    "combat_power": "122296",
+    "combat_power_delta": "31310"
+  },
+  {
+    "level": 23,
+    "exp_req": "9310",
+    "cumulative_exp_to_level_start": "32797",
+    "cumulative_exp_to_next_level": "42107",
+    "combat_power": "153621",
+    "combat_power_delta": "31325"
+  },
+  {
+    "level": 24,
+    "exp_req": "10120",
+    "cumulative_exp_to_level_start": "42107",
+    "cumulative_exp_to_next_level": "52227",
+    "combat_power": "184955",
+    "combat_power_delta": "31334"
+  },
+  {
+    "level": 25,
+    "exp_req": "10970",
+    "cumulative_exp_to_level_start": "52227",
+    "cumulative_exp_to_next_level": "63197",
+    "combat_power": "216190",
+    "combat_power_delta": "31235"
+  },
+  {
+    "level": 26,
+    "exp_req": "11850",
+    "cumulative_exp_to_level_start": "63197",
+    "cumulative_exp_to_next_level": "75047",
+    "combat_power": "247430",
+    "combat_power_delta": "31240"
+  },
+  {
+    "level": 27,
+    "exp_req": "12770",
+    "cumulative_exp_to_level_start": "75047",
+    "cumulative_exp_to_next_level": "87817",
+    "combat_power": "278810",
+    "combat_power_delta": "31380"
+  },
+  {
+    "level": 28,
+    "exp_req": "13730",
+    "cumulative_exp_to_level_start": "87817",
+    "cumulative_exp_to_next_level": "101547",
+    "combat_power": "310050",
+    "combat_power_delta": "31240"
+  },
+  {
+    "level": 29,
+    "exp_req": "19020",
+    "cumulative_exp_to_level_start": "101547",
+    "cumulative_exp_to_next_level": "120567",
+    "combat_power": "341430",
+    "combat_power_delta": "31380"
+  },
+  {
+    "level": 30,
+    "exp_req": "5697000",
+    "cumulative_exp_to_level_start": "120567",
+    "cumulative_exp_to_next_level": "5817567",
+    "combat_power": "372900",
+    "combat_power_delta": "31470"
+  },
+  {
+    "level": 31,
+    "exp_req": "6813000",
+    "cumulative_exp_to_level_start": "5817567",
+    "cumulative_exp_to_next_level": "12630567",
+    "combat_power": "457840",
+    "combat_power_delta": "84940"
+  },
+  {
+    "level": 32,
+    "exp_req": "8147000",
+    "cumulative_exp_to_level_start": "12630567",
+    "cumulative_exp_to_next_level": "20777567",
+    "combat_power": "542780",
+    "combat_power_delta": "84940"
+  },
+  {
+    "level": 33,
+    "exp_req": "9743000",
+    "cumulative_exp_to_level_start": "20777567",
+    "cumulative_exp_to_next_level": "30520567",
+    "combat_power": "627720",
+    "combat_power_delta": "84940"
+  },
+  {
+    "level": 34,
+    "exp_req": "11650000",
+    "cumulative_exp_to_level_start": "30520567",
+    "cumulative_exp_to_next_level": "42170567",
+    "combat_power": "712660",
+    "combat_power_delta": "84940"
+  },
+  {
+    "level": 35,
+    "exp_req": "13930000",
+    "cumulative_exp_to_level_start": "42170567",
+    "cumulative_exp_to_next_level": "56100567",
+    "combat_power": "797600",
+    "combat_power_delta": "84940"
+  },
+  {
+    "level": 36,
+    "exp_req": "16660000",
+    "cumulative_exp_to_level_start": "56100567",
+    "cumulative_exp_to_next_level": "72760567",
+    "combat_power": "882540",
+    "combat_power_delta": "84940"
+  },
+  {
+    "level": 37,
+    "exp_req": "19920000",
+    "cumulative_exp_to_level_start": "72760567",
+    "cumulative_exp_to_next_level": "92680567",
+    "combat_power": "967480",
+    "combat_power_delta": "84940"
+  },
+  {
+    "level": 38,
+    "exp_req": "23820000",
+    "cumulative_exp_to_level_start": "92680567",
+    "cumulative_exp_to_next_level": "116500567",
+    "combat_power": "1052420",
+    "combat_power_delta": "84940"
+  },
+  {
+    "level": 39,
+    "exp_req": "28480000",
+    "cumulative_exp_to_level_start": "116500567",
+    "cumulative_exp_to_next_level": "144980567",
+    "combat_power": "1137360",
+    "combat_power_delta": "84940"
+  },
+  {
+    "level": 40,
+    "exp_req": "73980000",
+    "cumulative_exp_to_level_start": "144980567",
+    "cumulative_exp_to_next_level": "218960567",
+    "combat_power": "1222450",
+    "combat_power_delta": "85090"
+  },
+  {
+    "level": 41,
+    "exp_req": "88470000",
+    "cumulative_exp_to_level_start": "218960567",
+    "cumulative_exp_to_next_level": "307430567",
+    "combat_power": "1490760",
+    "combat_power_delta": "268310"
+  },
+  {
+    "level": 42,
+    "exp_req": "105800000",
+    "cumulative_exp_to_level_start": "307430567",
+    "cumulative_exp_to_next_level": "413230567",
+    "combat_power": "1758990",
+    "combat_power_delta": "268230"
+  },
+  {
+    "level": 43,
+    "exp_req": "126500000",
+    "cumulative_exp_to_level_start": "413230567",
+    "cumulative_exp_to_next_level": "539730567",
+    "combat_power": "2027450",
+    "combat_power_delta": "268460"
+  },
+  {
+    "level": 44,
+    "exp_req": "151200000",
+    "cumulative_exp_to_level_start": "539730567",
+    "cumulative_exp_to_next_level": "690930567",
+    "combat_power": "2293300",
+    "combat_power_delta": "265850"
+  },
+  {
+    "level": 45,
+    "exp_req": "180900000",
+    "cumulative_exp_to_level_start": "690930567",
+    "cumulative_exp_to_next_level": "871830567",
+    "combat_power": "2562300",
+    "combat_power_delta": "269000"
+  },
+  {
+    "level": 46,
+    "exp_req": "216300000",
+    "cumulative_exp_to_level_start": "871830567",
+    "cumulative_exp_to_next_level": "1088130567",
+    "combat_power": "2831200",
+    "combat_power_delta": "268900"
+  },
+  {
+    "level": 47,
+    "exp_req": "258700000",
+    "cumulative_exp_to_level_start": "1088130567",
+    "cumulative_exp_to_next_level": "1346830567",
+    "combat_power": "3099300",
+    "combat_power_delta": "268100"
+  },
+  {
+    "level": 48,
+    "exp_req": "309300000",
+    "cumulative_exp_to_level_start": "1346830567",
+    "cumulative_exp_to_next_level": "1656130567",
+    "combat_power": "3368300",
+    "combat_power_delta": "269000"
+  },
+  {
+    "level": 49,
+    "exp_req": "369900000",
+    "cumulative_exp_to_level_start": "1656130567",
+    "cumulative_exp_to_next_level": "2026030567",
+    "combat_power": "3637200",
+    "combat_power_delta": "268900"
+  },
+  {
+    "level": 50,
+    "exp_req": "957400000",
+    "cumulative_exp_to_level_start": "2026030567",
+    "cumulative_exp_to_next_level": "2983430567",
+    "combat_power": "3905300",
+    "combat_power_delta": "268100"
+  },
+  {
+    "level": 51,
+    "exp_req": "1144000000",
+    "cumulative_exp_to_level_start": "2983430567",
+    "cumulative_exp_to_next_level": "4127430567",
+    "combat_power": "4736100",
+    "combat_power_delta": "830800"
+  },
+  {
+    "level": 52,
+    "exp_req": "1369000000",
+    "cumulative_exp_to_level_start": "4127430567",
+    "cumulative_exp_to_next_level": "5496430567",
+    "combat_power": "5569300",
+    "combat_power_delta": "833200"
+  },
+  {
+    "level": 53,
+    "exp_req": "1637000000",
+    "cumulative_exp_to_level_start": "5496430567",
+    "cumulative_exp_to_next_level": "7133430567",
+    "combat_power": "6402400",
+    "combat_power_delta": "833100"
+  },
+  {
+    "level": 54,
+    "exp_req": "1957000000",
+    "cumulative_exp_to_level_start": "7133430567",
+    "cumulative_exp_to_next_level": "9090430567",
+    "combat_power": "7234700",
+    "combat_power_delta": "832300"
+  },
+  {
+    "level": 55,
+    "exp_req": "2341000000",
+    "cumulative_exp_to_level_start": "9090430567",
+    "cumulative_exp_to_next_level": "11431430567",
+    "combat_power": "8067900",
+    "combat_power_delta": "833200"
+  },
+  {
+    "level": 56,
+    "exp_req": "2799000000",
+    "cumulative_exp_to_level_start": "11431430567",
+    "cumulative_exp_to_next_level": "14230430567",
+    "combat_power": "8901000",
+    "combat_power_delta": "833100"
+  },
+  {
+    "level": 57,
+    "exp_req": "3347000000",
+    "cumulative_exp_to_level_start": "14230430567",
+    "cumulative_exp_to_next_level": "17577430567",
+    "combat_power": "9733300",
+    "combat_power_delta": "832300"
+  },
+  {
+    "level": 58,
+    "exp_req": "4003000000",
+    "cumulative_exp_to_level_start": "17577430567",
+    "cumulative_exp_to_next_level": "21580430567",
+    "combat_power": "10566500",
+    "combat_power_delta": "833200"
+  },
+  {
+    "level": 59,
+    "exp_req": "4787000000",
+    "cumulative_exp_to_level_start": "21580430567",
+    "cumulative_exp_to_next_level": "26367430567",
+    "combat_power": "11399600",
+    "combat_power_delta": "833100"
+  },
+  {
+    "level": 60,
+    "exp_req": "25090000000",
+    "cumulative_exp_to_level_start": "26367430567",
+    "cumulative_exp_to_next_level": "51457430567",
+    "combat_power": "12231900",
+    "combat_power_delta": "832300"
+  },
+  {
+    "level": 61,
+    "exp_req": "30000000000",
+    "cumulative_exp_to_level_start": "51457430567",
+    "cumulative_exp_to_next_level": "81457430567",
+    "combat_power": "14782500",
+    "combat_power_delta": "2550600"
+  },
+  {
+    "level": 62,
+    "exp_req": "35880000000",
+    "cumulative_exp_to_level_start": "81457430567",
+    "cumulative_exp_to_next_level": "117337430567",
+    "combat_power": "17333000",
+    "combat_power_delta": "2550500"
+  },
+  {
+    "level": 63,
+    "exp_req": "42900000000",
+    "cumulative_exp_to_level_start": "117337430567",
+    "cumulative_exp_to_next_level": "160237430567",
+    "combat_power": "19882700",
+    "combat_power_delta": "2549700"
+  },
+  {
+    "level": 64,
+    "exp_req": "51310000000",
+    "cumulative_exp_to_level_start": "160237430567",
+    "cumulative_exp_to_next_level": "211547430567",
+    "combat_power": "22425000",
+    "combat_power_delta": "2542300"
+  },
+  {
+    "level": 65,
+    "exp_req": "61350000000",
+    "cumulative_exp_to_level_start": "211547430567",
+    "cumulative_exp_to_next_level": "272897430567",
+    "combat_power": "24967000",
+    "combat_power_delta": "2542000"
+  },
+  {
+    "level": 66,
+    "exp_req": "73370000000",
+    "cumulative_exp_to_level_start": "272897430567",
+    "cumulative_exp_to_next_level": "346267430567",
+    "combat_power": "27532000",
+    "combat_power_delta": "2565000"
+  },
+  {
+    "level": 67,
+    "exp_req": "87740000000",
+    "cumulative_exp_to_level_start": "346267430567",
+    "cumulative_exp_to_next_level": "434007430567",
+    "combat_power": "30074000",
+    "combat_power_delta": "2542000"
+  },
+  {
+    "level": 68,
+    "exp_req": "104900000000",
+    "cumulative_exp_to_level_start": "434007430567",
+    "cumulative_exp_to_next_level": "538907430567",
+    "combat_power": "32631000",
+    "combat_power_delta": "2557000"
+  },
+  {
+    "level": 69,
+    "exp_req": "125400000000",
+    "cumulative_exp_to_level_start": "538907430567",
+    "cumulative_exp_to_next_level": "664307430567",
+    "combat_power": "35173000",
+    "combat_power_delta": "2542000"
+  },
+  {
+    "level": 70,
+    "exp_req": "162100000000",
+    "cumulative_exp_to_level_start": "664307430567",
+    "cumulative_exp_to_next_level": "826407430567",
+    "combat_power": "37739000",
+    "combat_power_delta": "2566000"
+  },
+  {
+    "level": 71,
+    "exp_req": "193800000000",
+    "cumulative_exp_to_level_start": "826407430567",
+    "cumulative_exp_to_next_level": "1020207430567",
+    "combat_power": "45465000",
+    "combat_power_delta": "7726000"
+  },
+  {
+    "level": 72,
+    "exp_req": "231800000000",
+    "cumulative_exp_to_level_start": "1020207430567",
+    "cumulative_exp_to_next_level": "1252007430567",
+    "combat_power": "53200000",
+    "combat_power_delta": "7735000"
+  },
+  {
+    "level": 73,
+    "exp_req": "277200000000",
+    "cumulative_exp_to_level_start": "1252007430567",
+    "cumulative_exp_to_next_level": "1529207430567",
+    "combat_power": "60927000",
+    "combat_power_delta": "7727000"
+  },
+  {
+    "level": 74,
+    "exp_req": "331500000000",
+    "cumulative_exp_to_level_start": "1529207430567",
+    "cumulative_exp_to_next_level": "1860707430567",
+    "combat_power": "68653000",
+    "combat_power_delta": "7726000"
+  },
+  {
+    "level": 75,
+    "exp_req": "396400000000",
+    "cumulative_exp_to_level_start": "1860707430567",
+    "cumulative_exp_to_next_level": "2257107430567",
+    "combat_power": "76388000",
+    "combat_power_delta": "7735000"
+  },
+  {
+    "level": 76,
+    "exp_req": "474100000000",
+    "cumulative_exp_to_level_start": "2257107430567",
+    "cumulative_exp_to_next_level": "2731207430567",
+    "combat_power": "84115000",
+    "combat_power_delta": "7727000"
+  },
+  {
+    "level": 77,
+    "exp_req": "566900000000",
+    "cumulative_exp_to_level_start": "2731207430567",
+    "cumulative_exp_to_next_level": "3298107430567",
+    "combat_power": "91841000",
+    "combat_power_delta": "7726000"
+  },
+  {
+    "level": 78,
+    "exp_req": "677900000000",
+    "cumulative_exp_to_level_start": "3298107430567",
+    "cumulative_exp_to_next_level": "3976007430567",
+    "combat_power": "99576000",
+    "combat_power_delta": "7735000"
+  },
+  {
+    "level": 79,
+    "exp_req": "810700000000",
+    "cumulative_exp_to_level_start": "3976007430567",
+    "cumulative_exp_to_next_level": "4786707430567",
+    "combat_power": "107303000",
+    "combat_power_delta": "7727000"
+  },
+  {
+    "level": 80,
+    "exp_req": "1051000000000",
+    "cumulative_exp_to_level_start": "4786707430567",
+    "cumulative_exp_to_next_level": "5837707430567",
+    "combat_power": "115053000",
+    "combat_power_delta": "7750000"
+  },
+  {
+    "level": 81,
+    "exp_req": "1257000000000",
+    "cumulative_exp_to_level_start": "5837707430567",
+    "cumulative_exp_to_next_level": "7094707430567",
+    "combat_power": "138303000",
+    "combat_power_delta": "23250000"
+  },
+  {
+    "level": 82,
+    "exp_req": "1503000000000",
+    "cumulative_exp_to_level_start": "7094707430567",
+    "cumulative_exp_to_next_level": "8597707430567",
+    "combat_power": "161553000",
+    "combat_power_delta": "23250000"
+  },
+  {
+    "level": 83,
+    "exp_req": "1798000000000",
+    "cumulative_exp_to_level_start": "8597707430567",
+    "cumulative_exp_to_next_level": "10395707430567",
+    "combat_power": "184803000",
+    "combat_power_delta": "23250000"
+  },
+  {
+    "level": 84,
+    "exp_req": "2150000000000",
+    "cumulative_exp_to_level_start": "10395707430567",
+    "cumulative_exp_to_next_level": "12545707430567",
+    "combat_power": "207854000",
+    "combat_power_delta": "23051000"
+  },
+  {
+    "level": 85,
+    "exp_req": "2571000000000",
+    "cumulative_exp_to_level_start": "12545707430567",
+    "cumulative_exp_to_next_level": "15116707430567",
+    "combat_power": "231264000",
+    "combat_power_delta": "23410000"
+  },
+  {
+    "level": 86,
+    "exp_req": "3075000000000",
+    "cumulative_exp_to_level_start": "15116707430567",
+    "cumulative_exp_to_next_level": "18191707430567",
+    "combat_power": "254354000",
+    "combat_power_delta": "23090000"
+  },
+  {
+    "level": 87,
+    "exp_req": "3677000000000",
+    "cumulative_exp_to_level_start": "18191707430567",
+    "cumulative_exp_to_next_level": "21868707430567",
+    "combat_power": "277764000",
+    "combat_power_delta": "23410000"
+  },
+  {
+    "level": 88,
+    "exp_req": "4397000000000",
+    "cumulative_exp_to_level_start": "21868707430567",
+    "cumulative_exp_to_next_level": "26265707430567",
+    "combat_power": "300854000",
+    "combat_power_delta": "23090000"
+  },
+  {
+    "level": 89,
+    "exp_req": "5258000000000",
+    "cumulative_exp_to_level_start": "26265707430567",
+    "cumulative_exp_to_next_level": "31523707430567",
+    "combat_power": "324264000",
+    "combat_power_delta": "23410000"
+  },
+  {
+    "level": 90,
+    "exp_req": "34430000000000",
+    "cumulative_exp_to_level_start": "31523707430567",
+    "cumulative_exp_to_next_level": "65953707430567",
+    "combat_power": "347594000",
+    "combat_power_delta": "23330000"
+  },
+  {
+    "level": 91,
+    "exp_req": "38900000000000",
+    "cumulative_exp_to_level_start": "65953707430567",
+    "cumulative_exp_to_next_level": "104853707430567",
+    "combat_power": "416794000",
+    "combat_power_delta": "69200000"
+  },
+  {
+    "level": 92,
+    "exp_req": "43950000000000",
+    "cumulative_exp_to_level_start": "104853707430567",
+    "cumulative_exp_to_next_level": "148803707430567",
+    "combat_power": "486234000",
+    "combat_power_delta": "69440000"
+  },
+  {
+    "level": 93,
+    "exp_req": "49660000000000",
+    "cumulative_exp_to_level_start": "148803707430567",
+    "cumulative_exp_to_next_level": "198463707430567",
+    "combat_power": "555674000",
+    "combat_power_delta": "69440000"
+  },
+  {
+    "level": 94,
+    "exp_req": "56100000000000",
+    "cumulative_exp_to_level_start": "198463707430567",
+    "cumulative_exp_to_next_level": "254563707430567",
+    "combat_power": "625114000",
+    "combat_power_delta": "69440000"
+  },
+  {
+    "level": 95,
+    "exp_req": "63390000000000",
+    "cumulative_exp_to_level_start": "254563707430567",
+    "cumulative_exp_to_next_level": "317953707430567",
+    "combat_power": "694554000",
+    "combat_power_delta": "69440000"
+  },
+  {
+    "level": 96,
+    "exp_req": "71620000000000",
+    "cumulative_exp_to_level_start": "317953707430567",
+    "cumulative_exp_to_next_level": "389573707430567",
+    "combat_power": "763994000",
+    "combat_power_delta": "69440000"
+  },
+  {
+    "level": 97,
+    "exp_req": "80920000000000",
+    "cumulative_exp_to_level_start": "389573707430567",
+    "cumulative_exp_to_next_level": "470493707430567",
+    "combat_power": "833434000",
+    "combat_power_delta": "69440000"
+  },
+  {
+    "level": 98,
+    "exp_req": "91430000000000",
+    "cumulative_exp_to_level_start": "470493707430567",
+    "cumulative_exp_to_next_level": "561923707430567",
+    "combat_power": "902874000",
+    "combat_power_delta": "69440000"
+  },
+  {
+    "level": 99,
+    "exp_req": "103300000000000",
+    "cumulative_exp_to_level_start": "561923707430567",
+    "cumulative_exp_to_next_level": "665223707430567",
+    "combat_power": "972314000",
+    "combat_power_delta": "69440000"
+  },
+  {
+    "level": 100,
+    "exp_req": "263700000000000",
+    "cumulative_exp_to_level_start": "665223707430567",
+    "cumulative_exp_to_next_level": "928923707430567",
+    "combat_power": "1041754000",
+    "combat_power_delta": "69440000"
+  },
+  {
+    "level": 101,
+    "exp_req": "297900000000000",
+    "cumulative_exp_to_level_start": "928923707430567",
+    "cumulative_exp_to_next_level": "1226823707430567",
+    "combat_power": "1247834000",
+    "combat_power_delta": "206080000"
+  },
+  {
+    "level": 102,
+    "exp_req": "336600000000000",
+    "cumulative_exp_to_level_start": "1226823707430567",
+    "cumulative_exp_to_next_level": "1563423707430567",
+    "combat_power": "1454054000",
+    "combat_power_delta": "206220000"
+  },
+  {
+    "level": 103,
+    "exp_req": "380300000000000",
+    "cumulative_exp_to_level_start": "1563423707430567",
+    "cumulative_exp_to_next_level": "1943723707430567",
+    "combat_power": "1660364000",
+    "combat_power_delta": "206310000"
+  },
+  {
+    "level": 104,
+    "exp_req": "429700000000000",
+    "cumulative_exp_to_level_start": "1943723707430567",
+    "cumulative_exp_to_next_level": "2373423707430567",
+    "combat_power": "1866594000",
+    "combat_power_delta": "206230000"
+  },
+  {
+    "level": 105,
+    "exp_req": "485500000000000",
+    "cumulative_exp_to_level_start": "2373423707430567",
+    "cumulative_exp_to_next_level": "2858923707430567",
+    "combat_power": "2072304000",
+    "combat_power_delta": "205710000"
+  },
+  {
+    "level": 106,
+    "exp_req": "548500000000000",
+    "cumulative_exp_to_level_start": "2858923707430567",
+    "cumulative_exp_to_next_level": "3407423707430567",
+    "combat_power": "2276904000",
+    "combat_power_delta": "204600000"
+  },
+  {
+    "level": 107,
+    "exp_req": "619700000000000",
+    "cumulative_exp_to_level_start": "3407423707430567",
+    "cumulative_exp_to_next_level": "4027123707430567",
+    "combat_power": "2483904000",
+    "combat_power_delta": "207000000"
+  },
+  {
+    "level": 108,
+    "exp_req": "700200000000000",
+    "cumulative_exp_to_level_start": "4027123707430567",
+    "cumulative_exp_to_next_level": "4727323707430567",
+    "combat_power": "2690804000",
+    "combat_power_delta": "206900000"
+  },
+  {
+    "level": 109,
+    "exp_req": "791100000000000",
+    "cumulative_exp_to_level_start": "4727323707430567",
+    "cumulative_exp_to_next_level": "5518423707430567",
+    "combat_power": "2896904000",
+    "combat_power_delta": "206100000"
+  },
+  {
+    "level": 110,
+    "exp_req": "1972000000000000",
+    "cumulative_exp_to_level_start": "5518423707430567",
+    "cumulative_exp_to_next_level": "7490423707430567",
+    "combat_power": "3103904000",
+    "combat_power_delta": "207000000"
+  },
+  {
+    "level": 111,
+    "exp_req": "2228000000000000",
+    "cumulative_exp_to_level_start": "7490423707430567",
+    "cumulative_exp_to_next_level": "9718423707430567",
+    "combat_power": "3711504000",
+    "combat_power_delta": "607600000"
+  },
+  {
+    "level": 112,
+    "exp_req": "2517000000000000",
+    "cumulative_exp_to_level_start": "9718423707430567",
+    "cumulative_exp_to_next_level": "12235423707430567",
+    "combat_power": "4321404000",
+    "combat_power_delta": "609900000"
+  },
+  {
+    "level": 113,
+    "exp_req": "2844000000000000",
+    "cumulative_exp_to_level_start": "12235423707430567",
+    "cumulative_exp_to_next_level": "15079423707430567",
+    "combat_power": "4930504000",
+    "combat_power_delta": "609100000"
+  },
+  {
+    "level": 114,
+    "exp_req": "3213000000000000",
+    "cumulative_exp_to_level_start": "15079423707430567",
+    "cumulative_exp_to_next_level": "18292423707430567",
+    "combat_power": "5538104000",
+    "combat_power_delta": "607600000"
+  },
+  {
+    "level": 115,
+    "exp_req": "3630000000000000",
+    "cumulative_exp_to_level_start": "18292423707430567",
+    "cumulative_exp_to_next_level": "21922423707430567",
+    "combat_power": "6148104000",
+    "combat_power_delta": "610000000"
+  },
+  {
+    "level": 116,
+    "exp_req": "4102000000000000",
+    "cumulative_exp_to_level_start": "21922423707430567",
+    "cumulative_exp_to_next_level": "26024423707430567",
+    "combat_power": "6758004000",
+    "combat_power_delta": "609900000"
+  },
+  {
+    "level": 117,
+    "exp_req": "4634000000000000",
+    "cumulative_exp_to_level_start": "26024423707430567",
+    "cumulative_exp_to_next_level": "30658423707430567",
+    "combat_power": "7365604000",
+    "combat_power_delta": "607600000"
+  },
+  {
+    "level": 118,
+    "exp_req": "5236000000000000",
+    "cumulative_exp_to_level_start": "30658423707430567",
+    "cumulative_exp_to_next_level": "35894423707430567",
+    "combat_power": "7974704000",
+    "combat_power_delta": "609100000"
+  },
+  {
+    "level": 119,
+    "exp_req": "5916000000000000",
+    "cumulative_exp_to_level_start": "35894423707430567",
+    "cumulative_exp_to_next_level": "41810423707430567",
+    "combat_power": "8584704000",
+    "combat_power_delta": "610000000"
+  },
+  {
+    "level": 120,
+    "exp_req": "22880000000000000",
+    "cumulative_exp_to_level_start": "41810423707430567",
+    "cumulative_exp_to_next_level": "64690423707430567",
+    "combat_power": "9194604000",
+    "combat_power_delta": "609900000"
+  },
+  {
+    "level": 121,
+    "exp_req": "25850000000000000",
+    "cumulative_exp_to_level_start": "64690423707430567",
+    "cumulative_exp_to_next_level": "90540423707430567",
+    "combat_power": "10986404000",
+    "combat_power_delta": "1791800000"
+  },
+  {
+    "level": 122,
+    "exp_req": "29210000000000000",
+    "cumulative_exp_to_level_start": "90540423707430567",
+    "cumulative_exp_to_next_level": "119750423707430567",
+    "combat_power": "12778204000",
+    "combat_power_delta": "1791800000"
+  },
+  {
+    "level": 123,
+    "exp_req": "33000000000000000",
+    "cumulative_exp_to_level_start": "119750423707430567",
+    "cumulative_exp_to_next_level": "152750423707430567",
+    "combat_power": "14570004000",
+    "combat_power_delta": "1791800000"
+  },
+  {
+    "level": 124,
+    "exp_req": "37290000000000000",
+    "cumulative_exp_to_level_start": "152750423707430567",
+    "cumulative_exp_to_next_level": "190040423707430567",
+    "combat_power": "16361804000",
+    "combat_power_delta": "1791800000"
+  },
+  {
+    "level": 125,
+    "exp_req": "42130000000000000",
+    "cumulative_exp_to_level_start": "190040423707430567",
+    "cumulative_exp_to_next_level": "232170423707430567",
+    "combat_power": "18153604000",
+    "combat_power_delta": "1791800000"
+  },
+  {
+    "level": 126,
+    "exp_req": "47600000000000000",
+    "cumulative_exp_to_level_start": "232170423707430567",
+    "cumulative_exp_to_next_level": "279770423707430567",
+    "combat_power": "19945404000",
+    "combat_power_delta": "1791800000"
+  },
+  {
+    "level": 127,
+    "exp_req": "53780000000000000",
+    "cumulative_exp_to_level_start": "279770423707430567",
+    "cumulative_exp_to_next_level": "333550423707430567",
+    "combat_power": "21715004000",
+    "combat_power_delta": "1769600000"
+  },
+  {
+    "level": 128,
+    "exp_req": "60770000000000000",
+    "cumulative_exp_to_level_start": "333550423707430567",
+    "cumulative_exp_to_next_level": "394320423707430567",
+    "combat_power": "23513004000",
+    "combat_power_delta": "1798000000"
+  },
+  {
+    "level": 129,
+    "exp_req": "68660000000000000",
+    "cumulative_exp_to_level_start": "394320423707430567",
+    "cumulative_exp_to_next_level": "462980423707430567",
+    "combat_power": "25311004000",
+    "combat_power_delta": "1798000000"
+  },
+  {
+    "level": 130,
+    "exp_req": "148600000000000000",
+    "cumulative_exp_to_level_start": "462980423707430567",
+    "cumulative_exp_to_next_level": "611580423707430567",
+    "combat_power": "27109004000",
+    "combat_power_delta": "1798000000"
+  },
+  {
+    "level": 131,
+    "exp_req": "167900000000000000",
+    "cumulative_exp_to_level_start": "611580423707430567",
+    "cumulative_exp_to_next_level": "779480423707430567",
+    "combat_power": "32364004000",
+    "combat_power_delta": "5255000000"
+  },
+  {
+    "level": 132,
+    "exp_req": "189700000000000000",
+    "cumulative_exp_to_level_start": "779480423707430567",
+    "cumulative_exp_to_next_level": "969180423707430567",
+    "combat_power": "37634004000",
+    "combat_power_delta": "5270000000"
+  },
+  {
+    "level": 133,
+    "exp_req": "214300000000000000",
+    "cumulative_exp_to_level_start": "969180423707430567",
+    "cumulative_exp_to_next_level": "1183480423707430567",
+    "combat_power": "42881004000",
+    "combat_power_delta": "5247000000"
+  },
+  {
+    "level": 134,
+    "exp_req": "242100000000000000",
+    "cumulative_exp_to_level_start": "1183480423707430567",
+    "cumulative_exp_to_next_level": "1425580423707430567",
+    "combat_power": "48151004000",
+    "combat_power_delta": "5270000000"
+  },
+  {
+    "level": 135,
+    "exp_req": "273600000000000000",
+    "cumulative_exp_to_level_start": "1425580423707430567",
+    "cumulative_exp_to_next_level": "1699180423707430567",
+    "combat_power": "53397004000",
+    "combat_power_delta": "5246000000"
+  },
+  {
+    "level": 136,
+    "exp_req": "309100000000000000",
+    "cumulative_exp_to_level_start": "1699180423707430567",
+    "cumulative_exp_to_next_level": "2008280423707430567",
+    "combat_power": "58667004000",
+    "combat_power_delta": "5270000000"
+  },
+  {
+    "level": 137,
+    "exp_req": "349200000000000000",
+    "cumulative_exp_to_level_start": "2008280423707430567",
+    "cumulative_exp_to_next_level": "2357480423707430567",
+    "combat_power": "63922004000",
+    "combat_power_delta": "5255000000"
+  },
+  {
+    "level": 138,
+    "exp_req": "394600000000000000",
+    "cumulative_exp_to_level_start": "2357480423707430567",
+    "cumulative_exp_to_next_level": "2752080423707430567",
+    "combat_power": "69192004000",
+    "combat_power_delta": "5270000000"
+  },
+  {
+    "level": 139,
+    "exp_req": "445800000000000000",
+    "cumulative_exp_to_level_start": "2752080423707430567",
+    "cumulative_exp_to_next_level": "3197880423707430567",
+    "combat_power": "74439004000",
+    "combat_power_delta": "5247000000"
+  },
+  {
+    "level": 140,
+    "exp_req": "942600000000000000",
+    "cumulative_exp_to_level_start": "3197880423707430567",
+    "cumulative_exp_to_next_level": "4140480423707430567",
+    "combat_power": "79709004000",
+    "combat_power_delta": "5270000000"
+  },
+  {
+    "level": 141,
+    "exp_req": "1065000000000000000",
+    "cumulative_exp_to_level_start": "4140480423707430567",
+    "cumulative_exp_to_next_level": "5205480423707430567",
+    "combat_power": "95061004000",
+    "combat_power_delta": "15352000000"
+  },
+  {
+    "level": 142,
+    "exp_req": "1203000000000000000",
+    "cumulative_exp_to_level_start": "5205480423707430567",
+    "cumulative_exp_to_next_level": "6408480423707430567",
+    "combat_power": "110422004000",
+    "combat_power_delta": "15361000000"
+  },
+  {
+    "level": 143,
+    "exp_req": "1359000000000000000",
+    "cumulative_exp_to_level_start": "6408480423707430567",
+    "cumulative_exp_to_next_level": "7767480423707430567",
+    "combat_power": "125775004000",
+    "combat_power_delta": "15353000000"
+  },
+  {
+    "level": 144,
+    "exp_req": "1536000000000000000",
+    "cumulative_exp_to_level_start": "7767480423707430567",
+    "cumulative_exp_to_next_level": "9303480423707430567",
+    "combat_power": "141151004000",
+    "combat_power_delta": "15376000000"
+  },
+  {
+    "level": 145,
+    "exp_req": "1735000000000000000",
+    "cumulative_exp_to_level_start": "9303480423707430567",
+    "cumulative_exp_to_next_level": "11038480423707430567",
+    "combat_power": "156503004000",
+    "combat_power_delta": "15352000000"
+  },
+  {
+    "level": 146,
+    "exp_req": "1960000000000000000",
+    "cumulative_exp_to_level_start": "11038480423707430567",
+    "cumulative_exp_to_next_level": "12998480423707430567",
+    "combat_power": "171864004000",
+    "combat_power_delta": "15361000000"
+  },
+  {
+    "level": 147,
+    "exp_req": "2215000000000000000",
+    "cumulative_exp_to_level_start": "12998480423707430567",
+    "cumulative_exp_to_next_level": "15213480423707430567",
+    "combat_power": "187240004000",
+    "combat_power_delta": "15376000000"
+  },
+  {
+    "level": 148,
+    "exp_req": "2503000000000000000",
+    "cumulative_exp_to_level_start": "15213480423707430567",
+    "cumulative_exp_to_next_level": "17716480423707430567",
+    "combat_power": "202593004000",
+    "combat_power_delta": "15353000000"
+  },
+  {
+    "level": 149,
+    "exp_req": "2828000000000000000",
+    "cumulative_exp_to_level_start": "17716480423707430567",
+    "cumulative_exp_to_next_level": "20544480423707430567",
+    "combat_power": "217770004000",
+    "combat_power_delta": "15177000000"
+  },
+  {
+    "level": 150,
+    "exp_req": "9831000000000000000",
+    "cumulative_exp_to_level_start": "20544480423707430567",
+    "cumulative_exp_to_next_level": "30375480423707430567",
+    "combat_power": "233270004000",
+    "combat_power_delta": "15500000000"
+  },
+  {
+    "level": 151,
+    "exp_req": "11100000000000000000",
+    "cumulative_exp_to_level_start": "30375480423707430567",
+    "cumulative_exp_to_next_level": "41475480423707430567",
+    "combat_power": "277910004000",
+    "combat_power_delta": "44640000000"
+  },
+  {
+    "level": 152,
+    "exp_req": "12550000000000000000",
+    "cumulative_exp_to_level_start": "41475480423707430567",
+    "cumulative_exp_to_next_level": "54025480423707430567",
+    "combat_power": "322790004000",
+    "combat_power_delta": "44880000000"
+  },
+  {
+    "level": 153,
+    "exp_req": "14170000000000000000",
+    "cumulative_exp_to_level_start": "54025480423707430567",
+    "cumulative_exp_to_next_level": "68195480423707430567",
+    "combat_power": "367660004000",
+    "combat_power_delta": "44870000000"
+  },
+  {
+    "level": 154,
+    "exp_req": "16020000000000000000",
+    "cumulative_exp_to_level_start": "68195480423707430567",
+    "cumulative_exp_to_next_level": "84215480423707430567",
+    "combat_power": "412450004000",
+    "combat_power_delta": "44790000000"
+  },
+  {
+    "level": 155,
+    "exp_req": "18100000000000000000",
+    "cumulative_exp_to_level_start": "84215480423707430567",
+    "cumulative_exp_to_next_level": "102315480423707430567",
+    "combat_power": "457330004000",
+    "combat_power_delta": "44880000000"
+  },
+  {
+    "level": 156,
+    "exp_req": "20450000000000000000",
+    "cumulative_exp_to_level_start": "102315480423707430567",
+    "cumulative_exp_to_next_level": "122765480423707430567",
+    "combat_power": "502200004000",
+    "combat_power_delta": "44870000000"
+  },
+  {
+    "level": 157,
+    "exp_req": "23100000000000000000",
+    "cumulative_exp_to_level_start": "122765480423707430567",
+    "cumulative_exp_to_next_level": "145865480423707430567",
+    "combat_power": "546990004000",
+    "combat_power_delta": "44790000000"
+  },
+  {
+    "level": 158,
+    "exp_req": "26100000000000000000",
+    "cumulative_exp_to_level_start": "145865480423707430567",
+    "cumulative_exp_to_next_level": "171965480423707430567",
+    "combat_power": "591870004000",
+    "combat_power_delta": "44880000000"
+  },
+  {
+    "level": 159,
+    "exp_req": "29490000000000000000",
+    "cumulative_exp_to_level_start": "171965480423707430567",
+    "cumulative_exp_to_next_level": "201455480423707430567",
+    "combat_power": "636740004000",
+    "combat_power_delta": "44870000000"
+  },
+  {
+    "level": 160,
+    "exp_req": "74140000000000000000",
+    "cumulative_exp_to_level_start": "201455480423707430567",
+    "cumulative_exp_to_next_level": "275595480423707430567",
+    "combat_power": "681530004000",
+    "combat_power_delta": "44790000000"
+  },
+  {
+    "level": 161,
+    "exp_req": "83760000000000000000",
+    "cumulative_exp_to_level_start": "275595480423707430567",
+    "cumulative_exp_to_next_level": "359355480423707430567",
+    "combat_power": "811730004000",
+    "combat_power_delta": "130200000000"
+  },
+  {
+    "level": 162,
+    "exp_req": "94640000000000000000",
+    "cumulative_exp_to_level_start": "359355480423707430567",
+    "cumulative_exp_to_next_level": "453995480423707430567",
+    "combat_power": "942170004000",
+    "combat_power_delta": "130440000000"
+  },
+  {
+    "level": 163,
+    "exp_req": "106920000000000000000",
+    "cumulative_exp_to_level_start": "453995480423707430567",
+    "cumulative_exp_to_next_level": "560915480423707430567",
+    "combat_power": "1072370004000",
+    "combat_power_delta": "130200000000"
+  },
+  {
+    "level": 164,
+    "exp_req": "120700000000000000000",
+    "cumulative_exp_to_level_start": "560915480423707430567",
+    "cumulative_exp_to_next_level": "681615480423707430567",
+    "combat_power": "1202800004000",
+    "combat_power_delta": "130430000000"
+  },
+  {
+    "level": 165,
+    "exp_req": "136400000000000000000",
+    "cumulative_exp_to_level_start": "681615480423707430567",
+    "cumulative_exp_to_next_level": "818015480423707430567",
+    "combat_power": "1333150004000",
+    "combat_power_delta": "130350000000"
+  },
+  {
+    "level": 166,
+    "exp_req": "154100000000000000000",
+    "cumulative_exp_to_level_start": "818015480423707430567",
+    "cumulative_exp_to_next_level": "972115480423707430567",
+    "combat_power": "1463350004000",
+    "combat_power_delta": "130200000000"
+  },
+  {
+    "level": 167,
+    "exp_req": "174200000000000000000",
+    "cumulative_exp_to_level_start": "972115480423707430567",
+    "cumulative_exp_to_next_level": "1146315480423707430567",
+    "combat_power": "1593790004000",
+    "combat_power_delta": "130440000000"
+  },
+  {
+    "level": 168,
+    "exp_req": "196800000000000000000",
+    "cumulative_exp_to_level_start": "1146315480423707430567",
+    "cumulative_exp_to_next_level": "1343115480423707430567",
+    "combat_power": "1723990004000",
+    "combat_power_delta": "130200000000"
+  },
+  {
+    "level": 169,
+    "exp_req": "222300000000000000000",
+    "cumulative_exp_to_level_start": "1343115480423707430567",
+    "cumulative_exp_to_next_level": "1565415480423707430567",
+    "combat_power": "1854420004000",
+    "combat_power_delta": "130430000000"
+  },
+  {
+    "level": 170,
+    "exp_req": "407600000000000000000",
+    "cumulative_exp_to_level_start": "1565415480423707430567",
+    "cumulative_exp_to_next_level": "1973015480423707430567",
+    "combat_power": "1984770004000",
+    "combat_power_delta": "130350000000"
+  },
+  {
+    "level": 171,
+    "exp_req": "460500000000000000000",
+    "cumulative_exp_to_level_start": "1973015480423707430567",
+    "cumulative_exp_to_next_level": "2433515480423707430567",
+    "combat_power": "2362200004000",
+    "combat_power_delta": "377430000000"
+  },
+  {
+    "level": 172,
+    "exp_req": "520300000000000000000",
+    "cumulative_exp_to_level_start": "2433515480423707430567",
+    "cumulative_exp_to_next_level": "2953815480423707430567",
+    "combat_power": "2740400004000",
+    "combat_power_delta": "378200000000"
+  },
+  {
+    "level": 173,
+    "exp_req": "587800000000000000000",
+    "cumulative_exp_to_level_start": "2953815480423707430567",
+    "cumulative_exp_to_next_level": "3541615480423707430567",
+    "combat_power": "3118600004000",
+    "combat_power_delta": "378200000000"
+  },
+  {
+    "level": 174,
+    "exp_req": "664100000000000000000",
+    "cumulative_exp_to_level_start": "3541615480423707430567",
+    "cumulative_exp_to_next_level": "4205715480423707430567",
+    "combat_power": "3496800004000",
+    "combat_power_delta": "378200000000"
+  },
+  {
+    "level": 175,
+    "exp_req": "750400000000000000000",
+    "cumulative_exp_to_level_start": "4205715480423707430567",
+    "cumulative_exp_to_next_level": "4956115480423707430567",
+    "combat_power": "3875000004000",
+    "combat_power_delta": "378200000000"
+  },
+  {
+    "level": 176,
+    "exp_req": "847800000000000000000",
+    "cumulative_exp_to_level_start": "4956115480423707430567",
+    "cumulative_exp_to_next_level": "5803915480423707430567",
+    "combat_power": "4253200004000",
+    "combat_power_delta": "378200000000"
+  },
+  {
+    "level": 177,
+    "exp_req": "957900000000000000000",
+    "cumulative_exp_to_level_start": "5803915480423707430567",
+    "cumulative_exp_to_next_level": "6761815480423707430567",
+    "combat_power": "4631400004000",
+    "combat_power_delta": "378200000000"
+  },
+  {
+    "level": 178,
+    "exp_req": "1082000000000000000000",
+    "cumulative_exp_to_level_start": "6761815480423707430567",
+    "cumulative_exp_to_next_level": "7843815480423707430567",
+    "combat_power": "5009600004000",
+    "combat_power_delta": "378200000000"
+  },
+  {
+    "level": 179,
+    "exp_req": "1222000000000000000000",
+    "cumulative_exp_to_level_start": "7843815480423707430567",
+    "cumulative_exp_to_next_level": "9065815480423707430567",
+    "combat_power": "5387800004000",
+    "combat_power_delta": "378200000000"
+  },
+  {
+    "level": 180,
+    "exp_req": "1234000000000000000000",
+    "cumulative_exp_to_level_start": "9065815480423707430567",
+    "cumulative_exp_to_next_level": "10299815480423707430567",
+    "combat_power": "5766000004000",
+    "combat_power_delta": "378200000000"
+  },
+  {
+    "level": 181,
+    "exp_req": "1271000000000000000000",
+    "cumulative_exp_to_level_start": "10299815480423707430567",
+    "cumulative_exp_to_next_level": "11570815480423707430567",
+    "combat_power": "6861100004000",
+    "combat_power_delta": "1095100000000"
+  },
+  {
+    "level": 182,
+    "exp_req": "1309000000000000000000",
+    "cumulative_exp_to_level_start": "11570815480423707430567",
+    "cumulative_exp_to_next_level": "12879815480423707430567",
+    "combat_power": "7956100004000",
+    "combat_power_delta": "1095000000000"
+  },
+  {
+    "level": 183,
+    "exp_req": "1348000000000000000000",
+    "cumulative_exp_to_level_start": "12879815480423707430567",
+    "cumulative_exp_to_next_level": "14227815480423707430567",
+    "combat_power": "9052000004000",
+    "combat_power_delta": "1095900000000"
+  },
+  {
+    "level": 184,
+    "exp_req": "1388000000000000000000",
+    "cumulative_exp_to_level_start": "14227815480423707430567",
+    "cumulative_exp_to_next_level": "15615815480423707430567",
+    "combat_power": "10147100004000",
+    "combat_power_delta": "1095100000000"
+  },
+  {
+    "level": 185,
+    "exp_req": "1429000000000000000000",
+    "cumulative_exp_to_level_start": "15615815480423707430567",
+    "cumulative_exp_to_next_level": "17044815480423707430567",
+    "combat_power": "11242100004000",
+    "combat_power_delta": "1095000000000"
+  },
+  {
+    "level": 186,
+    "exp_req": "1471000000000000000000",
+    "cumulative_exp_to_level_start": "17044815480423707430567",
+    "cumulative_exp_to_next_level": "18515815480423707430567",
+    "combat_power": "12338000004000",
+    "combat_power_delta": "1095900000000"
+  },
+  {
+    "level": 187,
+    "exp_req": "1515000000000000000000",
+    "cumulative_exp_to_level_start": "18515815480423707430567",
+    "cumulative_exp_to_next_level": "20030815480423707430567",
+    "combat_power": "13433100004000",
+    "combat_power_delta": "1095100000000"
+  },
+  {
+    "level": 188,
+    "exp_req": "1560000000000000000000",
+    "cumulative_exp_to_level_start": "20030815480423707430567",
+    "cumulative_exp_to_next_level": "21590815480423707430567",
+    "combat_power": "14528100004000",
+    "combat_power_delta": "1095000000000"
+  },
+  {
+    "level": 189,
+    "exp_req": "1606000000000000000000",
+    "cumulative_exp_to_level_start": "21590815480423707430567",
+    "cumulative_exp_to_next_level": "23196815480423707430567",
+    "combat_power": "15624000004000",
+    "combat_power_delta": "1095900000000"
+  },
+  {
+    "level": 190,
+    "exp_req": "1846000000000000000000",
+    "cumulative_exp_to_level_start": "23196815480423707430567",
+    "cumulative_exp_to_next_level": "25042815480423707430567",
+    "combat_power": "16719100004000",
+    "combat_power_delta": "1095100000000"
+  },
+  {
+    "level": 191,
+    "exp_req": "1901000000000000000000",
+    "cumulative_exp_to_level_start": "25042815480423707430567",
+    "cumulative_exp_to_next_level": "26943815480423707430567",
+    "combat_power": "19884900004000",
+    "combat_power_delta": "3165800000000"
+  },
+  {
+    "level": 192,
+    "exp_req": "1958000000000000000000",
+    "cumulative_exp_to_level_start": "26943815480423707430567",
+    "cumulative_exp_to_next_level": "28901815480423707430567",
+    "combat_power": "23041000004000",
+    "combat_power_delta": "3156100000000"
+  },
+  {
+    "level": 193,
+    "exp_req": "2016000000000000000000",
+    "cumulative_exp_to_level_start": "28901815480423707430567",
+    "cumulative_exp_to_next_level": "30917815480423707430567",
+    "combat_power": "26203000004000",
+    "combat_power_delta": "3162000000000"
+  },
+  {
+    "level": 194,
+    "exp_req": "2076000000000000000000",
+    "cumulative_exp_to_level_start": "30917815480423707430567",
+    "cumulative_exp_to_next_level": "32993815480423707430567",
+    "combat_power": "29365000004000",
+    "combat_power_delta": "3162000000000"
+  },
+  {
+    "level": 195,
+    "exp_req": "2138000000000000000000",
+    "cumulative_exp_to_level_start": "32993815480423707430567",
+    "cumulative_exp_to_next_level": "35131815480423707430567",
+    "combat_power": "32550000004000",
+    "combat_power_delta": "3185000000000"
+  },
+  {
+    "level": 196,
+    "exp_req": "2202000000000000000000",
+    "cumulative_exp_to_level_start": "35131815480423707430567",
+    "cumulative_exp_to_next_level": "37333815480423707430567",
+    "combat_power": "35712000004000",
+    "combat_power_delta": "3162000000000"
+  },
+  {
+    "level": 197,
+    "exp_req": "2268000000000000000000",
+    "cumulative_exp_to_level_start": "37333815480423707430567",
+    "cumulative_exp_to_next_level": "39601815480423707430567",
+    "combat_power": "38874000004000",
+    "combat_power_delta": "3162000000000"
+  },
+  {
+    "level": 198,
+    "exp_req": "2336000000000000000000",
+    "cumulative_exp_to_level_start": "39601815480423707430567",
+    "cumulative_exp_to_next_level": "41937815480423707430567",
+    "combat_power": "42036000004000",
+    "combat_power_delta": "3162000000000"
+  },
+  {
+    "level": 199,
+    "exp_req": "2406000000000000000000",
+    "cumulative_exp_to_level_start": "41937815480423707430567",
+    "cumulative_exp_to_next_level": "44343815480423707430567",
+    "combat_power": "45198000004000",
+    "combat_power_delta": "3162000000000"
+  },
+  {
+    "level": 200,
+    "exp_req": "3808000000000000000000",
+    "cumulative_exp_to_level_start": "44343815480423707430567",
+    "cumulative_exp_to_next_level": "48151815480423707430567",
+    "combat_power": "48375000004000",
+    "combat_power_delta": "3177000000000"
+  },
+  {
+    "level": 201,
+    "exp_req": "3846000000000000000000",
+    "cumulative_exp_to_level_start": "48151815480423707430567",
+    "cumulative_exp_to_next_level": "51997815480423707430567",
+    "combat_power": "57513000004000",
+    "combat_power_delta": "9138000000000"
+  },
+  {
+    "level": 202,
+    "exp_req": "3885000000000000000000",
+    "cumulative_exp_to_level_start": "51997815480423707430567",
+    "cumulative_exp_to_next_level": "55882815480423707430567",
+    "combat_power": "66650000004000",
+    "combat_power_delta": "9137000000000"
+  },
+  {
+    "level": 203,
+    "exp_req": "3923000000000000000000",
+    "cumulative_exp_to_level_start": "55882815480423707430567",
+    "cumulative_exp_to_next_level": "59805815480423707430567",
+    "combat_power": "75779000004000",
+    "combat_power_delta": "9129000000000"
+  },
+  {
+    "level": 204,
+    "exp_req": "3963000000000000000000",
+    "cumulative_exp_to_level_start": "59805815480423707430567",
+    "cumulative_exp_to_next_level": "63768815480423707430567",
+    "combat_power": "84917000004000",
+    "combat_power_delta": "9138000000000"
+  },
+  {
+    "level": 205,
+    "exp_req": "4002000000000000000000",
+    "cumulative_exp_to_level_start": "63768815480423707430567",
+    "cumulative_exp_to_next_level": "67770815480423707430567",
+    "combat_power": "94069000004000",
+    "combat_power_delta": "9152000000000"
+  },
+  {
+    "level": 206,
+    "exp_req": "4041000000000000000000",
+    "cumulative_exp_to_level_start": "67770815480423707430567",
+    "cumulative_exp_to_next_level": "71811815480423707430567",
+    "combat_power": "103207000004000",
+    "combat_power_delta": "9138000000000"
+  },
+  {
+    "level": 207,
+    "exp_req": "4082000000000000000000",
+    "cumulative_exp_to_level_start": "71811815480423707430567",
+    "cumulative_exp_to_next_level": "75893815480423707430567",
+    "combat_power": "112344000004000",
+    "combat_power_delta": "9137000000000"
+  },
+  {
+    "level": 208,
+    "exp_req": "4122000000000000000000",
+    "cumulative_exp_to_level_start": "75893815480423707430567",
+    "cumulative_exp_to_next_level": "80015815480423707430567",
+    "combat_power": "121473000004000",
+    "combat_power_delta": "9129000000000"
+  },
+  {
+    "level": 209,
+    "exp_req": "4163000000000000000000",
+    "cumulative_exp_to_level_start": "80015815480423707430567",
+    "cumulative_exp_to_next_level": "84178815480423707430567",
+    "combat_power": "130611000004000",
+    "combat_power_delta": "9138000000000"
+  },
+  {
+    "level": 210,
+    "exp_req": "6068000000000000000000",
+    "cumulative_exp_to_level_start": "84178815480423707430567",
+    "cumulative_exp_to_next_level": "90246815480423707430567",
+    "combat_power": "139763000004000",
+    "combat_power_delta": "9152000000000"
+  },
+  {
+    "level": 211,
+    "exp_req": "6128000000000000000000",
+    "cumulative_exp_to_level_start": "90246815480423707430567",
+    "cumulative_exp_to_next_level": "96374815480423707430567",
+    "combat_power": "166098000004000",
+    "combat_power_delta": "26335000000000"
+  },
+  {
+    "level": 212,
+    "exp_req": "6189000000000000000000",
+    "cumulative_exp_to_level_start": "96374815480423707430567",
+    "cumulative_exp_to_next_level": "102563815480423707430567",
+    "combat_power": "192448000004000",
+    "combat_power_delta": "26350000000000"
+  },
+  {
+    "level": 213,
+    "exp_req": "6251000000000000000000",
+    "cumulative_exp_to_level_start": "102563815480423707430567",
+    "cumulative_exp_to_next_level": "108814815480423707430567",
+    "combat_power": "218630000004000",
+    "combat_power_delta": "26182000000000"
+  },
+  {
+    "level": 214,
+    "exp_req": "6313000000000000000000",
+    "cumulative_exp_to_level_start": "108814815480423707430567",
+    "cumulative_exp_to_next_level": "115127815480423707430567",
+    "combat_power": "245050000004000",
+    "combat_power_delta": "26420000000000"
+  },
+  {
+    "level": 215,
+    "exp_req": "6376000000000000000000",
+    "cumulative_exp_to_level_start": "115127815480423707430567",
+    "cumulative_exp_to_next_level": "121503815480423707430567",
+    "combat_power": "271330000004000",
+    "combat_power_delta": "26280000000000"
+  },
+  {
+    "level": 216,
+    "exp_req": "6439000000000000000000",
+    "cumulative_exp_to_level_start": "121503815480423707430567",
+    "cumulative_exp_to_next_level": "127942815480423707430567",
+    "combat_power": "297750000004000",
+    "combat_power_delta": "26420000000000"
+  },
+  {
+    "level": 217,
+    "exp_req": "6503000000000000000000",
+    "cumulative_exp_to_level_start": "127942815480423707430567",
+    "cumulative_exp_to_next_level": "134445815480423707430567",
+    "combat_power": "324030000004000",
+    "combat_power_delta": "26280000000000"
+  },
+  {
+    "level": 218,
+    "exp_req": "6568000000000000000000",
+    "cumulative_exp_to_level_start": "134445815480423707430567",
+    "cumulative_exp_to_next_level": "141013815480423707430567",
+    "combat_power": "350450000004000",
+    "combat_power_delta": "26420000000000"
+  },
+  {
+    "level": 219,
+    "exp_req": "6633000000000000000000",
+    "cumulative_exp_to_level_start": "141013815480423707430567",
+    "cumulative_exp_to_next_level": "147646815480423707430567",
+    "combat_power": "376730000004000",
+    "combat_power_delta": "26280000000000"
+  },
+  {
+    "level": 220,
+    "exp_req": "8821000000000000000000",
+    "cumulative_exp_to_level_start": "147646815480423707430567",
+    "cumulative_exp_to_next_level": "156467815480423707430567",
+    "combat_power": "403150000004000",
+    "combat_power_delta": "26420000000000"
+  },
+  {
+    "level": 221,
+    "exp_req": "8909000000000000000000",
+    "cumulative_exp_to_level_start": "156467815480423707430567",
+    "cumulative_exp_to_next_level": "165376815480423707430567",
+    "combat_power": "478790000004000",
+    "combat_power_delta": "75640000000000"
+  },
+  {
+    "level": 222,
+    "exp_req": "8997000000000000000000",
+    "cumulative_exp_to_level_start": "165376815480423707430567",
+    "cumulative_exp_to_next_level": "174373815480423707430567",
+    "combat_power": "554670000004000",
+    "combat_power_delta": "75880000000000"
+  },
+  {
+    "level": 223,
+    "exp_req": "9086000000000000000000",
+    "cumulative_exp_to_level_start": "174373815480423707430567",
+    "cumulative_exp_to_next_level": "183459815480423707430567",
+    "combat_power": "630540000004000",
+    "combat_power_delta": "75870000000000"
+  },
+  {
+    "level": 224,
+    "exp_req": "9176000000000000000000",
+    "cumulative_exp_to_level_start": "183459815480423707430567",
+    "cumulative_exp_to_next_level": "192635815480423707430567",
+    "combat_power": "706180000004000",
+    "combat_power_delta": "75640000000000"
+  },
+  {
+    "level": 225,
+    "exp_req": "9268000000000000000000",
+    "cumulative_exp_to_level_start": "192635815480423707430567",
+    "cumulative_exp_to_next_level": "201903815480423707430567",
+    "combat_power": "781970000004000",
+    "combat_power_delta": "75790000000000"
+  },
+  {
+    "level": 226,
+    "exp_req": "9361000000000000000000",
+    "cumulative_exp_to_level_start": "201903815480423707430567",
+    "cumulative_exp_to_next_level": "211264815480423707430567",
+    "combat_power": "857850000004000",
+    "combat_power_delta": "75880000000000"
+  },
+  {
+    "level": 227,
+    "exp_req": "9454000000000000000000",
+    "cumulative_exp_to_level_start": "211264815480423707430567",
+    "cumulative_exp_to_next_level": "220718815480423707430567",
+    "combat_power": "933490000004000",
+    "combat_power_delta": "75640000000000"
+  },
+  {
+    "level": 228,
+    "exp_req": "9548000000000000000000",
+    "cumulative_exp_to_level_start": "220718815480423707430567",
+    "cumulative_exp_to_next_level": "230266815480423707430567",
+    "combat_power": "1009360000004000",
+    "combat_power_delta": "75870000000000"
+  },
+  {
+    "level": 229,
+    "exp_req": "9643000000000000000000",
+    "cumulative_exp_to_level_start": "230266815480423707430567",
+    "cumulative_exp_to_next_level": "239909815480423707430567",
+    "combat_power": "1085150000004000",
+    "combat_power_delta": "75790000000000"
+  },
+  {
+    "level": 230,
+    "exp_req": "11892000000000000000000",
+    "cumulative_exp_to_level_start": "239909815480423707430567",
+    "cumulative_exp_to_next_level": "251801815480423707430567",
+    "combat_power": "1161030000004000",
+    "combat_power_delta": "75880000000000"
+  },
+  {
+    "level": 231,
+    "exp_req": "12010000000000000000000",
+    "cumulative_exp_to_level_start": "251801815480423707430567",
+    "cumulative_exp_to_next_level": "263811815480423707430567",
+    "combat_power": "1378880000004000",
+    "combat_power_delta": "217850000000000"
+  },
+  {
+    "level": 232,
+    "exp_req": "12130000000000000000000",
+    "cumulative_exp_to_level_start": "263811815480423707430567",
+    "cumulative_exp_to_next_level": "275941815480423707430567",
+    "combat_power": "1596650000004000",
+    "combat_power_delta": "217770000000000"
+  },
+  {
+    "level": 233,
+    "exp_req": "12251000000000000000000",
+    "cumulative_exp_to_level_start": "275941815480423707430567",
+    "cumulative_exp_to_next_level": "288192815480423707430567",
+    "combat_power": "1814510000004000",
+    "combat_power_delta": "217860000000000"
+  },
+  {
+    "level": 234,
+    "exp_req": "12373000000000000000000",
+    "cumulative_exp_to_level_start": "288192815480423707430567",
+    "cumulative_exp_to_next_level": "300565815480423707430567",
+    "combat_power": "2032360000004000",
+    "combat_power_delta": "217850000000000"
+  },
+  {
+    "level": 235,
+    "exp_req": "12496000000000000000000",
+    "cumulative_exp_to_level_start": "300565815480423707430567",
+    "cumulative_exp_to_next_level": "313061815480423707430567",
+    "combat_power": "2248300000004000",
+    "combat_power_delta": "215940000000000"
+  },
+  {
+    "level": 236,
+    "exp_req": "12620000000000000000000",
+    "cumulative_exp_to_level_start": "313061815480423707430567",
+    "cumulative_exp_to_next_level": "325681815480423707430567",
+    "combat_power": "2467600000004000",
+    "combat_power_delta": "219300000000000"
+  },
+  {
+    "level": 237,
+    "exp_req": "12746000000000000000000",
+    "cumulative_exp_to_level_start": "325681815480423707430567",
+    "cumulative_exp_to_next_level": "338427815480423707430567",
+    "combat_power": "2684600000004000",
+    "combat_power_delta": "217000000000000"
+  },
+  {
+    "level": 238,
+    "exp_req": "12873000000000000000000",
+    "cumulative_exp_to_level_start": "338427815480423707430567",
+    "cumulative_exp_to_next_level": "351300815480423707430567",
+    "combat_power": "2903100000004000",
+    "combat_power_delta": "218500000000000"
+  },
+  {
+    "level": 239,
+    "exp_req": "13001000000000000000000",
+    "cumulative_exp_to_level_start": "351300815480423707430567",
+    "cumulative_exp_to_next_level": "364301815480423707430567",
+    "combat_power": "3120100000004000",
+    "combat_power_delta": "217000000000000"
+  },
+  {
+    "level": 240,
+    "exp_req": "15100000000000000000000",
+    "cumulative_exp_to_level_start": "364301815480423707430567",
+    "cumulative_exp_to_next_level": "379401815480423707430567",
+    "combat_power": "3339500000004000",
+    "combat_power_delta": "219400000000000"
+  },
+  {
+    "level": 241,
+    "exp_req": "15251000000000000000000",
+    "cumulative_exp_to_level_start": "379401815480423707430567",
+    "cumulative_exp_to_next_level": "394652815480423707430567",
+    "combat_power": "3963300000004000",
+    "combat_power_delta": "623800000000000"
+  },
+  {
+    "level": 242,
+    "exp_req": "15403000000000000000000",
+    "cumulative_exp_to_level_start": "394652815480423707430567",
+    "cumulative_exp_to_next_level": "410055815480423707430567",
+    "combat_power": "4589500000004000",
+    "combat_power_delta": "626200000000000"
+  },
+  {
+    "level": 243,
+    "exp_req": "15556000000000000000000",
+    "cumulative_exp_to_level_start": "410055815480423707430567",
+    "cumulative_exp_to_next_level": "425611815480423707430567",
+    "combat_power": "5215700000004000",
+    "combat_power_delta": "626200000000000"
+  },
+  {
+    "level": 244,
+    "exp_req": "15711000000000000000000",
+    "cumulative_exp_to_level_start": "425611815480423707430567",
+    "cumulative_exp_to_next_level": "441322815480423707430567",
+    "combat_power": "5840400000004000",
+    "combat_power_delta": "624700000000000"
+  },
+  {
+    "level": 245,
+    "exp_req": "15867000000000000000000",
+    "cumulative_exp_to_level_start": "441322815480423707430567",
+    "cumulative_exp_to_next_level": "457189815480423707430567",
+    "combat_power": "6466600000004000",
+    "combat_power_delta": "626200000000000"
+  },
+  {
+    "level": 246,
+    "exp_req": "16025000000000000000000",
+    "cumulative_exp_to_level_start": "457189815480423707430567",
+    "cumulative_exp_to_next_level": "473214815480423707430567",
+    "combat_power": "7092800000004000",
+    "combat_power_delta": "626200000000000"
+  },
+  {
+    "level": 247,
+    "exp_req": "16185000000000000000000",
+    "cumulative_exp_to_level_start": "473214815480423707430567",
+    "cumulative_exp_to_next_level": "489399815480423707430567",
+    "combat_power": "7716700000004000",
+    "combat_power_delta": "623900000000000"
+  },
+  {
+    "level": 248,
+    "exp_req": "16346000000000000000000",
+    "cumulative_exp_to_level_start": "489399815480423707430567",
+    "cumulative_exp_to_next_level": "505745815480423707430567",
+    "combat_power": "8342900000004000",
+    "combat_power_delta": "626200000000000"
+  },
+  {
+    "level": 249,
+    "exp_req": "16509000000000000000000",
+    "cumulative_exp_to_level_start": "505745815480423707430567",
+    "cumulative_exp_to_next_level": "522254815480423707430567",
+    "combat_power": "8969100000004000",
+    "combat_power_delta": "626200000000000"
+  },
+  {
+    "level": 250,
+    "exp_req": "19718000000000000000000",
+    "cumulative_exp_to_level_start": "522254815480423707430567",
+    "cumulative_exp_to_next_level": "541972815480423707430567",
+    "combat_power": "9595300000004000",
+    "combat_power_delta": "626200000000000"
+  },
+  {
+    "level": 251,
+    "exp_req": "19914000000000000000000",
+    "cumulative_exp_to_level_start": "541972815480423707430567",
+    "cumulative_exp_to_next_level": "561886815480423707430567",
+    "combat_power": "11387100000004000",
+    "combat_power_delta": "1791800000000000"
+  },
+  {
+    "level": 252,
+    "exp_req": "20113000000000000000000",
+    "cumulative_exp_to_level_start": "561886815480423707430567",
+    "cumulative_exp_to_next_level": "581999815480423707430567",
+    "combat_power": "13181200000004000",
+    "combat_power_delta": "1794100000000000"
+  },
+  {
+    "level": 253,
+    "exp_req": "20312000000000000000000",
+    "cumulative_exp_to_level_start": "581999815480423707430567",
+    "cumulative_exp_to_next_level": "602311815480423707430567",
+    "combat_power": "14974500000004000",
+    "combat_power_delta": "1793300000000000"
+  },
+  {
+    "level": 254,
+    "exp_req": "20515000000000000000000",
+    "cumulative_exp_to_level_start": "602311815480423707430567",
+    "cumulative_exp_to_next_level": "622826815480423707430567",
+    "combat_power": "16766300000004000",
+    "combat_power_delta": "1791800000000000"
+  },
+  {
+    "level": 255,
+    "exp_req": "20719000000000000000000",
+    "cumulative_exp_to_level_start": "622826815480423707430567",
+    "cumulative_exp_to_next_level": "643545815480423707430567",
+    "combat_power": "18560500000004000",
+    "combat_power_delta": "1794200000000000"
+  },
+  {
+    "level": 256,
+    "exp_req": "20926000000000000000000",
+    "cumulative_exp_to_level_start": "643545815480423707430567",
+    "cumulative_exp_to_next_level": "664471815480423707430567",
+    "combat_power": "20354600000004000",
+    "combat_power_delta": "1794100000000000"
+  },
+  {
+    "level": 257,
+    "exp_req": "21134000000000000000000",
+    "cumulative_exp_to_level_start": "664471815480423707430567",
+    "cumulative_exp_to_next_level": "685605815480423707430567",
+    "combat_power": "22134000000004000",
+    "combat_power_delta": "1779400000000000"
+  },
+  {
+    "level": 258,
+    "exp_req": "21345000000000000000000",
+    "cumulative_exp_to_level_start": "685605815480423707430567",
+    "cumulative_exp_to_next_level": "706950815480423707430567",
+    "combat_power": "23932000000004000",
+    "combat_power_delta": "1798000000000000"
+  },
+  {
+    "level": 259,
+    "exp_req": "21557000000000000000000",
+    "cumulative_exp_to_level_start": "706950815480423707430567",
+    "cumulative_exp_to_next_level": "728507815480423707430567",
+    "combat_power": "25730000000004000",
+    "combat_power_delta": "1798000000000000"
+  },
+  {
+    "level": 260,
+    "exp_req": "26895000000000000000000",
+    "cumulative_exp_to_level_start": "728507815480423707430567",
+    "cumulative_exp_to_next_level": "755402815480423707430567",
+    "combat_power": "27528000000004000",
+    "combat_power_delta": "1798000000000000"
+  },
+  {
+    "level": 261,
+    "exp_req": "27163000000000000000000",
+    "cumulative_exp_to_level_start": "755402815480423707430567",
+    "cumulative_exp_to_next_level": "782565815480423707430567",
+    "combat_power": "32651000000004000",
+    "combat_power_delta": "5123000000000000"
+  },
+  {
+    "level": 262,
+    "exp_req": "27434000000000000000000",
+    "cumulative_exp_to_level_start": "782565815480423707430567",
+    "cumulative_exp_to_next_level": "809999815480423707430567",
+    "combat_power": "37797000000004000",
+    "combat_power_delta": "5146000000000000"
+  },
+  {
+    "level": 263,
+    "exp_req": "27708000000000000000000",
+    "cumulative_exp_to_level_start": "809999815480423707430567",
+    "cumulative_exp_to_next_level": "837707815480423707430567",
+    "combat_power": "42943000000004000",
+    "combat_power_delta": "5146000000000000"
+  },
+  {
+    "level": 264,
+    "exp_req": "27983000000000000000000",
+    "cumulative_exp_to_level_start": "837707815480423707430567",
+    "cumulative_exp_to_next_level": "865690815480423707430567",
+    "combat_power": "48065000000004000",
+    "combat_power_delta": "5122000000000000"
+  },
+  {
+    "level": 265,
+    "exp_req": "28262000000000000000000",
+    "cumulative_exp_to_level_start": "865690815480423707430567",
+    "cumulative_exp_to_next_level": "893952815480423707430567",
+    "combat_power": "53211000000004000",
+    "combat_power_delta": "5146000000000000"
+  },
+  {
+    "level": 266,
+    "exp_req": "28544000000000000000000",
+    "cumulative_exp_to_level_start": "893952815480423707430567",
+    "cumulative_exp_to_next_level": "922496815480423707430567",
+    "combat_power": "58357000000004000",
+    "combat_power_delta": "5146000000000000"
+  },
+  {
+    "level": 267,
+    "exp_req": "28828000000000000000000",
+    "cumulative_exp_to_level_start": "922496815480423707430567",
+    "cumulative_exp_to_next_level": "951324815480423707430567",
+    "combat_power": "63488000000004000",
+    "combat_power_delta": "5131000000000000"
+  },
+  {
+    "level": 268,
+    "exp_req": "29116000000000000000000",
+    "cumulative_exp_to_level_start": "951324815480423707430567",
+    "cumulative_exp_to_next_level": "980440815480423707430567",
+    "combat_power": "68634000000004000",
+    "combat_power_delta": "5146000000000000"
+  },
+  {
+    "level": 269,
+    "exp_req": "29406000000000000000000",
+    "cumulative_exp_to_level_start": "980440815480423707430567",
+    "cumulative_exp_to_next_level": "1009846815480423707430567",
+    "combat_power": "73780000000004000",
+    "combat_power_delta": "5146000000000000"
+  },
+  {
+    "level": 270,
+    "exp_req": "38893000000000000000000",
+    "cumulative_exp_to_level_start": "1009846815480423707430567",
+    "cumulative_exp_to_next_level": "1048739815480423707430567",
+    "combat_power": "78926000000004000",
+    "combat_power_delta": "5146000000000000"
+  },
+  {
+    "level": 271,
+    "exp_req": "39281000000000000000000",
+    "cumulative_exp_to_level_start": "1048739815480423707430567",
+    "cumulative_exp_to_next_level": "1088020815480423707430567",
+    "combat_power": "93635000000004000",
+    "combat_power_delta": "14709000000000000"
+  },
+  {
+    "level": 272,
+    "exp_req": "39672000000000000000000",
+    "cumulative_exp_to_level_start": "1088020815480423707430567",
+    "cumulative_exp_to_next_level": "1127692815480423707430567",
+    "combat_power": "108353000000004000",
+    "combat_power_delta": "14718000000000000"
+  },
+  {
+    "level": 273,
+    "exp_req": "40068000000000000000000",
+    "cumulative_exp_to_level_start": "1127692815480423707430567",
+    "cumulative_exp_to_next_level": "1167760815480423707430567",
+    "combat_power": "123070000000004000",
+    "combat_power_delta": "14717000000000000"
+  },
+  {
+    "level": 274,
+    "exp_req": "40469000000000000000000",
+    "cumulative_exp_to_level_start": "1167760815480423707430567",
+    "cumulative_exp_to_next_level": "1208229815480423707430567",
+    "combat_power": "137779000000004000",
+    "combat_power_delta": "14709000000000000"
+  },
+  {
+    "level": 275,
+    "exp_req": "40871000000000000000000",
+    "cumulative_exp_to_level_start": "1208229815480423707430567",
+    "cumulative_exp_to_next_level": "1249100815480423707430567",
+    "combat_power": "152497000000004000",
+    "combat_power_delta": "14718000000000000"
+  },
+  {
+    "level": 276,
+    "exp_req": "41278000000000000000000",
+    "cumulative_exp_to_level_start": "1249100815480423707430567",
+    "cumulative_exp_to_next_level": "1290378815480423707430567",
+    "combat_power": "167214000000004000",
+    "combat_power_delta": "14717000000000000"
+  },
+  {
+    "level": 277,
+    "exp_req": "41690000000000000000000",
+    "cumulative_exp_to_level_start": "1290378815480423707430567",
+    "cumulative_exp_to_next_level": "1332068815480423707430567",
+    "combat_power": "181923000000004000",
+    "combat_power_delta": "14709000000000000"
+  },
+  {
+    "level": 278,
+    "exp_req": "42105000000000000000000",
+    "cumulative_exp_to_level_start": "1332068815480423707430567",
+    "cumulative_exp_to_next_level": "1374173815480423707430567",
+    "combat_power": "196641000000004000",
+    "combat_power_delta": "14718000000000000"
+  },
+  {
+    "level": 279,
+    "exp_req": "42526000000000000000000",
+    "cumulative_exp_to_level_start": "1374173815480423707430567",
+    "cumulative_exp_to_next_level": "1416699815480423707430567",
+    "combat_power": "211190000000004000",
+    "combat_power_delta": "14549000000000000"
+  },
+  {
+    "level": 280,
+    "exp_req": "63449000000000000000000",
+    "cumulative_exp_to_level_start": "1416699815480423707430567",
+    "cumulative_exp_to_next_level": "1480148815480423707430567",
+    "combat_power": "226070000000004000",
+    "combat_power_delta": "14880000000000000"
+  },
+  {
+    "level": 281,
+    "exp_req": "64083000000000000000000",
+    "cumulative_exp_to_level_start": "1480148815480423707430567",
+    "cumulative_exp_to_next_level": "1544231815480423707430567",
+    "combat_power": "267990000000004000",
+    "combat_power_delta": "41920000000000000"
+  },
+  {
+    "level": 282,
+    "exp_req": "64723000000000000000000",
+    "cumulative_exp_to_level_start": "1544231815480423707430567",
+    "cumulative_exp_to_next_level": "1608954815480423707430567",
+    "combat_power": "310150000000004000",
+    "combat_power_delta": "42160000000000000"
+  },
+  {
+    "level": 283,
+    "exp_req": "65370000000000000000000",
+    "cumulative_exp_to_level_start": "1608954815480423707430567",
+    "cumulative_exp_to_next_level": "1674324815480423707430567",
+    "combat_power": "352160000000004000",
+    "combat_power_delta": "42010000000000000"
+  },
+  {
+    "level": 284,
+    "exp_req": "66023000000000000000000",
+    "cumulative_exp_to_level_start": "1674324815480423707430567",
+    "cumulative_exp_to_next_level": "1740347815480423707430567",
+    "combat_power": "394320000000004000",
+    "combat_power_delta": "42160000000000000"
+  },
+  {
+    "level": 285,
+    "exp_req": "66683000000000000000000",
+    "cumulative_exp_to_level_start": "1740347815480423707430567",
+    "cumulative_exp_to_next_level": "1807030815480423707430567",
+    "combat_power": "436480000000004000",
+    "combat_power_delta": "42160000000000000"
+  },
+  {
+    "level": 286,
+    "exp_req": "67349000000000000000000",
+    "cumulative_exp_to_level_start": "1807030815480423707430567",
+    "cumulative_exp_to_next_level": "1874379815480423707430567",
+    "combat_power": "478410000000004000",
+    "combat_power_delta": "41930000000000000"
+  },
+  {
+    "level": 287,
+    "exp_req": "68022000000000000000000",
+    "cumulative_exp_to_level_start": "1874379815480423707430567",
+    "cumulative_exp_to_next_level": "1942401815480423707430567",
+    "combat_power": "520570000000004000",
+    "combat_power_delta": "42160000000000000"
+  },
+  {
+    "level": 288,
+    "exp_req": "68701000000000000000000",
+    "cumulative_exp_to_level_start": "1942401815480423707430567",
+    "cumulative_exp_to_next_level": "2011102815480423707430567",
+    "combat_power": "562490000000004000",
+    "combat_power_delta": "41920000000000000"
+  },
+  {
+    "level": 289,
+    "exp_req": "69387000000000000000000",
+    "cumulative_exp_to_level_start": "2011102815480423707430567",
+    "cumulative_exp_to_next_level": "2080489815480423707430567",
+    "combat_power": "604650000000004000",
+    "combat_power_delta": "42160000000000000"
+  },
+  {
+    "level": 290,
+    "exp_req": "138003000000000000000000",
+    "cumulative_exp_to_level_start": "2080489815480423707430567",
+    "cumulative_exp_to_next_level": "2218492815480423707430567",
+    "combat_power": "646810000000004000",
+    "combat_power_delta": "42160000000000000"
+  },
+  {
+    "level": 291,
+    "exp_req": "139379000000000000000000",
+    "cumulative_exp_to_level_start": "2218492815480423707430567",
+    "cumulative_exp_to_next_level": "2357871815480423707430567",
+    "combat_power": "688820000000004000",
+    "combat_power_delta": "42010000000000000"
+  },
+  {
+    "level": 292,
+    "exp_req": "140768000000000000000000",
+    "cumulative_exp_to_level_start": "2357871815480423707430567",
+    "cumulative_exp_to_next_level": "2498639815480423707430567",
+    "combat_power": "730980000000004000",
+    "combat_power_delta": "42160000000000000"
+  },
+  {
+    "level": 293,
+    "exp_req": "142169000000000000000000",
+    "cumulative_exp_to_level_start": "2498639815480423707430567",
+    "cumulative_exp_to_next_level": "2640808815480423707430567",
+    "combat_power": "772910000000004000",
+    "combat_power_delta": "41930000000000000"
+  },
+  {
+    "level": 294,
+    "exp_req": "143590000000000000000000",
+    "cumulative_exp_to_level_start": "2640808815480423707430567",
+    "cumulative_exp_to_next_level": "2784398815480423707430567",
+    "combat_power": "815070000000004000",
+    "combat_power_delta": "42160000000000000"
+  },
+  {
+    "level": 295,
+    "exp_req": "145024000000000000000000",
+    "cumulative_exp_to_level_start": "2784398815480423707430567",
+    "cumulative_exp_to_next_level": "2929422815480423707430567",
+    "combat_power": "857230000000004000",
+    "combat_power_delta": "42160000000000000"
+  },
+  {
+    "level": 296,
+    "exp_req": "146470000000000000000000",
+    "cumulative_exp_to_level_start": "2929422815480423707430567",
+    "cumulative_exp_to_next_level": "3075892815480423707430567",
+    "combat_power": "899150000000004000",
+    "combat_power_delta": "41920000000000000"
+  },
+  {
+    "level": 297,
+    "exp_req": "147929000000000000000000",
+    "cumulative_exp_to_level_start": "3075892815480423707430567",
+    "cumulative_exp_to_next_level": "3223821815480423707430567",
+    "combat_power": "941310000000004000",
+    "combat_power_delta": "42160000000000000"
+  },
+  {
+    "level": 298,
+    "exp_req": "149408000000000000000000",
+    "cumulative_exp_to_level_start": "3223821815480423707430567",
+    "cumulative_exp_to_next_level": "3373229815480423707430567",
+    "combat_power": "983320000000004000",
+    "combat_power_delta": "42010000000000000"
+  },
+  {
+    "level": 299,
+    "exp_req": "150899000000000000000000",
+    "cumulative_exp_to_level_start": "3373229815480423707430567",
+    "cumulative_exp_to_next_level": "3524128815480423707430567",
+    "combat_power": "1025480000000004000",
+    "combat_power_delta": "42160000000000000"
+  },
+  {
+    "level": 300,
+    "exp_req": "999900000000000000000000",
+    "cumulative_exp_to_level_start": "3524128815480423707430567",
+    "cumulative_exp_to_next_level": "4524028815480423707430567",
+    "combat_power": "1067640000000004000",
+    "combat_power_delta": "42160000000000000"
+  }
+]

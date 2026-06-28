@@ -1,0 +1,21 @@
+{
+  "project": "stone",
+  "model": "role_level_baseline",
+  "sources": {
+    "role_lv": "E:\\stone-oasis\\data-tables\\Datas\\RoleLv.xlsx",
+    "attribute_def": "E:\\stone-oasis\\data-tables\\Datas\\CharacterAttributeDef.xlsx"
+  },
+  "artifacts": [
+    "role_level_curve.json",
+    "role_level_curve.csv",
+    "role_level_summary.md",
+    "source_manifest.json"
+  ],
+  "formula": {
+    "big_number_parts": "sign * coeff * 10^exp",
+    "big_number_or_integer": "value * powerValue",
+    "ratio_bps": "value / 10000 * powerValue"
+  },
+  "level_count": 300,
+  "max_level": 300
+}

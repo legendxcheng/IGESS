@@ -79,8 +79,9 @@ The implementation should lock these known values from the current source
 workbooks:
 
 - Level 1 combat power: `4310`
-- Level 300 combat power: about `1.06764e18`
-- Cumulative experience required to reach level 300 start: about `3.524129e24`
+- Level 300 combat power: `1067640000000004000`
+- Cumulative experience required to reach level 300 start:
+  `3524128815480423707430567`
 - Level count: `300`
 
 ## Non-Goals

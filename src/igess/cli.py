@@ -18,6 +18,7 @@ from .reporting.loader import ReportLoadError
 from .reporting.static import generate_static_report
 from .scan import run_scan
 from .simulator import Simulator
+from .stone_role_level import build_role_level_curve, write_role_level_artifacts
 from .templates import init_project
 from .verification import review_proposal, verify_edits
 from .yaml_plan import PlanValidationError, apply_yaml_plan, create_yaml_plan
@@ -29,6 +30,10 @@ def build_parser() -> argparse.ArgumentParser:
     export = subparsers.add_parser("export-tables")
     export.add_argument("--datas", required=True)
     export.add_argument("--out", required=True)
+    stone_role_level = subparsers.add_parser("stone-role-level")
+    stone_role_level.add_argument("--role-lv", required=True)
+    stone_role_level.add_argument("--attribute-def", required=True)
+    stone_role_level.add_argument("--out", required=True)
     report = subparsers.add_parser("report")
     report.add_argument("--run", required=True)
     report.add_argument("--out", required=True)
@@ -112,6 +117,14 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "export-tables":
             written = export_registered_workbooks(args.datas, args.out)
             print(f"Exported {len(written)} tables to {args.out}")
+            return 0
+        if args.command == "stone-role-level":
+            curve = build_role_level_curve(args.role_lv, args.attribute_def)
+            artifacts = write_role_level_artifacts(curve, args.out)
+            print(
+                "Wrote stone role level model to "
+                f"{args.out} ({len(artifacts)} artifact(s))"
+            )
             return 0
         if args.command == "report":
             index = generate_static_report(args.run, args.out, args.title)

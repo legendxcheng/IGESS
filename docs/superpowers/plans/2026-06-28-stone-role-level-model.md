@@ -42,8 +42,8 @@ def test_build_role_level_curve_uses_runtime_power_formula():
     assert result.rows[0].level == 1
     assert result.rows[0].combat_power == Decimal("4310")
     assert result.rows[-1].level == 300
-    assert result.rows[-1].combat_power == Decimal("1067640000000000000")
-    assert result.rows[-1].cumulative_exp_to_level_start == Decimal("3524129224321067851402093")
+    assert result.rows[-1].combat_power == Decimal("1067640000000004000")
+    assert result.rows[-1].cumulative_exp_to_level_start == Decimal("3524128815480423707430567")
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
