@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import html
 import mimetypes
+from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 from .workflows import WorkflowService
 
@@ -158,31 +159,43 @@ def _handler(service: WorkflowService, config: str | Path, tables: str | Path):
             self.wfile.write(encoded)
 
         def _send_report_file(self, relative: str) -> None:
-            parts = Path(relative)
-            if len(parts.parts) < 2:
-                self.send_error(404)
-                return
-            run_id = parts.parts[0]
-            rest = Path(*parts.parts[1:])
-            run = next((record for record in service.list_runs() if record.run_id == run_id), None)
-            if run is None:
-                self.send_error(404)
-                return
-            path = run.report_dir / rest
-            if not path.exists() or not path.is_file():
-                self.send_error(404)
-                return
-            body = path.read_bytes()
-            self.send_response(200)
-            self.send_header(
-                "Content-Type",
-                mimetypes.guess_type(path.name)[0] or "application/octet-stream",
-            )
+            status, content_type, body = send_report_file_response(service, relative)
+            self.send_response(int(status))
+            self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
 
     return DashboardHandler
+
+
+def send_report_file_response(service: WorkflowService, relative: str) -> tuple[HTTPStatus, str, bytes]:
+    parts = Path(unquote(relative))
+    if len(parts.parts) < 2:
+        return _not_found_response()
+    run_id = parts.parts[0]
+    rest = Path(*parts.parts[1:])
+    if rest.is_absolute():
+        return _not_found_response()
+    run = next((record for record in service.list_runs() if record.run_id == run_id), None)
+    if run is None:
+        return _not_found_response()
+    report_root = run.report_dir.resolve()
+    path = (report_root / rest).resolve()
+    if path != report_root and report_root not in path.parents:
+        return _not_found_response()
+    if not path.exists() or not path.is_file():
+        return _not_found_response()
+    body = path.read_bytes()
+    return (
+        HTTPStatus.OK,
+        mimetypes.guess_type(path.name)[0] or "application/octet-stream",
+        body,
+    )
+
+
+def _not_found_response() -> tuple[HTTPStatus, str, bytes]:
+    return HTTPStatus.NOT_FOUND, "text/plain; charset=utf-8", b"Not found"
 
 
 def _advice_panel(advice: dict | None) -> str:

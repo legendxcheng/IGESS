@@ -58,11 +58,14 @@ Open `http://127.0.0.1:8765/`.
 `report` reads a run directory and writes a self-contained report folder:
 
 - `index.html`
+- `report_data.json`
+- `assets/echarts.min.js`
 - `assets/report.css`
 - `assets/report.js`
 
-The report includes overview metadata, resource curves, event timeline, payback
-table, analysis warnings, and formula/source traces.
+The v0.9 Web report includes ECharts-backed resource curves, total-CPS curves,
+event timeline visualization, payback pressure charts, diagnostic summaries, and
+formula/source evidence sections.
 
 ### Dashboard
 

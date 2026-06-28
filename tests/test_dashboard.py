@@ -1,7 +1,9 @@
 import json
 import subprocess
 import sys
+from http import HTTPStatus
 
+from igess import dashboard
 from igess.dashboard import render_dashboard_home
 from igess.run_registry import RunRegistry
 from igess.workflows import WorkflowService
@@ -55,6 +57,37 @@ def test_render_dashboard_home_lists_actions_and_history(tmp_path):
     assert "Diagnostics" in html
     assert "Agent Analyst" in html
     assert "Latest advice" in html
+
+
+def test_send_report_file_response_blocks_path_traversal(tmp_path):
+    service = WorkflowService(project_root=".", runs_root=tmp_path / "runs")
+    record = service.run_scenario(CONFIG, TABLES, "day_1_progression")
+    secret = tmp_path / "runs" / "secret.txt"
+    secret.write_text("outside-report", encoding="utf-8")
+
+    status, content_type, body = dashboard.send_report_file_response(
+        service,
+        f"{record.run_id}/../secret.txt",
+    )
+
+    assert status == HTTPStatus.NOT_FOUND
+    assert content_type == "text/plain; charset=utf-8"
+    assert body == b"Not found"
+
+
+def test_dashboard_serves_shared_report_assets(tmp_path):
+    service = WorkflowService(project_root=".", runs_root=tmp_path / "runs")
+    record = service.run_scenario(CONFIG, TABLES, "day_1_progression")
+
+    for relative in [
+        f"{record.run_id}/report_data.json",
+        f"{record.run_id}/assets/report.js",
+        f"{record.run_id}/assets/echarts.min.js",
+    ]:
+        status, content_type, body = dashboard.send_report_file_response(service, relative)
+        assert status == HTTPStatus.OK
+        assert content_type
+        assert body
 
 
 def test_cli_dashboard_help_exposes_local_server_options():
