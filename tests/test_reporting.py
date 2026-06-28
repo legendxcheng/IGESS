@@ -83,6 +83,20 @@ def test_generate_static_report_writes_html_and_assets(tmp_path):
     assert '<script id="igess-report-data" type="application/json">' in html
 
 
+def test_generate_static_report_writes_chart_rendering_asset(tmp_path):
+    run_dir = _write_sample_run(tmp_path)
+    report_dir = tmp_path / "report"
+
+    generate_static_report(run_dir, report_dir)
+
+    script = (report_dir / "assets" / "report.js").read_text(encoding="utf-8")
+    assert "echarts.init" in script
+    assert "renderResourceChart" in script
+    assert "renderCpsChart" in script
+    assert "renderEventChart" in script
+    assert "renderPaybackChart" in script
+
+
 def test_generate_static_report_embeds_parseable_json_payload(tmp_path):
     run_dir = _write_sample_run(tmp_path)
     report_dir = tmp_path / "report"

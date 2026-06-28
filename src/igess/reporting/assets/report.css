@@ -65,6 +65,12 @@ h2 {
   cursor: pointer;
 }
 
+.controls button.active {
+  background: #d4e9fb;
+  border-color: #477da8;
+  font-weight: 700;
+}
+
 .empty {
   border: 1px dashed #b8c4d1;
   border-radius: 6px;
@@ -87,6 +93,12 @@ td {
 
 details {
   margin: 8px 0;
+}
+
+[data-diagnostics] {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
 }
 
 code {
