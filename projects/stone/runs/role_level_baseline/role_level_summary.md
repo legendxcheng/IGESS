@@ -3,6 +3,7 @@
 RoleLv source: `E:\stone-oasis\data-tables\Datas\RoleLv.xlsx`
 Attribute definition source: `E:\stone-oasis\data-tables\Datas\CharacterAttributeDef.xlsx`
 
+Number backend: `bignum_log` (`igess.numbers.SimNumber`)
 Level count: 300
 Min level: 1
 Max level: 300
