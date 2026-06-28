@@ -73,8 +73,32 @@ def test_generate_static_report_writes_html_and_assets(tmp_path):
     assert "Payback" in html
     assert "Analysis Warnings" in html
     assert "fisherman" in html
+    assert (report_dir / "report_data.json").exists()
+    assert (report_dir / "assets" / "echarts.min.js").exists()
     assert (report_dir / "assets" / "report.css").exists()
     assert (report_dir / "assets" / "report.js").exists()
+    assert 'src="assets/echarts.min.js"' in html
+    assert 'src="assets/report.js"' in html
+    assert 'data-report-src="report_data.json"' in html
+    assert '<script id="igess-report-data" type="application/json">' in html
+
+
+def test_generate_static_report_embeds_parseable_json_payload(tmp_path):
+    run_dir = _write_sample_run(tmp_path)
+    report_dir = tmp_path / "report"
+
+    generated = generate_static_report(run_dir, report_dir)
+
+    html = generated.read_text(encoding="utf-8")
+    marker = '<script id="igess-report-data" type="application/json">'
+    start = html.index(marker) + len(marker)
+    end = html.index("</script>", start)
+    inline_payload = json.loads(html[start:end])
+    file_payload = json.loads((report_dir / "report_data.json").read_text(encoding="utf-8"))
+    assert inline_payload == file_payload
+    assert inline_payload["schema_version"] == 1
+    assert inline_payload["series"]["resources"]
+    assert "&quot;" not in html[start:end]
 
 
 def test_cli_report_generates_static_report(tmp_path):

@@ -1,0 +1,94 @@
+:root {
+  color-scheme: light;
+  font-family: Segoe UI, Arial, sans-serif;
+  background: #f5f7fa;
+  color: #17202a;
+}
+
+body {
+  margin: 0;
+}
+
+main {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+h1 {
+  font-size: 30px;
+  margin: 0 0 18px;
+}
+
+h2 {
+  font-size: 18px;
+  margin: 0 0 12px;
+}
+
+.band {
+  background: #fff;
+  border: 1px solid #d8dee6;
+  border-radius: 6px;
+  margin: 14px 0;
+  padding: 18px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.metric {
+  border: 1px solid #e3e8ef;
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.chart {
+  min-height: 320px;
+  width: 100%;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.controls button {
+  border: 1px solid #8aa0b8;
+  background: #edf4fb;
+  border-radius: 4px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.empty {
+  border: 1px dashed #b8c4d1;
+  border-radius: 6px;
+  padding: 16px;
+  color: #536273;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+th,
+td {
+  border-bottom: 1px solid #e3e8ef;
+  padding: 8px;
+  text-align: left;
+}
+
+details {
+  margin: 8px 0;
+}
+
+code {
+  overflow-wrap: anywhere;
+}
