@@ -1,0 +1,24 @@
+{
+  "project": "stone",
+  "model": "realm_progression_baseline",
+  "number_backend": "bignum_log",
+  "number_type": "igess.numbers.SimNumber",
+  "sources": {
+    "role_realm": "E:\\stone-oasis\\data-tables\\Datas\\RoleRealm.xlsx",
+    "attribute_def": "E:\\stone-oasis\\data-tables\\Datas\\CharacterAttributeDef.xlsx"
+  },
+  "artifacts": [
+    "realm_progression_curve.json",
+    "realm_progression_curve.csv",
+    "realm_progression_summary.md",
+    "source_manifest.json"
+  ],
+  "formula": {
+    "big_number_parts": "sign * coeff * 10^exp",
+    "big_number_or_integer": "value * powerValue",
+    "ratio_bps": "value / 10000 * powerValue",
+    "level_combat_power": "not included"
+  },
+  "realm_count": 31,
+  "max_realm_id": 30
+}
