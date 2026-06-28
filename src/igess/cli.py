@@ -18,7 +18,12 @@ from .reporting.loader import ReportLoadError
 from .reporting.static import generate_static_report
 from .scan import run_scan
 from .simulator import Simulator
-from .stone_role_level import build_role_level_curve, write_role_level_artifacts
+from .stone_role_level import (
+    build_realm_progression_curve,
+    build_role_level_curve,
+    write_realm_progression_artifacts,
+    write_role_level_artifacts,
+)
 from .templates import init_project
 from .verification import review_proposal, verify_edits
 from .yaml_plan import PlanValidationError, apply_yaml_plan, create_yaml_plan
@@ -34,6 +39,10 @@ def build_parser() -> argparse.ArgumentParser:
     stone_role_level.add_argument("--role-lv", required=True)
     stone_role_level.add_argument("--attribute-def", required=True)
     stone_role_level.add_argument("--out", required=True)
+    stone_realm_progression = subparsers.add_parser("stone-realm-progression")
+    stone_realm_progression.add_argument("--role-realm", required=True)
+    stone_realm_progression.add_argument("--attribute-def", required=True)
+    stone_realm_progression.add_argument("--out", required=True)
     report = subparsers.add_parser("report")
     report.add_argument("--run", required=True)
     report.add_argument("--out", required=True)
@@ -123,6 +132,14 @@ def main(argv: list[str] | None = None) -> int:
             artifacts = write_role_level_artifacts(curve, args.out)
             print(
                 "Wrote stone role level model to "
+                f"{args.out} ({len(artifacts)} artifact(s))"
+            )
+            return 0
+        if args.command == "stone-realm-progression":
+            curve = build_realm_progression_curve(args.role_realm, args.attribute_def)
+            artifacts = write_realm_progression_artifacts(curve, args.out)
+            print(
+                "Wrote stone realm progression model to "
                 f"{args.out} ({len(artifacts)} artifact(s))"
             )
             return 0
