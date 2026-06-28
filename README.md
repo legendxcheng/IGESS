@@ -152,6 +152,35 @@ table recommendations, and YAML recommendations that require explicit approval.
 The dashboard also exposes an Agent Analyst panel backed by the same advice
 artifacts.
 
+## v0.8 Human Edit Verification
+
+v0.8 closes the loop after an Agent produces human-only table recommendations.
+It reviews proposal artifacts, lets designers edit Luban/Excel source tables by
+hand, then verifies whether the current exported table values match the
+recommendation and still pass deterministic simulation checks.
+
+Review an advice or tuning-style proposal:
+
+```powershell
+.\.venv\Scripts\python -m igess.cli review-proposal --proposal .tmp/advice/advice.json --out .tmp/proposal_review
+```
+
+Verify edits against already-exported tables:
+
+```powershell
+.\.venv\Scripts\python -m igess.cli verify-edits --config examples/shelldiver_v0/economy.yaml --tables examples/shelldiver_v0/luban_exports --proposal .tmp/advice/advice.json --scenario day_1_progression --out .tmp/verify
+```
+
+Verify edits from Luban source workbooks without modifying the source files:
+
+```powershell
+.\.venv\Scripts\python -m igess.cli verify-edits --config examples/shelldiver_v0/economy.yaml --datas data-tables/Datas --proposal .tmp/advice/advice.json --scenario day_1_progression --out .tmp/verify
+```
+
+Outputs include `proposal_review.json`, `proposal_review.md`,
+`verification_report.json`, `verification_report.md`, and a fresh simulation run
+under the verification output directory.
+
 ## Implemented Scope
 
 Implemented now:
@@ -180,6 +209,7 @@ Implemented now:
 - Regression gates with `gate`.
 - Project initialization, diagnostics, and event explanation with `init`, `doctor`, and `explain`.
 - Agent Analyst workflow with `advise`, `review-run`, `yaml-plan`, and `yaml-apply`.
+- Human edit verification with `review-proposal` and `verify-edits`.
 - Windows sample runner: `.\scripts\run_sample.ps1`.
 
 Still deferred:

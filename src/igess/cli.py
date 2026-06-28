@@ -19,6 +19,7 @@ from .reporting.static import generate_static_report
 from .scan import run_scan
 from .simulator import Simulator
 from .templates import init_project
+from .verification import review_proposal, verify_edits
 from .yaml_plan import PlanValidationError, apply_yaml_plan, create_yaml_plan
 
 
@@ -57,6 +58,17 @@ def build_parser() -> argparse.ArgumentParser:
     review.add_argument("--run", required=True)
     review.add_argument("--out", required=True)
     review.add_argument("--baseline")
+    proposal_review = subparsers.add_parser("review-proposal")
+    proposal_review.add_argument("--proposal", required=True)
+    proposal_review.add_argument("--out", required=True)
+    verify = subparsers.add_parser("verify-edits")
+    verify.add_argument("--config", required=True)
+    verify.add_argument("--proposal", required=True)
+    verify.add_argument("--scenario", required=True)
+    verify.add_argument("--out", required=True)
+    verify.add_argument("--tables")
+    verify.add_argument("--datas")
+    verify.add_argument("--baseline")
     yaml_plan = subparsers.add_parser("yaml-plan")
     yaml_plan.add_argument("--config", required=True)
     yaml_plan.add_argument("--intent", required=True)
@@ -128,6 +140,25 @@ def main(argv: list[str] | None = None) -> int:
             advice = review_run(args.run, args.out, args.baseline)
             print(f"Wrote advice to {args.out} ({advice['status']})")
             return 0
+        if args.command == "review-proposal":
+            review = review_proposal(args.proposal, args.out)
+            print(
+                f"Wrote proposal review to {args.out} "
+                f"({review['recommendation_count']} recommendation(s))"
+            )
+            return 0
+        if args.command == "verify-edits":
+            report = verify_edits(
+                args.config,
+                args.proposal,
+                args.scenario,
+                args.out,
+                tables=args.tables,
+                datas=args.datas,
+                baseline=args.baseline,
+            )
+            print(f"Wrote edit verification to {args.out} ({report['status']})")
+            return 0 if report["status"] in {"passed", "needs_review"} else 1
         if args.command == "yaml-plan":
             create_yaml_plan(args.config, args.intent, args.out)
             print(f"Wrote YAML plan to {args.out}")
