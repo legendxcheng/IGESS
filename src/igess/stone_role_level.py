@@ -3,32 +3,30 @@ from __future__ import annotations
 import csv
 import json
 from dataclasses import dataclass
-from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
 from openpyxl import load_workbook
 
-
-_TEN = Decimal(10)
+from .numbers import SimNumber
 
 
 @dataclass(frozen=True)
 class AttributeDefinition:
     key: str
     value_type: str
-    power_value: Decimal
+    power_value: SimNumber
     enabled: bool
 
 
 @dataclass(frozen=True)
 class RoleLevelRow:
     level: int
-    exp_req: Decimal
-    cumulative_exp_to_level_start: Decimal
-    cumulative_exp_to_next_level: Decimal
-    combat_power: Decimal
-    combat_power_delta: Decimal | None
+    exp_req: SimNumber
+    cumulative_exp_to_level_start: SimNumber
+    cumulative_exp_to_next_level: SimNumber
+    combat_power: SimNumber
+    combat_power_delta: SimNumber | None
 
 
 @dataclass(frozen=True)
@@ -54,10 +52,10 @@ def build_role_level_curve(
     definitions = _load_attribute_definitions(attribute_def)
     role_rows = _load_role_level_rows(role_lv)
     curve_rows: list[RoleLevelRow] = []
-    cumulative_exp = Decimal(0)
-    previous_power: Decimal | None = None
+    cumulative_exp = SimNumber.zero()
+    previous_power: SimNumber | None = None
     for values in role_rows:
-        level = int(values["id"])
+        level = int(values["id"].decimal)
         exp_req = values["expReq"]
         combat_power = _calculate_combat_power(values, definitions)
         curve_rows.append(
@@ -139,22 +137,22 @@ def _load_attribute_definitions(path: Path) -> dict[str, AttributeDefinition]:
         definitions[str(key)] = AttributeDefinition(
             key=str(key),
             value_type=str(data.get("valueType") or ""),
-            power_value=_decimal(data.get("powerValue")),
+            power_value=_sim_number(data.get("powerValue")),
             enabled=int(data.get("enabled") or 0) == 1,
         )
     return definitions
 
 
-def _load_role_level_rows(path: Path) -> list[dict[str, Decimal]]:
+def _load_role_level_rows(path: Path) -> list[dict[str, SimNumber]]:
     rows = _read_workbook_rows(path)
     if len(rows) < 6:
         raise ValueError(f"{path} does not contain RoleLv data rows")
     column_specs = _role_level_column_specs(rows[0], rows[2])
-    parsed_rows: list[dict[str, Decimal]] = []
+    parsed_rows: list[dict[str, SimNumber]] = []
     for row in rows[5:]:
         if all(value in (None, "") for value in row[1:]):
             continue
-        values: dict[str, Decimal] = {}
+        values: dict[str, SimNumber] = {}
         for spec in column_specs:
             if spec.value_type == "BigNumberParts":
                 sign_index, coeff_index, exp_index = spec.indexes
@@ -164,7 +162,7 @@ def _load_role_level_rows(path: Path) -> list[dict[str, Decimal]]:
                     row[exp_index],
                 )
             else:
-                values[spec.key] = _decimal(row[spec.indexes[0]])
+                values[spec.key] = _sim_number(row[spec.indexes[0]])
         parsed_rows.append(values)
     return parsed_rows
 
@@ -200,15 +198,23 @@ def _role_level_column_specs(header_row: tuple[Any, ...], type_row: tuple[Any, .
 
 
 def _calculate_combat_power(
-    values: dict[str, Decimal],
+    values: dict[str, SimNumber],
     definitions: dict[str, AttributeDefinition],
-) -> Decimal:
-    power = Decimal(0)
+) -> SimNumber:
+    power = SimNumber.zero()
     for key, value in values.items():
         definition = definitions.get(key)
-        if definition is None or not definition.enabled or definition.power_value <= 0:
+        if (
+            definition is None
+            or not definition.enabled
+            or definition.power_value <= SimNumber.zero()
+        ):
             continue
-        normalized = value / Decimal(10000) if definition.value_type == "ratio_bps" else value
+        normalized = (
+            value / SimNumber.parse(10000)
+            if definition.value_type == "ratio_bps"
+            else value
+        )
         power += normalized * definition.power_value
     return power
 
@@ -236,6 +242,7 @@ def _summary_markdown(result: RoleLevelCurve) -> str:
         f"RoleLv source: `{result.role_lv_path}`",
         f"Attribute definition source: `{result.attribute_def_path}`",
         "",
+        "Number backend: `bignum_log` (`igess.numbers.SimNumber`)",
         f"Level count: {level_count}",
     ]
     if first is not None and last is not None:
@@ -268,6 +275,8 @@ def _source_manifest(result: RoleLevelCurve) -> dict[str, Any]:
     return {
         "project": "stone",
         "model": "role_level_baseline",
+        "number_backend": "bignum_log",
+        "number_type": "igess.numbers.SimNumber",
         "sources": {
             "role_lv": str(result.role_lv_path),
             "attribute_def": str(result.attribute_def_path),
@@ -288,24 +297,20 @@ def _source_manifest(result: RoleLevelCurve) -> dict[str, Any]:
     }
 
 
-def _big_number_parts(sign: Any, coeff: Any, exponent: Any) -> Decimal:
-    return _decimal(sign) * _decimal(coeff) * (_TEN ** int(_decimal(exponent)))
+def _big_number_parts(sign: Any, coeff: Any, exponent: Any) -> SimNumber:
+    return _sim_number(sign) * _sim_number(coeff) * (
+        SimNumber.parse(10) ** int(_sim_number(exponent).decimal)
+    )
 
 
-def _decimal(value: Any) -> Decimal:
+def _sim_number(value: Any) -> SimNumber:
     if value in (None, ""):
-        return Decimal(0)
-    return Decimal(str(value))
+        return SimNumber.zero()
+    return SimNumber.parse(value)
 
 
-def _format_decimal(value: Decimal) -> str:
-    if value == 0:
-        return "0"
-    normalized = value.normalize()
-    text = format(normalized, "f")
-    if "." in text:
-        text = text.rstrip("0").rstrip(".")
-    return text or "0"
+def _format_decimal(value: SimNumber) -> str:
+    return value.to_decimal_string()
 
 
 def _read_workbook_rows(path: Path) -> list[tuple[Any, ...]]:

@@ -1,6 +1,8 @@
 {
   "project": "stone",
   "model": "role_level_baseline",
+  "number_backend": "bignum_log",
+  "number_type": "igess.numbers.SimNumber",
   "sources": {
     "role_lv": "E:\\stone-oasis\\data-tables\\Datas\\RoleLv.xlsx",
     "attribute_def": "E:\\stone-oasis\\data-tables\\Datas\\CharacterAttributeDef.xlsx"

@@ -5,6 +5,7 @@ from pathlib import Path
 import subprocess
 import sys
 
+from igess.numbers import SimNumber
 from igess.stone_role_level import build_role_level_curve, write_role_level_artifacts
 
 
@@ -27,6 +28,20 @@ def test_build_role_level_curve_uses_runtime_power_formula():
     )
 
 
+def test_role_level_curve_uses_igess_sim_number_backend():
+    result = build_role_level_curve(
+        STONE_DATAS / "RoleLv.xlsx",
+        STONE_DATAS / "CharacterAttributeDef.xlsx",
+    )
+
+    first = result.rows[0]
+    last = result.rows[-1]
+    assert isinstance(first.exp_req, SimNumber)
+    assert isinstance(last.cumulative_exp_to_level_start, SimNumber)
+    assert isinstance(last.combat_power, SimNumber)
+    assert last.combat_power.backend == "bignum_log"
+
+
 def test_write_role_level_artifacts_creates_auditable_outputs(tmp_path):
     result = build_role_level_curve(
         STONE_DATAS / "RoleLv.xlsx",
@@ -40,11 +55,14 @@ def test_write_role_level_artifacts_creates_auditable_outputs(tmp_path):
     assert (tmp_path / "role_level_curve.csv").exists()
     summary_path = tmp_path / "role_level_summary.md"
     assert summary_path.exists()
-    assert (tmp_path / "source_manifest.json").exists()
+    manifest_path = tmp_path / "source_manifest.json"
+    assert manifest_path.exists()
 
     rows = json.loads(curve_path.read_text(encoding="utf-8"))
     assert len(rows) == 300
     assert "Level count: 300" in summary_path.read_text(encoding="utf-8")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["number_backend"] == "bignum_log"
 
 
 def test_cli_stone_role_level_writes_artifacts(tmp_path):
