@@ -29,6 +29,34 @@ Outputs are deterministic JSON, CSV, and Markdown files:
 - `analysis.md`
 - `payback.csv`
 
+## Standard RNG Simulation
+
+`rng-run` simulates Roblox-style rarity-score RNG tables without requiring
+Luban table exports:
+
+```powershell
+.\.venv\Scripts\python -m igess.cli rng-run --config examples/shelldiver_v0/economy.yaml --scenario aura_baseline --out .tmp/rng
+```
+
+The sample `aura_roll` table uses:
+
+```text
+roll_power = luck / random(0, 1)
+```
+
+and selects the highest rarity denominator reached by that roll. The simulator
+uses log-space comparison internally, so very large denominators can be modeled
+without computing huge `roll_power` values directly.
+
+Outputs:
+
+- `rng_summary.json`
+- `rng_distribution.csv`
+- `rng_events.json`
+- `rng_events.csv`
+- `rng_analysis.md`
+- `rng_manifest.json`
+
 ## v0.4 Workflow
 
 The normal tuning loop is:
@@ -217,7 +245,6 @@ Implemented now:
 
 Still deferred:
 
-- Probability gates.
 - Build delays.
 - Complex offline caps.
 - Multi-layer prestige balancing beyond the simple configurable layer included in the sample.

@@ -47,6 +47,8 @@ class Rules:
     session_patterns: dict[str, dict[str, Any]]
     player_profiles: dict[str, "PlayerProfile"]
     scenarios: dict[str, "Scenario"]
+    rng_tables: dict[str, "RngTable"]
+    rng_scenarios: dict[str, "RngScenario"]
     regression_gates: dict[str, dict[str, Any]]
 
 
@@ -125,6 +127,7 @@ class PlayerProfile:
     behavior_policy: str
     session_pattern: str
     prestige_policy: str
+    luck: SimNumber = field(default_factory=SimNumber.one)
 
 
 @dataclass
@@ -136,6 +139,29 @@ class Scenario:
     record_interval_seconds: int
     outputs: list[str]
     time_mode: str = "tick"
+
+
+@dataclass(frozen=True)
+class RngRarity:
+    id: str
+    denominator: SimNumber
+
+
+@dataclass
+class RngTable:
+    id: str
+    algorithm: str
+    rarities: list[RngRarity]
+
+
+@dataclass
+class RngScenario:
+    id: str
+    table: str
+    rolls: int
+    trials: int
+    profiles: list[str]
+    event_threshold: str | None = None
 
 
 @dataclass
@@ -175,6 +201,8 @@ class EconomyModel:
     session_patterns: dict[str, dict[str, Any]]
     player_profiles: dict[str, PlayerProfile]
     scenarios: dict[str, Scenario]
+    rng_tables: dict[str, RngTable]
+    rng_scenarios: dict[str, RngScenario]
 
     def generator_cost(self, generator_id: str, owned: int) -> SimNumber:
         generator = self.generators[generator_id]

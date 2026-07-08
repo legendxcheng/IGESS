@@ -36,4 +36,6 @@ class ModelBuilder:
             session_patterns=raw.rules.session_patterns,
             player_profiles=raw.rules.player_profiles,
             scenarios=raw.rules.scenarios,
+            rng_tables=raw.rules.rng_tables,
+            rng_scenarios=raw.rules.rng_scenarios,
         )

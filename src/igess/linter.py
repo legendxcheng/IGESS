@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .conditions import referenced_owned_id
 from .formula import FormulaCompileError, FormulaEngine
+from .numbers import SimNumber
 from .schema import RawConfig
 
 
@@ -13,6 +14,7 @@ class ConfigLinter:
     ALLOWED_BACKENDS = {"bignum_log"}
     ALLOWED_POLICY_TYPES = {"cheap_unlock_first", "fastest_payback", "new_content_bias"}
     ALLOWED_PRESTIGE_POLICIES = {"conservative", "efficient_reset", "milestone_based"}
+    ALLOWED_RNG_ALGORITHMS = {"rarity_score"}
     FORMULA_CONTEXT_ARGS = {
         "cost_formula": {"base_cost", "growth", "owned"},
         "production_formula": {"base_output", "owned", "multiplier"},
@@ -140,6 +142,8 @@ class ConfigLinter:
                     raise ConfigError(
                         f"profile '{profile_id}' unknown source_efficiency key '{source_type}'"
                     )
+            if profile.luck <= SimNumber.zero():
+                raise ConfigError(f"profile '{profile_id}' luck must be positive")
 
         for scenario_id, scenario in rules.scenarios.items():
             if scenario.duration_hours <= 0:
@@ -162,6 +166,49 @@ class ConfigLinter:
                 if profile_id not in rules.player_profiles:
                     raise ConfigError(
                         f"scenario '{scenario_id}' unknown profile '{profile_id}'"
+                    )
+
+        for table_id, table in rules.rng_tables.items():
+            if table.algorithm not in cls.ALLOWED_RNG_ALGORITHMS:
+                raise ConfigError(
+                    f"rng_table '{table_id}' unknown algorithm '{table.algorithm}'"
+                )
+            if not table.rarities:
+                raise ConfigError(f"rng_table '{table_id}' must define at least one rarity")
+            previous = SimNumber.zero()
+            for rarity in table.rarities:
+                if rarity.denominator <= SimNumber.zero():
+                    raise ConfigError(
+                        f"rng_table '{table_id}' rarity '{rarity.id}' denominator must be positive"
+                    )
+                if rarity.denominator <= previous:
+                    raise ConfigError(
+                        f"rng_table '{table_id}' rarity denominators must be strictly increasing"
+                    )
+                previous = rarity.denominator
+
+        for scenario_id, scenario in rules.rng_scenarios.items():
+            if scenario.table not in rules.rng_tables:
+                raise ConfigError(
+                    f"rng_scenario '{scenario_id}' unknown table '{scenario.table}'"
+                )
+            if scenario.rolls <= 0:
+                raise ConfigError(f"rng_scenario '{scenario_id}' rolls must be positive")
+            if scenario.trials <= 0:
+                raise ConfigError(f"rng_scenario '{scenario_id}' trials must be positive")
+            if not scenario.profiles:
+                raise ConfigError(f"rng_scenario '{scenario_id}' must define profiles")
+            for profile_id in scenario.profiles:
+                if profile_id not in rules.player_profiles:
+                    raise ConfigError(
+                        f"rng_scenario '{scenario_id}' unknown profile '{profile_id}'"
+                    )
+            if scenario.event_threshold is not None:
+                rarity_ids = {rarity.id for rarity in rules.rng_tables[scenario.table].rarities}
+                if scenario.event_threshold not in rarity_ids:
+                    raise ConfigError(
+                        f"rng_scenario '{scenario_id}' unknown event_threshold "
+                        f"'{scenario.event_threshold}'"
                     )
 
     @classmethod

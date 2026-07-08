@@ -77,6 +77,7 @@ player_profiles:
     behavior_policy: cheap_unlock_first
     session_pattern: short_sessions
     prestige_policy: conservative
+    luck: 1.5
   optimizer:
     source_efficiency:
       active: 1.0
@@ -87,6 +88,7 @@ player_profiles:
     behavior_policy: fastest_payback
     session_pattern: long_active
     prestige_policy: efficient_reset
+    luck: 5.65
   explorer:
     source_efficiency:
       active: 0.7
@@ -97,6 +99,7 @@ player_profiles:
     behavior_policy: new_content_bias
     session_pattern: medium_sessions
     prestige_policy: milestone_based
+    luck: 2.25
 
 scenarios:
   day_1_progression:
@@ -121,3 +124,22 @@ scenarios:
       - resource_curve
       - purchase_timeline
       - unlock_timeline
+
+rng_tables:
+  aura_roll:
+    algorithm: rarity_score
+    rarities:
+      common: 1
+      rare: 10
+      epic: 100
+      legendary: 1000
+      mythic: 10000
+      secret: 1000000
+
+rng_scenarios:
+  aura_baseline:
+    table: aura_roll
+    rolls: 100000
+    trials: 20
+    profiles: [casual, optimizer, explorer]
+    event_threshold: mythic

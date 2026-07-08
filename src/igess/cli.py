@@ -16,6 +16,8 @@ from .luban_exporter import export_registered_workbooks
 from .outputs import OutputWriter
 from .reporting.loader import ReportLoadError
 from .reporting.static import generate_static_report
+from .rng import RngSimulator
+from .rng_outputs import RngOutputWriter
 from .scan import run_scan
 from .simulator import Simulator
 from .stone_role_level import (
@@ -57,6 +59,10 @@ def build_parser() -> argparse.ArgumentParser:
     scan.add_argument("--scenario", required=True)
     scan.add_argument("--param", required=True)
     scan.add_argument("--out", required=True)
+    rng_run = subparsers.add_parser("rng-run")
+    rng_run.add_argument("--config", required=True)
+    rng_run.add_argument("--scenario", required=True)
+    rng_run.add_argument("--out", required=True)
     gate = subparsers.add_parser("gate")
     gate.add_argument("--base", required=True)
     gate.add_argument("--candidate", required=True)
@@ -154,6 +160,14 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "scan":
             summary = run_scan(args.config, args.tables, args.scenario, args.param, args.out)
             print(f"Wrote scan summary to {summary}")
+            return 0
+        if args.command == "rng-run":
+            raw = ConfigLoader.load_rules_only(args.config)
+            ConfigLinter.validate(raw)
+            model = ModelBuilder.build(raw)
+            result = RngSimulator(model).run_scenario(args.scenario)
+            RngOutputWriter.write_all(result, args.out, model)
+            print(f"Wrote RNG simulation outputs to {args.out}")
             return 0
         if args.command == "gate":
             result = evaluate_gates(args.base, args.candidate, args.config, args.out)
