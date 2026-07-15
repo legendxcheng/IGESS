@@ -325,6 +325,7 @@ class TimelineRow:
     generators_owned: dict[str, int]
     upgrades_purchased: list[str]
     total_cps: str
+    prestige_counts: dict[str, int] = field(default_factory=dict)
 
     def to_ordered_dict(self) -> dict[str, Any]:
         return {

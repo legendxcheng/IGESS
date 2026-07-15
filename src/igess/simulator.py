@@ -190,6 +190,8 @@ class Simulator:
             income[generator.output_resource] = (
                 income.get(generator.output_resource, SimNumber.zero()) + output * efficiency
             )
+        for resource_id, amount in self._activity_cps(profile_id, state).items():
+            income[resource_id] = income.get(resource_id, SimNumber.zero()) + amount
         return income
 
     def _produce(self, profile_id: str, state: SimulationState, delta_seconds: int) -> None:
@@ -204,6 +206,41 @@ class Simulator:
             state.resources[generator.output_resource] = (
                 state.resources[generator.output_resource] + produced
             )
+        for resource_id, amount_per_second in self._activity_cps(profile_id, state).items():
+            produced = amount_per_second * SimNumber.parse(delta_seconds)
+            state.resources[resource_id] = state.resources[resource_id] + produced
+
+    def _activity_cps(self, profile_id: str, state: SimulationState) -> dict[str, SimNumber]:
+        profile = self.model.player_profiles[profile_id]
+        shares = self._activity_shares(profile_id, state)
+        income: dict[str, SimNumber] = {}
+        if not shares:
+            return income
+        for output in self.model.activity_outputs.values():
+            share = shares.get(output.activity_id)
+            if share is None:
+                continue
+            activity = self.model.activities[output.activity_id]
+            efficiency = profile.source_efficiency.get(activity.source_type, SimNumber.one())
+            amount = SimNumber.parse(output.amount_per_second) * share * efficiency
+            income[output.output_resource] = income.get(output.output_resource, SimNumber.zero()) + amount
+        return income
+
+    def _activity_shares(
+        self, profile_id: str, state: SimulationState
+    ) -> dict[str, SimNumber]:
+        profile = self.model.player_profiles[profile_id]
+        weights: dict[str, SimNumber] = {}
+        for activity_id in sorted(state.unlocked_activities):
+            weight = profile.activity_weights.get(activity_id, SimNumber.zero())
+            if weight > SimNumber.zero():
+                weights[activity_id] = weight
+        total = sum(weights.values(), SimNumber.zero())
+        if total <= SimNumber.zero():
+            return {}
+        return {
+            activity_id: weight / total for activity_id, weight in weights.items()
+        }
 
     def _apply_offline_reward(
         self,
@@ -399,6 +436,21 @@ class Simulator:
                         self.model.source_details("generator", generator_id),
                     )
                 )
+        for activity_id, activity in self.model.activities.items():
+            if activity_id in state.unlocked_activities:
+                continue
+            if evaluate(activity.unlock_condition, lambda item_id: state.generators_owned.get(item_id, 0)):
+                state.unlocked_activities.add(activity_id)
+                events.append(
+                    Event(
+                        scenario_id,
+                        profile_id,
+                        current_time,
+                        "unlock_activity",
+                        activity_id,
+                        self.model.source_details("activity", activity_id),
+                    )
+                )
         for upgrade_id, upgrade in self.model.upgrades.items():
             if upgrade_id in state.unlocked_upgrades:
                 continue
@@ -429,6 +481,7 @@ class Simulator:
             generators_owned={key: state.generators_owned[key] for key in sorted(state.generators_owned)},
             upgrades_purchased=sorted(state.upgrades_purchased),
             total_cps=self._total_cps(profile_id, state).to_decimal_string(),
+            prestige_counts={key: state.prestige_counts[key] for key in sorted(state.prestige_counts)},
         )
 
     def _total_cps(self, profile_id: str, state: SimulationState) -> SimNumber:

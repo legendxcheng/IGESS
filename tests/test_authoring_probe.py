@@ -1,15 +1,19 @@
 from __future__ import annotations
 
 import copy
-from dataclasses import FrozenInstanceError
+from dataclasses import FrozenInstanceError, replace
 from datetime import date
 import json
+import os
+from pathlib import Path
 
 import pytest
 
 from igess.authoring.probe import (
     EligibilityFinding,
     EligibilityResult,
+    TenTickProbeResult,
+    run_ten_tick_probe,
     static_smoke_eligibility,
 )
 from igess.authoring.response import AuthoringError
@@ -30,7 +34,10 @@ from igess.schema import (
     ResourceRow,
     Rules,
     Scenario,
+    Event,
+    SimulationResult,
     SimulationState,
+    TimelineRow,
 )
 
 
@@ -846,3 +853,304 @@ def test_programmer_type_error_is_not_silently_converted(monkeypatch) -> None:
 
     with pytest.raises(TypeError, match="programmer mistake"):
         static_smoke_eligibility(raw, model)
+
+
+def test_ten_tick_probe_is_frozen_json_safe_exact_and_non_mutating(tmp_path) -> None:
+    raw = _raw(route="activity")
+    raw.rules.model.tick_seconds = 3
+    raw.rules.scenarios["smoke"].duration_hours = 999
+    raw.rules.scenarios["smoke"].record_interval_seconds = 17
+    raw.rules.scenarios["smoke"].time_mode = "analytic"
+    model = ModelBuilder.build(raw)
+    scenario_before = copy.deepcopy(model.scenarios["smoke"])
+
+    result = run_ten_tick_probe(model)
+
+    assert isinstance(result, TenTickProbeResult)
+    assert result.observable_change is True
+    assert result.findings == ()
+    assert result.artifacts == ()
+    assert result.report_index is None
+    assert model.scenarios["smoke"] == scenario_before
+    assert list(tmp_path.iterdir()) == []
+    payload = result.to_payload()
+    assert payload == {
+        "observable_change": True,
+        "findings": [],
+        "artifacts": [],
+        "report_index": None,
+    }
+    json.dumps(payload)
+    with pytest.raises(FrozenInstanceError):
+        result.observable_change = False  # type: ignore[misc]
+
+
+def test_ten_tick_probe_result_defensively_normalizes_only_path_values(tmp_path) -> None:
+    finding = EligibilityFinding("notice", "Notice")
+    source_findings = [finding]
+    source_artifacts = [tmp_path / "b.json", str(tmp_path / "a.json")]
+
+    result = TenTickProbeResult(
+        False,
+        source_findings,  # type: ignore[arg-type]
+        source_artifacts,  # type: ignore[arg-type]
+        tmp_path / "index.html",  # type: ignore[arg-type]
+    )
+    source_findings.clear()
+    source_artifacts.clear()
+
+    assert result.findings == (finding,)
+    assert result.artifacts == (
+        str(tmp_path / "b.json"),
+        str(tmp_path / "a.json"),
+    )
+    assert result.report_index == str(tmp_path / "index.html")
+    json.dumps(result.to_payload())
+    with pytest.raises(TypeError):
+        TenTickProbeResult(False, (), (123,))  # type: ignore[arg-type]
+    with pytest.raises(TypeError):
+        TenTickProbeResult(False, (), (), 123)  # type: ignore[arg-type]
+
+
+def _timeline_row(
+    profile_id: str,
+    time_seconds: int,
+    *,
+    resource: str = "0",
+    owned: int = 0,
+    purchased: tuple[str, ...] = (),
+    prestige: int = 0,
+) -> TimelineRow:
+    return TimelineRow(
+        scenario_id="smoke",
+        profile_id=profile_id,
+        time_seconds=time_seconds,
+        resources={"gold": resource},
+        generators_owned={"mine": owned},
+        upgrades_purchased=list(purchased),
+        total_cps="999",
+        prestige_counts={"rebirth": prestige},
+    )
+
+
+@pytest.mark.parametrize(
+    "final",
+    [
+        _timeline_row("alpha", 10, resource="0.0000000000000000000000000001"),
+        _timeline_row("alpha", 10, owned=1),
+        _timeline_row("alpha", 10, purchased=("boost",)),
+        _timeline_row("alpha", 10, prestige=1),
+    ],
+    ids=("resource", "owned_generator", "purchased_upgrade", "prestige_count"),
+)
+def test_ten_tick_probe_detects_each_exact_state_category(monkeypatch, final) -> None:
+    model = ModelBuilder.build(_raw())
+    simulation = SimulationResult(
+        "smoke",
+        [_timeline_row("alpha", 0), final],
+        [],
+    )
+    monkeypatch.setattr(
+        "igess.authoring.probe.Simulator.run_scenario",
+        lambda self, scenario_id: simulation,
+    )
+
+    result = run_ten_tick_probe(model)
+
+    assert result.observable_change is True
+    assert result.findings == ()
+
+
+def test_elapsed_cps_unlocks_events_and_decimal_spelling_do_not_count(monkeypatch) -> None:
+    model = ModelBuilder.build(_raw())
+    simulation = SimulationResult(
+        "smoke",
+        [
+            _timeline_row("zeta", 0, resource="1"),
+            _timeline_row("zeta", 10, resource="1.0"),
+            _timeline_row("alpha", 0, resource="0"),
+            _timeline_row("alpha", 10, resource="0e99"),
+        ],
+        [Event("smoke", "alpha", 0, "unlock_generator", "mine", {})],
+    )
+    monkeypatch.setattr(
+        "igess.authoring.probe.Simulator.run_scenario",
+        lambda self, scenario_id: simulation,
+    )
+
+    result = run_ten_tick_probe(model)
+
+    assert result.observable_change is False
+    assert [finding.code for finding in result.findings] == ["smoke_no_state_change"]
+    assert result.to_payload()["findings"] == [
+        {
+            "code": "smoke_no_state_change",
+            "message": "The ten-tick smoke probe completed without an observable state change.",
+        }
+    ]
+
+
+@pytest.mark.parametrize(
+    "break_model",
+    [
+        lambda model: replace(model, config=replace(model.config, tick_seconds=0)),
+        lambda model: replace(model, scenarios={}),
+        lambda model: replace(
+            model,
+            scenarios={"smoke": replace(model.scenarios["smoke"], profiles=[])},
+        ),
+        lambda model: replace(
+            model,
+            scenarios={"smoke": replace(model.scenarios["smoke"], profiles=["missing"])},
+        ),
+    ],
+    ids=("nonpositive_tick", "missing_scenario", "empty_profiles", "unknown_profile"),
+)
+def test_ten_tick_probe_reports_build_setup_failures(break_model) -> None:
+    model = break_model(ModelBuilder.build(_raw(route="activity")))
+
+    with pytest.raises(AuthoringError) as caught:
+        run_ten_tick_probe(model)
+
+    assert caught.value.code == "smoke_failed"
+    assert caught.value.details["phase"] == "build"
+    assert isinstance(caught.value.details["original_type"], str)
+    json.dumps(dict(caught.value.details))
+
+
+def test_ten_tick_probe_splits_simulator_construction_and_execution_failures(
+    monkeypatch,
+) -> None:
+    model = ModelBuilder.build(_raw(route="activity"))
+
+    class BrokenSimulator:
+        def __init__(self, model) -> None:
+            raise LookupError("could not build")
+
+    monkeypatch.setattr("igess.authoring.probe.Simulator", BrokenSimulator)
+    with pytest.raises(AuthoringError) as build:
+        run_ten_tick_probe(model)
+    assert dict(build.value.details) == {
+        "original_type": "LookupError",
+        "phase": "build",
+    }
+
+    class RunBrokenSimulator:
+        def __init__(self, model) -> None:
+            pass
+
+        def run_scenario(self, scenario_id):
+            raise RuntimeError("could not execute")
+
+    monkeypatch.setattr("igess.authoring.probe.Simulator", RunBrokenSimulator)
+    with pytest.raises(AuthoringError) as execution:
+        run_ten_tick_probe(model)
+    assert dict(execution.value.details) == {
+        "original_type": "RuntimeError",
+        "phase": "execution",
+    }
+
+
+def test_ten_tick_probe_does_not_convert_cancellation(monkeypatch) -> None:
+    model = ModelBuilder.build(_raw(route="activity"))
+
+    class CancelledSimulator:
+        def __init__(self, model) -> None:
+            raise KeyboardInterrupt()
+
+    monkeypatch.setattr("igess.authoring.probe.Simulator", CancelledSimulator)
+    with pytest.raises(KeyboardInterrupt):
+        run_ten_tick_probe(model)
+
+
+def test_ten_tick_probe_atomically_publishes_complete_run_and_report(tmp_path) -> None:
+    model = ModelBuilder.build(_raw(route="activity"))
+    artifact_root = tmp_path / "probe"
+
+    result = run_ten_tick_probe(model, artifact_root=artifact_root)
+
+    assert artifact_root.is_dir()
+    assert result.report_index == str(artifact_root / "report" / "index.html")
+    assert result.artifacts == tuple(sorted(result.artifacts))
+    assert result.artifacts
+    assert all(Path(path).is_file() for path in result.artifacts)
+    assert str(artifact_root / "run" / "timeline.json") in result.artifacts
+    assert result.report_index in result.artifacts
+    timeline = json.loads(
+        (artifact_root / "run" / "timeline.json").read_text(encoding="utf-8")
+    )
+    assert {row["time_seconds"] for row in timeline} == set(range(11))
+    json.loads((artifact_root / "report" / "report_data.json").read_text(encoding="utf-8"))
+    assert not list(tmp_path.glob(".probe-probe-*"))
+
+
+@pytest.mark.parametrize("failure_point", ["writer", "report"])
+def test_ten_tick_probe_artifact_failures_leave_no_partial_target(
+    tmp_path, monkeypatch, failure_point
+) -> None:
+    model = ModelBuilder.build(_raw(route="activity"))
+    artifact_root = tmp_path / "probe"
+
+    if failure_point == "writer":
+        def fail_writer(result, output_dir, model=None, overrides=None):
+            output = Path(output_dir)
+            output.mkdir(parents=True)
+            (output / "partial.txt").write_text("partial", encoding="utf-8")
+            raise OSError("writer failed")
+
+        monkeypatch.setattr("igess.authoring.probe.OutputWriter.write_all", fail_writer)
+    else:
+        def fail_report(run_dir, output_dir, title=None):
+            output = Path(output_dir)
+            output.mkdir(parents=True)
+            (output / "partial.txt").write_text("partial", encoding="utf-8")
+            raise ValueError("report failed")
+
+        monkeypatch.setattr("igess.authoring.probe.generate_static_report", fail_report)
+
+    with pytest.raises(AuthoringError) as caught:
+        run_ten_tick_probe(model, artifact_root=artifact_root)
+
+    assert caught.value.code == "smoke_failed"
+    assert dict(caught.value.details) == {
+        "original_type": "OSError" if failure_point == "writer" else "ValueError",
+        "phase": "artifact",
+    }
+    assert not artifact_root.exists()
+    assert not list(tmp_path.glob(".probe-probe-*"))
+
+
+def test_ten_tick_probe_preserves_preexisting_nonempty_artifact_target(tmp_path) -> None:
+    model = ModelBuilder.build(_raw(route="activity"))
+    artifact_root = tmp_path / "probe"
+    artifact_root.mkdir()
+    sentinel = artifact_root / "mine.txt"
+    sentinel.write_text("keep", encoding="utf-8")
+
+    with pytest.raises(AuthoringError) as caught:
+        run_ten_tick_probe(model, artifact_root=artifact_root)
+
+    assert caught.value.code == "smoke_failed"
+    assert caught.value.details["phase"] == "artifact"
+    assert sentinel.read_text(encoding="utf-8") == "keep"
+    assert list(artifact_root.iterdir()) == [sentinel]
+
+
+def test_ten_tick_probe_treats_publish_replace_then_raise_as_committed(
+    tmp_path, monkeypatch
+) -> None:
+    model = ModelBuilder.build(_raw(route="activity"))
+    artifact_root = tmp_path / "probe"
+    real_replace = os.replace
+
+    def replace_then_raise(source, target):
+        real_replace(source, target)
+        if Path(target) == artifact_root:
+            raise OSError("reported failure after rename")
+
+    monkeypatch.setattr("igess.authoring.probe.os.replace", replace_then_raise)
+
+    result = run_ten_tick_probe(model, artifact_root=artifact_root)
+
+    assert Path(result.report_index).is_file()
+    assert artifact_root.is_dir()

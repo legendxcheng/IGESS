@@ -5,13 +5,21 @@ from __future__ import annotations
 import ast
 from collections import Counter
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal, DecimalException
+import json
+import os
+from pathlib import Path
+import shutil
+import tempfile
 from typing import Any, NoReturn
 
 from ..formula import CompiledFormula, FormulaCompileError, FormulaEngine
 from ..linter import ConfigError, ConfigLinter
 from ..numbers import SimNumber
+from ..outputs import OutputWriter
+from ..reporting.static import generate_static_report
+from ..simulator import Simulator
 from ..schema import (
     ActivityOutputRow,
     ActivityRow,
@@ -86,6 +94,336 @@ class EligibilityResult:
             "eligible": self.eligible,
             "findings": [finding.to_payload() for finding in self.findings],
         }
+
+
+@dataclass(frozen=True, slots=True)
+class TenTickProbeResult:
+    """Outcome of one deterministic, in-memory ten-tick simulation."""
+
+    observable_change: bool
+    findings: tuple[EligibilityFinding, ...]
+    artifacts: tuple[str, ...] = ()
+    report_index: str | None = None
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.observable_change, bool):
+            raise TypeError("observable_change must be a bool")
+        findings = tuple(self.findings)
+        if any(not isinstance(finding, EligibilityFinding) for finding in findings):
+            raise TypeError("findings must contain EligibilityFinding values")
+        if isinstance(self.artifacts, (str, bytes, bytearray)):
+            raise TypeError("artifacts must be a collection of string or Path values")
+        artifact_values = tuple(self.artifacts)
+        if any(not isinstance(path, (str, Path)) for path in artifact_values):
+            raise TypeError("artifacts must contain only string or Path values")
+        artifacts = tuple(str(path) for path in artifact_values)
+        object.__setattr__(self, "findings", findings)
+        object.__setattr__(self, "artifacts", artifacts)
+        if self.report_index is not None:
+            if not isinstance(self.report_index, (str, Path)):
+                raise TypeError("report_index must be a string, Path, or None")
+            object.__setattr__(self, "report_index", str(self.report_index))
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "observable_change": self.observable_change,
+            "findings": [finding.to_payload() for finding in self.findings],
+            "artifacts": list(self.artifacts),
+            "report_index": self.report_index,
+        }
+
+
+def run_ten_tick_probe(
+    model: EconomyModel,
+    scenario_id: str = "smoke",
+    artifact_root: str | Path | None = None,
+) -> TenTickProbeResult:
+    """Run exactly ten fixed ticks without mutating the caller's model."""
+
+    try:
+        probe_model = _build_probe_model(model, scenario_id)
+        simulator = Simulator(probe_model)
+    except Exception as exc:
+        _raise_smoke_failed("build", exc)
+
+    try:
+        result = simulator.run_scenario(scenario_id)
+        observable = _probe_has_observable_change(result.timeline)
+    except Exception as exc:
+        _raise_smoke_failed("execution", exc)
+
+    findings = () if observable else (
+        EligibilityFinding(
+            "smoke_no_state_change",
+            "The ten-tick smoke probe completed without an observable state change.",
+        ),
+    )
+    if artifact_root is None:
+        return TenTickProbeResult(observable, findings)
+
+    try:
+        artifacts, report_index = _write_probe_artifacts(
+            result,
+            probe_model,
+            Path(artifact_root),
+        )
+    except Exception as exc:
+        if isinstance(exc, AuthoringError) and exc.code == "smoke_failed":
+            raise
+        _raise_smoke_failed("artifact", exc)
+    return TenTickProbeResult(observable, findings, artifacts, report_index)
+
+
+def _build_probe_model(model: EconomyModel, scenario_id: str) -> EconomyModel:
+    if not isinstance(model, EconomyModel):
+        raise TypeError("model must be an EconomyModel")
+    if not isinstance(scenario_id, str) or not scenario_id:
+        raise ValueError("scenario_id must be a non-empty string")
+    tick_seconds = model.config.tick_seconds
+    if isinstance(tick_seconds, bool) or not isinstance(tick_seconds, int) or tick_seconds <= 0:
+        raise ValueError("model tick_seconds must be a positive integer")
+    if scenario_id not in model.scenarios:
+        raise KeyError(f"unknown scenario '{scenario_id}'")
+    scenario = model.scenarios[scenario_id]
+    if not isinstance(scenario, Scenario):
+        raise TypeError(f"scenario '{scenario_id}' is malformed")
+    if not isinstance(scenario.profiles, list) or not scenario.profiles:
+        raise ValueError(f"scenario '{scenario_id}' must reference at least one profile")
+    if any(
+        not isinstance(profile_id, str) or not profile_id or profile_id not in model.player_profiles
+        for profile_id in scenario.profiles
+    ):
+        raise KeyError(f"scenario '{scenario_id}' references an unknown profile")
+    if not isinstance(scenario.outputs, list):
+        raise TypeError(f"scenario '{scenario_id}' outputs must be a list")
+
+    probe_scenario = replace(
+        scenario,
+        duration_hours=Decimal(tick_seconds * 10) / Decimal(3600),
+        profiles=list(scenario.profiles),
+        outputs=list(scenario.outputs),
+        record_interval_seconds=tick_seconds,
+        time_mode="tick",
+    )
+    return replace(
+        model,
+        scenarios={**model.scenarios, scenario_id: probe_scenario},
+    )
+
+
+def _raise_smoke_failed(phase: str, exc: Exception) -> NoReturn:
+    raise AuthoringError(
+        "smoke_failed",
+        f"The ten-tick smoke probe failed during {phase}.",
+        {"phase": phase, "original_type": type(exc).__name__},
+    ) from exc
+
+
+_RUN_ARTIFACTS = (
+    "analysis.json",
+    "analysis.md",
+    "events.csv",
+    "events.json",
+    "payback.csv",
+    "run_manifest.json",
+    "timeline.csv",
+    "timeline.json",
+)
+_REPORT_ARTIFACTS = (
+    "assets/echarts.min.js",
+    "assets/report.css",
+    "assets/report.js",
+    "index.html",
+    "report_data.json",
+)
+
+
+def _write_probe_artifacts(
+    result: Any,
+    model: EconomyModel,
+    target: Path,
+) -> tuple[tuple[str, ...], str]:
+    parent = target.parent
+    parent.mkdir(parents=True, exist_ok=True)
+    target_identity = _publishable_target_identity(target)
+    staging = Path(
+        tempfile.mkdtemp(prefix=f".{target.name or 'probe'}-probe-", dir=parent)
+    )
+    staging_identity = staging.lstat()
+    published = False
+    relative_artifacts: tuple[Path, ...] = ()
+    try:
+        run_dir = staging / "run"
+        report_dir = staging / "report"
+        OutputWriter.write_all(result, run_dir, model)
+        report_index = generate_static_report(run_dir, report_dir)
+        relative_artifacts = _validate_probe_artifacts(
+            staging,
+            report_index,
+        )
+        _publish_probe_tree(staging, target, target_identity, staging_identity)
+        published = True
+    finally:
+        if not published and _path_matches_identity(staging, staging_identity):
+            shutil.rmtree(staging)
+
+    artifacts = tuple(str(target / path) for path in relative_artifacts)
+    return artifacts, str(target / "report" / "index.html")
+
+
+def _publishable_target_identity(target: Path) -> os.stat_result | None:
+    try:
+        identity = target.lstat()
+    except FileNotFoundError:
+        return None
+    if target.is_symlink() or not target.is_dir():
+        raise FileExistsError(f"artifact target is not a directory: {target}")
+    try:
+        next(target.iterdir())
+    except StopIteration:
+        return identity
+    raise FileExistsError(f"artifact target is not empty: {target}")
+
+
+def _validate_probe_artifacts(staging: Path, report_index: Path) -> tuple[Path, ...]:
+    expected = tuple(Path("run") / name for name in _RUN_ARTIFACTS) + tuple(
+        Path("report") / name for name in _REPORT_ARTIFACTS
+    )
+    if report_index != staging / "report" / "index.html":
+        raise ValueError("static report returned an unexpected index path")
+    for relative in expected:
+        path = staging / relative
+        if path.is_symlink() or not path.is_file():
+            raise FileNotFoundError(f"missing staged probe artifact: {relative.as_posix()}")
+    for relative, expected_type in (
+        (Path("run/timeline.json"), list),
+        (Path("run/events.json"), list),
+        (Path("run/analysis.json"), dict),
+        (Path("run/run_manifest.json"), dict),
+        (Path("report/report_data.json"), dict),
+    ):
+        payload = json.loads((staging / relative).read_text(encoding="utf-8"))
+        if not isinstance(payload, expected_type):
+            raise ValueError(f"staged artifact has invalid shape: {relative.as_posix()}")
+    return tuple(sorted(expected, key=lambda path: path.as_posix()))
+
+
+def _publish_probe_tree(
+    staging: Path,
+    target: Path,
+    target_identity: os.stat_result | None,
+    staging_identity: os.stat_result,
+) -> None:
+    if target_identity is None:
+        if _path_lexists(target):
+            raise FileExistsError(f"artifact target appeared before publication: {target}")
+        try:
+            os.replace(staging, target)
+        except BaseException:
+            if _path_matches_identity(target, staging_identity):
+                return
+            raise
+        if not _path_matches_identity(target, staging_identity):
+            raise OSError("staged probe artifact tree was not published")
+        return
+
+    if not _path_matches_identity(target, target_identity):
+        raise FileExistsError(f"artifact target changed before publication: {target}")
+    descriptor, backup_name = tempfile.mkstemp(
+        prefix=f".{target.name or 'probe'}-backup-", dir=target.parent
+    )
+    os.close(descriptor)
+    backup = Path(backup_name)
+    backup.unlink()
+    moved_original = False
+    try:
+        try:
+            os.replace(target, backup)
+        except BaseException:
+            if not _path_matches_identity(backup, target_identity):
+                raise
+        moved_original = True
+        try:
+            os.replace(staging, target)
+        except BaseException:
+            if _path_matches_identity(target, staging_identity):
+                _cleanup_empty_backup(backup, target_identity)
+                return
+            _restore_empty_target(backup, target, target_identity)
+            raise
+        if not _path_matches_identity(target, staging_identity):
+            _restore_empty_target(backup, target, target_identity)
+            raise OSError("staged probe artifact tree was not published")
+        _cleanup_empty_backup(backup, target_identity)
+    except BaseException:
+        if moved_original and not _path_lexists(target):
+            _restore_empty_target(backup, target, target_identity)
+        raise
+
+
+def _restore_empty_target(
+    backup: Path,
+    target: Path,
+    target_identity: os.stat_result,
+) -> None:
+    if not _path_matches_identity(backup, target_identity) or _path_lexists(target):
+        return
+    try:
+        os.replace(backup, target)
+    except BaseException:
+        if not _path_matches_identity(target, target_identity):
+            raise
+
+
+def _cleanup_empty_backup(backup: Path, target_identity: os.stat_result) -> None:
+    if not _path_matches_identity(backup, target_identity):
+        return
+    try:
+        backup.rmdir()
+    except OSError:
+        # Publication is already committed.  Preserve the known empty backup
+        # if Windows still has an open handle rather than failing the probe.
+        pass
+
+
+def _path_lexists(path: Path) -> bool:
+    return os.path.lexists(path)
+
+
+def _path_matches_identity(path: Path, identity: os.stat_result) -> bool:
+    try:
+        current = path.lstat()
+    except OSError:
+        return False
+    return (
+        current.st_dev == identity.st_dev
+        and current.st_ino == identity.st_ino
+        and current.st_mode == identity.st_mode
+    )
+
+
+def _probe_has_observable_change(timeline: Sequence[Any]) -> bool:
+    by_profile: dict[str, list[Any]] = {}
+    for row in timeline:
+        by_profile.setdefault(row.profile_id, []).append(row)
+    for profile_id in sorted(by_profile):
+        rows = by_profile[profile_id]
+        first, last = rows[0], rows[-1]
+        first_resources = {
+            key: SimNumber.parse(value) for key, value in first.resources.items()
+        }
+        last_resources = {
+            key: SimNumber.parse(value) for key, value in last.resources.items()
+        }
+        if first_resources != last_resources:
+            return True
+        if first.generators_owned != last.generators_owned:
+            return True
+        if set(first.upgrades_purchased) != set(last.upgrades_purchased):
+            return True
+        if getattr(first, "prestige_counts", {}) != getattr(last, "prestige_counts", {}):
+            return True
+    return False
 
 
 def static_smoke_eligibility(raw: RawConfig, model: EconomyModel) -> EligibilityResult:
