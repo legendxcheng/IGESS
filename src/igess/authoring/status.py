@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
+import os
 from pathlib import Path
 import re
+import stat
 from types import MappingProxyType
-from typing import Any, Literal
+from typing import Any, BinaryIO, Literal, NoReturn
 
 import yaml
 from yaml.nodes import MappingNode, ScalarNode
@@ -24,7 +26,6 @@ from .probe import (
 )
 from .project import AuthoringProject
 from .response import AuthoringError
-from .workbook_source import inspect_table
 from . import project as _project_module
 from . import workbook_source as _workbook_source
 from . import yaml_source as _yaml_source
@@ -63,6 +64,17 @@ class ModelStatus:
             raise TypeError("smoke_eligible must be a bool")
         if self.state not in {"incomplete", "runnable", "ready", "failed"}:
             raise ValueError("state must be incomplete, runnable, ready, or failed")
+        if self.state == "failed":
+            if self.structural_valid or self.smoke_eligible:
+                raise ValueError(
+                    "failed status must be structurally invalid and smoke-ineligible"
+                )
+        elif not self.structural_valid:
+            raise ValueError("non-failed status must be structurally valid")
+        if self.smoke_eligible and not self.structural_valid:
+            raise ValueError("smoke eligibility requires structural validity")
+        if self.state in {"runnable", "ready"} and not self.smoke_eligible:
+            raise ValueError("runnable and ready status must be smoke-eligible")
         if not isinstance(self.entity_counts, Mapping):
             raise TypeError("entity_counts must be a mapping")
         counts: dict[str, int] = {}
@@ -385,11 +397,28 @@ def _inspect_workbooks(
 ) -> None:
     registered = _registered_workbook_paths(project, requirements)
     for schema in _WORKBOOK_SCHEMAS:
-        path = registered.get(schema.storage_name, project.datas / schema.storage_name)
+        registered_path = registered.get(schema.storage_name)
+        path = registered_path or project.datas / schema.storage_name
         try:
-            inspected = inspect_table(path)
+            snapshot = _read_bounded_workbook_snapshot(
+                path,
+                project.datas,
+                entity=schema.entity,
+                direct=registered_path is None,
+            )
         except Exception as error:
-            counts[schema.entity] = _partial_workbook_count(path)
+            counts[schema.entity] = 0
+            requirements.append(_error_finding(error, "workbook"))
+            continue
+        try:
+            with _workbook_source._open_snapshot(
+                snapshot,
+                path,
+                read_only=True,
+            ) as workbook:
+                inspected = _workbook_source._inspect_open(workbook, path, schema)
+        except Exception as error:
+            counts[schema.entity] = _partial_workbook_count(snapshot, path)
             requirements.append(_error_finding(error, "workbook"))
             continue
         counts[schema.entity] = len(inspected.records)
@@ -440,11 +469,265 @@ def _registered_workbook_paths(
     return result
 
 
-def _partial_workbook_count(path: Path) -> int:
+def _open_workbook_binary(path: Path) -> BinaryIO:
+    """Open one workbook without following a final symlink where supported."""
+
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    descriptor = os.open(path, flags)
+    try:
+        return os.fdopen(descriptor, "rb")
+    except BaseException:
+        os.close(descriptor)
+        raise
+
+
+def _read_bounded_workbook_snapshot(
+    path: Path,
+    datas: Path,
+    *,
+    entity: str,
+    direct: bool,
+) -> Any:
+    """Read one boundary-checked workbook once into an immutable snapshot."""
+
+    initial = _validate_workbook_path(
+        path,
+        datas,
+        entity=entity,
+        direct=direct,
+    )
+    limit = _workbook_source._MAX_SOURCE_BYTES
+    if initial.st_size > limit:
+        _workbook_path_error(
+            "Workbook exceeds the compressed source size limit",
+            "source_too_large",
+            path,
+            entity,
+            actual_bytes=initial.st_size,
+            limit_bytes=limit,
+        )
+
+    try:
+        with _open_workbook_binary(path) as handle:
+            opened = os.fstat(handle.fileno())
+            _require_workbook_identity(
+                path,
+                datas,
+                initial,
+                opened,
+                entity=entity,
+                direct=direct,
+                phase="open",
+            )
+            content = handle.read(limit + 1)
+            after = os.fstat(handle.fileno())
+            current = _require_workbook_identity(
+                path,
+                datas,
+                initial,
+                after,
+                entity=entity,
+                direct=direct,
+                phase="read",
+            )
+    except AuthoringError:
+        raise
+    except Exception as error:
+        _workbook_path_error(
+            "Workbook could not be opened and read safely",
+            "source_open_error",
+            path,
+            entity,
+            error_type=type(error).__name__,
+        )
+
+    if len(content) > limit:
+        _workbook_path_error(
+            "Workbook exceeds the compressed source size limit",
+            "source_too_large",
+            path,
+            entity,
+            actual_bytes=len(content),
+            limit_bytes=limit,
+        )
+    opened_identity = _workbook_source._identity_from_stat(opened)
+    after_identity = _workbook_source._identity_from_stat(after)
+    current_identity = _workbook_source._identity_from_stat(current)
+    if (
+        opened_identity != after_identity
+        or after_identity != current_identity
+        or len(content) != after.st_size
+    ):
+        _workbook_path_error(
+            "Workbook changed while its immutable snapshot was read",
+            "source_changed_during_read",
+            path,
+            entity,
+            actual_bytes=len(content),
+            expected_bytes=after.st_size,
+        )
+
+    snapshot = _workbook_source._WorkbookSnapshot(
+        content,
+        after_identity,
+        stat.S_IMODE(after.st_mode),
+    )
+    _workbook_source._preflight_archive(snapshot, path)
+    return snapshot
+
+
+def _validate_workbook_path(
+    path: Path,
+    datas: Path,
+    *,
+    entity: str,
+    direct: bool,
+) -> os.stat_result:
+    try:
+        datas_identity = datas.lstat()
+        path_identity = path.lstat()
+    except (OSError, ValueError) as error:
+        _workbook_path_error(
+            "Workbook path could not be inspected safely",
+            "path_inspection_error",
+            path,
+            entity,
+            error_type=type(error).__name__,
+        )
+    if _path_is_indirection(datas, datas_identity):
+        _workbook_path_error(
+            "Workbook Datas boundary is an unsafe path indirection",
+            "boundary_indirection",
+            path,
+            entity,
+        )
+    if _path_is_indirection(path, path_identity):
+        _workbook_path_error(
+            "Workbook path is an unsafe indirection",
+            "path_indirection",
+            path,
+            entity,
+        )
+    if not stat.S_ISDIR(datas_identity.st_mode):
+        _workbook_path_error(
+            "Workbook Datas boundary is not a directory",
+            "boundary_wrong_type",
+            path,
+            entity,
+        )
+    if not stat.S_ISREG(path_identity.st_mode):
+        _workbook_path_error(
+            "Workbook path is not a regular file",
+            "path_wrong_type",
+            path,
+            entity,
+        )
+    try:
+        if not path.is_relative_to(datas):
+            raise ValueError("outside Datas")
+        if direct and path.parent != datas:
+            raise ValueError("not a direct child")
+        resolved_datas = datas.resolve(strict=True)
+        resolved_path = path.resolve(strict=True)
+    except (OSError, RuntimeError, ValueError) as error:
+        _workbook_path_error(
+            "Workbook path is outside its authoritative Datas boundary",
+            "outside_datas",
+            path,
+            entity,
+            error_type=type(error).__name__,
+        )
+    if resolved_datas != datas or not resolved_path.is_relative_to(resolved_datas):
+        _workbook_path_error(
+            "Workbook path resolves outside its authoritative Datas boundary",
+            "outside_datas",
+            path,
+            entity,
+            resolved_path=str(resolved_path),
+        )
+    if direct and resolved_path.parent != resolved_datas:
+        _workbook_path_error(
+            "Canonical workbook must be a direct child of Datas",
+            "not_direct_child",
+            path,
+            entity,
+            resolved_path=str(resolved_path),
+        )
+    return path_identity
+
+
+def _require_workbook_identity(
+    path: Path,
+    datas: Path,
+    initial: os.stat_result,
+    opened: os.stat_result,
+    *,
+    entity: str,
+    direct: bool,
+    phase: str,
+) -> os.stat_result:
+    if not stat.S_ISREG(opened.st_mode) or not os.path.samestat(initial, opened):
+        _workbook_path_error(
+            "Workbook path changed before its content could be consumed",
+            "path_identity_changed",
+            path,
+            entity,
+            phase=phase,
+        )
+    current = _validate_workbook_path(
+        path,
+        datas,
+        entity=entity,
+        direct=direct,
+    )
+    if not os.path.samestat(current, opened):
+        _workbook_path_error(
+            "Workbook pathname no longer identifies the opened file",
+            "path_identity_changed",
+            path,
+            entity,
+            phase=phase,
+        )
+    return current
+
+
+def _path_is_indirection(path: Path, identity: os.stat_result) -> bool:
+    if stat.S_ISLNK(identity.st_mode) or path.is_symlink():
+        return True
+    is_junction = getattr(path, "is_junction", None)
+    if callable(is_junction):
+        try:
+            if is_junction():
+                return True
+        except OSError:
+            return True
+    reparse_flag = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+    return bool(getattr(identity, "st_file_attributes", 0) & reparse_flag)
+
+
+def _workbook_path_error(
+    message: str,
+    reason: str,
+    path: Path,
+    entity: str,
+    **details: Any,
+) -> NoReturn:
+    raise AuthoringError(
+        "invalid_workbook_source",
+        message,
+        {
+            "entity": entity,
+            "path": str(path),
+            "reason": reason,
+            **details,
+        },
+    )
+
+
+def _partial_workbook_count(snapshot: Any, path: Path) -> int:
     """Best-effort id count from an already safety-preflighted workbook."""
 
     try:
-        snapshot = _workbook_source._read_snapshot(path)
         with _workbook_source._open_snapshot(snapshot, path, read_only=True) as workbook:
             sheet = workbook.active
             if sheet is None:

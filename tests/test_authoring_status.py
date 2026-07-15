@@ -5,8 +5,11 @@ import hashlib
 import json
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
+import os
 from pathlib import Path
 import shutil
+import stat
+import subprocess
 from types import SimpleNamespace
 
 from openpyxl import load_workbook
@@ -132,20 +135,58 @@ def _add_formal_scenario(project: AuthoringProject) -> None:
     )
 
 
+def _break_registry(project: AuthoringProject) -> None:
+    registry = project.datas / "__tables__.xlsx"
+    workbook = load_workbook(registry)
+    workbook.active["A1"] = "bad-marker"
+    workbook.save(registry)
+    workbook.close()
+
+
+def _write_sentinel_resource_workbook(source: Path, target: Path) -> None:
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(source.read_bytes())
+    workbook = load_workbook(target)
+    workbook.active.append([None, "outside_sentinel", "Outside", "currency"])
+    workbook.save(target)
+    workbook.close()
+
+
 def _manifest(root: Path) -> dict[str, tuple[str, int, str]]:
     result: dict[str, tuple[str, int, str]] = {}
-    for path in sorted(root.rglob("*"), key=lambda item: item.as_posix()):
-        relative = path.relative_to(root).as_posix()
-        mode = path.stat().st_mode
-        if path.is_dir():
-            result[relative] = ("dir", mode, "")
-        else:
-            result[relative] = (
-                "file",
-                mode,
-                hashlib.sha256(path.read_bytes()).hexdigest(),
-            )
+    pending = [root]
+    while pending:
+        directory = pending.pop()
+        with os.scandir(directory) as entries:
+            selected = sorted(entries, key=lambda item: item.name)
+        for entry in selected:
+            path = Path(entry.path)
+            relative = path.relative_to(root).as_posix()
+            identity = entry.stat(follow_symlinks=False)
+            mode = identity.st_mode
+            indirection = _test_path_is_indirection(path, identity)
+            if stat.S_ISDIR(mode) and not indirection:
+                result[relative] = ("dir", mode, "")
+                pending.append(path)
+            elif stat.S_ISREG(mode):
+                result[relative] = (
+                    "file",
+                    mode,
+                    hashlib.sha256(path.read_bytes()).hexdigest(),
+                )
+            else:
+                result[relative] = ("indirection" if indirection else "other", mode, "")
     return result
+
+
+def _test_path_is_indirection(path: Path, identity: os.stat_result) -> bool:
+    if stat.S_ISLNK(identity.st_mode):
+        return True
+    is_junction = getattr(path, "is_junction", None)
+    if callable(is_junction) and is_junction():
+        return True
+    reparse_flag = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+    return bool(getattr(identity, "st_file_attributes", 0) & reparse_flag)
 
 
 def _classifier_simulation(category: str | None) -> SimulationResult:
@@ -221,6 +262,73 @@ def test_model_status_payload_is_frozen_json_safe_and_defensive() -> None:
         status.entity_counts["resource"] = 2  # type: ignore[index]
     with pytest.raises(FrozenInstanceError):
         status.state = "failed"  # type: ignore[misc]
+
+
+@pytest.mark.parametrize(
+    ("state", "structural_valid", "smoke_eligible"),
+    [
+        ("failed", False, False),
+        ("incomplete", True, False),
+        ("incomplete", True, True),
+        ("runnable", True, True),
+        ("ready", True, True),
+    ],
+)
+def test_model_status_accepts_exact_valid_state_matrix(
+    state: str,
+    structural_valid: bool,
+    smoke_eligible: bool,
+) -> None:
+    status = ModelStatus(
+        model_digest="sha256:" + "a" * 64,
+        structural_valid=structural_valid,
+        smoke_eligible=smoke_eligible,
+        state=state,  # type: ignore[arg-type]
+        entity_counts={"resource": 0},
+        missing_requirements=(),
+        warnings=(),
+        available_scenarios=("smoke",),
+        latest_smoke_run_id="prior-smoke-1",
+    )
+
+    payload = status.to_payload()
+    assert payload["state"] == state
+    assert payload["structural_valid"] is structural_valid
+    assert payload["smoke_eligible"] is smoke_eligible
+    assert payload["entity_counts"] == {"resource": 0}
+    json.dumps(payload)
+
+
+@pytest.mark.parametrize(
+    ("state", "structural_valid", "smoke_eligible"),
+    [
+        (state, structural_valid, smoke_eligible)
+        for state in ("failed", "incomplete", "runnable", "ready")
+        for structural_valid in (False, True)
+        for smoke_eligible in (False, True)
+        if (state, structural_valid, smoke_eligible)
+        not in {
+            ("failed", False, False),
+            ("incomplete", True, False),
+            ("incomplete", True, True),
+            ("runnable", True, True),
+            ("ready", True, True),
+        }
+    ],
+)
+def test_model_status_rejects_every_contradictory_state_combination(
+    state: str,
+    structural_valid: bool,
+    smoke_eligible: bool,
+) -> None:
+    with pytest.raises(ValueError):
+        ModelStatus(
+            model_digest="sha256:" + "a" * 64,
+            structural_valid=structural_valid,
+            smoke_eligible=smoke_eligible,
+            state=state,  # type: ignore[arg-type]
+            entity_counts={},
+        )
 
 
 def test_blank_project_derives_complete_incomplete_payload(tmp_path: Path) -> None:
@@ -752,6 +860,144 @@ def test_unsafe_registry_path_is_never_read_for_partial_counts(tmp_path: Path) -
     assert status.state == "failed"
     assert status.entity_counts["resource"] == 0
     assert status.latest_smoke_run_id == "prior-smoke-1"
+
+
+def test_invalid_registry_canonical_file_symlink_is_never_followed(tmp_path: Path) -> None:
+    project = _blank_project(tmp_path)
+    _break_registry(project)
+    canonical = project.datas / "resources.xlsx"
+    outside = tmp_path / "outside_resources.xlsx"
+    _write_sentinel_resource_workbook(canonical, outside)
+    canonical.unlink()
+    try:
+        os.symlink(outside, canonical)
+    except (NotImplementedError, OSError) as error:
+        pytest.skip(f"file symlink unavailable on this platform: {type(error).__name__}")
+    before = _manifest(project.root)
+    outside_before = outside.read_bytes()
+
+    status = derive_status(project, lambda: {"run_id": "prior-smoke-1"})
+
+    assert status.state == "failed"
+    assert status.entity_counts["resource"] == 0
+    assert status.available_scenarios == ("smoke",)
+    assert status.latest_smoke_run_id == "prior-smoke-1"
+    assert any(
+        item.code == "invalid_workbook_source" and "indirection" in item.message
+        for item in status.missing_requirements
+    )
+    assert outside.read_bytes() == outside_before
+    assert _manifest(project.root) == before
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows directory junction coverage")
+def test_invalid_registry_canonical_junction_is_never_traversed(tmp_path: Path) -> None:
+    is_junction = getattr(Path, "is_junction", None)
+    if not callable(is_junction):
+        pytest.skip("Path.is_junction is unavailable")
+    project = _blank_project(tmp_path)
+    _break_registry(project)
+    canonical = project.datas / "resources.xlsx"
+    canonical.unlink()
+    outside = tmp_path / "outside_junction_target"
+    outside.mkdir()
+    sentinel = outside / "resources.xlsx"
+    _write_sentinel_resource_workbook(project.datas / "generators.xlsx", sentinel)
+    completed = subprocess.run(
+        [
+            os.environ.get("COMSPEC", "cmd.exe"),
+            "/c",
+            "mklink",
+            "/J",
+            str(canonical),
+            str(outside),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if completed.returncode != 0 or not canonical.is_junction():
+        if canonical.exists():
+            os.rmdir(canonical)
+        pytest.skip("directory junction creation is unavailable")
+    outside_before = sentinel.read_bytes()
+    try:
+        before = _manifest(project.root)
+
+        status = derive_status(project, lambda: {"run_id": "prior-smoke-1"})
+
+        assert status.state == "failed"
+        assert status.entity_counts["resource"] == 0
+        assert status.available_scenarios == ("smoke",)
+        assert status.latest_smoke_run_id == "prior-smoke-1"
+        assert any(
+            item.code == "invalid_workbook_source" and "indirection" in item.message
+            for item in status.missing_requirements
+        )
+        assert sentinel.read_bytes() == outside_before
+        assert _manifest(project.root) == before
+    finally:
+        os.rmdir(canonical)
+
+
+def test_canonical_fallback_retarget_before_open_is_rejected_without_reading(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project = _blank_project(tmp_path)
+    _break_registry(project)
+    canonical = project.datas / "resources.xlsx"
+    outside = tmp_path / "outside_resources.xlsx"
+    _write_sentinel_resource_workbook(canonical, outside)
+    original_open = status_module._open_workbook_binary
+    read_attempted = False
+    retargeted = False
+
+    class TrackedHandle:
+        def __init__(self, handle: object) -> None:
+            self._handle = handle
+
+        def fileno(self) -> int:
+            return self._handle.fileno()  # type: ignore[attr-defined]
+
+        def read(self, size: int = -1) -> bytes:
+            nonlocal read_attempted
+            read_attempted = True
+            return self._handle.read(size)  # type: ignore[attr-defined]
+
+    @contextmanager
+    def retarget_before_open(selected: Path):
+        nonlocal retargeted
+        if selected != canonical or retargeted:
+            with original_open(selected) as handle:
+                yield handle
+            return
+        retargeted = True
+        backup = canonical.with_name(".resources-original.xlsx")
+        os.replace(canonical, backup)
+        os.replace(outside, canonical)
+        try:
+            with original_open(canonical) as handle:
+                yield TrackedHandle(handle)
+        finally:
+            os.replace(canonical, outside)
+            os.replace(backup, canonical)
+
+    monkeypatch.setattr(status_module, "_open_workbook_binary", retarget_before_open)
+    before = _manifest(project.root)
+    outside_before = outside.read_bytes()
+
+    status = derive_status(project, lambda: {"run_id": "prior-smoke-1"})
+
+    assert retargeted
+    assert not read_attempted
+    assert status.state == "failed"
+    assert status.entity_counts["resource"] == 0
+    assert status.available_scenarios == ("smoke",)
+    assert status.latest_smoke_run_id == "prior-smoke-1"
+    assert any(item.code == "invalid_workbook_source" for item in status.missing_requirements)
+    assert outside.read_bytes() == outside_before
+    assert _manifest(project.root) == before
 
 
 def test_unresolved_workbook_reference_fails_with_partial_inventory(tmp_path: Path) -> None:
