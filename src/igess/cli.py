@@ -150,7 +150,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     scan.add_argument("--scenario", required=True, help="Scenario identifier to simulate.")
     scan.add_argument(
-        "--param", required=True, help="Parameter scan expression path=start:stop:step."
+        "--param", required=True, help="Parameter scan expression PATH=START..STOP:STEP."
     )
     scan.add_argument("--out", required=True, help="Directory for scan runs and summary.")
 

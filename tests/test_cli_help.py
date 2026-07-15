@@ -68,7 +68,7 @@ COMMAND_ARGUMENT_HELP = {
         "--config": "Path to the economy YAML configuration.",
         "--tables": "Directory containing exported Luban JSON tables.",
         "--scenario": "Scenario identifier to simulate.",
-        "--param": "Parameter scan expression path=start:stop:step.",
+        "--param": "Parameter scan expression PATH=START..STOP:STEP.",
         "--out": "Directory for scan runs and summary.",
     },
     "rng-run": {
