@@ -31,97 +31,308 @@ from .verification import review_proposal, verify_edits
 from .yaml_plan import PlanValidationError, apply_yaml_plan, create_yaml_plan
 
 
+class _HelpFormatter(
+    argparse.ArgumentDefaultsHelpFormatter,
+    argparse.RawDescriptionHelpFormatter,
+):
+    def __init__(self, prog: str) -> None:
+        super().__init__(prog, max_help_position=32, width=160)
+
+
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="igess")
-    subparsers = parser.add_subparsers(dest="command", required=True)
-    export = subparsers.add_parser("export-tables")
-    export.add_argument("--datas", required=True)
-    export.add_argument("--out", required=True)
-    stone_role_level = subparsers.add_parser("stone-role-level")
-    stone_role_level.add_argument("--role-lv", required=True)
-    stone_role_level.add_argument("--attribute-def", required=True)
-    stone_role_level.add_argument("--out", required=True)
-    stone_realm_progression = subparsers.add_parser("stone-realm-progression")
-    stone_realm_progression.add_argument("--role-realm", required=True)
-    stone_realm_progression.add_argument("--attribute-def", required=True)
-    stone_realm_progression.add_argument("--out", required=True)
-    report = subparsers.add_parser("report")
-    report.add_argument("--run", required=True)
-    report.add_argument("--out", required=True)
-    report.add_argument("--title")
-    compare = subparsers.add_parser("compare")
-    compare.add_argument("--base", required=True)
-    compare.add_argument("--candidate", required=True)
-    compare.add_argument("--out", required=True)
-    scan = subparsers.add_parser("scan")
-    scan.add_argument("--config", required=True)
-    scan.add_argument("--tables", required=True)
-    scan.add_argument("--scenario", required=True)
-    scan.add_argument("--param", required=True)
-    scan.add_argument("--out", required=True)
-    rng_run = subparsers.add_parser("rng-run")
-    rng_run.add_argument("--config", required=True)
-    rng_run.add_argument("--scenario", required=True)
-    rng_run.add_argument("--out", required=True)
-    gate = subparsers.add_parser("gate")
-    gate.add_argument("--base", required=True)
-    gate.add_argument("--candidate", required=True)
-    gate.add_argument("--config", required=True)
-    gate.add_argument("--out", required=True)
-    advise = subparsers.add_parser("advise")
-    advise.add_argument("--config", required=True)
-    advise.add_argument("--tables", required=True)
-    advise.add_argument("--scenario", required=True)
-    advise.add_argument("--out", required=True)
-    advise.add_argument("--baseline")
-    review = subparsers.add_parser("review-run")
-    review.add_argument("--run", required=True)
-    review.add_argument("--out", required=True)
-    review.add_argument("--baseline")
-    proposal_review = subparsers.add_parser("review-proposal")
-    proposal_review.add_argument("--proposal", required=True)
-    proposal_review.add_argument("--out", required=True)
-    verify = subparsers.add_parser("verify-edits")
-    verify.add_argument("--config", required=True)
-    verify.add_argument("--proposal", required=True)
-    verify.add_argument("--scenario", required=True)
-    verify.add_argument("--out", required=True)
-    verify.add_argument("--tables")
-    verify.add_argument("--datas")
-    verify.add_argument("--baseline")
-    yaml_plan = subparsers.add_parser("yaml-plan")
-    yaml_plan.add_argument("--config", required=True)
-    yaml_plan.add_argument("--intent", required=True)
-    yaml_plan.add_argument("--out", required=True)
-    yaml_apply = subparsers.add_parser("yaml-apply")
-    yaml_apply.add_argument("--config", required=True)
-    yaml_apply.add_argument("--plan", required=True)
-    yaml_apply.add_argument("--approve", action="store_true")
-    yaml_apply.add_argument("--tables")
-    init = subparsers.add_parser("init")
-    init.add_argument("--template", default="incremental-basic")
-    init.add_argument("--out", required=True)
-    doctor = subparsers.add_parser("doctor")
-    doctor.add_argument("--project", default=".")
-    doctor.add_argument("--config", default="examples/shelldiver_v0/economy.yaml")
-    doctor.add_argument("--tables", default="examples/shelldiver_v0/luban_exports")
-    explain = subparsers.add_parser("explain")
-    explain.add_argument("--run", required=True)
-    explain.add_argument("--event", required=True)
-    dashboard = subparsers.add_parser("dashboard")
-    dashboard.add_argument("--project", default=".")
-    dashboard.add_argument("--config", default="examples/shelldiver_v0/economy.yaml")
-    dashboard.add_argument("--tables", default="examples/shelldiver_v0/luban_exports")
-    dashboard.add_argument("--runs-root")
-    dashboard.add_argument("--host", default="127.0.0.1")
-    dashboard.add_argument("--port", type=int, default=8765)
-    for command in ("lint", "run"):
-        sub = subparsers.add_parser(command)
-        sub.add_argument("--config", required=True)
-        sub.add_argument("--tables", required=True)
-        if command == "run":
-            sub.add_argument("--scenario", required=True)
-            sub.add_argument("--out", required=True)
+    parser = argparse.ArgumentParser(
+        prog="igess",
+        description="Build, validate, simulate, inspect, and tune incremental-game economy models.",
+        epilog=(
+            "Exit codes:\n"
+            "  0  Command completed successfully.\n"
+            "  1  Command failed.\n"
+            "  2  Command-line usage error."
+        ),
+        formatter_class=_HelpFormatter,
+    )
+    subparsers = parser.add_subparsers(
+        dest="command",
+        required=True,
+        title="Commands",
+        metavar="<command>",
+    )
+
+    def add_command(name: str, summary: str, example: str) -> argparse.ArgumentParser:
+        return subparsers.add_parser(
+            name,
+            help=summary,
+            description=f"{summary}.",
+            epilog=f"Examples:\n  {example}",
+            formatter_class=_HelpFormatter,
+        )
+
+    export = add_command(
+        "export-tables",
+        "Export registered Luban workbooks",
+        "igess export-tables --datas data-tables/Datas --out luban_exports",
+    )
+    export.add_argument(
+        "--datas", required=True, help="Directory containing registered Luban workbooks."
+    )
+    export.add_argument("--out", required=True, help="Directory for exported JSON tables.")
+
+    stone_role_level = add_command(
+        "stone-role-level",
+        "Build the Stone role-level curve",
+        "igess stone-role-level --role-lv RoleLv.xlsx --attribute-def AttributeDef.xlsx --out artifacts/role-level",
+    )
+    stone_role_level.add_argument(
+        "--role-lv", required=True, help="Stone role-level workbook or sheet input."
+    )
+    stone_role_level.add_argument(
+        "--attribute-def",
+        required=True,
+        help="Stone attribute-definition workbook or sheet input.",
+    )
+    stone_role_level.add_argument(
+        "--out", required=True, help="Directory for generated role-level artifacts."
+    )
+
+    stone_realm_progression = add_command(
+        "stone-realm-progression",
+        "Build the Stone realm progression curve",
+        "igess stone-realm-progression --role-realm RoleRealm.xlsx --attribute-def AttributeDef.xlsx --out artifacts/realm",
+    )
+    stone_realm_progression.add_argument(
+        "--role-realm", required=True, help="Stone role-realm workbook or sheet input."
+    )
+    stone_realm_progression.add_argument(
+        "--attribute-def",
+        required=True,
+        help="Stone attribute-definition workbook or sheet input.",
+    )
+    stone_realm_progression.add_argument(
+        "--out", required=True, help="Directory for generated realm artifacts."
+    )
+
+    report = add_command(
+        "report",
+        "Generate a static HTML report",
+        "igess report --run runs/day_1 --out reports/day_1",
+    )
+    report.add_argument("--run", required=True, help="Simulation run directory to report on.")
+    report.add_argument("--out", required=True, help="Directory for the generated static report.")
+    report.add_argument("--title", help="Optional report title.")
+
+    compare = add_command(
+        "compare",
+        "Compare two simulation runs",
+        "igess compare --base runs/baseline --candidate runs/candidate --out reports/comparison",
+    )
+    compare.add_argument("--base", required=True, help="Baseline simulation run directory.")
+    compare.add_argument(
+        "--candidate", required=True, help="Candidate simulation run directory."
+    )
+    compare.add_argument("--out", required=True, help="Directory for the comparison report.")
+
+    scan = add_command(
+        "scan",
+        "Scan a numeric parameter",
+        "igess scan --config economy.yaml --tables luban_exports --scenario day_1 --param constants.spawn_rate=1:5:1 --out scans/spawn-rate",
+    )
+    scan.add_argument("--config", required=True, help="Path to the economy YAML configuration.")
+    scan.add_argument(
+        "--tables", required=True, help="Directory containing exported Luban JSON tables."
+    )
+    scan.add_argument("--scenario", required=True, help="Scenario identifier to simulate.")
+    scan.add_argument(
+        "--param", required=True, help="Parameter scan expression path=start:stop:step."
+    )
+    scan.add_argument("--out", required=True, help="Directory for scan runs and summary.")
+
+    rng_run = add_command(
+        "rng-run",
+        "Run an RNG scenario",
+        "igess rng-run --config economy.yaml --scenario loot_check --out runs/loot_check",
+    )
+    rng_run.add_argument(
+        "--config", required=True, help="Path to the economy YAML configuration."
+    )
+    rng_run.add_argument(
+        "--scenario", required=True, help="RNG scenario identifier to simulate."
+    )
+    rng_run.add_argument("--out", required=True, help="Directory for RNG simulation outputs.")
+
+    gate = add_command(
+        "gate",
+        "Evaluate regression gates",
+        "igess gate --base runs/baseline --candidate runs/candidate --config gates.yaml --out gate-results",
+    )
+    gate.add_argument("--base", required=True, help="Baseline simulation run directory.")
+    gate.add_argument(
+        "--candidate", required=True, help="Candidate simulation run directory."
+    )
+    gate.add_argument(
+        "--config", required=True, help="Path to the regression gate YAML configuration."
+    )
+    gate.add_argument("--out", required=True, help="Directory for regression gate results.")
+
+    advise = add_command(
+        "advise",
+        "Generate tuning advice",
+        "igess advise --config economy.yaml --tables luban_exports --scenario day_1 --out advice/day_1",
+    )
+    advise.add_argument("--config", required=True, help="Path to the economy YAML configuration.")
+    advise.add_argument(
+        "--tables", required=True, help="Directory containing exported Luban JSON tables."
+    )
+    advise.add_argument("--scenario", required=True, help="Scenario identifier to analyze.")
+    advise.add_argument("--out", required=True, help="Directory for tuning advice.")
+    advise.add_argument("--baseline", help="Optional baseline simulation run directory.")
+
+    review = add_command(
+        "review-run",
+        "Review an existing simulation run",
+        "igess review-run --run runs/day_1 --out reviews/day_1",
+    )
+    review.add_argument("--run", required=True, help="Simulation run directory to review.")
+    review.add_argument("--out", required=True, help="Directory for review artifacts.")
+    review.add_argument("--baseline", help="Optional baseline simulation run directory.")
+
+    proposal_review = add_command(
+        "review-proposal",
+        "Review a tuning proposal",
+        "igess review-proposal --proposal proposal.yaml --out reviews/proposal",
+    )
+    proposal_review.add_argument(
+        "--proposal", required=True, help="Path to the tuning proposal YAML file."
+    )
+    proposal_review.add_argument(
+        "--out", required=True, help="Directory for proposal review artifacts."
+    )
+
+    verify = add_command(
+        "verify-edits",
+        "Verify proposed configuration edits",
+        "igess verify-edits --config economy.yaml --proposal proposal.yaml --scenario day_1 --out verification/day_1",
+    )
+    verify.add_argument("--config", required=True, help="Path to the economy YAML configuration.")
+    verify.add_argument(
+        "--proposal", required=True, help="Path to the tuning proposal YAML file."
+    )
+    verify.add_argument(
+        "--scenario", required=True, help="Scenario identifier used for verification."
+    )
+    verify.add_argument("--out", required=True, help="Directory for verification artifacts.")
+    verify.add_argument("--tables", help="Optional exported Luban JSON table directory.")
+    verify.add_argument("--datas", help="Optional registered Luban workbook directory.")
+    verify.add_argument("--baseline", help="Optional baseline simulation run directory.")
+
+    yaml_plan = add_command(
+        "yaml-plan",
+        "Create a reviewable YAML edit plan",
+        'igess yaml-plan --config economy.yaml --intent "halve the first upgrade cost" --out plan.yaml',
+    )
+    yaml_plan.add_argument(
+        "--config", required=True, help="Path to the economy YAML configuration."
+    )
+    yaml_plan.add_argument("--intent", required=True, help="Natural-language edit intent.")
+    yaml_plan.add_argument("--out", required=True, help="Path for the generated YAML edit plan.")
+
+    yaml_apply = add_command(
+        "yaml-apply",
+        "Apply an approved YAML edit plan",
+        "igess yaml-apply --config economy.yaml --plan plan.yaml --approve",
+    )
+    yaml_apply.add_argument(
+        "--config", required=True, help="Path to the economy YAML configuration."
+    )
+    yaml_apply.add_argument("--plan", required=True, help="Path to a generated YAML edit plan.")
+    yaml_apply.add_argument(
+        "--approve",
+        action="store_true",
+        help="Confirm that the reviewed plan may be applied.",
+    )
+    yaml_apply.add_argument("--tables", help="Optional exported Luban JSON table directory.")
+
+    init = add_command(
+        "init",
+        "Initialize an IGESS project",
+        "igess init --out my-economy",
+    )
+    init.add_argument(
+        "--template",
+        default="incremental-basic",
+        help="Project template name.",
+    )
+    init.add_argument("--out", required=True, help="Directory to initialize.")
+
+    doctor = add_command(
+        "doctor",
+        "Diagnose an IGESS project",
+        "igess doctor --project my-economy --config economy.yaml --tables luban_exports",
+    )
+    doctor.add_argument("--project", default=".", help="IGESS project root directory.")
+    doctor.add_argument(
+        "--config",
+        default="examples/shelldiver_v0/economy.yaml",
+        help="Economy YAML path, relative to the project root by default.",
+    )
+    doctor.add_argument(
+        "--tables",
+        default="examples/shelldiver_v0/luban_exports",
+        help="Exported table directory, relative to the project root by default.",
+    )
+
+    explain = add_command(
+        "explain",
+        "Explain one simulation event",
+        "igess explain --run runs/day_1 --event 0",
+    )
+    explain.add_argument(
+        "--run", required=True, help="Simulation run directory containing event artifacts."
+    )
+    explain.add_argument("--event", required=True, help="Zero-based event index to explain.")
+
+    dashboard = add_command(
+        "dashboard",
+        "Serve the local simulation dashboard",
+        "igess dashboard --project . --port 8765",
+    )
+    dashboard.add_argument("--project", default=".", help="IGESS project root directory.")
+    dashboard.add_argument(
+        "--config",
+        default="examples/shelldiver_v0/economy.yaml",
+        help="Economy YAML path, relative to the project root by default.",
+    )
+    dashboard.add_argument(
+        "--tables",
+        default="examples/shelldiver_v0/luban_exports",
+        help="Exported table directory, relative to the project root by default.",
+    )
+    dashboard.add_argument(
+        "--runs-root", help="Optional directory used to discover simulation runs."
+    )
+    dashboard.add_argument("--host", default="127.0.0.1", help="Dashboard bind address.")
+    dashboard.add_argument("--port", type=int, default=8765, help="Dashboard TCP port.")
+
+    lint = add_command(
+        "lint",
+        "Validate an economy model",
+        "igess lint --config economy.yaml --tables luban_exports",
+    )
+    lint.add_argument("--config", required=True, help="Path to the economy YAML configuration.")
+    lint.add_argument(
+        "--tables", required=True, help="Directory containing exported Luban JSON tables."
+    )
+
+    run = add_command(
+        "run",
+        "Run a deterministic economy simulation",
+        "igess run --config economy.yaml --tables luban_exports --scenario day_1 --out runs/day_1",
+    )
+    run.add_argument("--config", required=True, help="Path to the economy YAML configuration.")
+    run.add_argument(
+        "--tables", required=True, help="Directory containing exported Luban JSON tables."
+    )
+    run.add_argument("--scenario", required=True, help="Scenario identifier to simulate.")
+    run.add_argument("--out", required=True, help="Directory for simulation outputs.")
     return parser
 
 
