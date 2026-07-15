@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import errno
 import json
 from pathlib import Path
+import shutil
 from typing import NoReturn
 
 from openpyxl import Workbook
@@ -157,6 +159,132 @@ def test_prepare_writes_exact_schema_one_disk_contract(tmp_path: Path) -> None:
     assert list(transaction.journal_path.parent.glob(".journal.json.*.tmp")) == []
 
 
+def test_recovery_cleans_transaction_that_crashed_during_staging(
+    tmp_path: Path,
+) -> None:
+    project = _make_project(tmp_path / "model")
+    before = _formal_snapshot(project)
+    transaction = Transaction(project, "change-1", project.model_digest())
+    transaction.candidate_dir.mkdir()
+    (transaction.candidate_dir / "partial.tmp").write_bytes(b"partial")
+
+    journal = json.loads(transaction.journal_path.read_text(encoding="utf-8"))
+    assert journal["phase"] == "staging"
+    assert journal["staged_change"] is None
+
+    assert recover_transactions(project) == [
+        {
+            "code": "recovered_transaction",
+            "message": "Recovered interrupted transaction change-1",
+            "change_id": "change-1",
+        }
+    ]
+    assert _formal_snapshot(project) == before
+    assert not transaction.root.exists()
+
+
+def test_abort_removes_unprepared_staging_transaction(tmp_path: Path) -> None:
+    project = _make_project(tmp_path / "model")
+    transaction = Transaction(project, "change-1", project.model_digest())
+    transaction.candidate_dir.mkdir()
+
+    transaction.abort()
+
+    assert not transaction.root.exists()
+    assert recover_transactions(project) == []
+
+
+@pytest.mark.parametrize(
+    "destination",
+    [
+        "changes",
+        "changes/nested/record.json",
+    ],
+)
+def test_change_destination_must_be_one_safe_registry_child(
+    tmp_path: Path,
+    destination: str,
+) -> None:
+    project = _make_project(tmp_path / "model")
+    transaction = Transaction(project, "change-1", project.model_digest())
+    transaction.candidate_dir.mkdir()
+    (transaction.candidate_dir / "economy.yaml").write_bytes(b"candidate")
+    transaction.staged_change_path.write_bytes(b"audit")
+
+    with pytest.raises(AuthoringError) as caught:
+        transaction.prepare(
+            targets=("economy.yaml",),
+            run_destination=None,
+            change_destination=destination,
+        )
+
+    assert caught.value.code == "transaction_artifact_destination_unsafe"
+
+
+def _directory_symlink_or_skip(link: Path, target: Path) -> None:
+    try:
+        link.symlink_to(target, target_is_directory=True)
+    except OSError as error:
+        pytest.skip(f"directory symlinks unavailable: {error}")
+
+
+def test_commit_rejects_candidate_ancestor_symlink_without_touching_external_tree(
+    tmp_path: Path,
+) -> None:
+    project = _make_project(tmp_path / "model")
+    before = _formal_snapshot(project)
+    transaction = _stage_transaction(project)
+    external = tmp_path / "external-candidate"
+    external.mkdir()
+    external_source = external / "resources.xlsx"
+    external_source.write_bytes(b"external bytes must remain")
+    shutil.rmtree(transaction.candidate_dir / "Datas")
+    _directory_symlink_or_skip(transaction.candidate_dir / "Datas", external)
+
+    with pytest.raises(AuthoringError) as caught:
+        transaction.commit()
+
+    assert caught.value.code == "commit_failed"
+    assert external_source.read_bytes() == b"external bytes must remain"
+    _assert_pre_transaction_state(project, before)
+
+
+def test_commit_rejects_run_registry_symlink_without_publishing_outside_project(
+    tmp_path: Path,
+) -> None:
+    project = _make_project(tmp_path / "model")
+    before = _formal_snapshot(project)
+    transaction = _stage_transaction(project)
+    external = tmp_path / "external-runs"
+    external.mkdir()
+    _directory_symlink_or_skip(project.runs, external)
+
+    with pytest.raises(AuthoringError) as caught:
+        transaction.commit()
+
+    assert caught.value.code in {"commit_failed", "recovery_required"}
+    assert list(external.iterdir()) == []
+    assert _formal_snapshot(project) == before
+
+
+def test_commit_rejects_backup_ancestor_symlink_without_writing_external_tree(
+    tmp_path: Path,
+) -> None:
+    project = _make_project(tmp_path / "model")
+    before = _formal_snapshot(project)
+    transaction = _stage_transaction(project)
+    external = tmp_path / "external-backups"
+    external.mkdir()
+    _directory_symlink_or_skip(transaction.backups_dir / "Datas", external)
+
+    with pytest.raises(AuthoringError) as caught:
+        transaction.commit()
+
+    assert caught.value.code in {"commit_failed", "recovery_required"}
+    assert list(external.iterdir()) == []
+    assert _formal_snapshot(project) == before
+
+
 def test_commit_rechecks_current_digest_and_reports_stale_model(tmp_path: Path) -> None:
     project = _make_project(tmp_path / "model")
     before = _formal_snapshot(project)
@@ -231,6 +359,41 @@ def test_committed_journal_write_failure_rolls_back_every_target_and_artifact(
     assert caught.value.details["checkpoint"] == "journal_committed"
     _assert_pre_transaction_state(project, before)
     assert not transaction.root.exists()
+
+
+def test_rollback_failure_reports_recovery_required_and_keeps_journal(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project = _make_project(tmp_path / "model")
+    before = _formal_snapshot(project)
+
+    def fail_after_first_target(name: str) -> None:
+        if name == "target:0:economy.yaml":
+            raise RuntimeError("primary commit failure")
+
+    transaction = _stage_transaction(project, checkpoint=fail_after_first_target)
+    real_rollback = transaction_module._rollback
+    monkeypatch.setattr(
+        transaction_module,
+        "_rollback",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("rollback failed")),
+    )
+
+    with pytest.raises(AuthoringError) as caught:
+        transaction.commit()
+
+    assert caught.value.code == "recovery_required"
+    assert "recovery" in caught.value.message.lower()
+    assert caught.value.details["checkpoint"] == "target:0:economy.yaml"
+    assert caught.value.details["rollback_error_type"] == "OSError"
+    assert transaction.root.exists()
+    assert project.config.read_bytes() == b"version: 1\nnew: config\n"
+    assert _formal_snapshot(project) != before
+
+    monkeypatch.setattr(transaction_module, "_rollback", real_rollback)
+    assert recover_transactions(project)[0]["code"] == "recovered_transaction"
+    _assert_pre_transaction_state(project, before)
 
 
 @pytest.mark.parametrize(
@@ -350,6 +513,112 @@ def test_cleanup_failure_after_durable_commit_keeps_post_change_state(
     assert recover_transactions(project) == []
     _assert_post_transaction_state(project)
     assert not transaction.root.exists()
+
+
+def test_cleanup_tombstone_survives_partial_delete_without_a_journal(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project = _make_project(tmp_path / "model")
+    transaction = _stage_transaction(project)
+    real_delete = transaction_module._delete_tombstone
+
+    def crash_after_partial_delete(tombstone: Path) -> NoReturn:
+        (tombstone / "journal.json").unlink()
+        candidate = tombstone / "candidate"
+        if candidate.exists():
+            shutil.rmtree(candidate)
+        raise _HardCrash("cleanup interrupted")
+
+    monkeypatch.setattr(transaction_module, "_delete_tombstone", crash_after_partial_delete)
+
+    with pytest.raises(_HardCrash):
+        transaction.commit()
+
+    assert not transaction.root.exists()
+    tombstones = list(project.transactions.glob(".cleanup-*"))
+    assert len(tombstones) == 1
+    assert not (tombstones[0] / "journal.json").exists()
+    _assert_post_transaction_state(project)
+
+    monkeypatch.setattr(transaction_module, "_delete_tombstone", real_delete)
+    assert recover_transactions(project) == []
+    assert list(project.transactions.glob(".cleanup-*")) == []
+    _assert_post_transaction_state(project)
+
+
+def test_publish_fsyncs_candidate_before_rename_and_both_rename_parents(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project = _make_project(tmp_path / "model")
+    transaction = _stage_transaction(project)
+    events: list[tuple[str, Path, Path | None]] = []
+    real_tree = transaction_module._fsync_tree
+    real_directory = transaction_module._fsync_directory
+    real_replace = transaction_module.os.replace
+
+    def record_tree(path: Path) -> None:
+        events.append(("tree", path, None))
+        real_tree(path)
+
+    def record_directory(path: Path) -> None:
+        events.append(("directory", path, None))
+        real_directory(path)
+
+    def record_replace(source: str | Path, destination: str | Path) -> None:
+        events.append(("replace", Path(source), Path(destination)))
+        real_replace(source, destination)
+
+    monkeypatch.setattr(transaction_module, "_fsync_tree", record_tree)
+    monkeypatch.setattr(transaction_module, "_fsync_directory", record_directory)
+    monkeypatch.setattr(transaction_module.os, "replace", record_replace)
+
+    assert transaction.commit() == ()
+
+    for relative in ("economy.yaml", "Datas/resources.xlsx", "luban_exports"):
+        candidate = transaction.candidate_dir / relative
+        live = project.root / relative
+        replace_index = events.index(("replace", candidate, live))
+        assert ("tree", candidate, None) in events[:replace_index]
+        later = events[replace_index + 1 :]
+        assert ("directory", candidate.parent, None) in later
+        assert ("directory", live.parent, None) in later
+
+    replace_indices = [
+        index for index, event in enumerate(events) if event[0] == "replace"
+    ]
+    for position, replace_index in enumerate(replace_indices):
+        _, source, destination = events[replace_index]
+        assert destination is not None
+        if source.parent == destination.parent:
+            continue
+        next_replace = (
+            replace_indices[position + 1]
+            if position + 1 < len(replace_indices)
+            else len(events)
+        )
+        durable_events = events[replace_index + 1 : next_replace]
+        assert ("directory", source.parent, None) in durable_events
+        assert ("directory", destination.parent, None) in durable_events
+
+
+def test_directory_fsync_propagates_non_unsupported_media_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(transaction_module.os, "open", lambda *_args: 91)
+    monkeypatch.setattr(transaction_module.os, "close", lambda _descriptor: None)
+
+    def fail_fsync(_descriptor: int) -> NoReturn:
+        raise OSError(errno.EIO, "directory media failed")
+
+    monkeypatch.setattr(transaction_module.os, "fsync", fail_fsync)
+
+    with pytest.raises(OSError) as caught:
+        transaction_module._fsync_directory(tmp_path)
+
+    assert caught.value.errno == errno.EIO
 
 
 def test_successful_commit_publishes_every_target_and_cleans_transaction(

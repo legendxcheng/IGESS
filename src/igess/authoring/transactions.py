@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
+import errno
 import json
 import os
 from pathlib import Path, PurePosixPath
@@ -10,13 +11,15 @@ import shutil
 import stat
 import tempfile
 from typing import Any, NoReturn
+import uuid
 
 from .project import AuthoringProject
 from .response import AuthoringError
 
 
 JOURNAL_SCHEMA_VERSION = 1
-_PHASES = {"prepared", "committing", "committed"}
+_PHASES = {"staging", "prepared", "committing", "committed"}
+_CLEANUP_TOMBSTONE_PREFIX = ".cleanup-"
 _Checkpoint = Callable[[str], None]
 _DigestReader = Callable[[], str]
 
@@ -61,25 +64,22 @@ class Transaction:
         self.journal_path = self.root / "journal.json"
         self._checkpoint = checkpoint or (lambda _name: None)
         self._digest_reader = digest_reader or project.model_digest
-        self._active_checkpoint = "prepared"
+        self._active_checkpoint = "staging"
         self._prepared = False
         self._journal: dict[str, Any] = {
             "schema_version": JOURNAL_SCHEMA_VERSION,
             "change_id": change_id,
-            "phase": "prepared",
+            "phase": "staging",
             "pre_digest": pre_digest,
             "targets": [],
             "staged_run": None,
             "staged_change": None,
-            "last_completed_checkpoint": "prepared",
+            "last_completed_checkpoint": "staging",
         }
 
         try:
-            project.transactions.mkdir(parents=True, exist_ok=True)
+            _ensure_owned_directory(project.root, project.transactions)
             self.root.mkdir()
-            self.backups_dir.mkdir()
-            self.staged_artifacts_dir.mkdir()
-            _write_journal(self.journal_path, self._journal)
         except FileExistsError:
             _transaction_error(
                 "transaction_exists",
@@ -87,6 +87,19 @@ class Transaction:
                 change_id=change_id,
                 path=str(self.root),
             )
+        except Exception as error:
+            _transaction_error(
+                "transaction_prepare_failed",
+                "Transaction storage could not be created",
+                change_id=change_id,
+                error_type=type(error).__name__,
+                path=str(self.root),
+            )
+
+        try:
+            self.backups_dir.mkdir()
+            self.staged_artifacts_dir.mkdir()
+            _write_journal(self.journal_path, self._journal)
         except AuthoringError:
             raise
         except Exception as error:
@@ -144,6 +157,25 @@ class Transaction:
             live = self.project.root.joinpath(*relative.parts)
             candidate = self.candidate_dir.joinpath(*relative.parts)
             backup = self.backups_dir.joinpath(*relative.parts)
+            _require_owned_path(
+                self.root,
+                candidate,
+                role="candidate target",
+                allow_missing_leaf=False,
+            )
+            _require_owned_path(
+                self.project.root,
+                live,
+                role="live target",
+                allow_missing_leaf=True,
+            )
+            _require_owned_path(
+                self.root,
+                backup,
+                role="backup target",
+                allow_missing_leaf=True,
+                allow_missing_parents=True,
+            )
             candidate_identity = _lstat_or_none(candidate)
             if candidate_identity is None or not (
                 stat.S_ISREG(candidate_identity.st_mode)
@@ -200,11 +232,36 @@ class Transaction:
             allowed_root=self.project.changes,
             role="change",
         )
+        self._journal["phase"] = "prepared"
         self._journal["targets"] = ordered
         self._journal["staged_run"] = staged_run
         self._journal["staged_change"] = staged_change
+        self._journal["last_completed_checkpoint"] = "prepared"
         _write_journal(self.journal_path, self._journal)
         self._prepared = True
+
+    def abort(self) -> None:
+        """Discard a staging/prepared transaction before commit starts."""
+
+        if self._journal["phase"] not in {"staging", "prepared"}:
+            _transaction_error(
+                "transaction_abort_unsafe",
+                "A committing or committed transaction must be recovered",
+                change_id=self.change_id,
+                phase=self._journal["phase"],
+            )
+        try:
+            _cleanup_transaction(self.root)
+        except Exception as error:
+            raise AuthoringError(
+                "recovery_required",
+                "Transaction abort cleanup is incomplete; recovery required",
+                {
+                    "change_id": self.change_id,
+                    "error_type": type(error).__name__,
+                    "path": str(self.root),
+                },
+            ) from None
 
     def commit(self) -> tuple[dict[str, str], ...]:
         """Publish all prepared targets or restore their exact prior state."""
@@ -263,7 +320,24 @@ class Transaction:
         except Exception as error:
             if committed_durable:
                 return (self._cleanup_warning(),)
-            self._rollback_after_failure(error)
+            rollback_error = self._rollback_after_failure(error)
+            if rollback_error is not None:
+                uncertain = AuthoringError(
+                    "recovery_required",
+                    "Commit failed and automatic rollback is incomplete; recovery required",
+                    {
+                        "change_id": self.change_id,
+                        "checkpoint": self._active_checkpoint,
+                        "error_type": type(error).__name__,
+                        "path": str(self.root),
+                        "rollback_error_type": type(rollback_error).__name__,
+                    },
+                )
+                uncertain.add_note(
+                    "Automatic rollback failed: "
+                    f"{type(rollback_error).__name__}: {rollback_error}"
+                )
+                raise uncertain from None
             if isinstance(error, AuthoringError) and error.code == "stale_model":
                 raise
             raise AuthoringError(
@@ -288,7 +362,7 @@ class Transaction:
         _write_journal(self.journal_path, self._journal)
         self._checkpoint(name)
 
-    def _rollback_after_failure(self, primary: Exception) -> None:
+    def _rollback_after_failure(self, primary: Exception) -> Exception | None:
         try:
             _rollback(self.project.root, self.root, self._journal)
         except Exception as rollback_error:
@@ -296,7 +370,7 @@ class Transaction:
                 "Transaction rollback failed: "
                 f"{type(rollback_error).__name__}: {rollback_error}"
             )
-            return
+            return rollback_error
         try:
             _cleanup_transaction(self.root)
         except Exception as cleanup_error:
@@ -304,6 +378,7 @@ class Transaction:
                 "Rolled-back transaction cleanup failed: "
                 f"{type(cleanup_error).__name__}: {cleanup_error}"
             )
+        return None
 
     def _cleanup_warning(self) -> dict[str, str]:
         return {
@@ -323,10 +398,13 @@ def recover_transactions(project: AuthoringProject) -> list[dict[str, str]]:
     try:
         if not project.transactions.exists():
             return []
-        roots = sorted(
-            (path for path in project.transactions.iterdir() if path.is_dir()),
-            key=lambda path: path.name,
+        _require_owned_path(
+            project.root,
+            project.transactions,
+            role="transaction registry",
+            allow_missing_leaf=False,
         )
+        entries = sorted(project.transactions.iterdir(), key=lambda path: path.name)
     except Exception as error:
         _recovery_error(
             "Transaction registry could not be inspected",
@@ -335,13 +413,27 @@ def recover_transactions(project: AuthoringProject) -> list[dict[str, str]]:
         )
 
     warnings: list[dict[str, str]] = []
+    for entry in entries:
+        if entry.name.startswith(_CLEANUP_TOMBSTONE_PREFIX):
+            try:
+                _delete_tombstone(entry)
+            except Exception as error:
+                _recovery_error("Transaction tombstone cleanup failed", entry, error)
+    roots = [
+        entry
+        for entry in entries
+        if not entry.name.startswith(_CLEANUP_TOMBSTONE_PREFIX)
+        and _lstat_or_none(entry) is not None
+    ]
     for root in roots:
         try:
+            _require_real_directory(root, role="transaction directory")
             journal = _load_journal(project, root)
             if journal["phase"] == "committed":
                 _cleanup_transaction(root)
                 continue
-            _rollback(project.root, root, journal)
+            if journal["phase"] != "staging":
+                _rollback(project.root, root, journal)
             _cleanup_transaction(root)
             change_id = journal["change_id"]
             warnings.append(
@@ -419,6 +511,13 @@ def _coerce_destination(
     path = Path(value)
     if not path.is_absolute():
         path = project.root / path
+    if allowed_root.parent != project.root or allowed_root.name not in {"runs", "changes"}:
+        _transaction_error(
+            "transaction_artifact_destination_unsafe",
+            "A transaction artifact registry is not a direct project child",
+            role=role,
+            path=str(allowed_root),
+        )
     try:
         relative = path.relative_to(allowed_root)
     except ValueError:
@@ -428,13 +527,22 @@ def _coerce_destination(
             role=role,
             path=str(path),
         )
-    if not relative.parts or any(part in {"", ".", ".."} for part in relative.parts):
+    if len(relative.parts) != 1 or any(
+        part in {"", ".", ".."} for part in relative.parts
+    ):
         _transaction_error(
             "transaction_artifact_destination_unsafe",
-            "A transaction artifact destination is unsafe",
+            "A transaction artifact destination must be one safe registry child",
             role=role,
             path=str(path),
         )
+    _require_component(relative.parts[0], f"{role} destination")
+    _require_owned_path(
+        project.root,
+        allowed_root,
+        role=f"{role} registry",
+        allow_missing_leaf=True,
+    )
     return path
 
 
@@ -442,20 +550,38 @@ def _replace_target(project_root: Path, transaction_root: Path, target: Mapping[
     live = _journal_path(project_root, target["live"])
     candidate = _journal_path(transaction_root, target["candidate"])
     backup = _journal_path(transaction_root, target["backup"])
-    backup.parent.mkdir(parents=True, exist_ok=True)
+    _require_owned_path(
+        transaction_root,
+        candidate,
+        role="candidate target",
+        allow_missing_leaf=False,
+    )
+    _require_owned_path(
+        project_root,
+        live,
+        role="live target",
+        allow_missing_leaf=not target["live_existed"],
+    )
+    _ensure_owned_directory(transaction_root, backup.parent)
+    _require_owned_path(
+        transaction_root,
+        backup,
+        role="backup target",
+        allow_missing_leaf=True,
+    )
+    _fsync_tree(candidate)
     if target["live_existed"]:
-        os.replace(live, backup)
+        _durable_replace(live, backup)
     elif _lstat_or_none(live) is not None:
         raise OSError(f"live target appeared before commit: {live}")
     try:
-        os.replace(candidate, live)
+        _durable_replace(candidate, live)
     except BaseException:
         if target["live_existed"] and _lstat_or_none(backup) is not None:
             if _lstat_or_none(live) is not None:
-                _remove_path(live)
-            os.replace(backup, live)
+                _remove_owned_path(project_root, live)
+            _durable_replace(backup, live)
         raise
-    _fsync_directory(live.parent)
 
 
 def _move_artifact(
@@ -465,41 +591,91 @@ def _move_artifact(
 ) -> None:
     staged = _journal_path(transaction_root, artifact["staged"])
     destination = _journal_path(project_root, artifact["destination"])
-    destination.parent.mkdir(parents=True, exist_ok=True)
+    _require_owned_path(
+        transaction_root,
+        staged,
+        role="staged artifact",
+        allow_missing_leaf=False,
+    )
+    _ensure_owned_directory(project_root, destination.parent)
+    _require_owned_path(
+        project_root,
+        destination,
+        role="artifact destination",
+        allow_missing_leaf=True,
+    )
     if _lstat_or_none(destination) is not None:
         raise OSError(f"artifact destination already exists: {destination}")
-    os.replace(staged, destination)
+    _fsync_tree(staged)
+    _durable_replace(staged, destination)
     _fsync_tree(destination)
-    _fsync_directory(destination.parent)
 
 
 def _rollback(project_root: Path, transaction_root: Path, journal: Mapping[str, Any]) -> None:
+    errors: list[Exception] = []
     for artifact_name in ("staged_change", "staged_run"):
         artifact = journal.get(artifact_name)
         if artifact is None:
             continue
-        destination = _journal_path(project_root, artifact["destination"])
-        if _lstat_or_none(destination) is not None:
-            _remove_path(destination)
-            _fsync_directory(destination.parent)
+        try:
+            destination = _journal_path(project_root, artifact["destination"])
+            _require_owned_path(
+                project_root,
+                destination.parent,
+                role="artifact registry",
+                allow_missing_leaf=True,
+            )
+            if _lstat_or_none(destination.parent) is None:
+                continue
+            _require_owned_path(
+                project_root,
+                destination,
+                role="artifact destination",
+                allow_missing_leaf=True,
+            )
+            if _lstat_or_none(destination) is not None:
+                _remove_owned_path(project_root, destination)
+                _fsync_directory(destination.parent)
+        except Exception as error:
+            errors.append(error)
 
     for target in reversed(journal["targets"]):
-        live = _journal_path(project_root, target["live"])
-        backup = _journal_path(transaction_root, target["backup"])
-        backup_identity = _lstat_or_none(backup)
-        if backup_identity is not None:
-            if _lstat_or_none(live) is not None:
-                _remove_path(live)
-            live.parent.mkdir(parents=True, exist_ok=True)
-            os.replace(backup, live)
-            _fsync_directory(live.parent)
-        elif not target["live_existed"] and _lstat_or_none(live) is not None:
-            _remove_path(live)
-            _fsync_directory(live.parent)
+        try:
+            live = _journal_path(project_root, target["live"])
+            backup = _journal_path(transaction_root, target["backup"])
+            _require_owned_path(
+                project_root,
+                live,
+                role="live rollback target",
+                allow_missing_leaf=True,
+            )
+            _require_owned_path(
+                transaction_root,
+                backup,
+                role="backup rollback target",
+                allow_missing_leaf=True,
+                allow_missing_parents=True,
+            )
+            backup_identity = _lstat_or_none(backup)
+            if backup_identity is not None:
+                if _lstat_or_none(live) is not None:
+                    _remove_owned_path(project_root, live)
+                _ensure_owned_directory(project_root, live.parent)
+                _durable_replace(backup, live)
+            elif not target["live_existed"] and _lstat_or_none(live) is not None:
+                _remove_owned_path(project_root, live)
+                _fsync_directory(live.parent)
+        except Exception as error:
+            errors.append(error)
+    if errors:
+        raise OSError(
+            f"transaction rollback has {len(errors)} unsafe or failed operation(s): "
+            f"{errors[0]}"
+        ) from errors[0]
 
 
 def _write_journal(path: Path, payload: Mapping[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
+    _require_real_directory(path.parent, role="transaction journal directory")
     descriptor, temporary_name = tempfile.mkstemp(
         prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
     )
@@ -510,8 +686,7 @@ def _write_journal(path: Path, payload: Mapping[str, Any]) -> None:
             handle.write("\n")
             handle.flush()
             os.fsync(handle.fileno())
-        os.replace(temporary, path)
-        _fsync_directory(path.parent)
+        _durable_replace(temporary, path)
     except BaseException:
         try:
             os.close(descriptor)
@@ -550,8 +725,18 @@ def _load_journal(project: AuthoringProject, root: Path) -> dict[str, Any]:
             raise ValueError("targets are not ordered")
         for target in targets:
             _validate_journal_target(target)
-        _validate_journal_artifact(value.get("staged_run"), "runs", required=False)
-        _validate_journal_artifact(value.get("staged_change"), "changes", required=True)
+        if value["phase"] == "staging":
+            if (
+                targets
+                or value.get("staged_run") is not None
+                or value.get("staged_change") is not None
+            ):
+                raise ValueError("staging journal contains prepared destinations")
+        else:
+            _validate_journal_artifact(value.get("staged_run"), "runs", required=False)
+            _validate_journal_artifact(
+                value.get("staged_change"), "changes", required=True
+            )
     except (KeyError, TypeError, ValueError) as error:
         _recovery_error("Transaction journal is malformed", path, error)
     return value
@@ -587,10 +772,16 @@ def _validate_journal_artifact(value: Any, root_name: str, *, required: bool) ->
         raise ValueError("invalid staged artifact")
     staged = _safe_relative(value["staged"])
     destination = _safe_relative(value["destination"])
-    if staged.parts[0] != "staged_artifacts":
+    expected_staged = (
+        PurePosixPath("staged_artifacts/run")
+        if root_name == "runs"
+        else PurePosixPath("staged_artifacts/change.json")
+    )
+    if staged != expected_staged:
         raise ValueError("staged artifact escapes its directory")
-    if destination.parts[0] != root_name:
+    if len(destination.parts) != 2 or destination.parts[0] != root_name:
         raise ValueError("artifact destination escapes its registry")
+    _require_component(destination.parts[1], "artifact destination")
 
 
 def _coerce_project_target(value: str | os.PathLike[str]) -> PurePosixPath:
@@ -613,7 +804,7 @@ def _is_allowed_target(relative: PurePosixPath) -> bool:
     return (
         relative == PurePosixPath("economy.yaml")
         or relative == PurePosixPath("luban_exports")
-        or (len(relative.parts) >= 2 and relative.parts[0] == "Datas")
+        or (len(relative.parts) == 2 and relative.parts[0] == "Datas")
     )
 
 
@@ -647,36 +838,155 @@ def _lstat_or_none(path: Path) -> os.stat_result | None:
         return None
 
 
-def _remove_path(path: Path) -> None:
-    identity = path.lstat()
-    if stat.S_ISDIR(identity.st_mode) and not stat.S_ISLNK(identity.st_mode):
+def _is_indirection(identity: os.stat_result) -> bool:
+    reparse_flag = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+    file_attributes = getattr(identity, "st_file_attributes", 0)
+    return stat.S_ISLNK(identity.st_mode) or bool(file_attributes & reparse_flag)
+
+
+def _require_real_directory(path: Path, *, role: str) -> os.stat_result:
+    identity = _lstat_or_none(path)
+    if identity is None:
+        raise OSError(f"{role} is missing: {path}")
+    if _is_indirection(identity) or not stat.S_ISDIR(identity.st_mode):
+        raise OSError(f"{role} is an indirection or not a directory: {path}")
+    try:
+        resolved = path.resolve(strict=True)
+    except (OSError, RuntimeError, ValueError) as error:
+        raise OSError(f"{role} could not be resolved safely: {path}") from error
+    if resolved != path:
+        raise OSError(f"{role} resolves through an indirection: {path}")
+    return identity
+
+
+def _require_owned_path(
+    root: Path,
+    path: Path,
+    *,
+    role: str,
+    allow_missing_leaf: bool,
+    allow_missing_parents: bool = False,
+) -> os.stat_result | None:
+    _require_real_directory(root, role=f"{role} boundary")
+    try:
+        relative = path.relative_to(root)
+    except ValueError as error:
+        raise OSError(f"{role} escapes its boundary: {path}") from error
+    if not relative.parts:
+        return root.lstat()
+    resolved_root = root.resolve(strict=True)
+    current = root
+    for index, part in enumerate(relative.parts):
+        if part in {"", ".", ".."}:
+            raise OSError(f"{role} contains an unsafe path component: {path}")
+        current = current / part
+        identity = _lstat_or_none(current)
+        is_leaf = index == len(relative.parts) - 1
+        if identity is None:
+            if (is_leaf and allow_missing_leaf) or allow_missing_parents:
+                return None
+            raise OSError(f"{role} is missing: {current}")
+        if _is_indirection(identity):
+            raise OSError(f"{role} crosses an indirection: {current}")
+        if not is_leaf and not stat.S_ISDIR(identity.st_mode):
+            raise OSError(f"{role} ancestor is not a directory: {current}")
+        try:
+            resolved = current.resolve(strict=True)
+        except (OSError, RuntimeError, ValueError) as error:
+            raise OSError(f"{role} could not be resolved safely: {current}") from error
+        if not resolved.is_relative_to(resolved_root):
+            raise OSError(f"{role} resolves outside its boundary: {current}")
+    return identity
+
+
+def _ensure_owned_directory(root: Path, path: Path) -> None:
+    _require_real_directory(root, role="directory boundary")
+    try:
+        relative = path.relative_to(root)
+    except ValueError as error:
+        raise OSError(f"directory escapes its boundary: {path}") from error
+    current = root
+    for part in relative.parts:
+        if part in {"", ".", ".."}:
+            raise OSError(f"directory contains an unsafe path component: {path}")
+        current = current / part
+        identity = _lstat_or_none(current)
+        if identity is None:
+            current.mkdir()
+            _fsync_directory(current.parent)
+        _require_real_directory(current, role="owned directory")
+
+
+def _remove_owned_path(root: Path, path: Path) -> None:
+    identity = _require_owned_path(
+        root,
+        path,
+        role="removal target",
+        allow_missing_leaf=False,
+    )
+    assert identity is not None
+    if stat.S_ISDIR(identity.st_mode):
         shutil.rmtree(path)
     else:
         path.unlink()
 
 
 def _cleanup_transaction(root: Path) -> None:
-    shutil.rmtree(root)
-    _fsync_directory(root.parent)
+    _require_real_directory(root.parent, role="transaction registry")
+    _require_real_directory(root, role="transaction cleanup root")
+    _require_component(root.name, "transaction cleanup id")
+    tombstone = root.parent / (
+        f"{_CLEANUP_TOMBSTONE_PREFIX}{root.name}-{uuid.uuid4().hex}"
+    )
+    _durable_replace(root, tombstone)
+    _delete_tombstone(tombstone)
+
+
+def _delete_tombstone(tombstone: Path) -> None:
+    if (
+        tombstone.parent == tombstone
+        or not tombstone.name.startswith(_CLEANUP_TOMBSTONE_PREFIX)
+    ):
+        raise OSError(f"invalid transaction cleanup tombstone: {tombstone}")
+    _require_real_directory(tombstone.parent, role="transaction registry")
+    _require_real_directory(tombstone, role="transaction cleanup tombstone")
+    shutil.rmtree(tombstone)
+    _fsync_directory(tombstone.parent)
+
+
+def _durable_replace(source: Path, destination: Path) -> None:
+    source_parent = source.parent
+    destination_parent = destination.parent
+    os.replace(source, destination)
+    _fsync_directory(source_parent)
+    _fsync_directory(destination_parent)
 
 
 def _fsync_tree(path: Path) -> None:
     identity = path.lstat()
+    if _is_indirection(identity):
+        raise OSError(f"cannot fsync an indirection: {path}")
     if stat.S_ISREG(identity.st_mode):
         _fsync_file(path)
         return
     if stat.S_ISDIR(identity.st_mode):
-        for child in sorted(path.rglob("*")):
+        directories: list[Path] = []
+        for child in sorted(path.iterdir()):
             child_identity = child.lstat()
+            if _is_indirection(child_identity):
+                raise OSError(f"cannot fsync a tree containing an indirection: {child}")
             if stat.S_ISREG(child_identity.st_mode):
                 _fsync_file(child)
-        for directory in sorted(
-            (item for item in path.rglob("*") if item.is_dir()),
-            key=lambda item: len(item.parts),
-            reverse=True,
-        ):
+            elif stat.S_ISDIR(child_identity.st_mode):
+                _fsync_tree(child)
+                directories.append(child)
+            else:
+                raise OSError(f"cannot fsync an unsupported artifact type: {child}")
+        for directory in reversed(directories):
             _fsync_directory(directory)
         _fsync_directory(path)
+        return
+    raise OSError(f"cannot fsync an unsupported artifact type: {path}")
 
 
 def _fsync_file(path: Path) -> None:
@@ -691,14 +1001,28 @@ def _fsync_directory(path: Path) -> None:
     flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
     try:
         descriptor = os.open(path, flags)
-    except (OSError, ValueError):
-        return
+    except OSError as error:
+        if _is_unsupported_directory_fsync(error):
+            return
+        raise
     try:
         os.fsync(descriptor)
-    except OSError:
-        pass
+    except OSError as error:
+        if not _is_unsupported_directory_fsync(error):
+            raise
     finally:
         os.close(descriptor)
+
+
+def _is_unsupported_directory_fsync(error: OSError) -> bool:
+    unsupported = {
+        errno.EINVAL,
+        getattr(errno, "ENOTSUP", errno.EINVAL),
+        getattr(errno, "EOPNOTSUPP", errno.EINVAL),
+    }
+    if os.name == "nt":
+        unsupported.update({errno.EACCES, errno.EBADF, errno.EPERM})
+    return error.errno in unsupported
 
 
 def _transaction_error(code: str, message: str, **details: Any) -> NoReturn:
