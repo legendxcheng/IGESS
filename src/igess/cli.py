@@ -5,6 +5,7 @@ import sys
 
 from .advice import review_run, run_advise
 from .builder import ModelBuilder
+from .cli_support import require_directory, require_file
 from .compare import compare_runs
 from .dashboard import serve_dashboard
 from .doctor import format_doctor_report, run_doctor
@@ -349,10 +350,13 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         if args.command == "export-tables":
+            require_directory(args.datas, "source workbook directory")
             written = export_registered_workbooks(args.datas, args.out)
             print(f"Exported {len(written)} tables to {args.out}")
             return 0
         if args.command == "stone-role-level":
+            require_file(args.role_lv, "role-level workbook")
+            require_file(args.attribute_def, "attribute-definition workbook")
             curve = build_role_level_curve(args.role_lv, args.attribute_def)
             artifacts = write_role_level_artifacts(curve, args.out)
             print(
@@ -361,6 +365,8 @@ def main(argv: list[str] | None = None) -> int:
             )
             return 0
         if args.command == "stone-realm-progression":
+            require_file(args.role_realm, "role-realm workbook")
+            require_file(args.attribute_def, "attribute-definition workbook")
             curve = build_realm_progression_curve(args.role_realm, args.attribute_def)
             artifacts = write_realm_progression_artifacts(curve, args.out)
             print(
@@ -369,18 +375,24 @@ def main(argv: list[str] | None = None) -> int:
             )
             return 0
         if args.command == "report":
+            require_directory(args.run, "run directory")
             index = generate_static_report(args.run, args.out, args.title)
             print(f"Wrote static report to {index}")
             return 0
         if args.command == "compare":
+            require_directory(args.base, "baseline run directory")
+            require_directory(args.candidate, "candidate run directory")
             index = compare_runs(args.base, args.candidate, args.out)
             print(f"Wrote comparison report to {index}")
             return 0
         if args.command == "scan":
+            require_file(args.config, "config file")
+            require_directory(args.tables, "runtime export directory")
             summary = run_scan(args.config, args.tables, args.scenario, args.param, args.out)
             print(f"Wrote scan summary to {summary}")
             return 0
         if args.command == "rng-run":
+            require_file(args.config, "config file")
             raw = ConfigLoader.load_rules_only(args.config)
             ConfigLinter.validate(raw)
             model = ModelBuilder.build(raw)
@@ -389,6 +401,9 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Wrote RNG simulation outputs to {args.out}")
             return 0
         if args.command == "gate":
+            require_directory(args.base, "baseline run directory")
+            require_directory(args.candidate, "candidate run directory")
+            require_file(args.config, "config file")
             result = evaluate_gates(args.base, args.candidate, args.config, args.out)
             if result.ok:
                 print(f"Regression gates passed; wrote results to {result.output_dir}")
@@ -396,14 +411,22 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Regression gates failed; wrote results to {result.output_dir}")
             return 1
         if args.command == "advise":
+            require_file(args.config, "config file")
+            require_directory(args.tables, "runtime export directory")
+            if args.baseline is not None:
+                require_directory(args.baseline, "baseline run directory")
             advice = run_advise(args.config, args.tables, args.scenario, args.out, args.baseline)
             print(f"Wrote advice to {args.out} ({advice['status']})")
             return 0
         if args.command == "review-run":
+            require_directory(args.run, "run directory")
+            if args.baseline is not None:
+                require_directory(args.baseline, "baseline run directory")
             advice = review_run(args.run, args.out, args.baseline)
             print(f"Wrote advice to {args.out} ({advice['status']})")
             return 0
         if args.command == "review-proposal":
+            require_file(args.proposal, "proposal file")
             review = review_proposal(args.proposal, args.out)
             print(
                 f"Wrote proposal review to {args.out} "
@@ -411,6 +434,14 @@ def main(argv: list[str] | None = None) -> int:
             )
             return 0
         if args.command == "verify-edits":
+            require_file(args.config, "config file")
+            require_file(args.proposal, "proposal file")
+            if args.tables is not None:
+                require_directory(args.tables, "runtime export directory")
+            if args.datas is not None:
+                require_directory(args.datas, "source workbook directory")
+            if args.baseline is not None:
+                require_directory(args.baseline, "baseline run directory")
             report = verify_edits(
                 args.config,
                 args.proposal,
@@ -423,10 +454,15 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Wrote edit verification to {args.out} ({report['status']})")
             return 0 if report["status"] in {"passed", "needs_review"} else 1
         if args.command == "yaml-plan":
+            require_file(args.config, "config file")
             create_yaml_plan(args.config, args.intent, args.out)
             print(f"Wrote YAML plan to {args.out}")
             return 0
         if args.command == "yaml-apply":
+            require_file(args.config, "config file")
+            require_file(args.plan, "YAML plan file")
+            if args.tables is not None:
+                require_directory(args.tables, "runtime export directory")
             result = apply_yaml_plan(args.config, args.plan, approve=args.approve, tables=args.tables)
             print(f"Applied YAML plan to {result['config']}")
             return 0
@@ -439,6 +475,7 @@ def main(argv: list[str] | None = None) -> int:
             print(format_doctor_report(report))
             return 0 if report.ok else 1
         if args.command == "explain":
+            require_directory(args.run, "run directory")
             explanation = explain_event(args.run, args.event)
             print(format_event_explanation(explanation))
             return 0
@@ -452,6 +489,8 @@ def main(argv: list[str] | None = None) -> int:
                 port=args.port,
             )
             return 0
+        require_file(args.config, "config file")
+        require_directory(args.tables, "runtime export directory")
         raw = ConfigLoader.load(args.config, args.tables)
         ConfigLinter.validate(raw)
         if args.command == "lint":

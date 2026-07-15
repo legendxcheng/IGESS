@@ -135,6 +135,11 @@ class RngSimulator:
         self.model = model
 
     def run_scenario(self, scenario_id: str) -> RngSimulationResult:
+        if scenario_id not in self.model.rng_scenarios:
+            available = ", ".join(sorted(self.model.rng_scenarios)) or "none"
+            raise ValueError(
+                f"unknown scenario '{scenario_id}'; available: {available}"
+            )
         scenario = self.model.rng_scenarios[scenario_id]
         table = self.model.rng_tables[scenario.table]
         summaries: list[RngProfileSummary] = []

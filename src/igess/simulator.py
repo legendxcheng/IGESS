@@ -16,6 +16,11 @@ class Simulator:
         self.time = TimeEngine(model.config.tick_seconds)
 
     def run_scenario(self, scenario_id: str) -> SimulationResult:
+        if scenario_id not in self.model.scenarios:
+            available = ", ".join(sorted(self.model.scenarios)) or "none"
+            raise ValueError(
+                f"unknown scenario '{scenario_id}'; available: {available}"
+            )
         scenario = self.model.scenarios[scenario_id]
         duration_seconds = int(scenario.duration_hours * 3600)
         timeline: list[TimelineRow] = []
