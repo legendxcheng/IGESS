@@ -6,12 +6,23 @@ from copy import deepcopy
 import os
 from pathlib import Path
 import re
+import stat
 import tempfile
 from typing import Any, Mapping, NoReturn
 
 import yaml
 from yaml.constructor import ConstructorError
-from yaml.nodes import MappingNode, ScalarNode
+from yaml.nodes import MappingNode, ScalarNode, SequenceNode
+from yaml.tokens import (
+    AliasToken,
+    BlockEndToken,
+    BlockMappingStartToken,
+    BlockSequenceStartToken,
+    FlowMappingEndToken,
+    FlowMappingStartToken,
+    FlowSequenceEndToken,
+    FlowSequenceStartToken,
+)
 
 from .change import ModelChange
 from .entity_schema import (
@@ -27,6 +38,8 @@ _MAX_SOURCE_BYTES = 4 * 1024 * 1024
 _MAX_NESTING_DEPTH = 64
 _MAX_CONTAINERS = 8_192
 _MAX_VISITS = 32_768
+_MAX_YAML_TOKENS = 32_768
+_MAX_YAML_ALIASES = 4_096
 
 # PyYAML does not resolve exponent-only values such as ``1e3`` as floats.
 # Authoring YAML rejects them as numeric tokens rather than silently turning
@@ -132,6 +145,21 @@ def _reject_float(loader: _StrictConfigLoader, node: yaml.Node) -> NoReturn:
 _StrictConfigLoader.add_constructor("tag:yaml.org,2002:float", _reject_float)
 
 
+class _CanonicalConfigDumper(yaml.SafeDumper):
+    """Safe dumper that keeps strict-loader numeric strings unambiguous."""
+
+
+def _represent_canonical_string(
+    dumper: _CanonicalConfigDumper,
+    value: str,
+) -> yaml.Node:
+    style = "'" if _YAML_DECIMAL_OR_EXPONENT_RE.fullmatch(value) else None
+    return dumper.represent_scalar("tag:yaml.org,2002:str", value, style=style)
+
+
+_CanonicalConfigDumper.add_representer(str, _represent_canonical_string)
+
+
 def read_yaml_entity(
     config_or_path: Mapping[str, Any] | str | os.PathLike[str],
     entity: str,
@@ -181,12 +209,21 @@ def find_yaml_duplicates(
 
     path = _coerce_path(config_or_path)
     text, _ = _read_text(path)
+    _scan_yaml_budget(text)
     try:
         root = yaml.compose(text, Loader=yaml.SafeLoader)
     except yaml.YAMLError as error:
-        _yaml_parse_error(error)
+        _yaml_parse_error(error, phase="compose")
+    except (MemoryError, RecursionError, ValueError) as error:
+        _source_error(
+            "YAML duplicate scan could not compose the source safely",
+            "compose_error",
+            error_type=type(error).__name__,
+            phase="compose",
+        )
     if root is None:
         return []
+    _validate_composed_tree(root)
     if not isinstance(root, MappingNode):
         _source_error(
             "YAML project config must be a mapping",
@@ -215,6 +252,135 @@ def find_yaml_duplicates(
     return duplicates
 
 
+def _scan_yaml_budget(text: str) -> None:
+    starts = (
+        BlockMappingStartToken,
+        BlockSequenceStartToken,
+        FlowMappingStartToken,
+        FlowSequenceStartToken,
+    )
+    ends = (BlockEndToken, FlowMappingEndToken, FlowSequenceEndToken)
+    depth = 0
+    token_count = 0
+    alias_count = 0
+    try:
+        for token in yaml.scan(text, Loader=yaml.SafeLoader):
+            token_count += 1
+            if token_count > _MAX_YAML_TOKENS:
+                _source_error(
+                    "YAML duplicate scan exceeds the token budget",
+                    "token_budget_exceeded",
+                    actual=token_count,
+                    limit=_MAX_YAML_TOKENS,
+                    phase="scan",
+                )
+            if isinstance(token, starts):
+                depth += 1
+                if depth > _MAX_NESTING_DEPTH:
+                    _source_error(
+                        "YAML duplicate scan exceeds the nesting limit",
+                        "nesting_depth_exceeded",
+                        actual=depth,
+                        limit=_MAX_NESTING_DEPTH,
+                        phase="scan",
+                    )
+            elif isinstance(token, ends):
+                depth = max(0, depth - 1)
+            if isinstance(token, AliasToken):
+                alias_count += 1
+                if alias_count > _MAX_YAML_ALIASES:
+                    _source_error(
+                        "YAML duplicate scan exceeds the alias budget",
+                        "alias_budget_exceeded",
+                        actual=alias_count,
+                        limit=_MAX_YAML_ALIASES,
+                        phase="scan",
+                    )
+    except AuthoringError:
+        raise
+    except yaml.YAMLError as error:
+        _yaml_parse_error(error, phase="scan")
+    except (MemoryError, RecursionError, ValueError) as error:
+        _source_error(
+            "YAML duplicate scan could not tokenize the source safely",
+            "scan_error",
+            error_type=type(error).__name__,
+            phase="scan",
+        )
+
+
+def _validate_composed_tree(root: yaml.Node) -> None:
+    active: dict[int, str] = {}
+    unique_containers: set[int] = set()
+    visits = 0
+    stack: list[tuple[bool, yaml.Node, str, int]] = [(False, root, "$", 0)]
+    while stack:
+        exiting, node, path, depth = stack.pop()
+        marker = id(node)
+        if exiting:
+            active.pop(marker, None)
+            continue
+
+        visits += 1
+        if visits > _MAX_VISITS:
+            _source_error(
+                "YAML duplicate scan exceeds the node visit budget",
+                "traversal_budget_exceeded",
+                actual=visits,
+                limit=_MAX_VISITS,
+                path=path,
+                phase="compose",
+            )
+        if isinstance(node, ScalarNode):
+            continue
+        if depth > _MAX_NESTING_DEPTH:
+            _source_error(
+                "YAML duplicate scan exceeds the composed nesting limit",
+                "nesting_depth_exceeded",
+                actual=depth,
+                limit=_MAX_NESTING_DEPTH,
+                path=path,
+                phase="compose",
+            )
+        cycle_to = active.get(marker)
+        if cycle_to is not None:
+            _source_error(
+                "YAML aliases may not form cyclic structures",
+                "cyclic_structure",
+                cycle_to=cycle_to,
+                path=path,
+                phase="compose",
+            )
+        if marker not in unique_containers:
+            unique_containers.add(marker)
+            if len(unique_containers) > _MAX_CONTAINERS:
+                _source_error(
+                    "YAML duplicate scan contains too many containers",
+                    "container_budget_exceeded",
+                    actual=len(unique_containers),
+                    limit=_MAX_CONTAINERS,
+                    path=path,
+                    phase="compose",
+                )
+
+        active[marker] = path
+        stack.append((True, node, path, depth))
+        if isinstance(node, MappingNode):
+            children = [child for pair in node.value for child in pair]
+        elif isinstance(node, SequenceNode):
+            children = list(node.value)
+        else:
+            _source_error(
+                "YAML duplicate scan found an unsupported node",
+                "unsupported_node",
+                node_type=type(node).__name__,
+                path=path,
+                phase="compose",
+            )
+        for index in range(len(children) - 1, -1, -1):
+            stack.append((False, children[index], f"{path}[{index}]", depth + 1))
+
+
 def upsert_yaml_entity(candidate_config: Path, change: ModelChange) -> bool:
     """Persist one complete YAML-backed entity candidate atomically.
 
@@ -241,8 +407,9 @@ def upsert_yaml_entity(candidate_config: Path, change: ModelChange) -> bool:
     )
     entities[change.id] = normalized
 
-    serialized = yaml.safe_dump(
+    serialized = yaml.dump(
         config,
+        Dumper=_CanonicalConfigDumper,
         allow_unicode=True,
         sort_keys=False,
     ).rstrip("\r\n") + "\n"
@@ -389,7 +556,11 @@ def _parse_config(text: str) -> dict[str, Any]:
     return loaded
 
 
-def _yaml_parse_error(error: yaml.YAMLError) -> NoReturn:
+def _yaml_parse_error(
+    error: yaml.YAMLError,
+    *,
+    phase: str | None = None,
+) -> NoReturn:
     details: dict[str, Any] = {
         "error_type": type(error).__name__,
         "reason": "parse_error",
@@ -400,6 +571,8 @@ def _yaml_parse_error(error: yaml.YAMLError) -> NoReturn:
     problem = getattr(error, "problem", None)
     if isinstance(problem, str):
         details["problem"] = problem
+    if phase is not None:
+        details["phase"] = phase
     raise AuthoringError(
         "invalid_yaml_source",
         "YAML project config is not valid YAML",
@@ -642,6 +815,7 @@ def _replace_atomically(path: Path, content: bytes, change: ModelChange) -> None
     temporary: Path | None = None
     phase = "temp_write"
     try:
+        source_mode = stat.S_IMODE(path.stat().st_mode)
         descriptor, temporary_name = tempfile.mkstemp(
             prefix=f".{path.name}.",
             suffix=".tmp",
@@ -652,6 +826,7 @@ def _replace_atomically(path: Path, content: bytes, change: ModelChange) -> None
             handle.write(content)
             handle.flush()
             os.fsync(handle.fileno())
+        os.chmod(temporary, source_mode)
 
         phase = "reload"
         reloaded = _load_config(temporary)
@@ -671,6 +846,8 @@ def _replace_atomically(path: Path, content: bytes, change: ModelChange) -> None
     except AuthoringError:
         raise
     except (OSError, MemoryError, ValueError) as error:
+        if phase == "replace" and _path_has_exact_bytes(path, content):
+            return
         reason = {
             "temp_write": "temp_write_error",
             "reload": "reload_error",
@@ -691,6 +868,17 @@ def _replace_atomically(path: Path, content: bytes, change: ModelChange) -> None
                 temporary.unlink(missing_ok=True)
             except OSError:
                 pass
+
+
+def _path_has_exact_bytes(path: Path, expected: bytes) -> bool:
+    """Fingerprint the target after an ambiguous replace-side exception."""
+
+    try:
+        if path.stat().st_size != len(expected):
+            return False
+        return path.read_bytes() == expected
+    except (OSError, MemoryError, ValueError):
+        return False
 
 
 def _plain_tree(value: Any) -> Any:

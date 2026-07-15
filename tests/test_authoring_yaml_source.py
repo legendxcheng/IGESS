@@ -4,6 +4,8 @@ from copy import deepcopy
 import json
 import os
 from pathlib import Path
+import stat
+from typing import NoReturn
 
 import pytest
 import yaml
@@ -516,6 +518,58 @@ def test_duplicate_entity_ids_can_be_found_and_are_rejected(tmp_path: Path) -> N
     assert path.read_bytes() == before
 
 
+def test_duplicate_scan_rejects_deep_yaml_before_composition(tmp_path: Path) -> None:
+    path = tmp_path / "economy.yaml"
+    nested = "value"
+    for _ in range(80):
+        nested = f"[{nested}]"
+    path.write_text(f"formulas: {nested}\n", encoding="utf-8", newline="\n")
+
+    with pytest.raises(AuthoringError) as caught:
+        find_yaml_duplicates(path, "formula")
+
+    assert caught.value.code == "invalid_yaml_source"
+    assert caught.value.details["reason"] == "nesting_depth_exceeded"
+    assert caught.value.details["phase"] == "scan"
+
+
+def test_duplicate_scan_rejects_alias_fanout_before_composition(tmp_path: Path) -> None:
+    path = tmp_path / "economy.yaml"
+    aliases = ", ".join("*shared" for _ in range(5000))
+    path.write_text(
+        f"shared: &shared {{value: exact}}\nitems: [{aliases}]\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+
+    with pytest.raises(AuthoringError) as caught:
+        find_yaml_duplicates(path, "formula")
+
+    assert caught.value.code == "invalid_yaml_source"
+    assert caught.value.details["reason"] == "alias_budget_exceeded"
+    assert caught.value.details["phase"] == "scan"
+
+
+def test_duplicate_scan_converts_composer_recursion_to_stable_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = tmp_path / "economy.yaml"
+    path.write_text("formulas: {}\n", encoding="utf-8", newline="\n")
+
+    def recurse(*args: object, **kwargs: object) -> NoReturn:
+        del args, kwargs
+        raise RecursionError("composer recursion")
+
+    monkeypatch.setattr("igess.authoring.yaml_source.yaml.compose", recurse)
+    with pytest.raises(AuthoringError) as caught:
+        find_yaml_duplicates(path, "formula")
+
+    assert caught.value.code == "invalid_yaml_source"
+    assert caught.value.details["reason"] == "compose_error"
+    assert caught.value.details["error_type"] == "RecursionError"
+
+
 @pytest.mark.parametrize(
     ("source", "reason"),
     [
@@ -566,6 +620,33 @@ def test_serialization_is_canonical_ordered_utf8_lf_and_repeatable(
     assert path.read_bytes() == first
 
 
+def test_exponent_like_strings_remain_exact_and_reload_after_unrelated_edit(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "economy.yaml"
+    exponent_values = ["1e3", "1E+3", "-1e-3", "1.0e3", "-1.0E+3"]
+    data = _base_config()
+    _write_config(path, data)
+    with path.open("a", encoding="utf-8", newline="\n") as handle:
+        handle.write("engine_defaults:\n")
+        for index, value in enumerate(exponent_values):
+            handle.write(f"  value_{index}: '{value}'\n")
+
+    change = _patch(path, "source_type", "active", {"description": "Updated"})
+    assert upsert_yaml_entity(path, change) is True
+    written = path.read_text(encoding="utf-8")
+    for value in exponent_values:
+        assert f"'{value}'" in written
+    assert list(yaml.safe_load(written)["engine_defaults"].values()) == exponent_values
+    assert read_yaml_entity(path, "source_type", "active") == {
+        "description": "Updated"
+    }
+
+    first = path.read_bytes()
+    assert upsert_yaml_entity(path, change) is False
+    assert path.read_bytes() == first
+
+
 def test_comments_are_deliberately_not_preserved(tmp_path: Path) -> None:
     path = tmp_path / "economy.yaml"
     _write_config(path)
@@ -604,6 +685,73 @@ def test_atomic_replace_failure_preserves_original_and_cleans_temp(
     assert caught.value.details["error_type"] == "OSError"
     assert path.read_bytes() == before
     assert list(tmp_path.glob(".*.tmp")) == []
+
+
+def test_replace_that_installs_planned_bytes_then_raises_is_success(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = tmp_path / "economy.yaml"
+    _write_config(path)
+    real_replace = os.replace
+
+    def replace_then_raise(
+        source: str | bytes | os.PathLike[str] | os.PathLike[bytes],
+        target: str | bytes | os.PathLike[str] | os.PathLike[bytes],
+    ) -> NoReturn:
+        real_replace(source, target)
+        raise OSError("replace wrapper failed after success")
+
+    monkeypatch.setattr("igess.authoring.yaml_source.os.replace", replace_then_raise)
+    assert upsert_yaml_entity(
+        path,
+        _change("source_type", "new", {"description": "New source"}),
+    ) is True
+
+    assert read_yaml_entity(path, "source_type", "new") == {
+        "description": "New source"
+    }
+    assert list(tmp_path.glob(".*.tmp")) == []
+
+
+def test_atomic_write_applies_only_the_source_permission_bits_to_temp(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = tmp_path / "economy.yaml"
+    _write_config(path)
+    expected_mode = stat.S_IMODE(path.stat().st_mode)
+    calls: list[tuple[Path, int]] = []
+    real_chmod = os.chmod
+
+    def record_chmod(target: str | os.PathLike[str], mode: int) -> None:
+        calls.append((Path(target), mode))
+        real_chmod(target, mode)
+
+    monkeypatch.setattr("igess.authoring.yaml_source.os.chmod", record_chmod)
+    assert upsert_yaml_entity(
+        path,
+        _change("source_type", "new", {"description": "New source"}),
+    ) is True
+
+    assert len(calls) == 1
+    assert calls[0][0].parent == path.parent
+    assert calls[0][0] != path
+    assert calls[0][1] == expected_mode
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX permission contract")
+def test_atomic_write_preserves_posix_permission_mode(tmp_path: Path) -> None:
+    path = tmp_path / "economy.yaml"
+    _write_config(path)
+    path.chmod(0o640)
+
+    assert upsert_yaml_entity(
+        path,
+        _change("source_type", "new", {"description": "New source"}),
+    ) is True
+
+    assert stat.S_IMODE(path.stat().st_mode) == 0o640
 
 
 def test_mapping_and_entity_shape_errors_are_stable(tmp_path: Path) -> None:
