@@ -64,10 +64,11 @@ def _stage_transaction(
     *,
     checkpoint=lambda _name: None,
     digest_reader=None,
+    change_id: str = "change-1",
 ) -> Transaction:
     transaction = Transaction(
         project,
-        "change-1",
+        change_id,
         project.model_digest(),
         checkpoint=checkpoint,
         digest_reader=digest_reader,
@@ -192,6 +193,50 @@ def test_abort_removes_unprepared_staging_transaction(tmp_path: Path) -> None:
 
     assert not transaction.root.exists()
     assert recover_transactions(project) == []
+
+
+def test_cleanup_prefixed_change_id_remains_a_normal_recoverable_transaction(
+    tmp_path: Path,
+) -> None:
+    project = _make_project(tmp_path / "model")
+    before = _formal_snapshot(project)
+
+    def crash(name: str) -> NoReturn | None:
+        if name == "target:0:economy.yaml":
+            raise _HardCrash(name)
+        return None
+
+    transaction = _stage_transaction(
+        project,
+        checkpoint=crash,
+        change_id=".cleanup-legitimate-change",
+    )
+    with pytest.raises(_HardCrash):
+        transaction.commit()
+
+    assert recover_transactions(project) == [
+        {
+            "code": "recovered_transaction",
+            "message": (
+                "Recovered interrupted transaction .cleanup-legitimate-change"
+            ),
+            "change_id": ".cleanup-legitimate-change",
+        }
+    ]
+    _assert_pre_transaction_state(project, before)
+
+
+@pytest.mark.parametrize("change_id", ["../transactions-trash", "bad/name", "bad\\name"])
+def test_change_id_cannot_escape_transaction_namespace(
+    tmp_path: Path,
+    change_id: str,
+) -> None:
+    project = _make_project(tmp_path / "model")
+
+    with pytest.raises((TypeError, ValueError)):
+        Transaction(project, change_id, project.model_digest())
+
+    assert not (project.root / ".igess" / "transactions-trash").exists()
 
 
 @pytest.mark.parametrize(
@@ -358,6 +403,65 @@ def test_committed_journal_write_failure_rolls_back_every_target_and_artifact(
     assert caught.value.code == "commit_failed"
     assert caught.value.details["checkpoint"] == "journal_committed"
     _assert_pre_transaction_state(project, before)
+    assert not transaction.root.exists()
+
+
+def test_visible_committed_journal_fsync_failure_never_rolls_back_post_state(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project = _make_project(tmp_path / "model")
+    transaction = _stage_transaction(project)
+    real_replace = transaction_module.os.replace
+    real_fsync_directory = transaction_module._fsync_directory
+    real_rollback = transaction_module._rollback
+    committed_published = False
+    failed = False
+
+    def observe_replace(source: str | Path, destination: str | Path) -> None:
+        nonlocal committed_published
+        real_replace(source, destination)
+        destination_path = Path(destination)
+        if destination_path == transaction.journal_path:
+            payload = json.loads(destination_path.read_text(encoding="utf-8"))
+            committed_published = payload["phase"] == "committed"
+
+    def fail_committed_parent_fsync(path: Path) -> None:
+        nonlocal failed
+        if committed_published and path == transaction.root and not failed:
+            failed = True
+            raise OSError(errno.EIO, "committed directory fsync failed")
+        real_fsync_directory(path)
+
+    monkeypatch.setattr(transaction_module.os, "replace", observe_replace)
+    monkeypatch.setattr(transaction_module, "_fsync_directory", fail_committed_parent_fsync)
+    monkeypatch.setattr(
+        transaction_module,
+        "_journal_matches",
+        lambda *_args, **_kwargs: False,
+    )
+    monkeypatch.setattr(
+        transaction_module,
+        "_rollback",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("committed-visible state must not roll back")
+        ),
+    )
+
+    with pytest.raises(AuthoringError) as caught:
+        transaction.commit()
+
+    assert failed is True
+    assert caught.value.code == "commit_in_doubt"
+    assert caught.value.details["phase"] == "committed"
+    _assert_post_transaction_state(project)
+    assert transaction.root.exists()
+
+    monkeypatch.setattr(transaction_module.os, "replace", real_replace)
+    monkeypatch.setattr(transaction_module, "_fsync_directory", real_fsync_directory)
+    monkeypatch.setattr(transaction_module, "_rollback", real_rollback)
+    assert recover_transactions(project) == []
+    _assert_post_transaction_state(project)
     assert not transaction.root.exists()
 
 
@@ -536,15 +640,56 @@ def test_cleanup_tombstone_survives_partial_delete_without_a_journal(
         transaction.commit()
 
     assert not transaction.root.exists()
-    tombstones = list(project.transactions.glob(".cleanup-*"))
+    trash_root = project.root / ".igess" / "transactions-trash"
+    tombstones = list(trash_root.glob("txn-*"))
     assert len(tombstones) == 1
     assert not (tombstones[0] / "journal.json").exists()
     _assert_post_transaction_state(project)
 
     monkeypatch.setattr(transaction_module, "_delete_tombstone", real_delete)
     assert recover_transactions(project) == []
-    assert list(project.transactions.glob(".cleanup-*")) == []
+    assert list(trash_root.glob("txn-*")) == []
     _assert_post_transaction_state(project)
+
+
+def test_crash_before_first_staging_journal_leaves_recoverable_init_residue(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project = _make_project(tmp_path / "model")
+    before = _formal_snapshot(project)
+    real_writer = transaction_module._write_journal
+
+    def crash_before_journal(path: Path, payload: dict[str, object]) -> NoReturn:
+        assert payload["phase"] == "staging"
+        raise _HardCrash(f"journal absent at {path}")
+
+    monkeypatch.setattr(transaction_module, "_write_journal", crash_before_journal)
+
+    with pytest.raises(_HardCrash):
+        Transaction(project, "change-1", project.model_digest())
+
+    assert not (project.transactions / "change-1").exists()
+    init_root = project.root / ".igess" / "transactions-init"
+    assert len(list(init_root.glob("init-*"))) == 1
+
+    monkeypatch.setattr(transaction_module, "_write_journal", real_writer)
+    assert recover_transactions(project) == []
+    assert list(init_root.glob("init-*")) == []
+    assert _formal_snapshot(project) == before
+
+
+def test_recovery_does_not_delete_unrecognized_init_namespace_content(
+    tmp_path: Path,
+) -> None:
+    project = _make_project(tmp_path / "model")
+    unknown = project.root / ".igess" / "transactions-init" / "user-content"
+    unknown.mkdir(parents=True)
+    (unknown / "keep.txt").write_text("keep", encoding="utf-8")
+
+    assert recover_transactions(project) == []
+
+    assert (unknown / "keep.txt").read_text(encoding="utf-8") == "keep"
 
 
 def test_publish_fsyncs_candidate_before_rename_and_both_rename_parents(
@@ -651,3 +796,36 @@ def test_recovery_rejects_malformed_journal_without_touching_project(
     assert caught.value.code == "recovery_failed"
     assert _formal_snapshot(project) == before
     assert bad.exists()
+
+
+@pytest.mark.parametrize("corruption", ["duplicate_target", "phase_checkpoint"])
+def test_recovery_rejects_conflicting_targets_and_phase_checkpoint(
+    tmp_path: Path,
+    corruption: str,
+) -> None:
+    project = _make_project(tmp_path / "model")
+
+    def crash(name: str) -> NoReturn | None:
+        if name == "target:0:economy.yaml":
+            raise _HardCrash(name)
+        return None
+
+    transaction = _stage_transaction(project, checkpoint=crash)
+    with pytest.raises(_HardCrash):
+        transaction.commit()
+    journal = json.loads(transaction.journal_path.read_text(encoding="utf-8"))
+    if corruption == "duplicate_target":
+        duplicate = dict(journal["targets"][0])
+        duplicate["live_existed"] = not duplicate["live_existed"]
+        journal["targets"].append(duplicate)
+    else:
+        journal["phase"] = "committed"
+    transaction.journal_path.write_text(json.dumps(journal), encoding="utf-8")
+    before_recovery = _formal_snapshot(project)
+
+    with pytest.raises(AuthoringError) as caught:
+        recover_transactions(project)
+
+    assert caught.value.code == "recovery_failed"
+    assert _formal_snapshot(project) == before_recovery
+    assert transaction.root.exists()

@@ -7,6 +7,7 @@ import errno
 import json
 import os
 from pathlib import Path, PurePosixPath
+import re
 import shutil
 import stat
 import tempfile
@@ -19,9 +20,28 @@ from .response import AuthoringError
 
 JOURNAL_SCHEMA_VERSION = 1
 _PHASES = {"staging", "prepared", "committing", "committed"}
-_CLEANUP_TOMBSTONE_PREFIX = ".cleanup-"
+_INIT_DIRECTORY_NAME = "transactions-init"
+_TRASH_DIRECTORY_NAME = "transactions-trash"
+_INIT_NAME = re.compile(r"^init-[0-9a-f]{32}$")
+_TOMBSTONE_NAME = re.compile(r"^txn-[0-9a-f]{32}$")
 _Checkpoint = Callable[[str], None]
 _DigestReader = Callable[[], str]
+
+
+class _CommittedJournalVisibleError(Exception):
+    """The committed journal rename applied but its durability is uncertain."""
+
+    def __init__(self, original: Exception) -> None:
+        super().__init__(str(original))
+        self.original = original
+
+
+class _ReplaceAppliedButNotDurableError(Exception):
+    """``os.replace`` returned, but a required parent fsync failed."""
+
+    def __init__(self, original: Exception) -> None:
+        super().__init__(str(original))
+        self.original = original
 
 
 class Transaction:
@@ -79,7 +99,8 @@ class Transaction:
 
         try:
             _ensure_owned_directory(project.root, project.transactions)
-            self.root.mkdir()
+            if _lstat_or_none(self.root) is not None:
+                raise FileExistsError(self.root)
         except FileExistsError:
             _transaction_error(
                 "transaction_exists",
@@ -96,15 +117,37 @@ class Transaction:
                 path=str(self.root),
             )
 
+        metadata = project.transactions.parent
+        init_registry = metadata / _INIT_DIRECTORY_NAME
+        init_root = init_registry / f"init-{uuid.uuid4().hex}"
         try:
-            self.backups_dir.mkdir()
-            self.staged_artifacts_dir.mkdir()
-            _write_journal(self.journal_path, self._journal)
-        except AuthoringError:
-            raise
+            _ensure_owned_directory(metadata, init_registry)
+            init_root.mkdir()
+            (init_root / "backups").mkdir()
+            (init_root / "staged_artifacts").mkdir()
+            _write_journal(init_root / "journal.json", self._journal)
+            _fsync_tree(init_root)
+            if _lstat_or_none(self.root) is not None:
+                raise FileExistsError(self.root)
+            _durable_replace(init_root, self.root)
+        except FileExistsError:
+            if _lstat_or_none(init_root) is not None:
+                try:
+                    _delete_init_residue(init_root)
+                except Exception:
+                    pass
+            _transaction_error(
+                "transaction_exists",
+                "A transaction with this change id already exists",
+                change_id=change_id,
+                path=str(self.root),
+            )
         except Exception as error:
             try:
-                _cleanup_transaction(self.root)
+                if _lstat_or_none(init_root) is not None:
+                    _delete_init_residue(init_root)
+                elif _lstat_or_none(self.root) is not None:
+                    _cleanup_transaction(self.root)
             except Exception:
                 pass
             _transaction_error(
@@ -320,6 +363,19 @@ class Transaction:
         except Exception as error:
             if committed_durable:
                 return (self._cleanup_warning(),)
+            if isinstance(error, _CommittedJournalVisibleError):
+                raise AuthoringError(
+                    "commit_in_doubt",
+                    "Committed state is visible but journal durability is "
+                    "uncertain; recovery required",
+                    {
+                        "change_id": self.change_id,
+                        "checkpoint": "journal_committed",
+                        "error_type": type(error.original).__name__,
+                        "path": str(self.root),
+                        "phase": "committed",
+                    },
+                ) from None
             rollback_error = self._rollback_after_failure(error)
             if rollback_error is not None:
                 uncertain = AuthoringError(
@@ -396,6 +452,16 @@ def recover_transactions(project: AuthoringProject) -> list[dict[str, str]]:
     if not isinstance(project, AuthoringProject):
         raise TypeError("project must be an AuthoringProject")
     try:
+        _recover_internal_residues(project)
+    except AuthoringError:
+        raise
+    except Exception as error:
+        _recovery_error(
+            "Transaction internal residue cleanup failed",
+            project.transactions.parent,
+            error,
+        )
+    try:
         if not project.transactions.exists():
             return []
         _require_owned_path(
@@ -413,17 +479,10 @@ def recover_transactions(project: AuthoringProject) -> list[dict[str, str]]:
         )
 
     warnings: list[dict[str, str]] = []
-    for entry in entries:
-        if entry.name.startswith(_CLEANUP_TOMBSTONE_PREFIX):
-            try:
-                _delete_tombstone(entry)
-            except Exception as error:
-                _recovery_error("Transaction tombstone cleanup failed", entry, error)
     roots = [
         entry
         for entry in entries
-        if not entry.name.startswith(_CLEANUP_TOMBSTONE_PREFIX)
-        and _lstat_or_none(entry) is not None
+        if _lstat_or_none(entry) is not None
     ]
     for root in roots:
         try:
@@ -687,7 +746,15 @@ def _write_journal(path: Path, payload: Mapping[str, Any]) -> None:
             handle.flush()
             os.fsync(handle.fileno())
         _durable_replace(temporary, path)
-    except BaseException:
+    except BaseException as error:
+        committed_visible = (
+            isinstance(error, Exception)
+            and payload.get("phase") == "committed"
+            and (
+                isinstance(error, _ReplaceAppliedButNotDurableError)
+                or (not temporary.exists() and _journal_matches(path, payload))
+            )
+        )
         try:
             os.close(descriptor)
         except OSError:
@@ -696,7 +763,22 @@ def _write_journal(path: Path, payload: Mapping[str, Any]) -> None:
             temporary.unlink()
         except OSError:
             pass
+        if committed_visible:
+            assert isinstance(error, Exception)
+            original = (
+                error.original
+                if isinstance(error, _ReplaceAppliedButNotDurableError)
+                else error
+            )
+            raise _CommittedJournalVisibleError(original) from error
         raise
+
+
+def _journal_matches(path: Path, payload: Mapping[str, Any]) -> bool:
+    try:
+        return json.loads(path.read_text(encoding="utf-8")) == dict(payload)
+    except (OSError, UnicodeError, ValueError):
+        return False
 
 
 def _load_journal(project: AuthoringProject, root: Path) -> dict[str, Any]:
@@ -723,8 +805,20 @@ def _load_journal(project: AuthoringProject, root: Path) -> dict[str, Any]:
         targets = value["targets"]
         if not isinstance(targets, list):
             raise ValueError("targets are not ordered")
+        live_paths: set[str] = set()
+        candidate_paths: set[str] = set()
+        backup_paths: set[str] = set()
         for target in targets:
             _validate_journal_target(target)
+            if target["live"] in live_paths:
+                raise ValueError("duplicate live transaction target")
+            if target["candidate"] in candidate_paths:
+                raise ValueError("duplicate candidate transaction target")
+            if target["backup"] in backup_paths:
+                raise ValueError("duplicate backup transaction target")
+            live_paths.add(target["live"])
+            candidate_paths.add(target["candidate"])
+            backup_paths.add(target["backup"])
         if value["phase"] == "staging":
             if (
                 targets
@@ -733,13 +827,40 @@ def _load_journal(project: AuthoringProject, root: Path) -> dict[str, Any]:
             ):
                 raise ValueError("staging journal contains prepared destinations")
         else:
+            if not targets:
+                raise ValueError("prepared journal has no transaction targets")
             _validate_journal_artifact(value.get("staged_run"), "runs", required=False)
             _validate_journal_artifact(
                 value.get("staged_change"), "changes", required=True
             )
+        _validate_journal_checkpoint(value)
     except (KeyError, TypeError, ValueError) as error:
         _recovery_error("Transaction journal is malformed", path, error)
     return value
+
+
+def _validate_journal_checkpoint(journal: Mapping[str, Any]) -> None:
+    phase = journal["phase"]
+    checkpoint = journal["last_completed_checkpoint"]
+    targets = journal["targets"]
+    if phase == "staging":
+        allowed = {"staging"}
+    elif phase == "prepared":
+        allowed = {"prepared", "stale_digest_recheck"}
+    elif phase == "committed":
+        allowed = {"journal_committed"}
+    else:
+        allowed = {"journal_committing", "staged_change"}
+        allowed.update(
+            f"target:{index}:{target['live']}"
+            for index, target in enumerate(targets)
+        )
+        if journal.get("staged_run") is not None:
+            allowed.add("staged_run")
+    if checkpoint not in allowed:
+        raise ValueError(
+            f"checkpoint {checkpoint!r} is inconsistent with phase {phase!r}"
+        )
 
 
 def _validate_journal_target(target: Any) -> None:
@@ -932,34 +1053,83 @@ def _remove_owned_path(root: Path, path: Path) -> None:
 
 
 def _cleanup_transaction(root: Path) -> None:
-    _require_real_directory(root.parent, role="transaction registry")
+    registry = root.parent
+    metadata = registry.parent
+    if registry.name != "transactions":
+        raise OSError(f"invalid transaction registry: {registry}")
+    _require_real_directory(metadata, role="authoring metadata directory")
+    _require_real_directory(registry, role="transaction registry")
     _require_real_directory(root, role="transaction cleanup root")
     _require_component(root.name, "transaction cleanup id")
-    tombstone = root.parent / (
-        f"{_CLEANUP_TOMBSTONE_PREFIX}{root.name}-{uuid.uuid4().hex}"
-    )
+    trash = metadata / _TRASH_DIRECTORY_NAME
+    _ensure_owned_directory(metadata, trash)
+    tombstone = trash / f"txn-{uuid.uuid4().hex}"
     _durable_replace(root, tombstone)
     _delete_tombstone(tombstone)
 
 
 def _delete_tombstone(tombstone: Path) -> None:
     if (
-        tombstone.parent == tombstone
-        or not tombstone.name.startswith(_CLEANUP_TOMBSTONE_PREFIX)
+        tombstone.parent.name != _TRASH_DIRECTORY_NAME
+        or _TOMBSTONE_NAME.fullmatch(tombstone.name) is None
     ):
         raise OSError(f"invalid transaction cleanup tombstone: {tombstone}")
-    _require_real_directory(tombstone.parent, role="transaction registry")
+    _require_real_directory(tombstone.parent, role="transaction trash registry")
     _require_real_directory(tombstone, role="transaction cleanup tombstone")
     shutil.rmtree(tombstone)
     _fsync_directory(tombstone.parent)
+
+
+def _delete_init_residue(residue: Path) -> None:
+    if (
+        residue.parent.name != _INIT_DIRECTORY_NAME
+        or _INIT_NAME.fullmatch(residue.name) is None
+    ):
+        raise OSError(f"invalid transaction init residue: {residue}")
+    _require_real_directory(residue.parent, role="transaction init registry")
+    _require_real_directory(residue, role="transaction init residue")
+    shutil.rmtree(residue)
+    _fsync_directory(residue.parent)
+
+
+def _recover_internal_residues(project: AuthoringProject) -> None:
+    metadata = project.transactions.parent
+    if _lstat_or_none(metadata) is None:
+        return
+    _require_owned_path(
+        project.root,
+        metadata,
+        role="authoring metadata directory",
+        allow_missing_leaf=False,
+    )
+    registries = (
+        (metadata / _INIT_DIRECTORY_NAME, _INIT_NAME, _delete_init_residue),
+        (metadata / _TRASH_DIRECTORY_NAME, _TOMBSTONE_NAME, _delete_tombstone),
+    )
+    for registry, name_pattern, delete in registries:
+        if _lstat_or_none(registry) is None:
+            continue
+        _require_owned_path(
+            metadata,
+            registry,
+            role="transaction internal registry",
+            allow_missing_leaf=False,
+        )
+        for entry in sorted(registry.iterdir(), key=lambda path: path.name):
+            if name_pattern.fullmatch(entry.name) is None:
+                continue
+            delete(entry)
 
 
 def _durable_replace(source: Path, destination: Path) -> None:
     source_parent = source.parent
     destination_parent = destination.parent
     os.replace(source, destination)
-    _fsync_directory(source_parent)
-    _fsync_directory(destination_parent)
+    try:
+        _fsync_directory(source_parent)
+        _fsync_directory(destination_parent)
+    except Exception as error:
+        raise _ReplaceAppliedButNotDurableError(error) from error
 
 
 def _fsync_tree(path: Path) -> None:
