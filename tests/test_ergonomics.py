@@ -1,3 +1,5 @@
+import json
+from pathlib import Path
 import subprocess
 import sys
 
@@ -51,6 +53,33 @@ def test_init_project_copies_usable_sample(tmp_path):
     assert (target / "luban_exports" / "generators.json").exists()
     report = run_doctor(target, target / "economy.yaml", target / "luban_exports")
     assert report.ok
+
+
+def test_legacy_init_remains_a_populated_byte_exact_sample_copy(tmp_path):
+    target = tmp_path / "legacy"
+
+    init_project("incremental-basic", target)
+
+    sample = Path("examples/shelldiver_v0")
+    assert (target / "economy.yaml").read_bytes() == (
+        sample / "economy.yaml"
+    ).read_bytes()
+    expected_exports = {
+        path.relative_to(sample / "luban_exports").as_posix(): path.read_bytes()
+        for path in (sample / "luban_exports").rglob("*")
+        if path.is_file()
+    }
+    actual_exports = {
+        path.relative_to(target / "luban_exports").as_posix(): path.read_bytes()
+        for path in (target / "luban_exports").rglob("*")
+        if path.is_file()
+    }
+    assert actual_exports == expected_exports
+    assert any(json.loads(content.decode("utf-8")) for content in actual_exports.values())
+    assert (target / "README.md").read_bytes() == (
+        b"# IGESS Economy Project\n\n"
+        b"Run `igess lint --config economy.yaml --tables luban_exports` to validate this project.\n"
+    )
 
 
 def test_cli_doctor_explain_and_init(tmp_path):

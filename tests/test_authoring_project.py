@@ -9,10 +9,15 @@ import shutil
 
 from openpyxl import Workbook, load_workbook
 import pytest
+import yaml
 
 from igess.authoring import AuthoringProject
 from igess.authoring import project as project_module
 from igess.authoring.response import AuthoringError
+from igess.authoring.templates import (
+    _model_id_from_output_name,
+    initialize_authoring_project,
+)
 
 
 def _write_registry(datas: Path, paths: list[object]) -> Path:
@@ -71,6 +76,150 @@ def _expected_digest(root: Path, paths: list[Path]) -> str:
         digest.update(b"\0")
         digest.update(path.read_bytes())
     return f"sha256:{digest.hexdigest()}"
+
+
+_BLANK_TABLE_SCHEMAS = {
+    "resources.xlsx": (
+        ("id", "name", "dimension"),
+        ("stable resource id", "display name", "quantity dimension"),
+        ("string", "string", "string"),
+    ),
+    "generators.xlsx": (
+        (
+            "id",
+            "name",
+            "generator_type",
+            "output_resource",
+            "source_type",
+            "base_output",
+            "base_cost",
+            "cost_resource",
+            "cost_growth",
+            "unlock_condition",
+        ),
+        (
+            "stable generator id",
+            "display name",
+            "YAML generator type",
+            "produced resource id",
+            "source type id",
+            "base output per second",
+            "first purchase cost",
+            "resource spent",
+            "exponential cost growth",
+            "deterministic unlock condition",
+        ),
+        ("string",) * 10,
+    ),
+    "activities.xlsx": (
+        ("id", "name", "source_type", "unlock_condition"),
+        (
+            "stable activity id",
+            "display name",
+            "source type id",
+            "deterministic unlock condition",
+        ),
+        ("string",) * 4,
+    ),
+    "activity_outputs.xlsx": (
+        ("id", "activity_id", "output_resource", "amount_per_second"),
+        (
+            "stable output id",
+            "activity id",
+            "produced resource id",
+            "full-time amount per second",
+        ),
+        ("string",) * 4,
+    ),
+    "upgrades.xlsx": (
+        (
+            "id",
+            "name",
+            "target",
+            "modifier_type",
+            "value",
+            "cost_resource",
+            "base_cost",
+            "unlock_condition",
+        ),
+        (
+            "stable upgrade id",
+            "display name",
+            "modifier target",
+            "modifier type id",
+            "modifier value",
+            "resource spent",
+            "purchase cost",
+            "deterministic unlock condition",
+        ),
+        ("string",) * 8,
+    ),
+    "constants.xlsx": (
+        ("id", "value"),
+        ("stable constant id", "string-encoded number"),
+        ("string", "string"),
+    ),
+    "milestones.xlsx": (
+        ("id", "name", "condition", "reward_resource", "reward_amount"),
+        (
+            "stable milestone id",
+            "display name",
+            "condition",
+            "resource rewarded",
+            "reward amount",
+        ),
+        ("string",) * 5,
+    ),
+    "prestige_layers.xlsx": (
+        (
+            "id",
+            "name",
+            "trigger_resource",
+            "reward_resource",
+            "formula",
+            "divisor",
+            "exponent",
+            "min_gain",
+            "reset_resources",
+            "unlock_condition",
+        ),
+        (
+            "stable prestige id",
+            "display name",
+            "resource measured",
+            "resource rewarded",
+            "YAML formula id",
+            "formula divisor",
+            "formula exponent",
+            "minimum gain",
+            "resources reset",
+            "condition",
+        ),
+        (
+            "string",
+            "string",
+            "string",
+            "string",
+            "string",
+            "string",
+            "string",
+            "string",
+            "(list#sep=;),string",
+            "string",
+        ),
+    ),
+}
+
+_BLANK_REGISTRATIONS = (
+    ("resources", "resources.xlsx", "map", "id"),
+    ("generators", "generators.xlsx", "map", "id"),
+    ("activities", "activities.xlsx", "map", "id"),
+    ("activity_outputs", "activity_outputs.xlsx", "map", "id"),
+    ("upgrades", "upgrades.xlsx", "map", "id"),
+    ("constants", "constants.xlsx", "map", "id"),
+    ("milestones", "milestones.xlsx", "map", "id"),
+    ("prestige_layers", "prestige_layers.xlsx", "map", "id"),
+)
 
 
 def test_discover_returns_frozen_canonical_direct_child_paths(tmp_path: Path) -> None:
@@ -656,3 +805,277 @@ def test_model_digest_wraps_missing_or_malformed_registry_as_structured_error(tm
     assert malformed.value.details["reason"] == "malformed_registry"
     assert isinstance(malformed.value.details["error_type"], str)
     assert all(isinstance(value, (str, int, bool)) or value is None for value in malformed.value.details.values())
+
+
+def test_initialize_authoring_project_creates_exact_blank_tree_and_is_discoverable(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "My Game.v1!"
+
+    created = initialize_authoring_project(target)
+
+    assert created == target
+    assert sorted(path.relative_to(target).as_posix() for path in target.iterdir()) == [
+        "Datas",
+        "README.md",
+        "changes",
+        "economy.yaml",
+        "luban_exports",
+        "reports",
+        "run.ps1",
+        "runs",
+    ]
+    assert sorted(path.name for path in (target / "Datas").iterdir()) == [
+        "__tables__.xlsx",
+        "activities.xlsx",
+        "activity_outputs.xlsx",
+        "constants.xlsx",
+        "generators.xlsx",
+        "milestones.xlsx",
+        "prestige_layers.xlsx",
+        "resources.xlsx",
+        "upgrades.xlsx",
+    ]
+    for relative in ("luban_exports", "runs", "reports", "changes"):
+        assert list((target / relative).iterdir()) == []
+    assert AuthoringProject.discover(target).root == target.resolve()
+
+
+def test_initialize_authoring_project_accepts_an_existing_empty_directory(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "empty"
+    target.mkdir()
+
+    assert initialize_authoring_project(target, model_id="valid-ID_9") == target
+    assert yaml.safe_load((target / "economy.yaml").read_text(encoding="utf-8"))["model"][
+        "id"
+    ] == "valid-ID_9"
+
+
+@pytest.mark.parametrize("existing_kind", ["directory", "file"])
+def test_initialize_authoring_project_refuses_nonempty_target_without_changes(
+    tmp_path: Path, existing_kind: str
+) -> None:
+    target = tmp_path / "occupied"
+    if existing_kind == "directory":
+        target.mkdir()
+        sentinel = target / "keep.txt"
+        sentinel.write_bytes(b"do not touch")
+    else:
+        target.write_bytes(b"do not touch")
+        sentinel = target
+    before = {path: path.read_bytes() for path in tmp_path.rglob("*") if path.is_file()}
+
+    with pytest.raises(AuthoringError) as captured:
+        initialize_authoring_project(target)
+
+    assert captured.value.code == "project_not_empty"
+    assert captured.value.details["path"] == str(target)
+    assert captured.value.details["reason"] in {"not_empty", "not_directory"}
+    assert sentinel.read_bytes() == b"do not touch"
+    assert {path: path.read_bytes() for path in tmp_path.rglob("*") if path.is_file()} == before
+
+
+@pytest.mark.parametrize("model_id", ["", "has space", "dot.bad", "中文", "a/b"])
+def test_initialize_authoring_project_rejects_invalid_explicit_id_before_writing(
+    tmp_path: Path, model_id: str
+) -> None:
+    target = tmp_path / "must-not-exist"
+
+    with pytest.raises(AuthoringError) as captured:
+        initialize_authoring_project(target, model_id=model_id)
+
+    assert captured.value.code == "invalid_model_id"
+    assert captured.value.details == {
+        "allowed": "[A-Za-z0-9_-]+",
+        "model_id": model_id,
+        "path": str(target),
+        "reason": "invalid_explicit_id",
+    }
+    assert not target.exists()
+
+
+@pytest.mark.parametrize(
+    ("output_name", "expected"),
+    [
+        ("plain-ID_9", "plain-ID_9"),
+        ("My Game.v1!", "My_Game_v1_"),
+        ("!!!", "___"),
+        ("", "model"),
+    ],
+)
+def test_default_model_id_sanitizes_output_name(output_name: str, expected: str) -> None:
+    assert _model_id_from_output_name(output_name) == expected
+
+
+def test_initialize_authoring_project_writes_exact_engine_default_yaml(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "blank"
+    initialize_authoring_project(target)
+
+    raw = (target / "economy.yaml").read_bytes()
+    data = yaml.safe_load(raw)
+
+    assert b"\r" not in raw
+    assert raw.endswith(b"\n")
+    assert data == {
+        "model": {
+            "id": "blank",
+            "tick_seconds": 1,
+            "number_backend": "bignum_log",
+            "random_seed": 20260626,
+        },
+        "formulas": {
+            "exponential_cost": {
+                "args": ["base_cost", "growth", "owned"],
+                "expr": "base_cost * pow(growth, owned)",
+            },
+            "generator_output": {
+                "args": ["base_output", "owned", "multiplier"],
+                "expr": "base_output * owned * multiplier",
+            },
+            "prestige_gain": {
+                "args": ["progress", "divisor", "exponent"],
+                "expr": "floor(pow(progress / divisor, exponent))",
+            },
+        },
+        "generator_types": {
+            "building": {
+                "cost_formula": "exponential_cost",
+                "production_formula": "generator_output",
+            }
+        },
+        "source_types": {
+            "active": {"description": "Active player actions"},
+            "generator": {"description": "Automatic generator output"},
+            "offline": {"description": "Offline reward"},
+            "milestone": {"description": "Milestone reward"},
+            "prestige": {"description": "Prestige reward"},
+        },
+        "modifier_pipeline": {"order": ["base", "flat", "add_pct", "mult", "exp"]},
+        "modifier_types": {
+            "flat": {"stage": "flat"},
+            "add_pct": {"stage": "add_pct"},
+            "multiply": {"stage": "mult"},
+            "exponent": {"stage": "exp"},
+        },
+        "behavior_policies": {"cheap_unlock_first": {"type": "cheap_unlock_first"}},
+        "session_patterns": {
+            "authoring_default": {
+                "offline_every_seconds": 60,
+                "offline_duration_seconds": 0,
+            }
+        },
+        "player_profiles": {
+            "default": {
+                "source_efficiency": {
+                    "active": "1",
+                    "generator": "1",
+                    "offline": "1",
+                    "milestone": "1",
+                    "prestige": "1",
+                },
+                "behavior_policy": "cheap_unlock_first",
+                "session_pattern": "authoring_default",
+                "prestige_policy": "conservative",
+                "activity_weights": {},
+                "luck": "1",
+            }
+        },
+        "scenarios": {
+            "smoke": {
+                "duration_hours": "0.002777777777777778",
+                "time_mode": "tick",
+                "profiles": ["default"],
+                "start_state": "new_player",
+                "record_interval_seconds": 1,
+                "outputs": [
+                    "resource_curve",
+                    "purchase_timeline",
+                    "unlock_timeline",
+                    "prestige_timeline",
+                    "bottleneck_report",
+                ],
+            }
+        },
+    }
+    duration = float(data["scenarios"]["smoke"]["duration_hours"])
+    assert int(duration * 3600 / data["model"]["tick_seconds"]) == 10
+
+
+def test_initialize_authoring_project_writes_exact_blank_luban_workbooks(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "blank"
+    initialize_authoring_project(target)
+
+    for filename, (headers, comments, types) in _BLANK_TABLE_SCHEMAS.items():
+        workbook = load_workbook(target / "Datas" / filename, read_only=True, data_only=True)
+        try:
+            rows = list(workbook.active.iter_rows(values_only=True))
+        finally:
+            workbook.close()
+        assert rows == [
+            ("##var", *headers),
+            ("##", *comments),
+            ("##type", *types),
+        ], filename
+
+    registry = load_workbook(
+        target / "Datas" / "__tables__.xlsx", read_only=True, data_only=True
+    )
+    try:
+        rows = list(registry.active.iter_rows(values_only=True))
+    finally:
+        registry.close()
+    assert rows[:3] == [
+        ("##var", "table", "path", "mode", "key"),
+        ("##", "stable table id", "source workbook", "export mode", "map key field"),
+        ("##type", "string", "string", "string", "string"),
+    ]
+    assert rows[3:] == [(None, *registration) for registration in _BLANK_REGISTRATIONS]
+
+
+def test_blank_workbook_templates_are_byte_deterministic(tmp_path: Path) -> None:
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    initialize_authoring_project(first, model_id="same")
+    initialize_authoring_project(second, model_id="same")
+
+    assert {
+        path.name: path.read_bytes() for path in (first / "Datas").iterdir()
+    } == {path.name: path.read_bytes() for path in (second / "Datas").iterdir()}
+
+
+def test_initialize_authoring_project_documents_agent_workflow_and_robust_runner(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "blank"
+    initialize_authoring_project(target)
+
+    readme_bytes = (target / "README.md").read_bytes()
+    run_bytes = (target / "run.ps1").read_bytes()
+    readme = readme_bytes.decode("utf-8")
+    runner = run_bytes.decode("utf-8")
+
+    assert b"\r" not in readme_bytes
+    assert b"\r" not in run_bytes
+    assert "economy.yaml" in readme and "Datas/" in readme
+    assert "formal sources" in readme
+    assert "luban_exports/" in readme and "generated" in readme
+    for command in (
+        "igess model init",
+        "igess model status",
+        "igess model apply",
+        "igess model simulate",
+    ):
+        assert command in readme
+    for artifact in ("runs/", "reports/", "changes/"):
+        assert artifact in readme
+    assert "Agent" in readme and "one rule" in readme
+    assert "$PSScriptRoot" in runner
+    assert "igess model status --project $PSScriptRoot" in runner
+    assert "igess model simulate --project $PSScriptRoot --scenario smoke" in runner
+    assert runner.index("model status") < runner.index("model simulate")
