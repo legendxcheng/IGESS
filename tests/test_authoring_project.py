@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import FrozenInstanceError
 import hashlib
-import io
 import os
 from pathlib import Path
 import re
@@ -12,6 +11,7 @@ from openpyxl import Workbook, load_workbook
 import pytest
 
 from igess.authoring import AuthoringProject
+from igess.authoring import project as project_module
 from igess.authoring.response import AuthoringError
 
 
@@ -333,25 +333,32 @@ def test_model_digest_streams_files_with_fixed_bounded_reads(
     read_sizes: list[int] = []
 
     class TrackingReader:
-        def __init__(self, payload: bytes) -> None:
-            self._stream = io.BytesIO(payload)
+        def __init__(self, stream: object) -> None:
+            self._stream = stream
 
         def __enter__(self) -> TrackingReader:
             return self
 
         def __exit__(self, *args: object) -> None:
-            self._stream.close()
+            self.close()
+
+        def fileno(self) -> int:
+            return self._stream.fileno()  # type: ignore[attr-defined,no-any-return]
+
+        def seek(self, offset: int, whence: int = 0) -> int:
+            return self._stream.seek(offset, whence)  # type: ignore[attr-defined,no-any-return]
+
+        def close(self) -> None:
+            self._stream.close()  # type: ignore[attr-defined]
 
         def read(self, size: int = -1) -> bytes:
             read_sizes.append(size)
             assert size > 0
-            return self._stream.read(size)
-
-    payload = project.config.read_bytes()
+            return self._stream.read(size)  # type: ignore[attr-defined,no-any-return]
 
     def tracking_open(path: Path, *args: object, **kwargs: object) -> object:
         if path == project.config:
-            return TrackingReader(payload)
+            return TrackingReader(original_open(path, *args, **kwargs))
         return original_open(path, *args, **kwargs)
 
     monkeypatch.setattr(Path, "open", tracking_open)
@@ -368,18 +375,30 @@ def test_model_digest_converts_memory_error_to_structured_diagnostic(
     original_open = Path.open
 
     class ExhaustedReader:
+        def __init__(self, stream: object) -> None:
+            self._stream = stream
+
         def __enter__(self) -> ExhaustedReader:
             return self
 
         def __exit__(self, *args: object) -> None:
-            return None
+            self.close()
+
+        def fileno(self) -> int:
+            return self._stream.fileno()  # type: ignore[attr-defined,no-any-return]
+
+        def seek(self, offset: int, whence: int = 0) -> int:
+            return self._stream.seek(offset, whence)  # type: ignore[attr-defined,no-any-return]
+
+        def close(self) -> None:
+            self._stream.close()  # type: ignore[attr-defined]
 
         def read(self, size: int = -1) -> bytes:
             raise MemoryError("simulated allocation failure")
 
     def exhausted_open(path: Path, *args: object, **kwargs: object) -> object:
         if path == project.config:
-            return ExhaustedReader()
+            return ExhaustedReader(original_open(path, *args, **kwargs))
         return original_open(path, *args, **kwargs)
 
     monkeypatch.setattr(Path, "open", exhausted_open)
@@ -390,6 +409,86 @@ def test_model_digest_converts_memory_error_to_structured_diagnostic(
     assert captured.value.code == "project_config_unreadable"
     assert captured.value.details["reason"] == "source_read_error"
     assert captured.value.details["error_type"] == "MemoryError"
+
+
+def test_model_digest_rejects_config_identity_swap_before_open(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project = _make_project(tmp_path / "model")
+    replacement = tmp_path / "replacement-config.yaml"
+    replacement.write_text("external: true\n", encoding="utf-8")
+    original_open = getattr(project_module, "_open_binary", lambda path: path.open("rb"))
+    swapped = False
+
+    def swapping_open(path: Path) -> object:
+        nonlocal swapped
+        if path == project.config and not swapped:
+            swapped = True
+            os.replace(replacement, path)
+        return original_open(path)
+
+    monkeypatch.setattr(project_module, "_open_binary", swapping_open, raising=False)
+
+    with pytest.raises(AuthoringError) as captured:
+        project.model_digest()
+
+    assert swapped
+    assert captured.value.code == "project_config_unsafe"
+    assert captured.value.details["reason"] == "path_identity_changed"
+
+
+def test_model_digest_rejects_registry_identity_swap_before_parsing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project = _make_project(tmp_path / "model")
+    replacement_root = tmp_path / "replacement-registry"
+    replacement = _write_registry(replacement_root, ["external.xlsx"])
+    original_open = getattr(project_module, "_open_binary", lambda path: path.open("rb"))
+    registry = project.datas / "__tables__.xlsx"
+    swapped = False
+
+    def swapping_open(path: Path) -> object:
+        nonlocal swapped
+        if path == registry and not swapped:
+            swapped = True
+            os.replace(replacement, path)
+        return original_open(path)
+
+    monkeypatch.setattr(project_module, "_open_binary", swapping_open, raising=False)
+
+    with pytest.raises(AuthoringError) as captured:
+        project.model_digest()
+
+    assert swapped
+    assert captured.value.code == "invalid_source_registry"
+    assert captured.value.details["reason"] == "path_identity_changed"
+
+
+def test_model_digest_rejects_registered_source_identity_swap_before_consumption(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project = _make_project(tmp_path / "model", ["source.xlsx"])
+    replacement = tmp_path / "replacement-source.xlsx"
+    replacement.write_bytes(b"external source bytes")
+    original_open = getattr(project_module, "_open_binary", lambda path: path.open("rb"))
+    source = project.datas / "source.xlsx"
+    swapped = False
+
+    def swapping_open(path: Path) -> object:
+        nonlocal swapped
+        if path == source and not swapped:
+            swapped = True
+            os.replace(replacement, path)
+        return original_open(path)
+
+    monkeypatch.setattr(project_module, "_open_binary", swapping_open, raising=False)
+
+    with pytest.raises(AuthoringError) as captured:
+        project.model_digest()
+
+    assert swapped
+    assert captured.value.code == "invalid_source_registry"
+    assert captured.value.details["reason"] == "path_identity_changed"
 
 
 def test_model_digest_changes_for_config_registry_and_registered_workbook(tmp_path: Path) -> None:

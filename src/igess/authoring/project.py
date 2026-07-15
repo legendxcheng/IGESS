@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass, field
 import hashlib
 import os
 from pathlib import Path
 import stat
-from typing import Any, NoReturn
+from typing import Any, BinaryIO, Iterator, Literal, NoReturn
 
 from openpyxl import load_workbook
 
@@ -21,6 +22,24 @@ _PROJECT_PATHS = (
 )
 
 _DIGEST_CHUNK_SIZE = 1024 * 1024
+
+
+@dataclass(frozen=True, slots=True)
+class _SourceSnapshot:
+    kind: Literal["config", "registry", "workbook"]
+    path: Path
+    identity: os.stat_result | None
+    registry: Path | None = None
+    row: int | None = None
+    registration_path: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class _OpenedSource:
+    snapshot: _SourceSnapshot
+    path: Path
+    handle: BinaryIO
+    identity: os.stat_result
 
 
 @dataclass(frozen=True, slots=True)
@@ -114,16 +133,52 @@ class AuthoringProject:
             "source_tables",
         )
         registry = _resolve_registry(datas / "__tables__.xlsx", datas)
-        registrations = _read_registration_paths(registry)
-        source_paths = _validate_registration_paths(datas, registry, registrations)
-        digest = hashlib.sha256()
-        paths = [config, registry, *source_paths]
-        for path in sorted(paths, key=lambda item: _root_relative_posix(self.root, item)):
-            relative = _root_relative_posix(self.root, path)
-            digest.update(relative.encode("utf-8"))
-            digest.update(b"\0")
-            _stream_digest_file(digest, path, config=config, registry=registry)
-        return f"sha256:{digest.hexdigest()}"
+        config_snapshot = _snapshot_source("config", config)
+        registry_snapshot = _snapshot_source("registry", registry, registry=registry)
+
+        with ExitStack() as stack:
+            opened_config = stack.enter_context(
+                _open_validated_source(
+                    config_snapshot,
+                    root=self.root,
+                    boundary=self.root,
+                    direct=True,
+                )
+            )
+            opened_registry = stack.enter_context(
+                _open_validated_source(
+                    registry_snapshot,
+                    root=self.root,
+                    boundary=datas,
+                    direct=True,
+                )
+            )
+            registrations = _read_registration_paths(opened_registry.handle, registry)
+            source_snapshots = _validate_registration_paths(datas, registry, registrations)
+            opened_sources = [
+                stack.enter_context(
+                    _open_validated_source(
+                        snapshot,
+                        root=self.root,
+                        boundary=datas,
+                        direct=False,
+                    )
+                )
+                for snapshot in source_snapshots
+            ]
+            _reject_duplicate_opened_sources(opened_sources, registry)
+
+            digest = hashlib.sha256()
+            all_sources = [opened_config, opened_registry, *opened_sources]
+            for source in sorted(
+                all_sources,
+                key=lambda item: _root_relative_posix(self.root, item.path),
+            ):
+                relative = _root_relative_posix(self.root, source.path)
+                digest.update(relative.encode("utf-8"))
+                digest.update(b"\0")
+                _stream_opened_source(digest, source)
+            return f"sha256:{digest.hexdigest()}"
 
 
 def _require_project_path(
@@ -254,6 +309,197 @@ def _same_file(first: Path, second: Path) -> bool:
         return False
 
 
+def _snapshot_source(
+    kind: Literal["config", "registry", "workbook"],
+    path: Path,
+    *,
+    registry: Path | None = None,
+    row: int | None = None,
+    registration_path: str | None = None,
+) -> _SourceSnapshot:
+    partial = _SourceSnapshot(
+        kind=kind,
+        path=path,
+        identity=None,
+        registry=registry,
+        row=row,
+        registration_path=registration_path,
+    )
+    try:
+        identity = path.stat()
+    except (OSError, MemoryError, ValueError) as error:
+        _source_error(
+            partial,
+            "A model source could not be inspected",
+            "source_access_error",
+            error_type=type(error).__name__,
+        )
+    if not stat.S_ISREG(identity.st_mode):
+        _source_error(
+            partial,
+            "A model source is not a regular file",
+            "source_wrong_type",
+        )
+    return _SourceSnapshot(
+        kind=kind,
+        path=path,
+        identity=identity,
+        registry=registry,
+        row=row,
+        registration_path=registration_path,
+    )
+
+
+def _open_binary(path: Path) -> BinaryIO:
+    """Open a source for identity validation before any content is consumed."""
+
+    return path.open("rb")
+
+
+@contextmanager
+def _open_validated_source(
+    snapshot: _SourceSnapshot,
+    *,
+    root: Path,
+    boundary: Path,
+    direct: bool,
+) -> Iterator[_OpenedSource]:
+    handle: BinaryIO | None = None
+    try:
+        try:
+            handle = _open_binary(snapshot.path)
+            opened_identity = os.fstat(handle.fileno())
+        except (OSError, MemoryError, TypeError, ValueError) as error:
+            _source_error(
+                snapshot,
+                "A model source could not be opened",
+                "source_open_error",
+                error_type=type(error).__name__,
+            )
+
+        if snapshot.identity is None or not os.path.samestat(snapshot.identity, opened_identity):
+            _source_error(
+                snapshot,
+                "A model source changed between validation and opening",
+                "path_identity_changed",
+            )
+        if not stat.S_ISREG(opened_identity.st_mode):
+            _source_error(
+                snapshot,
+                "An opened model source is not a regular file",
+                "source_wrong_type",
+            )
+
+        try:
+            resolved_root = root.resolve(strict=True)
+            resolved_boundary = boundary.resolve(strict=True)
+            resolved_path = snapshot.path.resolve(strict=True)
+            path_identity = resolved_path.stat()
+        except (OSError, RuntimeError, ValueError) as error:
+            _source_error(
+                snapshot,
+                "A model source boundary could not be verified after opening",
+                "post_open_validation_error",
+                error_type=type(error).__name__,
+            )
+        if resolved_root != root or resolved_boundary != boundary:
+            _source_error(
+                snapshot,
+                "A model source boundary changed while opening",
+                "boundary_identity_changed",
+                resolved_path=str(resolved_path),
+            )
+        if boundary != root and boundary.parent != root:
+            _source_error(
+                snapshot,
+                "A model source boundary is no longer a direct project child",
+                "boundary_not_direct_child",
+                resolved_path=str(resolved_boundary),
+            )
+        if not resolved_path.is_relative_to(resolved_boundary):
+            _source_error(
+                snapshot,
+                "An opened model source resolves outside its allowed boundary",
+                "outside_root",
+                resolved_path=str(resolved_path),
+            )
+        if direct and resolved_path.parent != resolved_boundary:
+            _source_error(
+                snapshot,
+                "An opened model source is no longer a direct child",
+                "not_direct_child",
+                resolved_path=str(resolved_path),
+            )
+        if not os.path.samestat(opened_identity, path_identity):
+            _source_error(
+                snapshot,
+                "A model source path changed after opening",
+                "path_identity_changed",
+                resolved_path=str(resolved_path),
+            )
+
+        yield _OpenedSource(snapshot, resolved_path, handle, opened_identity)
+    finally:
+        if handle is not None:
+            try:
+                handle.close()
+            except (OSError, MemoryError, ValueError) as error:
+                _source_error(
+                    snapshot,
+                    "A model source handle could not be closed safely",
+                    "source_close_error",
+                    error_type=type(error).__name__,
+                )
+
+
+def _source_error(
+    snapshot: _SourceSnapshot,
+    message: str,
+    reason: str,
+    **details: str,
+) -> NoReturn:
+    if snapshot.kind == "config":
+        unsafe_reasons = {
+            "boundary_identity_changed",
+            "boundary_not_direct_child",
+            "not_direct_child",
+            "outside_root",
+            "path_identity_changed",
+            "post_open_validation_error",
+        }
+        _project_path_error(
+            "project_config_unsafe" if reason in unsafe_reasons else "project_config_unreadable",
+            message,
+            snapshot.path,
+            "file",
+            "project config",
+            reason,
+            **details,
+        )
+
+    registry = snapshot.registry or snapshot.path
+    source_details: dict[str, str | int] = dict(details)
+    if snapshot.kind == "workbook":
+        source_details["source_path"] = str(snapshot.path)
+    if snapshot.row is not None:
+        source_details["row"] = snapshot.row
+    if snapshot.registration_path is not None:
+        source_details["registration_path"] = snapshot.registration_path
+    _registry_error(message, reason, registry, **source_details)
+
+
+def _reject_duplicate_opened_sources(sources: list[_OpenedSource], registry: Path) -> None:
+    for index, source in enumerate(sources):
+        for earlier in sources[:index]:
+            if os.path.samestat(source.identity, earlier.identity):
+                _registry_error(
+                    "A workbook file is registered more than once",
+                    "duplicate_registration_path",
+                    registry,
+                    source_path=str(source.path),
+                )
+
+
 def _resolve_registry(path: Path, datas: Path) -> Path:
     try:
         registry = path.resolve(strict=True)
@@ -293,10 +539,14 @@ def _resolve_registry(path: Path, datas: Path) -> Path:
     return registry
 
 
-def _read_registration_paths(registry: Path) -> list[tuple[int, Any]]:
+def _read_registration_paths(
+    registry_handle: BinaryIO,
+    registry: Path,
+) -> list[tuple[int, Any]]:
     workbook = None
     try:
-        workbook = load_workbook(registry, read_only=True, data_only=True)
+        registry_handle.seek(0)
+        workbook = load_workbook(registry_handle, read_only=True, data_only=True)
         sheet = workbook.active
         if (
             sheet["A1"].value != "##var"
@@ -388,9 +638,9 @@ def _validate_registration_paths(
     datas_root: Path,
     registry: Path,
     registrations: list[tuple[int, Any]],
-) -> list[Path]:
+) -> list[_SourceSnapshot]:
     identities: set[str] = set()
-    result: list[Path] = []
+    result: list[_SourceSnapshot] = []
     for row, value in registrations:
         if not isinstance(value, str) or not value.strip():
             _registry_error(
@@ -450,31 +700,9 @@ def _validate_registration_paths(
                 row=row,
                 registration_path=value,
             )
-        for existing in result:
-            try:
-                duplicate_file = os.path.samefile(source, existing)
-            except OSError as error:
-                _registry_error(
-                    "A registered source workbook could not be compared",
-                    "registered_source_inaccessible",
-                    registry,
-                    row=row,
-                    registration_path=value,
-                    source_path=str(source),
-                    error_type=type(error).__name__,
-                )
-            if duplicate_file:
-                _registry_error(
-                    "A workbook file is registered more than once",
-                    "duplicate_registration_path",
-                    registry,
-                    row=row,
-                    registration_path=value,
-                    source_path=str(source),
-                )
         identities.add(identity)
         try:
-            source_is_file = stat.S_ISREG(source.stat().st_mode)
+            source_identity = source.stat()
         except OSError as error:
             _registry_error(
                 "A registered source workbook could not be inspected",
@@ -485,7 +713,7 @@ def _validate_registration_paths(
                 source_path=str(source),
                 error_type=type(error).__name__,
             )
-        if not source_is_file:
+        if not stat.S_ISREG(source_identity.st_mode):
             _registry_error(
                 "A registered source workbook is not a file",
                 "registered_source_wrong_type",
@@ -494,7 +722,29 @@ def _validate_registration_paths(
                 registration_path=value,
                 source_path=str(source),
             )
-        result.append(source)
+        for existing in result:
+            if existing.identity is not None and os.path.samestat(
+                source_identity,
+                existing.identity,
+            ):
+                _registry_error(
+                    "A workbook file is registered more than once",
+                    "duplicate_registration_path",
+                    registry,
+                    row=row,
+                    registration_path=value,
+                    source_path=str(source),
+                )
+        result.append(
+            _SourceSnapshot(
+                kind="workbook",
+                path=source,
+                identity=source_identity,
+                registry=registry,
+                row=row,
+                registration_path=value,
+            )
+        )
     return result
 
 
@@ -510,36 +760,22 @@ def _root_relative_posix(root: Path, path: Path) -> str:
         )
 
 
-def _stream_digest_file(
+def _stream_opened_source(
     digest: Any,
-    path: Path,
-    *,
-    config: Path,
-    registry: Path,
+    source: _OpenedSource,
 ) -> None:
     try:
-        with path.open("rb") as source:
-            while True:
-                chunk = source.read(_DIGEST_CHUNK_SIZE)
-                if not chunk:
-                    break
-                digest.update(chunk)
+        source.handle.seek(0)
+        while True:
+            chunk = source.handle.read(_DIGEST_CHUNK_SIZE)
+            if not chunk:
+                break
+            digest.update(chunk)
     except (OSError, MemoryError, ValueError) as error:
-        if path == config:
-            _project_path_error(
-                "project_config_unreadable",
-                "Project config could not be read",
-                path,
-                "file",
-                "project config",
-                "source_read_error",
-                error_type=type(error).__name__,
-            )
-        _registry_error(
-            "Unable to read a model source file",
+        _source_error(
+            source.snapshot,
+            "Unable to read an opened model source file",
             "source_read_error",
-            registry,
-            source_path=str(path),
             error_type=type(error).__name__,
         )
 
