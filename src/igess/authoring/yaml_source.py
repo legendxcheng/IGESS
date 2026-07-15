@@ -38,7 +38,10 @@ _MAX_SOURCE_BYTES = 4 * 1024 * 1024
 _MAX_NESTING_DEPTH = 64
 _MAX_CONTAINERS = 8_192
 _MAX_VISITS = 32_768
-_MAX_YAML_TOKENS = 32_768
+# YAML punctuation, key/value markers, tags, and anchors can require several
+# lexical tokens per composed node.  Keep token-only attacks bounded while
+# leaving ample headroom for every tree that fits the node-visit budget.
+_MAX_YAML_TOKENS = _MAX_VISITS * 8
 _MAX_YAML_ALIASES = 4_096
 
 # PyYAML does not resolve exponent-only values such as ``1e3`` as floats.
@@ -841,13 +844,16 @@ def _replace_atomically(path: Path, content: bytes, change: ModelChange) -> None
         _validate_entity(reloaded, change.entity, change.id, reloaded_fields)
 
         phase = "replace"
-        os.replace(temporary, path)
+        try:
+            os.replace(temporary, path)
+        except BaseException:
+            if _path_has_exact_bytes(path, content):
+                return
+            raise
         temporary = None
     except AuthoringError:
         raise
     except (OSError, MemoryError, ValueError) as error:
-        if phase == "replace" and _path_has_exact_bytes(path, content):
-            return
         reason = {
             "temp_write": "temp_write_error",
             "reload": "reload_error",

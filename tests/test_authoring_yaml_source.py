@@ -19,6 +19,10 @@ from igess.authoring.yaml_source import (
 )
 
 
+class _ReplaceSignal(BaseException):
+    pass
+
+
 def _base_config() -> dict[str, object]:
     return {
         "model": {
@@ -570,6 +574,44 @@ def test_duplicate_scan_converts_composer_recursion_to_stable_error(
     assert caught.value.details["error_type"] == "RecursionError"
 
 
+def test_large_structurally_valid_config_has_read_and_duplicate_scan_parity(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "economy.yaml"
+    lines = ["source_types:"]
+    for index in range(8000):
+        lines.extend(
+            (
+                f"  source_{index}:",
+                f"    description: Source {index}",
+            )
+        )
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+
+    assert read_yaml_entity(path, "source_type", "source_7999") == {
+        "description": "Source 7999"
+    }
+    assert find_yaml_duplicates(path, "source_type") == []
+
+
+def test_duplicate_scan_stably_rejects_token_only_input_over_budget(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "economy.yaml"
+    path.write_text(
+        "items: [" + ("," * 270_000) + "]\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+
+    with pytest.raises(AuthoringError) as caught:
+        find_yaml_duplicates(path, "formula")
+
+    assert caught.value.code == "invalid_yaml_source"
+    assert caught.value.details["reason"] == "token_budget_exceeded"
+    assert caught.value.details["phase"] == "scan"
+
+
 @pytest.mark.parametrize(
     ("source", "reason"),
     [
@@ -711,6 +753,59 @@ def test_replace_that_installs_planned_bytes_then_raises_is_success(
     assert read_yaml_entity(path, "source_type", "new") == {
         "description": "New source"
     }
+    assert list(tmp_path.glob(".*.tmp")) == []
+
+
+@pytest.mark.parametrize("error_type", [_ReplaceSignal, KeyboardInterrupt])
+def test_replace_that_installs_bytes_then_raises_base_exception_is_success(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    error_type: type[BaseException],
+) -> None:
+    path = tmp_path / "economy.yaml"
+    _write_config(path)
+    real_replace = os.replace
+
+    def replace_then_raise(
+        source: str | bytes | os.PathLike[str] | os.PathLike[bytes],
+        target: str | bytes | os.PathLike[str] | os.PathLike[bytes],
+    ) -> NoReturn:
+        real_replace(source, target)
+        raise error_type("raised after replace")
+
+    monkeypatch.setattr("igess.authoring.yaml_source.os.replace", replace_then_raise)
+    assert upsert_yaml_entity(
+        path,
+        _change("source_type", "new", {"description": "New source"}),
+    ) is True
+    assert read_yaml_entity(path, "source_type", "new") == {
+        "description": "New source"
+    }
+    assert list(tmp_path.glob(".*.tmp")) == []
+
+
+@pytest.mark.parametrize("error_type", [_ReplaceSignal, KeyboardInterrupt])
+def test_before_replace_base_exception_propagates_without_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    error_type: type[BaseException],
+) -> None:
+    path = tmp_path / "economy.yaml"
+    _write_config(path)
+    before = path.read_bytes()
+
+    def fail_before_replace(*args: object, **kwargs: object) -> NoReturn:
+        del args, kwargs
+        raise error_type("raised before replace")
+
+    monkeypatch.setattr("igess.authoring.yaml_source.os.replace", fail_before_replace)
+    with pytest.raises(error_type):
+        upsert_yaml_entity(
+            path,
+            _change("source_type", "new", {"description": "New source"}),
+        )
+
+    assert path.read_bytes() == before
     assert list(tmp_path.glob(".*.tmp")) == []
 
 
