@@ -4,7 +4,9 @@ from dataclasses import FrozenInstanceError
 import hashlib
 import json
 from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
 from pathlib import Path
+import shutil
 from types import SimpleNamespace
 
 from openpyxl import load_workbook
@@ -110,6 +112,22 @@ def _add_generator_route(
     )
     if starting_gold is not None:
         _upsert(project, "constant", "starting_gold", {"value": starting_gold})
+
+
+def _add_formal_scenario(project: AuthoringProject) -> None:
+    _upsert(
+        project,
+        "scenario",
+        "formal",
+        {
+            "duration_hours": "1",
+            "time_mode": "tick",
+            "profiles": ["default"],
+            "start_state": "new_player",
+            "record_interval_seconds": 60,
+            "outputs": ["resource_curve"],
+        },
+    )
 
 
 def _manifest(root: Path) -> dict[str, tuple[str, int, str]]:
@@ -343,6 +361,185 @@ def test_no_change_probe_remains_incomplete_not_failed(
     ]
 
 
+@pytest.mark.parametrize(
+    ("observable_category", "formal", "expected_state"),
+    [
+        ("resource_value", False, "runnable"),
+        ("owned_generator_count", True, "ready"),
+        ("purchased_upgrade_set", False, "runnable"),
+        ("prestige_count", True, "ready"),
+    ],
+)
+def test_every_probe_observable_category_maps_to_runnable_or_ready(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    observable_category: str,
+    formal: bool,
+    expected_state: str,
+) -> None:
+    project = _blank_project(tmp_path)
+    _add_activity_route(project)
+    if formal:
+        _add_formal_scenario(project)
+    calls: list[str] = []
+
+    def category_probe(_model: object) -> TenTickProbeResult:
+        calls.append(observable_category)
+        return TenTickProbeResult(True, ())
+
+    monkeypatch.setattr(status_module, "run_ten_tick_probe", category_probe)
+    before = _manifest(project.root)
+
+    status = derive_status(project, lambda: {"run_id": "prior-smoke-1"})
+
+    assert status.state == expected_state
+    assert status.structural_valid and status.smoke_eligible
+    assert calls == [observable_category]
+    assert status.latest_smoke_run_id == "prior-smoke-1"
+    assert status.entity_counts["resource"] == 1
+    assert status.available_scenarios == (
+        ("formal", "smoke") if formal else ("smoke",)
+    )
+    assert _manifest(project.root) == before
+
+
+def test_elapsed_time_and_unlock_events_without_observable_state_are_incomplete(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project = _blank_project(tmp_path)
+    _add_activity_route(project)
+    monkeypatch.setattr(
+        status_module,
+        "run_ten_tick_probe",
+        lambda _model: TenTickProbeResult(
+            False,
+            (
+                EligibilityFinding(
+                    "smoke_no_state_change",
+                    "Elapsed time and unlock events do not change observable model state.",
+                ),
+            ),
+        ),
+    )
+    before = _manifest(project.root)
+
+    status = derive_status(project, lambda: {"run_id": "prior-smoke-1"})
+
+    assert status.state == "incomplete"
+    assert status.structural_valid and status.smoke_eligible
+    assert [item.code for item in status.missing_requirements] == [
+        "smoke_no_state_change"
+    ]
+    assert status.entity_counts["resource"] == 1
+    assert status.available_scenarios == ("smoke",)
+    assert status.latest_smoke_run_id == "prior-smoke-1"
+    assert _manifest(project.root) == before
+
+
+@pytest.mark.parametrize(
+    ("efficiencies", "weights", "expected_code"),
+    [
+        ({"active": "1"}, {"gather": "0"}, "activity_weight_nonpositive"),
+        ({"active": "1"}, {}, "activity_weight_nonpositive"),
+        ({"active": "0"}, {"gather": "1"}, "activity_efficiency_nonpositive"),
+        ({"generator": "1"}, {"gather": "1"}, "activity_efficiency_nonpositive"),
+    ],
+)
+def test_activity_route_requires_weight_and_efficiency_for_every_smoke_profile(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    efficiencies: dict[str, str],
+    weights: dict[str, str],
+    expected_code: str,
+) -> None:
+    project = _blank_project(tmp_path)
+    _add_activity_route(project)
+    _upsert(
+        project,
+        "player_profile",
+        "second",
+        {
+            "source_efficiency": efficiencies,
+            "behavior_policy": "cheap_unlock_first",
+            "session_pattern": "authoring_default",
+            "prestige_policy": "conservative",
+            "activity_weights": weights,
+            "luck": "1",
+        },
+    )
+    _upsert(
+        project,
+        "scenario",
+        "smoke",
+        {
+            "duration_hours": "0.002777777777777778",
+            "time_mode": "tick",
+            "profiles": ["default", "second"],
+            "start_state": "new_player",
+            "record_interval_seconds": 1,
+            "outputs": ["resource_curve"],
+        },
+    )
+
+    def forbidden_probe(_model: object) -> TenTickProbeResult:
+        raise AssertionError("static ineligibility must not run the probe")
+
+    monkeypatch.setattr(status_module, "run_ten_tick_probe", forbidden_probe)
+    before = _manifest(project.root)
+
+    status = derive_status(project, lambda: {"run_id": "prior-smoke-1"})
+
+    assert status.state == "incomplete"
+    assert status.structural_valid and not status.smoke_eligible
+    assert expected_code in {item.code for item in status.missing_requirements}
+    assert status.entity_counts["resource"] == 1
+    assert status.available_scenarios == ("smoke",)
+    assert status.latest_smoke_run_id == "prior-smoke-1"
+    assert _manifest(project.root) == before
+
+
+def test_activity_route_with_two_positive_profiles_runs_real_probe(tmp_path: Path) -> None:
+    project = _blank_project(tmp_path)
+    _add_activity_route(project)
+    _upsert(
+        project,
+        "player_profile",
+        "second",
+        {
+            "source_efficiency": {"active": "0.5"},
+            "behavior_policy": "cheap_unlock_first",
+            "session_pattern": "authoring_default",
+            "prestige_policy": "conservative",
+            "activity_weights": {"gather": "2"},
+            "luck": "1",
+        },
+    )
+    _upsert(
+        project,
+        "scenario",
+        "smoke",
+        {
+            "duration_hours": "0.002777777777777778",
+            "time_mode": "tick",
+            "profiles": ["default", "second"],
+            "start_state": "new_player",
+            "record_interval_seconds": 1,
+            "outputs": ["resource_curve"],
+        },
+    )
+    before = _manifest(project.root)
+
+    status = derive_status(project, lambda: {"run_id": "prior-smoke-1"})
+
+    assert status.state == "runnable"
+    assert status.structural_valid and status.smoke_eligible
+    assert status.entity_counts["resource"] == 1
+    assert status.available_scenarios == ("smoke",)
+    assert status.latest_smoke_run_id == "prior-smoke-1"
+    assert _manifest(project.root) == before
+
+
 def test_latest_smoke_is_called_once_and_lookup_failures_are_status_failures(
     tmp_path: Path,
 ) -> None:
@@ -572,11 +769,120 @@ def test_ephemeral_export_is_opened_exactly_once(tmp_path: Path, monkeypatch: py
     assert calls == 1
 
 
+@pytest.mark.parametrize(("formal", "would_be"), [(False, "runnable"), (True, "ready")])
+def test_ephemeral_export_cleanup_failure_discards_computed_model_outcome(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    formal: bool,
+    would_be: str,
+) -> None:
+    project = _blank_project(tmp_path)
+    _add_activity_route(project)
+    if formal:
+        _add_formal_scenario(project)
+    original = status_module.ephemeral_export
+
+    @contextmanager
+    def cleanup_failure(selected: AuthoringProject):
+        with original(selected) as exported:
+            yield exported
+        raise RuntimeError(f"cleanup failed after {would_be}")
+
+    monkeypatch.setattr(status_module, "ephemeral_export", cleanup_failure)
+    before = _manifest(project.root)
+
+    status = derive_status(project, lambda: {"run_id": "prior-smoke-1"})
+
+    assert status.state == "failed"
+    assert not status.structural_valid and not status.smoke_eligible
+    assert [item.code for item in status.missing_requirements] == [
+        "status_export_failed"
+    ]
+    assert status.warnings == ()
+    assert status.entity_counts["resource"] == 1
+    assert status.available_scenarios == (
+        ("formal", "smoke") if formal else ("smoke",)
+    )
+    assert status.latest_smoke_run_id == "prior-smoke-1"
+    assert _manifest(project.root) == before
+
+
+def test_synchronized_committed_exports_have_no_stale_warning(tmp_path: Path) -> None:
+    project = _blank_project(tmp_path)
+    _add_activity_route(project)
+    with status_module.ephemeral_export(project) as current:
+        shutil.copytree(current.export_root, project.exports, dirs_exist_ok=True)
+    before = _manifest(project.root)
+
+    status = derive_status(project, lambda: {"run_id": "prior-smoke-1"})
+
+    assert status.state == "runnable"
+    assert status.warnings == ()
+    assert status.entity_counts["resource"] == 1
+    assert status.available_scenarios == ("smoke",)
+    assert status.latest_smoke_run_id == "prior-smoke-1"
+    assert _manifest(project.root) == before
+
+
+def test_corrupt_committed_export_adds_one_warning_without_changing_state(
+    tmp_path: Path,
+) -> None:
+    project = _blank_project(tmp_path)
+    _add_activity_route(project)
+    with status_module.ephemeral_export(project) as current:
+        shutil.copytree(current.export_root, project.exports, dirs_exist_ok=True)
+    synchronized = derive_status(project, lambda: {"run_id": "prior-smoke-1"})
+    (project.exports / "resources.json").write_bytes(b"not-json")
+    before = _manifest(project.root)
+
+    corrupt = derive_status(project, lambda: {"run_id": "prior-smoke-1"})
+
+    assert corrupt.state == synchronized.state == "runnable"
+    assert corrupt.structural_valid and corrupt.smoke_eligible
+    assert [item.code for item in corrupt.warnings] == ["exports_stale"]
+    assert corrupt.entity_counts == synchronized.entity_counts
+    assert corrupt.available_scenarios == synchronized.available_scenarios == ("smoke",)
+    assert corrupt.latest_smoke_run_id == "prior-smoke-1"
+    assert _manifest(project.root) == before
+
+
 def test_programmer_base_exception_from_latest_lookup_is_not_swallowed(tmp_path: Path) -> None:
     project = _blank_project(tmp_path)
 
     with pytest.raises(KeyboardInterrupt):
         derive_status(project, lambda: (_ for _ in ()).throw(KeyboardInterrupt()))
+
+
+@pytest.mark.parametrize("phase", ["build", "execution", "artifact"])
+def test_each_smoke_failure_phase_is_a_structured_failed_requirement(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    phase: str,
+) -> None:
+    project = _blank_project(tmp_path)
+    _add_activity_route(project)
+    monkeypatch.setattr(
+        status_module,
+        "run_ten_tick_probe",
+        lambda _model: (_ for _ in ()).throw(
+            AuthoringError(
+                "smoke_failed",
+                f"The ten-tick smoke probe failed during {phase}.",
+                {"phase": phase},
+            )
+        ),
+    )
+    before = _manifest(project.root)
+
+    status = derive_status(project, lambda: {"run_id": "prior-smoke-1"})
+
+    assert status.state == "failed"
+    assert not status.structural_valid and not status.smoke_eligible
+    assert [item.code for item in status.missing_requirements] == ["smoke_failed"]
+    assert status.entity_counts["resource"] == 1
+    assert status.available_scenarios == ("smoke",)
+    assert status.latest_smoke_run_id == "prior-smoke-1"
+    assert _manifest(project.root) == before
 
 
 @pytest.mark.parametrize("phase", ["export", "load", "lint", "build", "probe"])

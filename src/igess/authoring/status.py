@@ -222,6 +222,8 @@ def derive_status(
                                             requirements.extend(probe.findings)
         export_completed = True
     except Exception as error:
+        state = "failed"
+        smoke_eligible = False
         requirements.append(_error_finding(error, "export"))
 
     if state == "failed":
