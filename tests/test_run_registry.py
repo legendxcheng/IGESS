@@ -384,6 +384,52 @@ def test_write_status_replace_failure_preserves_old_status_and_cleans_temp(
     assert not list(record.run_dir.glob(".run_status.*.tmp"))
 
 
+def test_write_status_parent_swap_never_writes_payload_or_temp_outside_registry(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    registry = RunRegistry(tmp_path / "runs")
+    run_dir = registry.runs_root / "20260715T010203000000Z-day_1"
+    run_dir.mkdir(parents=True)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    displaced = registry.runs_root / ".displaced-run"
+    original_open = registry_module._open_exclusive_regular
+    swapped = False
+
+    def swapping_open(path: Path, *args: object, **kwargs: object) -> int:
+        nonlocal swapped
+        if not swapped:
+            swapped = True
+            os.replace(run_dir, displaced)
+            try:
+                run_dir.symlink_to(outside, target_is_directory=True)
+            except OSError as error:
+                pytest.skip(f"directory links unavailable: {error}")
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(registry_module, "_open_exclusive_regular", swapping_open)
+
+    with pytest.raises(ValueError, match="changed|outside|parent"):
+        registry.write_status(
+            run_dir,
+            status="success",
+            scenario_id="day_1",
+            message="PAYLOAD-MUST-NOT-ESCAPE",
+            kind="formal",
+            model_digest=_DIGEST,
+            **_paths(run_dir),
+        )
+
+    assert swapped
+    assert list(outside.iterdir()) == []
+    assert all(
+        b"PAYLOAD-MUST-NOT-ESCAPE" not in path.read_bytes()
+        for path in displaced.iterdir()
+        if path.is_file()
+    )
+
+
 def test_status_read_rejects_leaf_retargeted_after_its_single_open(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -527,6 +573,66 @@ def test_prune_smoke_does_not_delete_a_formal_directory_swapped_during_quarantin
         "formal",
         "smoke",
     ]
+    assert [(item.run_id, item.kind) for item in registry.list_runs()] == [
+        (smoke.run_id, "smoke"),
+        (formal.run_id, "formal"),
+    ]
+
+
+def test_next_prune_recovers_crash_tombstones_and_ignores_unsafe_trash(
+    tmp_path: Path,
+) -> None:
+    registry = RunRegistry(tmp_path / "runs")
+    smoke = _write(
+        registry,
+        "20260715T010203000000Z-smoke-rule",
+        kind="smoke",
+        change_id="rule",
+    )
+    formal = _write(
+        registry,
+        "20260715T010204000000Z-day_1",
+        kind="formal",
+    )
+    advice = _write(
+        registry,
+        "20260715T010205000000Z-advice-day_1",
+        kind="advice",
+    )
+    trash = registry.runs_root / ".run-trash"
+    trash.mkdir()
+    smoke_tomb = trash / ("tomb-" + "a" * 32)
+    formal_tomb = trash / ("tomb-" + "b" * 32)
+    advice_tomb = trash / ("tomb-" + "e" * 32)
+    os.replace(smoke.run_dir, smoke_tomb)
+    os.replace(formal.run_dir, formal_tomb)
+    os.replace(advice.run_dir, advice_tomb)
+    corrupt = trash / ("tomb-" + "c" * 32)
+    corrupt.mkdir()
+    (corrupt / "run_status.json").write_text("{", encoding="utf-8")
+    outside = tmp_path / "outside-trash-target"
+    outside.mkdir()
+    outside_marker = outside / "marker.txt"
+    outside_marker.write_text("keep", encoding="utf-8")
+    linked = trash / ("tomb-" + "d" * 32)
+    try:
+        linked.symlink_to(outside, target_is_directory=True)
+    except OSError as error:
+        pytest.skip(f"directory links unavailable: {error}")
+
+    deleted = registry.prune_smoke(keep=0)
+
+    assert deleted == [smoke.run_id]
+    assert [(item.run_id, item.kind) for item in registry.list_runs()] == [
+        (formal.run_id, "formal"),
+        (advice.run_id, "advice"),
+    ]
+    assert not smoke_tomb.exists()
+    assert not formal_tomb.exists()
+    assert not advice_tomb.exists()
+    assert corrupt.exists()
+    assert linked.is_symlink()
+    assert outside_marker.read_text(encoding="utf-8") == "keep"
 
 
 def test_prune_smoke_rejects_negative_retention(tmp_path: Path) -> None:

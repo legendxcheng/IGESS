@@ -21,6 +21,7 @@ _MAX_STATUS_BYTES = 1024 * 1024
 _STATUS_TEMP_PREFIX = ".run_status."
 _STATUS_TEMP_SUFFIX = ".tmp"
 _TRASH_NAME = ".run-trash"
+_TOMBSTONE_RE = re.compile(r"^tomb-[0-9a-f]{32}$")
 
 
 @dataclass(frozen=True)
@@ -51,6 +52,13 @@ class _LoadedStatus:
 class _BoundRunRecord:
     record: RunRecord
     loaded: _LoadedStatus
+
+
+@dataclass(frozen=True)
+class _DirectoryBinding:
+    identity: os.stat_result
+    resolved_path: Path
+    fd: int | None = None
 
 
 class RunRegistry:
@@ -192,6 +200,7 @@ class RunRegistry:
 
         if isinstance(keep, bool) or not isinstance(keep, int) or keep < 0:
             raise ValueError("keep must be a non-negative integer")
+        self._recover_run_trash()
         smoke = sorted(
             (
                 bound
@@ -301,7 +310,7 @@ class RunRegistry:
 
             trash = self.runs_root / _TRASH_NAME
             trash_identity = _ensure_private_trash(self.runs_root, trash)
-            destination = trash / f"{record.run_id}-{secrets.token_hex(16)}"
+            destination = trash / _new_tombstone_name()
             if _path_exists_or_link(destination):
                 return False
 
@@ -354,11 +363,10 @@ class RunRegistry:
             return False
         finally:
             if moved and destination is not None:
-                _restore_quarantined_run(
-                    self.runs_root,
-                    destination,
-                    record.run_dir,
-                )
+                self._recover_run_trash()
+
+    def _recover_run_trash(self) -> None:
+        _recover_run_trash(self.runs_root)
 
 
 def _parse_run_metadata(
@@ -395,19 +403,24 @@ def _atomic_write_status(root: Path, run_dir: Path, payload: dict[str, Any]) -> 
     if len(data) > _MAX_STATUS_BYTES:
         raise ValueError("run status exceeds the maximum supported size")
 
-    directory_identity = _snapshot_owned_run_dir(root, run_dir)
+    binding = _bind_directory(root, run_dir)
     status_path = run_dir / "run_status.json"
-    previous_status = _optional_regular_leaf(status_path, "run status")
+    previous_status: os.stat_result | None = None
     temp_path: Path | None = None
+    temp_cleanup_path: Path | None = None
     temp_identity: os.stat_result | None = None
     replaced = False
     try:
+        previous_status = _optional_regular_leaf(status_path, "run status")
         for _ in range(8):
             candidate = run_dir / (
                 f"{_STATUS_TEMP_PREFIX}{secrets.token_hex(16)}{_STATUS_TEMP_SUFFIX}"
             )
             try:
-                fd = _open_exclusive_regular(candidate)
+                if binding.fd is None:
+                    fd = _open_exclusive_regular(candidate)
+                else:
+                    fd = _open_exclusive_regular(candidate.name, dir_fd=binding.fd)
             except FileExistsError:
                 continue
             temp_path = candidate
@@ -419,13 +432,21 @@ def _atomic_write_status(root: Path, run_dir: Path, payload: dict[str, Any]) -> 
             temp_identity = os.fstat(fd)
             if not stat.S_ISREG(temp_identity.st_mode):
                 raise ValueError("run-status temporary path is not a regular file")
+            temp_cleanup_path = _validate_opened_temp_parent(
+                root,
+                run_dir,
+                binding,
+                fd,
+                candidate,
+                temp_identity,
+            )
             _write_all(fd, data)
             os.fsync(fd)
             temp_identity = os.fstat(fd)
         finally:
             os.close(fd)
 
-        if not _directory_identity_matches(root, run_dir, directory_identity):
+        if not _binding_matches(root, run_dir, binding):
             raise ValueError("run directory changed before status replacement")
         current_status = _optional_regular_leaf(status_path, "run status")
         if not _same_optional_snapshot(previous_status, current_status):
@@ -438,9 +459,17 @@ def _atomic_write_status(root: Path, run_dir: Path, payload: dict[str, Any]) -> 
         ):
             raise ValueError("run-status temporary file changed before replacement")
 
-        os.replace(temp_path, status_path)
+        if binding.fd is None:
+            os.replace(temp_path, status_path)
+        else:
+            os.replace(
+                temp_path.name,
+                status_path.name,
+                src_dir_fd=binding.fd,
+                dst_dir_fd=binding.fd,
+            )
         replaced = True
-        if not _directory_identity_matches(root, run_dir, directory_identity):
+        if not _binding_matches(root, run_dir, binding):
             raise ValueError("run directory changed during status replacement")
         installed = _required_regular_leaf(status_path, "run status")
         if not os.path.samestat(temp_identity, installed):
@@ -448,7 +477,14 @@ def _atomic_write_status(root: Path, run_dir: Path, payload: dict[str, Any]) -> 
         _fsync_directory(run_dir)
     finally:
         if not replaced and temp_path is not None and temp_identity is not None:
-            _remove_private_temp(root, run_dir, directory_identity, temp_path, temp_identity)
+            _remove_bound_temp(
+                binding,
+                temp_path,
+                temp_cleanup_path,
+                temp_identity,
+            )
+        if binding.fd is not None:
+            os.close(binding.fd)
 
 
 def _read_status_payload(root: Path, run_dir: Path) -> _LoadedStatus:
@@ -492,7 +528,113 @@ def _read_status_payload(root: Path, run_dir: Path) -> _LoadedStatus:
     return _LoadedStatus(payload, directory_after, opened_after)
 
 
-def _open_exclusive_regular(path: Path) -> int:
+def _bind_directory(root: Path, run_dir: Path) -> _DirectoryBinding:
+    identity = _snapshot_owned_run_dir(root, run_dir)
+    resolved = run_dir.resolve(strict=True)
+    if os.name == "nt":
+        return _DirectoryBinding(identity, resolved)
+
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_DIRECTORY", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
+    fd = os.open(run_dir, flags)
+    try:
+        opened = os.fstat(fd)
+        if (
+            not stat.S_ISDIR(opened.st_mode)
+            or not os.path.samestat(identity, opened)
+            or not _directory_identity_matches(root, run_dir, identity)
+        ):
+            raise ValueError("run directory changed while it was bound")
+    except BaseException:
+        os.close(fd)
+        raise
+    return _DirectoryBinding(opened, resolved, fd)
+
+
+def _binding_matches(root: Path, run_dir: Path, binding: _DirectoryBinding) -> bool:
+    if not _directory_identity_matches(root, run_dir, binding.identity):
+        return False
+    if binding.fd is None:
+        return True
+    try:
+        opened = os.fstat(binding.fd)
+    except OSError:
+        return False
+    return stat.S_ISDIR(opened.st_mode) and os.path.samestat(binding.identity, opened)
+
+
+def _validate_opened_temp_parent(
+    root: Path,
+    run_dir: Path,
+    binding: _DirectoryBinding,
+    fd: int,
+    candidate: Path,
+    temp_identity: os.stat_result,
+) -> Path:
+    if binding.fd is not None:
+        if not _binding_matches(root, run_dir, binding):
+            raise ValueError("run directory changed before temporary-file write")
+        return candidate
+
+    final_path = _final_path_from_fd(fd)
+    if final_path is None:
+        raise ValueError("temporary-file parent identity could not be verified")
+    try:
+        final_parent = final_path.parent.resolve(strict=True)
+    except (OSError, RuntimeError, ValueError) as error:
+        raise ValueError(
+            f"temporary-file parent could not be resolved: {type(error).__name__}"
+        ) from None
+    if os.path.normcase(str(final_parent)) != os.path.normcase(str(binding.resolved_path)):
+        raise ValueError("temporary file was created outside the bound run directory")
+    if not _binding_matches(root, run_dir, binding):
+        raise ValueError("run directory changed before temporary-file write")
+    current = _required_regular_leaf(final_path, "run-status temporary file")
+    if not os.path.samestat(temp_identity, current):
+        raise ValueError("temporary-file handle no longer matches its final path")
+    return final_path
+
+
+def _final_path_from_fd(fd: int) -> Path | None:
+    if os.name != "nt":
+        try:
+            return Path(os.readlink(f"/proc/self/fd/{fd}"))
+        except OSError:
+            return None
+
+    import ctypes
+    from ctypes import wintypes
+    import msvcrt
+
+    handle = msvcrt.get_osfhandle(fd)
+    buffer = ctypes.create_unicode_buffer(32768)
+    get_final_path = ctypes.windll.kernel32.GetFinalPathNameByHandleW
+    get_final_path.argtypes = [
+        wintypes.HANDLE,
+        wintypes.LPWSTR,
+        wintypes.DWORD,
+        wintypes.DWORD,
+    ]
+    get_final_path.restype = wintypes.DWORD
+    length = get_final_path(handle, buffer, len(buffer), 0)
+    if length == 0 or length >= len(buffer):
+        return None
+    value = buffer.value
+    if value.startswith("\\\\?\\UNC\\"):
+        value = "\\\\" + value[8:]
+    elif value.startswith("\\\\?\\"):
+        value = value[4:]
+    return Path(value)
+
+
+def _open_exclusive_regular(
+    path: str | Path,
+    *,
+    dir_fd: int | None = None,
+) -> int:
     flags = (
         os.O_WRONLY
         | os.O_CREAT
@@ -500,7 +642,7 @@ def _open_exclusive_regular(path: Path) -> int:
         | getattr(os, "O_BINARY", 0)
         | getattr(os, "O_NOFOLLOW", 0)
     )
-    return os.open(path, flags, 0o600)
+    return os.open(path, flags, 0o600, dir_fd=dir_fd)
 
 
 def _write_all(fd: int, data: bytes) -> None:
@@ -560,19 +702,27 @@ def _stat_signature(info: os.stat_result) -> tuple[int, int, int, int, int]:
     )
 
 
-def _remove_private_temp(
-    root: Path,
-    run_dir: Path,
-    directory_identity: os.stat_result,
+def _remove_bound_temp(
+    binding: _DirectoryBinding,
     temp_path: Path,
+    final_path: Path | None,
     temp_identity: os.stat_result,
 ) -> None:
     try:
-        if not _directory_identity_matches(root, run_dir, directory_identity):
+        if binding.fd is not None:
+            current = os.stat(
+                temp_path.name,
+                dir_fd=binding.fd,
+                follow_symlinks=False,
+            )
+            if _is_stat_link_like(current) or not os.path.samestat(temp_identity, current):
+                return
+            os.unlink(temp_path.name, dir_fd=binding.fd)
             return
-        current = _required_regular_leaf(temp_path, "run-status temporary file")
+        cleanup_path = final_path or temp_path
+        current = _required_regular_leaf(cleanup_path, "run-status temporary file")
         if os.path.samestat(temp_identity, current):
-            temp_path.unlink()
+            cleanup_path.unlink()
     except (OSError, RuntimeError, ValueError):
         return
 
@@ -583,21 +733,134 @@ def _ensure_private_trash(root: Path, trash: Path) -> os.stat_result:
     return _snapshot_owned_run_dir(root, trash)
 
 
-def _restore_quarantined_run(root: Path, source: Path, destination: Path) -> None:
+def _new_tombstone_name() -> str:
+    return f"tomb-{secrets.token_hex(16)}"
+
+
+def _recover_run_trash(root: Path) -> None:
+    trash = root / _TRASH_NAME
     try:
-        trash = source.parent
+        if not _path_exists_or_link(trash):
+            return
         trash_identity = _snapshot_owned_run_dir(root, trash)
-        source_identity = _snapshot_owned_run_dir(trash, source)
-        if _path_exists_or_link(destination):
-            return
-        if not _directory_identity_matches(root, trash, trash_identity):
-            return
-        os.replace(source, destination)
-        restored = _snapshot_owned_run_dir(root, destination)
-        if not os.path.samestat(source_identity, restored):
-            raise ValueError("restored run identity does not match quarantine")
+        candidates = _strict_tombstones(trash)
     except (OSError, RuntimeError, ValueError):
         return
+
+    max_rounds = max(1, len(candidates) * 2 + 2)
+    for _ in range(max_rounds):
+        progress = False
+        for tombstone in _strict_tombstones(trash):
+            if _recover_one_tombstone(root, trash, trash_identity, tombstone):
+                progress = True
+        if not progress:
+            break
+
+
+def _strict_tombstones(trash: Path) -> list[Path]:
+    try:
+        children = sorted(trash.iterdir(), key=lambda path: path.name)
+    except OSError:
+        return []
+    return [child for child in children if _TOMBSTONE_RE.fullmatch(child.name)]
+
+
+def _recover_one_tombstone(
+    root: Path,
+    trash: Path,
+    trash_identity: os.stat_result,
+    tombstone: Path,
+) -> bool:
+    displaced: Path | None = None
+    try:
+        if not _directory_identity_matches(root, trash, trash_identity):
+            return False
+        loaded = _read_status_payload(trash, tombstone)
+        run_id, _version, _kind, _change_id, _digest = _parse_run_metadata(
+            loaded.payload,
+            expected_run_id=_stored_run_id(loaded.payload),
+        )
+        desired = root / run_id
+        if not _path_exists_or_link(desired):
+            return _move_tombstone_to_run(
+                root,
+                trash,
+                trash_identity,
+                tombstone,
+                loaded.directory_identity,
+                desired,
+            )
+
+        occupied = _read_status_payload(root, desired)
+        occupied_run_id = _stored_run_id(occupied.payload)
+        _parse_run_metadata(occupied.payload, expected_run_id=occupied_run_id)
+        if occupied_run_id == desired.name:
+            return False
+
+        occupied_target = root / occupied_run_id
+        if _path_exists_or_link(occupied_target):
+            return False
+        displaced = trash / _new_tombstone_name()
+        if _path_exists_or_link(displaced):
+            return False
+        if not _directory_identity_matches(root, trash, trash_identity):
+            return False
+        current_occupied = _snapshot_owned_run_dir(root, desired)
+        if not os.path.samestat(occupied.directory_identity, current_occupied):
+            return False
+        os.replace(desired, displaced)
+        displaced_identity = _snapshot_owned_run_dir(trash, displaced)
+        if not os.path.samestat(occupied.directory_identity, displaced_identity):
+            return False
+
+        restored = _move_tombstone_to_run(
+            root,
+            trash,
+            trash_identity,
+            tombstone,
+            loaded.directory_identity,
+            desired,
+        )
+        if not restored:
+            return False
+        _recover_one_tombstone(root, trash, trash_identity, displaced)
+        return True
+    except (
+        OSError,
+        RuntimeError,
+        UnicodeError,
+        ValueError,
+        TypeError,
+        json.JSONDecodeError,
+    ):
+        return False
+
+
+def _move_tombstone_to_run(
+    root: Path,
+    trash: Path,
+    trash_identity: os.stat_result,
+    tombstone: Path,
+    tombstone_identity: os.stat_result,
+    destination: Path,
+) -> bool:
+    if _path_exists_or_link(destination):
+        return False
+    if not _directory_identity_matches(root, trash, trash_identity):
+        return False
+    current = _snapshot_owned_run_dir(trash, tombstone)
+    if not os.path.samestat(tombstone_identity, current):
+        return False
+    os.replace(tombstone, destination)
+    restored = _snapshot_owned_run_dir(root, destination)
+    return os.path.samestat(tombstone_identity, restored)
+
+
+def _stored_run_id(payload: dict[str, Any]) -> str:
+    run_id = _required_text(payload, "run_id")
+    if Path(run_id).name != run_id or run_id in {".", ".."}:
+        raise ValueError("stored run_id is not a safe path component")
+    return run_id
 
 
 def _path_exists_or_link(path: Path) -> bool:
