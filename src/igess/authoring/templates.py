@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import stat
 import tempfile
 from typing import Any, NoReturn
 from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
@@ -156,7 +157,7 @@ def initialize_authoring_project(
     ):
         _invalid_model_id(target, effective_model_id)
 
-    target_was_empty = _validate_empty_target(target)
+    target_identity = _validate_empty_target(target)
     parent = target.parent
     parent.mkdir(parents=True, exist_ok=True)
     staging = Path(
@@ -165,18 +166,57 @@ def initialize_authoring_project(
             dir=parent,
         )
     )
-    removed_empty_target = False
+    backup_container: Path | None = None
+    backup: Path | None = None
+    original_backed_up = False
+    staged_installed = False
+    staged_identity: os.stat_result | None = None
     try:
         _write_project(staging, effective_model_id)
-        current_target_is_empty = _validate_empty_target(target)
-        if current_target_is_empty:
-            target.rmdir()
-            removed_empty_target = True
+        staged_identity = staging.stat()
+        current_target_identity = _validate_empty_target(target)
+        if target_identity is None:
+            if current_target_identity is not None:
+                _occupied_target(target, "target_appeared")
+        else:
+            _require_same_identity(target, target_identity, current_target_identity)
+            backup_container = Path(
+                tempfile.mkdtemp(
+                    prefix=f".{target.name or 'igess'}-backup-",
+                    dir=parent,
+                )
+            )
+            backup = backup_container / "original"
+            os.rename(target, backup)
+            original_backed_up = True
+            backup_identity = _validate_empty_target(backup)
+            _require_same_identity(backup, target_identity, backup_identity)
+            if _validate_empty_target(target) is not None:
+                _occupied_target(target, "target_reappeared")
         os.replace(staging, target)
-    except BaseException:
-        shutil.rmtree(staging, ignore_errors=True)
-        if target_was_empty and removed_empty_target and not target.exists():
-            target.mkdir()
+        staged_installed = True
+        if backup is not None:
+            backup_identity = _validate_empty_target(backup)
+            _require_same_identity(backup, target_identity, backup_identity)
+            backup.rmdir()
+            original_backed_up = False
+            backup_container.rmdir()
+    except BaseException as primary:
+        restored = True
+        if original_backed_up and backup is not None:
+            restored = _restore_original_target(
+                target,
+                backup,
+                staging,
+                target_identity,
+                staged_identity,
+                staged_installed,
+                primary,
+            )
+        if staging.exists() and not staged_installed:
+            _cleanup_generated_tree(staging, primary)
+        if restored and backup_container is not None and backup_container.exists():
+            _remove_empty_directory(backup_container, primary)
         raise
     return target
 
@@ -188,13 +228,15 @@ def _model_id_from_output_name(output_name: str) -> str:
     return sanitized or "model"
 
 
-def _validate_empty_target(target: Path) -> bool:
-    if target.is_symlink():
-        _occupied_target(target, "unsafe_symlink")
+def _validate_empty_target(target: Path) -> os.stat_result | None:
     try:
-        if not target.exists():
-            return False
-        if not target.is_dir():
+        try:
+            identity = target.lstat()
+        except FileNotFoundError:
+            return None
+        if _is_path_indirection(target, identity):
+            _occupied_target(target, "unsafe_reparse_point")
+        if not stat.S_ISDIR(identity.st_mode):
             _occupied_target(target, "not_directory")
         if any(target.iterdir()):
             _occupied_target(target, "not_empty")
@@ -210,7 +252,114 @@ def _validate_empty_target(target: Path) -> bool:
                 "reason": "access_error",
             },
         ) from None
-    return True
+    return identity
+
+
+def _is_path_indirection(path: Path, identity: os.stat_result) -> bool:
+    if stat.S_ISLNK(identity.st_mode):
+        return True
+    junction_check = getattr(path, "is_junction", None)
+    junction_error: OSError | None = None
+    if callable(junction_check):
+        try:
+            if junction_check():
+                return True
+        except OSError as error:
+            junction_error = error
+    file_attributes = getattr(identity, "st_file_attributes", 0)
+    reparse_attribute = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
+    if reparse_attribute and file_attributes & reparse_attribute:
+        return True
+    if junction_error is not None:
+        raise AuthoringError(
+            "project_target_inaccessible",
+            f"Authoring project target indirection could not be inspected: {path}",
+            {
+                "error_type": type(junction_error).__name__,
+                "path": str(path),
+                "reason": "reparse_check_error",
+            },
+        ) from None
+    return False
+
+
+def _require_same_identity(
+    path: Path,
+    expected: os.stat_result | None,
+    actual: os.stat_result | None,
+) -> None:
+    if (
+        expected is not None
+        and actual is not None
+        and os.path.samestat(expected, actual)
+    ):
+        return
+    raise AuthoringError(
+        "project_target_changed",
+        f"Authoring project target changed during initialization: {path}",
+        {"path": str(path), "reason": "target_identity_changed"},
+    )
+
+
+def _restore_original_target(
+    target: Path,
+    backup: Path,
+    staging: Path,
+    original_identity: os.stat_result | None,
+    staged_identity: os.stat_result | None,
+    staged_installed: bool,
+    primary: BaseException,
+) -> bool:
+    try:
+        backup_identity = backup.lstat()
+        if original_identity is None or not os.path.samestat(
+            original_identity, backup_identity
+        ):
+            raise OSError("original backup identity changed before rollback")
+        if _is_path_indirection(backup, backup_identity):
+            raise OSError("original backup became a path indirection before rollback")
+        if staged_installed:
+            installed_identity = target.lstat()
+            if staged_identity is None or not os.path.samestat(
+                staged_identity, installed_identity
+            ):
+                raise OSError("installed target identity changed before rollback")
+            os.rename(target, staging)
+        try:
+            target.lstat()
+        except FileNotFoundError:
+            pass
+        else:
+            raise OSError("target path was occupied before original could be restored")
+        os.rename(backup, target)
+        return True
+    except OSError as rollback_error:
+        primary.add_note(
+            "Original empty target remains preserved at "
+            f"{backup}; rollback failed with {type(rollback_error).__name__}: "
+            f"{rollback_error}"
+        )
+        return False
+
+
+def _cleanup_generated_tree(path: Path, primary: BaseException) -> None:
+    try:
+        shutil.rmtree(path)
+    except OSError as cleanup_error:
+        primary.add_note(
+            f"Generated staging cleanup failed at {path}: "
+            f"{type(cleanup_error).__name__}: {cleanup_error}"
+        )
+
+
+def _remove_empty_directory(path: Path, primary: BaseException) -> None:
+    try:
+        path.rmdir()
+    except OSError as cleanup_error:
+        primary.add_note(
+            f"Empty backup container cleanup failed at {path}: "
+            f"{type(cleanup_error).__name__}: {cleanup_error}"
+        )
 
 
 def _occupied_target(target: Path, reason: str) -> NoReturn:

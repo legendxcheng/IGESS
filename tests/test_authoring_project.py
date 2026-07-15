@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import subprocess
 
 from openpyxl import Workbook, load_workbook
 import pytest
@@ -13,6 +14,7 @@ import yaml
 
 from igess.authoring import AuthoringProject
 from igess.authoring import project as project_module
+from igess.authoring import templates as templates_module
 from igess.authoring.response import AuthoringError
 from igess.authoring.templates import (
     _model_id_from_output_name,
@@ -851,6 +853,128 @@ def test_initialize_authoring_project_accepts_an_existing_empty_directory(
     assert yaml.safe_load((target / "economy.yaml").read_text(encoding="utf-8"))["model"][
         "id"
     ] == "valid-ID_9"
+    assert list(tmp_path.iterdir()) == [target]
+
+
+def test_initialize_authoring_project_restores_original_directory_if_backup_rename_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "empty"
+    target.mkdir()
+    os.utime(target, ns=(1_700_000_000_000_000_000,) * 2)
+    original = target.stat()
+    injected = OSError("injected backup rename failure")
+    real_rename = os.rename
+
+    def fail_backup_rename(source: object, destination: object) -> None:
+        if Path(source) == target:
+            raise injected
+        real_rename(source, destination)
+
+    monkeypatch.setattr(templates_module.os, "rename", fail_backup_rename)
+
+    with pytest.raises(OSError) as captured:
+        initialize_authoring_project(target)
+
+    restored = target.stat()
+    assert captured.value is injected
+    assert os.path.samestat(original, restored)
+    assert restored.st_mtime_ns == original.st_mtime_ns
+    assert list(target.iterdir()) == []
+    assert list(tmp_path.iterdir()) == [target]
+
+
+def test_initialize_authoring_project_restores_original_directory_if_install_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "empty"
+    target.mkdir()
+    os.utime(target, ns=(1_700_000_000_000_000_000,) * 2)
+    original = target.stat()
+    injected = OSError("injected staged install failure")
+    real_replace = os.replace
+
+    def fail_staged_install(source: object, destination: object) -> None:
+        if Path(destination) == target:
+            raise injected
+        real_replace(source, destination)
+
+    monkeypatch.setattr(templates_module.os, "replace", fail_staged_install)
+
+    with pytest.raises(OSError) as captured:
+        initialize_authoring_project(target)
+
+    restored = target.stat()
+    assert captured.value is injected
+    assert os.path.samestat(original, restored)
+    assert restored.st_mtime_ns == original.st_mtime_ns
+    assert list(target.iterdir()) == []
+    assert list(tmp_path.iterdir()) == [target]
+
+
+def test_initialize_authoring_project_preserves_raced_content_when_revalidating_backup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "empty"
+    target.mkdir()
+    original = target.stat()
+    real_rename = os.rename
+
+    def add_content_after_backup_rename(source: object, destination: object) -> None:
+        real_rename(source, destination)
+        if Path(source) == target:
+            (Path(destination) / "late.txt").write_bytes(b"do not delete")
+
+    monkeypatch.setattr(
+        templates_module.os, "rename", add_content_after_backup_rename
+    )
+
+    with pytest.raises(AuthoringError) as captured:
+        initialize_authoring_project(target)
+
+    assert captured.value.code == "project_not_empty"
+    assert captured.value.details["reason"] == "not_empty"
+    assert os.path.samestat(original, target.stat())
+    assert (target / "late.txt").read_bytes() == b"do not delete"
+    assert list(tmp_path.iterdir()) == [target]
+
+
+@pytest.mark.skipif(os.name != "nt", reason="directory junctions are Windows-only")
+def test_initialize_authoring_project_rejects_directory_junction_without_replacing_it(
+    tmp_path: Path,
+) -> None:
+    actual = tmp_path / "actual"
+    actual.mkdir()
+    sentinel = actual / "sentinel.txt"
+    sentinel.write_bytes(b"keep")
+    junction = tmp_path / "junction"
+    created = subprocess.run(
+        ["cmd", "/c", "mklink", "/J", str(junction), str(actual)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if created.returncode != 0:
+        pytest.skip(f"directory junctions unavailable: {created.stderr or created.stdout}")
+
+    try:
+        with pytest.raises(AuthoringError) as captured:
+            initialize_authoring_project(junction)
+
+        assert captured.value.code == "project_not_empty"
+        assert captured.value.details == {
+            "path": str(junction),
+            "reason": "unsafe_reparse_point",
+        }
+        assert junction.exists()
+        assert sentinel.read_bytes() == b"keep"
+    finally:
+        try:
+            junction.lstat()
+        except FileNotFoundError:
+            pass
+        else:
+            os.rmdir(junction)
 
 
 @pytest.mark.parametrize("existing_kind", ["directory", "file"])
