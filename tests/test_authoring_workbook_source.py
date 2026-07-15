@@ -11,6 +11,8 @@ from typing import Any, NoReturn
 from zipfile import ZipFile
 
 from openpyxl import Workbook, load_workbook
+from openpyxl.cell.rich_text import CellRichText, TextBlock
+from openpyxl.cell.text import InlineFont
 from openpyxl.comments import Comment
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Protection, Side
 import pytest
@@ -468,6 +470,38 @@ def test_update_preserves_formulas_comments_styles_dimensions_merges_and_sheets(
     workbook.close()
 
 
+def test_update_preserves_unrelated_rich_text_runs_and_inline_fonts(
+    tmp_path: Path,
+) -> None:
+    path = _path_for(tmp_path, "resource")
+    initial, updated = ENTITY_CASES["resource"]
+    _write_table(path, "resource", [("gold", initial)], extra_header="notes")
+    workbook = load_workbook(path)
+    workbook.active["E4"] = CellRichText(
+        "plain ",
+        TextBlock(InlineFont(b=True, color="FF112233"), "bold"),
+        TextBlock(InlineFont(i=True, color="FF445566"), " italic"),
+    )
+    workbook.save(path)
+    workbook.close()
+
+    assert upsert_workbook_entity(path, _change("resource", "gold", updated))
+
+    workbook = load_workbook(path, data_only=False, rich_text=True)
+    value = workbook.active["E4"].value
+    assert isinstance(value, CellRichText)
+    assert str(value) == "plain bold italic"
+    assert isinstance(value[1], TextBlock)
+    assert value[1].text == "bold"
+    assert value[1].font.b is True
+    assert value[1].font.color.rgb == "FF112233"
+    assert isinstance(value[2], TextBlock)
+    assert value[2].text == " italic"
+    assert value[2].font.i is True
+    assert value[2].font.color.rgb == "FF445566"
+    workbook.close()
+
+
 @pytest.mark.parametrize(
     ("mutation", "reason"),
     [
@@ -774,6 +808,43 @@ def test_source_cells_keep_exact_types_instead_of_string_coercion(
         message=caught.value.message,
         details=caught.value.details,
     ).to_json()
+
+
+@pytest.mark.parametrize(
+    ("entity", "field"),
+    [
+        ("resource", "id"),
+        ("resource", "name"),
+        ("activity", "unlock_condition"),
+        ("prestige_layer", "reset_resources"),
+    ],
+)
+def test_excel_error_cells_are_never_accepted_as_literal_strings(
+    tmp_path: Path,
+    entity: str,
+    field: str,
+) -> None:
+    path = _path_for(tmp_path, entity)
+    _write_table(path, entity, [("entry", ENTITY_CASES[entity][0])])
+    workbook = load_workbook(path)
+    sheet = workbook.active
+    headers = {
+        sheet.cell(1, column).value: column
+        for column in range(2, sheet.max_column + 1)
+    }
+    cell = sheet.cell(4, headers[field], "#N/A")
+    assert cell.data_type == "e"
+    workbook.save(path)
+    workbook.close()
+
+    with pytest.raises(AuthoringError) as caught:
+        inspect_table(path)
+
+    assert caught.value.code == "invalid_workbook_source"
+    assert caught.value.details["reason"] == "invalid_entity_row"
+    assert caught.value.details["row"] == 4
+    assert caught.value.details["field"] == field
+    assert caught.value.details["source_type"] == "e"
 
 
 @pytest.mark.parametrize("raw_value", ["gold;;ore", ";gold", "gold;", 123, True])

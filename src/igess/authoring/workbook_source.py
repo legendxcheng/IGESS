@@ -45,6 +45,7 @@ _MAX_ROWS = 100_000
 _MAX_COLUMNS = 1_024
 _MAX_CELLS = 250_000
 _CELL_REFERENCE_RE = re.compile(r"^([A-Z]+)([1-9][0-9]*)$")
+_STRING_CELL_TYPES = frozenset({"s", "inlineStr"})
 
 _LOSSY_PACKAGE_PREFIXES = (
     ("_xmlsignatures/", "digital_signatures"),
@@ -579,6 +580,7 @@ def _open_snapshot(
                 read_only=read_only,
                 data_only=False,
                 keep_links=False,
+                rich_text=True,
             )
         except Exception as error:
             raise AuthoringError(
@@ -615,7 +617,7 @@ def _inspect_open(
     }
     for row in sheet.iter_rows():
         for cell in row:
-            if cell.value in marker_positions:
+            if type(cell.value) is str and cell.value in marker_positions:
                 marker_positions[cell.value].append((cell.row, cell.column))
 
     for marker in _MARKERS:
@@ -794,7 +796,7 @@ def _expected_column_type(entity: str, field: str) -> str:
 
 def _decode_id_cell(entity: str, cell: Any) -> str:
     value = cell.value
-    if cell.data_type == "f" or type(value) is not str:
+    if cell.data_type not in _STRING_CELL_TYPES or type(value) is not str:
         _invalid_cell_value(
             entity,
             _diagnostic_value(value),
@@ -813,20 +815,10 @@ def _decode_field_cell(
     cell: Any,
 ) -> Any:
     value = cell.value
-    if cell.data_type == "f":
-        _invalid_cell_value(
-            entity,
-            entity_id,
-            spec.name,
-            value,
-            ("literal cell value",),
-            cell.data_type,
-        )
-
     if spec.value_type == "list_id":
         if value in (None, ""):
             return []
-        if type(value) is not str:
+        if cell.data_type not in _STRING_CELL_TYPES or type(value) is not str:
             _invalid_cell_value(
                 entity,
                 entity_id,
@@ -848,7 +840,11 @@ def _decode_field_cell(
         return values
 
     if spec.value_type in {"decimal", "positive_decimal", "nonnegative_decimal"}:
-        if type(value) not in {int, str}:
+        is_integer_cell = cell.data_type == "n" and type(value) is int
+        is_string_cell = (
+            cell.data_type in _STRING_CELL_TYPES and type(value) is str
+        )
+        if not is_integer_cell and not is_string_cell:
             _invalid_cell_value(
                 entity,
                 entity_id,
@@ -859,7 +855,7 @@ def _decode_field_cell(
             )
         return value
 
-    if type(value) is not str:
+    if cell.data_type not in _STRING_CELL_TYPES or type(value) is not str:
         _invalid_cell_value(
             entity,
             entity_id,
