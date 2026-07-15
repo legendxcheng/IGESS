@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from collections import UserDict
 from collections.abc import Mapping
+from types import MappingProxyType
 
 import pytest
 
@@ -163,8 +165,20 @@ def test_valid_envelope_id_is_accepted(entity_id: str) -> None:
     assert validate_entity_fields("constant", entity_id, {"value": "1"}) == {"value": "1"}
 
 
-def test_fields_must_be_native_mapping_and_cannot_contain_id() -> None:
-    _assert_invalid("constant", "c", [], field="fields")
+@pytest.mark.parametrize(
+    "fields",
+    [
+        [],
+        (),
+        UserDict({"value": "1"}),
+        MappingProxyType({"value": "1"}),
+    ],
+)
+def test_fields_must_be_native_dict(fields: object) -> None:
+    _assert_invalid("constant", "c", fields, field="fields")
+
+
+def test_fields_cannot_contain_id() -> None:
     _assert_invalid("constant", "c", {"id": "other", "value": "1"}, field="id")
 
 
@@ -337,7 +351,7 @@ def test_id_lists_are_native_validate_items_and_preserve_order() -> None:
     assert validate_entity_fields(
         "scenario", "s", {"profiles": ["b", "a"]}, require_complete=False
     ) == {"profiles": ["b", "a"]}
-    for value in ("a", {"a": 1}, ["ok", "bad/id"], ["ok", 1]):
+    for value in ("a", {"a": 1}, ("a",), ["ok", "bad/id"], ["ok", 1]):
         _assert_invalid("scenario", "s", {"profiles": value}, field="profiles", require_complete=False)
     _assert_invalid("scenario", "s", {"profiles": []}, field="profiles", require_complete=False)
 
@@ -360,6 +374,7 @@ def test_output_list_is_native_and_restricted_but_may_be_empty() -> None:
     assert validate_entity_fields("scenario", "s", {"outputs": []}, require_complete=False) == {"outputs": []}
     _assert_invalid("scenario", "s", {"outputs": ["unknown"]}, field="outputs", require_complete=False)
     _assert_invalid("scenario", "s", {"outputs": "resource_curve"}, field="outputs", require_complete=False)
+    _assert_invalid("scenario", "s", {"outputs": tuple(allowed)}, field="outputs", require_complete=False)
 
 
 def test_decimal_maps_are_native_validate_key_kind_and_never_accept_float() -> None:
@@ -370,7 +385,15 @@ def test_decimal_maps_are_native_validate_key_kind_and_never_accept_float() -> N
         require_complete=False,
     )
     assert result == {"source_efficiency": {"active": "0", "idle": "1e-2"}}
-    for value in ([], "active:1", {"bad/id": "1"}, {"active": 1.0}, {1: "1"}):
+    for value in (
+        [],
+        "active:1",
+        UserDict({"active": "1"}),
+        MappingProxyType({"active": "1"}),
+        {"bad/id": "1"},
+        {"active": 1.0},
+        {1: "1"},
+    ):
         _assert_invalid(
             "player_profile", "p", {"source_efficiency": value}, field="source_efficiency", require_complete=False
         )
@@ -397,9 +420,11 @@ def test_formula_compiler_accepts_safe_expression_and_rejects_unsafe_or_bad_args
     _assert_invalid(
         "formula", "cost", {"args": ["bad/id"], "expr": "1"}, field="args"
     )
-    _assert_invalid(
-        "formula", "cost", {"args": ["x", "x"], "expr": "x"}, field="args"
-    )
+
+
+def test_formula_args_do_not_add_an_unsupported_uniqueness_constraint() -> None:
+    fields = {"args": ["x", "x"], "expr": "x"}
+    assert validate_entity_fields("formula", "cost", fields) == fields
 
 
 def test_rng_rarities_accept_unordered_input_and_normalize_by_exact_denominator() -> None:
@@ -417,7 +442,16 @@ def test_rng_rarities_accept_unordered_input_and_normalize_by_exact_denominator(
 
 @pytest.mark.parametrize(
     "rarities",
-    [{}, [], {"common": 0}, {"common": "-1"}, {"bad/id": "1"}, {"a": "1", "b": "1.0"}],
+    [
+        {},
+        [],
+        UserDict({"common": "1"}),
+        MappingProxyType({"common": "1"}),
+        {"common": 0},
+        {"common": "-1"},
+        {"bad/id": "1"},
+        {"a": "1", "b": "1.0"},
+    ],
 )
 def test_rng_rarities_require_nonempty_valid_ids_positive_unique_exact_denominators(rarities: object) -> None:
     _assert_invalid("rng_table", "loot", {"rarities": rarities}, field="rarities", require_complete=False)
@@ -468,6 +502,18 @@ def test_regression_gate_accepts_zero_values_in_each_supported_map() -> None:
         "max_payback_seconds": {"mine": "0"},
         "min_prestige_gain": {"soul": "0.0"},
     }
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("max_unlock_delay_pct", UserDict({"first": "0"})),
+        ("max_payback_seconds", MappingProxyType({"mine": "0"})),
+        ("min_prestige_gain", UserDict({"soul": "0"})),
+    ],
+)
+def test_regression_gate_nested_maps_must_be_native_dict(field: str, value: object) -> None:
+    _assert_invalid("regression_gate", "scenario", {field: value}, field=field)
 
 
 def test_every_complete_entity_schema_has_a_valid_representative() -> None:

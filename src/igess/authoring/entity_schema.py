@@ -317,7 +317,7 @@ def validate_entity_fields(
             allowed=("[A-Za-z0-9_.-]+",),
             message="Entity id must match [A-Za-z0-9_.-]+",
         )
-    if not isinstance(fields, Mapping):
+    if type(fields) is not dict:
         _invalid(
             entity=entity,
             entity_id=entity_id,
@@ -368,7 +368,7 @@ def validate_entity_fields(
     _validate_formula(entity, entity_id, normalized)
     _validate_rng_threshold(entity, entity_id, normalized, context)
     if entity == "regression_gate" and require_complete:
-        if not any(isinstance(value, Mapping) and value for value in normalized.values()):
+        if not any(type(value) is dict and value for value in normalized.values()):
             _invalid(
                 entity=entity,
                 entity_id=entity_id,
@@ -441,13 +441,13 @@ def _validate_value(
             return value
         allowed = spec.allowed
     elif kind in {"list_id", "nonempty_list_id"}:
-        if isinstance(value, list) and (
+        if type(value) is list and (
             kind == "list_id" or bool(value)
         ) and all(_is_id(item) for item in value):
             return list(value)
         allowed = (("non-empty " if kind == "nonempty_list_id" else "") + "native list[id]",)
     elif kind == "output_list":
-        if isinstance(value, list) and all(
+        if type(value) is list and all(
             isinstance(item, str) and item in _SCENARIO_OUTPUTS for item in value
         ):
             return list(value)
@@ -507,7 +507,7 @@ def _parse_exact_decimal(value: Any) -> SimNumber | None:
 
 
 def _validate_decimal_map(value: Any, *, id_keys: bool) -> dict[str, str] | None:
-    if not isinstance(value, Mapping):
+    if type(value) is not dict:
         return None
     normalized: dict[str, str] = {}
     for key, item in value.items():
@@ -520,7 +520,7 @@ def _validate_decimal_map(value: Any, *, id_keys: bool) -> dict[str, str] | None
 
 
 def _validate_rng_rarities(value: Any) -> dict[str, str] | None:
-    if not isinstance(value, Mapping) or not value:
+    if type(value) is not dict or not value:
         return None
     parsed_rows: list[tuple[SimNumber, str, str]] = []
     seen: set[SimNumber] = set()
@@ -539,15 +539,6 @@ def _validate_formula(entity: str, entity_id: str, fields: Mapping[str, Any]) ->
     if entity != "formula" or "args" not in fields or "expr" not in fields:
         return
     args = fields["args"]
-    if len(args) != len(set(args)):
-        _invalid(
-            entity=entity,
-            entity_id=entity_id,
-            field="args",
-            value=args,
-            allowed=("unique formula argument ids",),
-            message="Formula argument ids must be unique",
-        )
     try:
         FormulaEngine.compile(entity_id, args, fields["expr"])
     except FormulaCompileError as exc:
