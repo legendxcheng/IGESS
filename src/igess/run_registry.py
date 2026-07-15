@@ -14,7 +14,7 @@ RunKind = Literal["smoke", "formal", "advice"]
 
 _RUN_STATUS_VERSION = 1
 _RUN_KINDS = frozenset({"smoke", "formal", "advice"})
-_DIGEST = re.compile(r"^[0-9a-f]{64}$")
+_DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
 _SAFE_COMPONENT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$")
 _MAX_STATUS_BYTES = 1024 * 1024
 
@@ -357,7 +357,7 @@ def _require_component(value: object, name: str) -> None:
 
 def _require_digest(value: object) -> None:
     if not isinstance(value, str) or _DIGEST.fullmatch(value) is None:
-        raise ValueError("model_digest must be a lowercase SHA-256 digest")
+        raise ValueError("model_digest must match sha256:<64 lowercase hex>")
 
 
 def _required_text(payload: dict[str, Any], key: str) -> str:

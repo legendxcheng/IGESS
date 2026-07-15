@@ -6,10 +6,12 @@ from pathlib import Path
 
 import pytest
 
+from igess.authoring import AuthoringProject
+from igess.authoring.templates import initialize_authoring_project
 from igess.run_registry import RunRecord, RunRegistry
 
 
-_DIGEST = "a" * 64
+_DIGEST = "sha256:" + "a" * 64
 
 
 def _paths(run_dir: Path) -> dict[str, Path]:
@@ -77,6 +79,28 @@ def test_authoring_status_is_schema_versioned_and_attributable(tmp_path: Path) -
     assert record.model_digest == _DIGEST
 
 
+def test_authoring_status_accepts_the_canonical_project_model_digest(tmp_path: Path) -> None:
+    project_root = initialize_authoring_project(tmp_path / "model")
+    project = AuthoringProject.discover(project_root)
+    digest = project.model_digest()
+    registry = RunRegistry(project.runs)
+    run_dir = registry.new_run_dir("day_1", kind="formal")
+
+    record = registry.write_status(
+        run_dir,
+        status="success",
+        scenario_id="day_1",
+        message="Formal run complete",
+        kind="formal",
+        model_digest=digest,
+        **_paths(run_dir),
+    )
+
+    assert digest.startswith("sha256:")
+    assert record.model_digest == digest
+    assert registry.list_runs() == [record]
+
+
 @pytest.mark.parametrize("kind", ["smoke", "formal", "advice"])
 def test_new_authoring_status_requires_a_model_digest(tmp_path: Path, kind: str) -> None:
     registry = RunRegistry(tmp_path / "runs")
@@ -91,6 +115,23 @@ def test_new_authoring_status_requires_a_model_digest(tmp_path: Path, kind: str)
             kind=kind,
             change_id="rule-1" if kind == "smoke" else None,
             model_digest=None,
+            **_paths(run_dir),
+        )
+    assert not run_dir.exists()
+
+
+def test_authoring_status_rejects_a_bare_hex_digest(tmp_path: Path) -> None:
+    registry = RunRegistry(tmp_path / "runs")
+    run_dir = registry.runs_root / "20260715T010203000000Z-run"
+
+    with pytest.raises(ValueError, match="sha256:<64 lowercase hex>"):
+        registry.write_status(
+            run_dir,
+            status="success",
+            scenario_id="day_1",
+            message="done",
+            kind="formal",
+            model_digest="a" * 64,
             **_paths(run_dir),
         )
     assert not run_dir.exists()
