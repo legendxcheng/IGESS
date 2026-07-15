@@ -33,7 +33,7 @@ from .yaml_plan import PlanValidationError, apply_yaml_plan, create_yaml_plan
 
 class _HelpFormatter(argparse.RawDescriptionHelpFormatter):
     def __init__(self, prog: str) -> None:
-        super().__init__(prog, max_help_position=32, width=160)
+        super().__init__(prog, max_help_position=32)
 
     def _get_help_string(self, action: argparse.Action) -> str:
         help_text = action.help or ""

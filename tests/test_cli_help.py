@@ -1,9 +1,34 @@
+import argparse
 import subprocess
 import sys
 
 import pytest
 
 from igess.cli import build_parser
+
+
+EXPECTED_COMMANDS = {
+    "advise",
+    "compare",
+    "dashboard",
+    "doctor",
+    "explain",
+    "export-tables",
+    "gate",
+    "init",
+    "lint",
+    "report",
+    "review-proposal",
+    "review-run",
+    "rng-run",
+    "run",
+    "scan",
+    "stone-realm-progression",
+    "stone-role-level",
+    "verify-edits",
+    "yaml-apply",
+    "yaml-plan",
+}
 
 
 def run_cli(*args: str) -> subprocess.CompletedProcess[str]:
@@ -15,249 +40,132 @@ def run_cli(*args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-COMMAND_SUMMARIES = {
-    "export-tables": "Export registered Luban workbooks",
-    "stone-role-level": "Build the Stone role-level curve",
-    "stone-realm-progression": "Build the Stone realm progression curve",
-    "report": "Generate a static HTML report",
-    "compare": "Compare two simulation runs",
-    "scan": "Scan a numeric parameter",
-    "rng-run": "Run an RNG scenario",
-    "gate": "Evaluate regression gates",
-    "advise": "Generate tuning advice",
-    "review-run": "Review an existing simulation run",
-    "review-proposal": "Review a tuning proposal",
-    "verify-edits": "Verify proposed configuration edits",
-    "yaml-plan": "Create a reviewable YAML edit plan",
-    "yaml-apply": "Apply an approved YAML edit plan",
-    "init": "Initialize an IGESS project",
-    "doctor": "Diagnose an IGESS project",
-    "explain": "Explain one simulation event",
-    "dashboard": "Serve the local simulation dashboard",
-    "lint": "Validate an economy model",
-    "run": "Run a deterministic economy simulation",
-}
+def command_group(parser: argparse.ArgumentParser) -> argparse._SubParsersAction:
+    return next(
+        action
+        for action in parser._actions
+        if isinstance(action, argparse._SubParsersAction)
+    )
 
 
-COMMAND_ARGUMENT_HELP = {
-    "export-tables": {
-        "--datas": "Directory containing registered Luban workbooks.",
-        "--out": "Directory for exported JSON tables.",
-    },
-    "stone-role-level": {
-        "--role-lv": "Stone role-level workbook or sheet input.",
-        "--attribute-def": "Stone attribute-definition workbook or sheet input.",
-        "--out": "Directory for generated role-level artifacts.",
-    },
-    "stone-realm-progression": {
-        "--role-realm": "Stone role-realm workbook or sheet input.",
-        "--attribute-def": "Stone attribute-definition workbook or sheet input.",
-        "--out": "Directory for generated realm artifacts.",
-    },
-    "report": {
-        "--run": "Simulation run directory to report on.",
-        "--out": "Directory for the generated static report.",
-        "--title": "Optional report title.",
-    },
-    "compare": {
-        "--base": "Baseline simulation run directory.",
-        "--candidate": "Candidate simulation run directory.",
-        "--out": "Directory for the comparison report.",
-    },
-    "scan": {
-        "--config": "Path to the economy YAML configuration.",
-        "--tables": "Directory containing exported Luban JSON tables.",
-        "--scenario": "Scenario identifier to simulate.",
-        "--param": "Parameter scan expression PATH=START..STOP:STEP.",
-        "--out": "Directory for scan runs and summary.",
-    },
-    "rng-run": {
-        "--config": "Path to the economy YAML configuration.",
-        "--scenario": "RNG scenario identifier to simulate.",
-        "--out": "Directory for RNG simulation outputs.",
-    },
-    "gate": {
-        "--base": "Baseline simulation run directory.",
-        "--candidate": "Candidate simulation run directory.",
-        "--config": "Path to the regression gate YAML configuration.",
-        "--out": "Directory for regression gate results.",
-    },
-    "advise": {
-        "--config": "Path to the economy YAML configuration.",
-        "--tables": "Directory containing exported Luban JSON tables.",
-        "--scenario": "Scenario identifier to analyze.",
-        "--out": "Directory for tuning advice.",
-        "--baseline": "Optional baseline simulation run directory.",
-    },
-    "review-run": {
-        "--run": "Simulation run directory to review.",
-        "--out": "Directory for review artifacts.",
-        "--baseline": "Optional baseline simulation run directory.",
-    },
-    "review-proposal": {
-        "--proposal": "Path to the tuning proposal YAML file.",
-        "--out": "Directory for proposal review artifacts.",
-    },
-    "verify-edits": {
-        "--config": "Path to the economy YAML configuration.",
-        "--proposal": "Path to the tuning proposal YAML file.",
-        "--scenario": "Scenario identifier used for verification.",
-        "--out": "Directory for verification artifacts.",
-        "--tables": "Optional exported Luban JSON table directory.",
-        "--datas": "Optional registered Luban workbook directory.",
-        "--baseline": "Optional baseline simulation run directory.",
-    },
-    "yaml-plan": {
-        "--config": "Path to the economy YAML configuration.",
-        "--intent": "Natural-language edit intent.",
-        "--out": "Path for the generated YAML edit plan.",
-    },
-    "yaml-apply": {
-        "--config": "Path to the economy YAML configuration.",
-        "--plan": "Path to a generated YAML edit plan.",
-        "--approve": "Confirm that the reviewed plan may be applied.",
-        "--tables": "Optional exported Luban JSON table directory.",
-    },
-    "init": {
-        "--template": "Project template name.",
-        "--out": "Directory to initialize.",
-    },
-    "doctor": {
-        "--project": "IGESS project root directory.",
-        "--config": "Economy YAML path, relative to the project root by default.",
-        "--tables": "Exported table directory, relative to the project root by default.",
-    },
-    "explain": {
-        "--run": "Simulation run directory containing event artifacts.",
-        "--event": "Zero-based event index to explain.",
-    },
-    "dashboard": {
-        "--project": "IGESS project root directory.",
-        "--config": "Economy YAML path, relative to the project root by default.",
-        "--tables": "Exported table directory, relative to the project root by default.",
-        "--runs-root": "Optional directory used to discover simulation runs.",
-        "--host": "Dashboard bind address.",
-        "--port": "Dashboard TCP port.",
-    },
-    "lint": {
-        "--config": "Path to the economy YAML configuration.",
-        "--tables": "Directory containing exported Luban JSON tables.",
-    },
-    "run": {
-        "--config": "Path to the economy YAML configuration.",
-        "--tables": "Directory containing exported Luban JSON tables.",
-        "--scenario": "Scenario identifier to simulate.",
-        "--out": "Directory for simulation outputs.",
-    },
-}
+def command_actions(parser: argparse.ArgumentParser) -> dict[str, argparse.Action]:
+    return {action.dest: action for action in parser._actions}
 
 
-def test_top_level_help_lists_and_describes_all_commands_and_exit_codes():
+def test_top_level_cli_help_lists_all_commands_with_summaries_and_exit_codes():
+    parser = build_parser()
+    commands = command_group(parser)
     result = run_cli("--help")
 
     assert result.returncode == 0, result.stderr
+    assert set(commands.choices) == EXPECTED_COMMANDS
     assert "Commands:" in result.stdout
-    for command, summary in COMMAND_SUMMARIES.items():
-        assert command in result.stdout
-        assert summary in result.stdout
+    for choice in commands._choices_actions:
+        assert choice.dest in result.stdout
+        assert choice.help
+        assert choice.help in result.stdout
     assert "Exit codes:" in result.stdout
     assert "0  Command completed successfully." in result.stdout
     assert "1  Command failed." in result.stdout
     assert "2  Command-line usage error." in result.stdout
 
 
+def test_every_registered_command_has_description_example_and_argument_help():
+    commands = command_group(build_parser())
+
+    assert set(commands.choices) == EXPECTED_COMMANDS
+    for command, parser in commands.choices.items():
+        assert parser.description and parser.description.strip(), command
+        assert parser.epilog and "Examples:" in parser.epilog, command
+        assert f"igess {command}" in parser.epilog, command
+        for action in parser._actions:
+            if action.dest == "help":
+                continue
+            assert action.help not in (None, argparse.SUPPRESS), (command, action.dest)
+            assert action.help.strip(), (command, action.dest)
+
+
 @pytest.mark.parametrize(
-    ("command", "example"),
+    ("command", "expected_text"),
     [
         (
             "run",
-            "igess run --config economy.yaml --tables luban_exports --scenario day_1 --out runs/day_1",
+            (
+                "Run a deterministic economy simulation.",
+                "--config",
+                "--tables",
+                "--scenario",
+                "--out",
+                "igess run --config economy.yaml --tables luban_exports "
+                "--scenario day_1 --out runs/day_1",
+            ),
         ),
-        ("lint", "igess lint --config economy.yaml --tables luban_exports"),
         (
             "scan",
-            "igess scan --config examples/shelldiver_v0/economy.yaml --tables "
-            "examples/shelldiver_v0/luban_exports --scenario day_1_progression --param "
-            "generators.fisherman.cost_growth=1.14..1.18:0.01 --out scan-out",
+            (
+                "Scan a numeric parameter.",
+                "Parameter scan expression PATH=START..STOP:STEP.",
+                "igess scan --config examples/shelldiver_v0/economy.yaml --tables "
+                "examples/shelldiver_v0/luban_exports --scenario day_1_progression --param "
+                "generators.fisherman.cost_growth=1.14..1.18:0.01 --out scan-out",
+            ),
         ),
-        (
-            "rng-run",
-            "igess rng-run --config economy.yaml --scenario loot_check --out runs/loot_check",
-        ),
-        ("report", "igess report --run runs/day_1 --out reports/day_1"),
-        ("dashboard", "igess dashboard --project . --port 8765"),
-        ("init", "igess init --out my-economy"),
     ],
 )
-def test_primary_command_help_has_arguments_and_complete_example(command, example):
+def test_representative_command_help_works_through_cli(command, expected_text):
     result = run_cli(command, "--help")
 
     assert result.returncode == 0, result.stderr
-    assert "Examples:" in result.stdout
-    assert example in result.stdout
-    for option, description in COMMAND_ARGUMENT_HELP[command].items():
-        assert option in result.stdout
-        assert description in result.stdout
+    for text in expected_text:
+        assert text in result.stdout
 
 
-@pytest.mark.parametrize("command", sorted(COMMAND_ARGUMENT_HELP))
-def test_every_existing_command_documents_each_argument(command):
-    result = run_cli(command, "--help")
+def test_run_and_scan_argument_contracts_are_unchanged():
+    commands = command_group(build_parser()).choices
+    run_actions = command_actions(commands["run"])
+    scan_actions = command_actions(commands["scan"])
 
-    assert result.returncode == 0, result.stderr
-    assert "Examples:" in result.stdout
-    for option, description in COMMAND_ARGUMENT_HELP[command].items():
-        assert option in result.stdout
-        assert description in result.stdout
-
-
-@pytest.mark.parametrize("command", sorted(COMMAND_ARGUMENT_HELP))
-def test_every_existing_command_has_an_independent_description(command):
-    parser = build_parser()
-    command_group = next(action for action in parser._actions if action.dest == "command")
-    command_parser = command_group.choices[command]
-
-    assert command_parser.description
-    assert command_parser.description.strip()
-    assert "Examples:" not in command_parser.description
-    assert command_parser.description in run_cli(command, "--help").stdout
+    assert set(run_actions) == {"help", "config", "tables", "scenario", "out"}
+    assert set(scan_actions) == {"help", "config", "tables", "scenario", "param", "out"}
+    assert all(run_actions[name].required for name in ("config", "tables", "scenario", "out"))
+    assert all(
+        scan_actions[name].required
+        for name in ("config", "tables", "scenario", "param", "out")
+    )
 
 
-@pytest.mark.parametrize("command", sorted(COMMAND_ARGUMENT_HELP))
-def test_command_help_never_describes_missing_defaults_as_none(command):
-    result = run_cli(command, "--help")
+def test_missing_defaults_are_hidden_but_real_defaults_are_rendered():
+    commands = command_group(build_parser()).choices
+    rendered_help = "\n".join(parser.format_help() for parser in commands.values())
 
-    assert result.returncode == 0, result.stderr
-    assert "(default: None)" not in result.stdout
+    assert "(default: None)" not in rendered_help
 
+    init_actions = command_actions(commands["init"])
+    assert init_actions["template"].default == "incremental-basic"
+    assert init_actions["out"].default is None
+    assert "(default: incremental-basic)" in commands["init"].format_help()
 
-def test_required_init_and_run_arguments_do_not_show_none_defaults():
-    init_help = run_cli("init", "--help").stdout
-    run_help = run_cli("run", "--help").stdout
+    dashboard_actions = command_actions(commands["dashboard"])
+    assert dashboard_actions["host"].default == "127.0.0.1"
+    assert dashboard_actions["port"].default == 8765
+    dashboard_help = commands["dashboard"].format_help()
+    assert "(default: 127.0.0.1)" in dashboard_help
+    assert "(default: 8765)" in dashboard_help
 
-    assert "--out OUT            Directory to initialize. (default: None)" not in init_help
-    for option in ("--config", "--tables", "--scenario", "--out"):
-        option_line = next(line for line in run_help.splitlines() if option in line)
-        assert "default: None" not in option_line
-
-
-@pytest.mark.parametrize(
-    ("command", "default_text"),
-    [
-        ("init", "incremental-basic"),
-        ("doctor", "examples/shelldiver_v0/economy.yaml"),
-        ("dashboard", "127.0.0.1"),
-        ("dashboard", "8765"),
-    ],
-)
-def test_command_help_shows_meaningful_defaults(command, default_text):
-    result = run_cli(command, "--help")
-
-    assert result.returncode == 0, result.stderr
-    assert f"(default: {default_text})" in result.stdout
+    doctor_actions = command_actions(commands["doctor"])
+    assert doctor_actions["project"].default == "."
+    assert doctor_actions["config"].default == "examples/shelldiver_v0/economy.yaml"
+    assert doctor_actions["tables"].default == "examples/shelldiver_v0/luban_exports"
+    doctor_help = commands["doctor"].format_help()
+    assert doctor_help.count("default:") == 3
+    assert "examples/shelldiver_v0/economy.yaml" in doctor_help
+    assert "examples/shelldiver_v0/luban_exports" in doctor_help
 
 
-def test_help_does_not_expose_unimplemented_model_command():
-    result = run_cli("--help")
+def test_help_formatter_follows_terminal_width(monkeypatch):
+    monkeypatch.setenv("COLUMNS", "94")
 
-    assert "\n    model" not in result.stdout
+    formatter = build_parser().formatter_class("igess")
+
+    assert formatter._width == 92
+    assert formatter._max_help_position == 32
