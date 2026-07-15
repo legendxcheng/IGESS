@@ -61,6 +61,30 @@ def _publish(staged: Path, destination: Path) -> None:
     os.replace(staged, destination)
 
 
+def _published_success(tmp_path: Path) -> tuple[ChangeRecordStore, Path]:
+    store = _store(tmp_path)
+    staged = _stage_path(tmp_path)
+    destination = store.stage_success(
+        staged,
+        change_id="valid",
+        change=_change(),
+        pre_digest=PRE_DIGEST,
+        post_digest=POST_DIGEST,
+        affected_files=[],
+        status=_status(),
+    )
+    _publish(staged, destination)
+    return store, destination
+
+
+def _rewrite_payload(path: Path, payload: object) -> None:
+    path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+
+
 def test_stage_success_writes_exact_schema_without_touching_final_registry(
     tmp_path: Path,
 ) -> None:
@@ -294,3 +318,165 @@ def test_latest_is_none_when_registry_has_no_valid_success_record(tmp_path: Path
     store = _store(tmp_path)
 
     assert store.latest() is None
+
+
+@pytest.mark.parametrize(
+    "corrupt",
+    [
+        lambda payload: payload.__setitem__("change", {}),
+        lambda payload: payload["change"].__setitem__("unknown", "value"),
+        lambda payload: payload["change"].__setitem__("version", "1"),
+        lambda payload: payload.__setitem__("status", {}),
+        lambda payload: payload["status"].__setitem__("structural_valid", "yes"),
+        lambda payload: payload["status"].__setitem__("state", "ready"),
+        lambda payload: payload["status"]["missing_requirements"].append(None),
+        lambda payload: payload.__setitem__("warnings", [None]),
+        lambda payload: payload.__setitem__(
+            "warnings", [{"code": "", "message": "bad"}]
+        ),
+        lambda payload: payload.__setitem__(
+            "warnings", [{"code": "bad", "message": "bad", "unknown": True}]
+        ),
+        lambda payload: payload.__setitem__("affected_files", ["../escape"]),
+        lambda payload: payload.__setitem__("post_digest", PRE_DIGEST),
+    ],
+    ids=[
+        "empty-change",
+        "unknown-change-field",
+        "wrong-change-type",
+        "empty-status",
+        "wrong-status-type",
+        "invalid-status-invariant",
+        "invalid-status-finding",
+        "null-record-warning",
+        "empty-record-warning-code",
+        "unknown-record-warning-field",
+        "unsafe-affected-file",
+        "status-digest-disagrees-with-post-digest",
+    ],
+)
+def test_list_and_latest_skip_invalid_nested_success_payloads_without_raising(
+    tmp_path: Path,
+    corrupt: object,
+) -> None:
+    store, path = _published_success(tmp_path)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    assert callable(corrupt)
+    corrupt(payload)
+    _rewrite_payload(path, payload)
+
+    with pytest.warns(ChangeRecordWarning, match=r"Skipped malformed change record .*ValueError"):
+        assert store.list_records() == []
+    with pytest.warns(ChangeRecordWarning, match=r"Skipped malformed change record .*ValueError"):
+        assert store.latest() is None
+
+
+@pytest.mark.parametrize(
+    "corrupt",
+    [
+        lambda payload: payload.__setitem__("error", {}),
+        lambda payload: payload["error"].__setitem__("details", []),
+        lambda payload: payload["error"].__setitem__("result", None),
+        lambda payload: payload["error"].__setitem__("code", ""),
+        lambda payload: payload["error"].__setitem__("message", 7),
+        lambda payload: payload.__setitem__("post_digest", POST_DIGEST),
+        lambda payload: (
+            payload.__setitem__("outcome", "success"),
+            payload.__setitem__("status", _status().to_payload()),
+        ),
+    ],
+    ids=[
+        "empty-error",
+        "wrong-error-details-type",
+        "wrong-error-result-type",
+        "empty-error-code",
+        "wrong-error-message-type",
+        "failure-post-digest",
+        "mutually-exclusive-outcome-branches",
+    ],
+)
+def test_list_and_latest_skip_invalid_failure_payloads_without_raising(
+    tmp_path: Path,
+    corrupt: object,
+) -> None:
+    store = _store(tmp_path)
+    path = store.write_failure(
+        change_id="failed",
+        change=_change(),
+        pre_digest=PRE_DIGEST,
+        affected_files=[],
+        error=AuthoringError("model_invalid", "Candidate validation failed"),
+    )
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    assert callable(corrupt)
+    corrupt(payload)
+    _rewrite_payload(path, payload)
+
+    with pytest.warns(ChangeRecordWarning, match=r"Skipped malformed change record .*ValueError"):
+        assert store.list_records(include_failed=True) == []
+    with pytest.warns(ChangeRecordWarning, match=r"Skipped malformed change record .*ValueError"):
+        assert store.latest(include_failed=True) is None
+
+
+def test_stage_success_rejects_status_digest_that_disagrees_with_post_digest(
+    tmp_path: Path,
+) -> None:
+    store = _store(tmp_path)
+    staged = _stage_path(tmp_path)
+    mismatched = ModelStatus(
+        model_digest=PRE_DIGEST,
+        structural_valid=True,
+        smoke_eligible=False,
+        state="incomplete",
+    )
+
+    with pytest.raises(ValueError, match="status model_digest"):
+        store.stage_success(
+            staged,
+            change_id="mismatched",
+            change=_change(),
+            pre_digest=PRE_DIGEST,
+            post_digest=POST_DIGEST,
+            affected_files=[],
+            status=mismatched,
+        )
+
+    assert not staged.exists()
+
+
+def test_stage_success_rejects_warning_fields_outside_the_record_schema(
+    tmp_path: Path,
+) -> None:
+    store = _store(tmp_path)
+    staged = _stage_path(tmp_path)
+
+    with pytest.raises(ValueError, match="warning keys"):
+        store.stage_success(
+            staged,
+            change_id="bad-warning",
+            change=_change(),
+            pre_digest=PRE_DIGEST,
+            post_digest=POST_DIGEST,
+            affected_files=[],
+            status=_status(),
+            warnings=[{"code": "note", "message": "Note", "unknown": True}],
+        )
+
+    assert not staged.exists()
+
+
+def test_write_failure_rejects_an_invalid_error_envelope_before_persistence(
+    tmp_path: Path,
+) -> None:
+    store = _store(tmp_path)
+
+    with pytest.raises(ValueError, match="error code"):
+        store.write_failure(
+            change_id="bad-error",
+            change=_change(),
+            pre_digest=PRE_DIGEST,
+            affected_files=[],
+            error=AuthoringError("", "Candidate validation failed"),
+        )
+
+    assert not (tmp_path / "changes" / "failed").exists()

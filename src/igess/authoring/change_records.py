@@ -15,6 +15,7 @@ from typing import Any
 import warnings as _warnings
 
 from .change import ModelChange
+from .probe import EligibilityFinding
 from .response import AuthoringError
 from .status import ModelStatus
 
@@ -38,6 +39,20 @@ _SUCCESS_KEYS = {
     "run_id",
 }
 _FAILURE_KEYS = (_SUCCESS_KEYS - {"status"}) | {"error"}
+_CHANGE_KEYS = {"version", "operation", "entity", "id", "fields"}
+_STATUS_KEYS = {
+    "model_digest",
+    "structural_valid",
+    "smoke_eligible",
+    "state",
+    "entity_counts",
+    "missing_requirements",
+    "warnings",
+    "available_scenarios",
+    "latest_smoke_run_id",
+}
+_FINDING_KEYS = {"code", "message", "entity", "id"}
+_RECORD_WARNING_KEYS = _FINDING_KEYS | {"change_id"}
 
 
 class ChangeRecordWarning(UserWarning):
@@ -95,6 +110,8 @@ class ChangeRecordStore:
         _require_digest(post_digest, "post_digest")
         if not isinstance(status, ModelStatus):
             raise TypeError("status must be a ModelStatus")
+        if status.model_digest != post_digest:
+            raise ValueError("status model_digest must match post_digest")
         timestamp = _utc_timestamp(self._clock())
         destination = self.changes_root / _record_filename(timestamp, change_id)
         if destination.exists():
@@ -154,12 +171,7 @@ class ChangeRecordStore:
             "pre_digest": pre_digest,
             "post_digest": None,
             "affected_files": _affected_files(affected_files),
-            "error": {
-                "code": error.code,
-                "message": error.message,
-                "details": _strict_json_copy(error.details, "error.details"),
-                "result": _strict_json_copy(error.result, "error.result"),
-            },
+            "error": _error_payload(error),
             "warnings": _warning_payloads(warnings),
             "run_id": _optional_run_id(run_id),
         }
@@ -295,6 +307,7 @@ def _warning_payloads(values: Sequence[object]) -> list[dict[str, Any]]:
         if not isinstance(message, str) or not message:
             raise ValueError("warning message must be a non-empty string")
         result.append(dict(sorted(copied.items())))
+    _validate_record_warnings(result)
     return result
 
 
@@ -441,41 +454,155 @@ def _validate_loaded_record(
         raise ValueError("record timestamp does not match its filename")
 
     _require_digest(payload["pre_digest"], "pre_digest")
+    _validate_change_payload(payload["change"])
+    _validate_record_warnings(payload["warnings"])
     if outcome == "success":
         _require_digest(payload["post_digest"], "post_digest")
-        if not isinstance(payload["status"], dict):
-            raise ValueError("success status is not an object")
+        _validate_status_payload(payload["status"])
+        if payload["status"]["model_digest"] != payload["post_digest"]:
+            raise ValueError("success status digest does not match post_digest")
     elif payload["post_digest"] is not None:
         raise ValueError("failure post_digest must be null")
-    if not isinstance(payload["change"], dict):
-        raise ValueError("change envelope is not an object")
     affected = payload["affected_files"]
-    if (
-        not isinstance(affected, list)
-        or affected != sorted(set(affected))
-        or any(not isinstance(item, str) for item in affected)
-    ):
+    if not isinstance(affected, list) or _affected_files(affected) != affected:
         raise ValueError("affected files are not a sorted unique string list")
-    if not isinstance(payload["warnings"], list):
-        raise ValueError("warnings are not an array")
     _optional_run_id(payload["run_id"])
     if outcome == "failure":
-        error = payload["error"]
-        if not isinstance(error, dict) or set(error) != {
-            "code",
-            "message",
-            "details",
-            "result",
-        }:
-            raise ValueError("failure error envelope is malformed")
-        if not isinstance(error["code"], str) or not error["code"]:
-            raise ValueError("failure error code is malformed")
-        if not isinstance(error["message"], str) or not error["message"]:
-            raise ValueError("failure error message is malformed")
-        if not isinstance(error["details"], dict) or not isinstance(error["result"], dict):
-            raise ValueError("failure error context is malformed")
+        _validate_error_payload(payload["error"])
     _strict_json_copy(payload, "record")
     return timestamp
+
+
+def _validate_change_payload(value: object) -> None:
+    if not isinstance(value, dict):
+        raise ValueError("change envelope is not an object")
+    allowed_keys = _CHANGE_KEYS | {"if_model_digest"}
+    if not _CHANGE_KEYS.issubset(value) or not set(value).issubset(allowed_keys):
+        raise ValueError("change envelope keys do not match its schema")
+    try:
+        change = ModelChange(
+            version=value["version"],
+            operation=value["operation"],
+            entity=value["entity"],
+            id=value["id"],
+            fields=value["fields"],
+            if_model_digest=value.get("if_model_digest"),
+        )
+        if change.to_payload() != value:
+            raise ValueError("change envelope is not canonical")
+    except (
+        AuthoringError,
+        KeyError,
+        TypeError,
+        ValueError,
+        OverflowError,
+        RecursionError,
+    ) as error:
+        raise ValueError("change envelope is malformed") from error
+
+
+def _validate_status_payload(value: object) -> None:
+    if not isinstance(value, dict) or set(value) != _STATUS_KEYS:
+        raise ValueError("status payload keys do not match its schema")
+    try:
+        model_digest = value["model_digest"]
+        _require_digest(model_digest, "status.model_digest")
+        missing = _status_findings(value["missing_requirements"])
+        status_warnings = _status_findings(value["warnings"])
+        status = ModelStatus(
+            model_digest=model_digest,
+            structural_valid=value["structural_valid"],
+            smoke_eligible=value["smoke_eligible"],
+            state=value["state"],
+            entity_counts=value["entity_counts"],
+            missing_requirements=missing,
+            warnings=status_warnings,
+            available_scenarios=value["available_scenarios"],
+            latest_smoke_run_id=value["latest_smoke_run_id"],
+        )
+        if status.to_payload() != value:
+            raise ValueError("status payload is not canonical")
+    except (KeyError, TypeError, ValueError, OverflowError, RecursionError) as error:
+        raise ValueError("status payload is malformed") from error
+
+
+def _status_findings(value: object) -> tuple[EligibilityFinding, ...]:
+    if not isinstance(value, list):
+        raise ValueError("status findings are not an array")
+    return tuple(_eligibility_finding(item) for item in value)
+
+
+def _eligibility_finding(value: object) -> EligibilityFinding:
+    if not isinstance(value, dict):
+        raise ValueError("status finding is not an object")
+    if not {"code", "message"}.issubset(value) or not set(value).issubset(
+        _FINDING_KEYS
+    ):
+        raise ValueError("status finding keys do not match its schema")
+    for optional in ("entity", "id"):
+        if optional in value and (
+            not isinstance(value[optional], str) or not value[optional]
+        ):
+            raise ValueError("status finding references must be non-empty strings")
+    finding = EligibilityFinding(
+        code=value["code"],
+        message=value["message"],
+        entity=value.get("entity"),
+        id=value.get("id"),
+    )
+    if finding.to_payload() != value:
+        raise ValueError("status finding is not canonical")
+    return finding
+
+
+def _validate_record_warnings(value: object) -> None:
+    if not isinstance(value, list):
+        raise ValueError("record warnings are not an array")
+    for warning in value:
+        if not isinstance(warning, dict):
+            raise ValueError("record warning is not an object")
+        if not {"code", "message"}.issubset(warning) or not set(
+            warning
+        ).issubset(_RECORD_WARNING_KEYS):
+            raise ValueError("record warning keys do not match its schema")
+        for required in ("code", "message"):
+            if not isinstance(warning[required], str) or not warning[required]:
+                raise ValueError("record warning text must be non-empty strings")
+        for optional in ("entity", "id", "change_id"):
+            if optional in warning and (
+                not isinstance(warning[optional], str) or not warning[optional]
+            ):
+                raise ValueError("record warning references must be non-empty strings")
+
+
+def _error_payload(error: AuthoringError) -> dict[str, Any]:
+    payload = {
+        "code": error.code,
+        "message": error.message,
+        "details": _strict_json_copy(error.details, "error.details"),
+        "result": _strict_json_copy(error.result, "error.result"),
+    }
+    _validate_error_payload(payload)
+    return payload
+
+
+def _validate_error_payload(value: object) -> None:
+    if not isinstance(value, dict) or set(value) != {
+        "code",
+        "message",
+        "details",
+        "result",
+    }:
+        raise ValueError("failure error envelope is malformed")
+    if not isinstance(value["code"], str) or not value["code"]:
+        raise ValueError("failure error code is malformed")
+    if not isinstance(value["message"], str) or not value["message"]:
+        raise ValueError("failure error message is malformed")
+    if not isinstance(value["details"], dict) or not isinstance(
+        value["result"], dict
+    ):
+        raise ValueError("failure error context is malformed")
+    _strict_json_copy(value, "error")
 
 
 def _audit_error(
