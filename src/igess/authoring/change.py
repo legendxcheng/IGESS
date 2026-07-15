@@ -26,6 +26,8 @@ _REQUIRED_ENVELOPE_KEYS = ("version", "operation", "entity", "id", "fields")
 _OPTIONAL_ENVELOPE_KEYS = ("if_model_digest",)
 _ENVELOPE_KEYS = _REQUIRED_ENVELOPE_KEYS + _OPTIONAL_ENVELOPE_KEYS
 _DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
+_PATH_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*$")
+_MAX_DIAGNOSTIC_PATH = 512
 
 # PyYAML 6 does not recognize unquoted ``1e3`` as a float.  The protocol does,
 # because accepting it as a string would make quoting change numeric semantics.
@@ -126,6 +128,7 @@ class ModelChange:
     if_model_digest: str | None = None
 
     def __post_init__(self) -> None:
+        _ensure_acyclic_tree(self.fields, "$.fields")
         if not isinstance(self.fields, Mapping):
             raise TypeError("ModelChange fields must be a mapping")
         object.__setattr__(self, "fields", _deep_freeze(self.fields))
@@ -153,6 +156,7 @@ def parse_change_text(
     """Parse, merge, validate, and normalize one YAML or JSON upsert document."""
 
     document = _parse_document(text, format_name)
+    _ensure_acyclic_tree(document, "$")
     if type(document) is not dict:
         _parse_error(
             "Change document must be a mapping",
@@ -264,6 +268,8 @@ def merge_fields(
 ) -> dict[str, Any]:
     """Apply JSON Merge Patch semantics to entity fields without mutation."""
 
+    _ensure_acyclic_tree(current, "$.current")
+    _ensure_acyclic_tree(patch, "$.fields")
     if not isinstance(current, Mapping):
         _invalid_field(
             entity=schema.entity,
@@ -364,6 +370,67 @@ def _contains_null(value: Any) -> bool:
     if type(value) is list:
         return any(_contains_null(item) for item in value)
     return False
+
+
+def _ensure_acyclic_tree(value: Any, root_path: str) -> None:
+    """Reject cycles while allowing aliases shared by independent branches."""
+
+    active: dict[int, str] = {}
+    stack: list[tuple[bool, Any, str]] = [(False, value, root_path)]
+    while stack:
+        exiting, node, path = stack.pop()
+        if type(node) not in {dict, list}:
+            continue
+
+        marker = id(node)
+        if exiting:
+            active.pop(marker, None)
+            continue
+
+        cycle_to = active.get(marker)
+        if cycle_to is not None:
+            raise AuthoringError(
+                "invalid_change",
+                "Cyclic mappings and lists are not allowed in changes",
+                {
+                    "reason": "cyclic_structure",
+                    "path": path,
+                    "cycle_to": cycle_to,
+                },
+            )
+
+        active[marker] = path
+        stack.append((True, node, path))
+        if type(node) is dict:
+            children = [
+                (item, _mapping_path(path, key))
+                for key, item in node.items()
+            ]
+        else:
+            children = [
+                (item, _bounded_path(f"{path}[{index}]"))
+                for index, item in enumerate(node)
+            ]
+        for child, child_path in reversed(children):
+            stack.append((False, child, child_path))
+
+
+def _mapping_path(parent: str, key: Any) -> str:
+    if isinstance(key, str) and _PATH_IDENTIFIER_RE.fullmatch(key):
+        segment = f".{key}"
+    else:
+        safe_key = _json_safe_diagnostic(key)
+        encoded = json.dumps(safe_key, ensure_ascii=False, separators=(",", ":"))
+        if len(encoded) > 64:
+            encoded = encoded[:61] + "..."
+        segment = f"[{encoded}]"
+    return _bounded_path(parent + segment)
+
+
+def _bounded_path(path: str) -> str:
+    if len(path) <= _MAX_DIAGNOSTIC_PATH:
+        return path
+    return path[: _MAX_DIAGNOSTIC_PATH - 3] + "..."
 
 
 def _parse_document(text: str, format_name: str) -> Any:

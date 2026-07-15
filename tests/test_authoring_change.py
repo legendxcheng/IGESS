@@ -242,6 +242,74 @@ def test_duplicate_keys_are_rejected_at_every_mapping_depth(text: str, format_na
 
 
 @pytest.mark.parametrize(
+    ("text", "expected_path"),
+    [
+        (
+            """\
+version: 1
+operation: upsert
+entity: player_profile
+id: default
+fields:
+  source_efficiency: &loop
+    active: *loop
+  behavior_policy: cheap
+  session_pattern: authoring
+  prestige_policy: conservative
+""",
+            "$.fields.source_efficiency.active",
+        ),
+        (
+            """\
+version: 1
+operation: upsert
+entity: scenario
+id: smoke
+fields:
+  duration_hours: '1'
+  time_mode: tick
+  profiles: &loop
+    - *loop
+  start_state: new_player
+  record_interval_seconds: 1
+  outputs: []
+""",
+            "$.fields.profiles[0]",
+        ),
+    ],
+)
+def test_yaml_alias_cycles_are_rejected_as_safe_typed_errors(
+    text: str, expected_path: str
+) -> None:
+    error = _assert_invalid(text, "yaml")
+    assert error.details["reason"] == "cyclic_structure"
+    assert error.details["path"] == expected_path
+    assert error.details["cycle_to"].startswith("$.fields")
+    assert len(error.details["path"]) <= 512
+    json.dumps(dict(error.details), allow_nan=False)
+
+
+def test_shared_acyclic_yaml_alias_is_accepted_in_each_branch() -> None:
+    change = parse_change_text(
+        """\
+version: 1
+operation: upsert
+entity: regression_gate
+id: smoke
+fields:
+  max_unlock_delay_pct: &limits
+    first_upgrade: '10'
+  max_payback_seconds: *limits
+""",
+        "yaml",
+    )
+    assert change.fields == {
+        "max_unlock_delay_pct": {"first_upgrade": "10"},
+        "max_payback_seconds": {"first_upgrade": "10"},
+    }
+
+
+@pytest.mark.parametrize(
     ("text", "format_name", "reason"),
     [
         ("{not-json", "json", "invalid_syntax"),
@@ -454,6 +522,43 @@ def test_merge_fields_rejects_required_null_and_unknown_fields() -> None:
     with pytest.raises(AuthoringError) as unknown:
         merge_fields(current, {"unknown": 1}, schema)
     assert unknown.value.details["field"] == "unknown"
+
+
+@pytest.mark.parametrize("cyclic_side", ["current", "patch"])
+def test_merge_fields_rejects_programmatic_cycles_before_recursive_processing(
+    cyclic_side: str,
+) -> None:
+    schema = get_entity_schema("player_profile")
+    current: dict[str, object] = {
+        "source_efficiency": {"active": "1"},
+        "behavior_policy": "cheap",
+        "session_pattern": "authoring",
+        "prestige_policy": "conservative",
+    }
+    patch: dict[str, object] = {"activity_weights": {"gather": "1"}}
+    loop: dict[str, object] = {}
+    loop["self"] = loop
+    if cyclic_side == "current":
+        current["source_efficiency"] = loop
+    else:
+        patch["activity_weights"] = loop
+
+    with pytest.raises(AuthoringError) as caught:
+        merge_fields(current, patch, schema)
+
+    error = caught.value
+    assert error.code == "invalid_change"
+    assert error.details["reason"] == "cyclic_structure"
+    assert error.details["path"].endswith(".self")
+    json.dumps(dict(error.details), allow_nan=False)
+
+
+def test_direct_model_change_rejects_cycle_before_recursive_freeze() -> None:
+    fields: dict[str, object] = {}
+    fields["loop"] = fields
+    with pytest.raises(AuthoringError) as caught:
+        ModelChange(1, "upsert", "resource", "gold", fields)
+    assert caught.value.details["reason"] == "cyclic_structure"
 
 
 def test_create_with_empty_current_argument_is_an_update_but_still_requires_complete_result() -> None:
