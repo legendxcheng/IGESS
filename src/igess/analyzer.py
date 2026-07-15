@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import Counter
 
 from .conditions import evaluate
+from .human_numbers import format_human_number
 from .numbers import SimNumber
 from .modifiers import ModifierStack
 from .schema import EconomyModel, SimulationResult, SimulationState, TimelineRow
@@ -59,12 +60,16 @@ class Analyzer:
         for profile in profiles:
             final_rows = [row for row in result.timeline if row.profile_id == profile]
             final = final_rows[-1]
+            final_resources = "{" + ", ".join(
+                f"{resource_id!r}: {format_human_number(value)}"
+                for resource_id, value in sorted(final.resources.items())
+            ) + "}"
             lines.extend(
                 [
                     f"### {profile}",
                     "",
-                    f"- Final time: {final.time_seconds}s",
-                    f"- Final resources: {final.resources}",
+                    f"- Final time: {format_human_number(final.time_seconds)}s",
+                    f"- Final resources: {final_resources}",
                     f"- Generators owned: {final.generators_owned}",
                     f"- Upgrades purchased: {final.upgrades_purchased}",
                     f"- Purchase events: {purchases[profile]}",
@@ -104,7 +109,8 @@ class Analyzer:
             for row in payback[:20]:
                 lines.append(
                     f"- `{row['profile_id']}` {row['kind']} `{row['item_id']}`: "
-                    f"{row['payback_seconds']}s, source `{row['source_ref']}`"
+                    f"{format_human_number(row['payback_seconds'])}s, "
+                    f"source `{row['source_ref']}`"
                 )
             if len(payback) > 20:
                 lines.append(f"- ... {len(payback) - 20} more")
