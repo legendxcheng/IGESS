@@ -30,6 +30,85 @@ EXPECTED_COMMANDS = {
     "yaml-plan",
 }
 
+CRITICAL_HELP_CASES = (
+    (
+        "lint",
+        (
+            ("config", "Path to the economy YAML configuration."),
+            ("tables", "Directory containing exported Luban JSON tables."),
+        ),
+        "igess lint --config economy.yaml --tables luban_exports",
+    ),
+    (
+        "rng-run",
+        (
+            ("config", "Path to the economy YAML configuration."),
+            ("scenario", "RNG scenario identifier to simulate."),
+            ("out", "Directory for RNG simulation outputs."),
+        ),
+        "igess rng-run --config economy.yaml --scenario loot_check --out runs/loot_check",
+    ),
+    (
+        "report",
+        (
+            ("run", "Simulation run directory to report on."),
+            ("out", "Directory for the generated static report."),
+            ("title", "Optional report title."),
+        ),
+        "igess report --run runs/day_1 --out reports/day_1",
+    ),
+    (
+        "dashboard",
+        (
+            ("project", "IGESS project root directory."),
+            ("config", "Economy YAML path, relative to the project root by default."),
+            (
+                "tables",
+                "Exported table directory, relative to the project root by default.",
+            ),
+            ("runs_root", "Optional directory used to discover simulation runs."),
+            ("host", "Dashboard bind address."),
+            ("port", "Dashboard TCP port."),
+        ),
+        "igess dashboard --project . --port 8765",
+    ),
+    (
+        "init",
+        (
+            ("template", "Project template name."),
+            ("out", "Directory to initialize."),
+        ),
+        "igess init --out my-economy",
+    ),
+    (
+        "run",
+        (
+            ("config", "Path to the economy YAML configuration."),
+            ("tables", "Directory containing exported Luban JSON tables."),
+            ("scenario", "Scenario identifier to simulate."),
+            ("out", "Directory for simulation outputs."),
+        ),
+        "igess run --config economy.yaml --tables luban_exports "
+        "--scenario day_1 --out runs/day_1",
+    ),
+    (
+        "scan",
+        (
+            ("config", "Path to the economy YAML configuration."),
+            ("tables", "Directory containing exported Luban JSON tables."),
+            ("scenario", "Scenario identifier to simulate."),
+            ("param", "Parameter scan expression PATH=START..STOP:STEP."),
+            ("out", "Directory for scan runs and summary."),
+        ),
+        "igess scan --config examples/shelldiver_v0/economy.yaml --tables "
+        "examples/shelldiver_v0/luban_exports --scenario day_1_progression --param "
+        "generators.fisherman.cost_growth=1.14..1.18:0.01 --out scan-out",
+    ),
+)
+
+CRITICAL_COMMANDS = frozenset(case[0] for case in CRITICAL_HELP_CASES)
+OTHER_COMMANDS = tuple(sorted(EXPECTED_COMMANDS - CRITICAL_COMMANDS))
+
 
 def run_cli(*args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
@@ -52,6 +131,33 @@ def command_actions(parser: argparse.ArgumentParser) -> dict[str, argparse.Actio
     return {action.dest: action for action in parser._actions}
 
 
+def example_from(parser: argparse.ArgumentParser) -> str:
+    assert parser.epilog and "Examples:" in parser.epilog
+    return parser.epilog.split("Examples:", 1)[1].strip()
+
+
+def assert_complete_help_contract(command: str, parser: argparse.ArgumentParser) -> None:
+    rendered = parser.format_help()
+    assert parser.description and parser.description.strip(), command
+    assert parser.description in rendered, command
+    assert parser.epilog and "Examples:" in parser.epilog, command
+    example = example_from(parser)
+    assert example.startswith(f"igess {command} "), command
+    assert example in rendered, command
+
+    example_tokens = example.split()
+    for action in parser._actions:
+        if action.dest == "help":
+            continue
+        assert action.help not in (None, argparse.SUPPRESS), (command, action.dest)
+        assert action.help.strip(), (command, action.dest)
+        if action.required:
+            assert any(option in example_tokens for option in action.option_strings), (
+                command,
+                action.dest,
+            )
+
+
 def test_top_level_cli_help_lists_all_commands_with_summaries_and_exit_codes():
     parser = build_parser()
     commands = command_group(parser)
@@ -70,19 +176,40 @@ def test_top_level_cli_help_lists_all_commands_with_summaries_and_exit_codes():
     assert "2  Command-line usage error." in result.stdout
 
 
-def test_every_registered_command_has_description_example_and_argument_help():
+def test_parameterized_help_cases_cover_every_registered_command():
     commands = command_group(build_parser())
 
     assert set(commands.choices) == EXPECTED_COMMANDS
-    for command, parser in commands.choices.items():
-        assert parser.description and parser.description.strip(), command
-        assert parser.epilog and "Examples:" in parser.epilog, command
-        assert f"igess {command}" in parser.epilog, command
-        for action in parser._actions:
-            if action.dest == "help":
-                continue
-            assert action.help not in (None, argparse.SUPPRESS), (command, action.dest)
-            assert action.help.strip(), (command, action.dest)
+    assert CRITICAL_COMMANDS | set(OTHER_COMMANDS) == set(commands.choices)
+    assert CRITICAL_COMMANDS.isdisjoint(OTHER_COMMANDS)
+
+
+@pytest.mark.parametrize(
+    ("command", "expected_argument_help", "expected_example"),
+    CRITICAL_HELP_CASES,
+    ids=[case[0] for case in CRITICAL_HELP_CASES],
+)
+def test_critical_command_help_contracts(
+    command,
+    expected_argument_help,
+    expected_example,
+):
+    parser = command_group(build_parser()).choices[command]
+    actions = command_actions(parser)
+    rendered = parser.format_help()
+
+    assert_complete_help_contract(command, parser)
+    assert example_from(parser) == expected_example
+    for dest, expected_help in expected_argument_help:
+        assert actions[dest].help == expected_help
+        assert actions[dest].option_strings[0] in rendered
+
+
+@pytest.mark.parametrize("command", OTHER_COMMANDS)
+def test_other_command_help_contracts(command):
+    parser = command_group(build_parser()).choices[command]
+
+    assert_complete_help_contract(command, parser)
 
 
 @pytest.mark.parametrize(
@@ -160,6 +287,47 @@ def test_missing_defaults_are_hidden_but_real_defaults_are_rendered():
     assert doctor_help.count("default:") == 3
     assert "examples/shelldiver_v0/economy.yaml" in doctor_help
     assert "examples/shelldiver_v0/luban_exports" in doctor_help
+
+
+@pytest.mark.parametrize(
+    ("command", "expected_required", "expected_defaults"),
+    [
+        (
+            "dashboard",
+            frozenset(),
+            (
+                ("project", "."),
+                ("config", "examples/shelldiver_v0/economy.yaml"),
+                ("tables", "examples/shelldiver_v0/luban_exports"),
+                ("runs_root", None),
+                ("host", "127.0.0.1"),
+                ("port", 8765),
+            ),
+        ),
+        (
+            "init",
+            frozenset({"out"}),
+            (("template", "incremental-basic"), ("out", None)),
+        ),
+    ],
+)
+def test_dashboard_and_init_defaults_and_required_contracts(
+    command,
+    expected_required,
+    expected_defaults,
+):
+    parser = command_group(build_parser()).choices[command]
+    actions = command_actions(parser)
+    rendered = parser.format_help()
+
+    required = {action.dest for action in parser._actions if action.required}
+    assert required == expected_required
+    for dest, expected_default in expected_defaults:
+        assert actions[dest].default == expected_default
+    assert rendered.count("default:") == sum(
+        default is not None for _, default in expected_defaults
+    )
+    assert "(default: None)" not in rendered
 
 
 def test_help_formatter_follows_terminal_width(monkeypatch):
