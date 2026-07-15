@@ -6,7 +6,7 @@ from pathlib import Path
 import shutil
 from typing import NoReturn
 
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 import pytest
 
 from igess.authoring.project import AuthoringProject
@@ -97,6 +97,42 @@ def _stage_transaction(
     return transaction
 
 
+def _add_nested_registered_source(project: AuthoringProject) -> None:
+    registry_path = project.datas / "__tables__.xlsx"
+    registry = load_workbook(registry_path)
+    registry.active.append([None, "alpha", "nested/alpha.xlsx"])
+    registry.save(registry_path)
+    registry.close()
+    nested = project.datas / "nested"
+    nested.mkdir()
+    (nested / "alpha.xlsx").write_bytes(b"old nested workbook bytes")
+
+
+def _stage_nested_transaction(
+    project: AuthoringProject,
+    *,
+    checkpoint=lambda _name: None,
+) -> Transaction:
+    transaction = Transaction(
+        project,
+        "nested-change",
+        project.model_digest(),
+        checkpoint=checkpoint,
+    )
+    nested = transaction.candidate_dir / "Datas" / "nested"
+    nested.mkdir(parents=True)
+    (nested / "alpha.xlsx").write_bytes(b"new nested workbook bytes")
+    transaction.staged_change_path.write_text(
+        '{"outcome":"success"}\n', encoding="utf-8"
+    )
+    transaction.prepare(
+        targets=("Datas/nested/alpha.xlsx",),
+        run_destination=None,
+        change_destination=project.changes / "nested-record.json",
+    )
+    return transaction
+
+
 def _assert_pre_transaction_state(
     project: AuthoringProject,
     snapshot: dict[str, bytes],
@@ -158,6 +194,84 @@ def test_prepare_writes_exact_schema_one_disk_contract(tmp_path: Path) -> None:
         "last_completed_checkpoint": "prepared",
     }
     assert list(transaction.journal_path.parent.glob(".journal.json.*.tmp")) == []
+
+
+def test_nested_registered_workbook_target_commits(tmp_path: Path) -> None:
+    project = _make_project(tmp_path / "model")
+    _add_nested_registered_source(project)
+    transaction = _stage_nested_transaction(project)
+
+    assert transaction.commit() == ()
+
+    assert (project.datas / "nested" / "alpha.xlsx").read_bytes() == (
+        b"new nested workbook bytes"
+    )
+    assert (project.changes / "nested-record.json").is_file()
+    assert not transaction.root.exists()
+
+
+def test_nested_registered_workbook_target_rolls_back_normal_failure(
+    tmp_path: Path,
+) -> None:
+    project = _make_project(tmp_path / "model")
+    _add_nested_registered_source(project)
+
+    def fail(name: str) -> None:
+        if name == "target:0:Datas/nested/alpha.xlsx":
+            raise RuntimeError("nested target checkpoint failed")
+
+    transaction = _stage_nested_transaction(project, checkpoint=fail)
+
+    with pytest.raises(AuthoringError) as caught:
+        transaction.commit()
+
+    assert caught.value.code == "commit_failed"
+    assert (project.datas / "nested" / "alpha.xlsx").read_bytes() == (
+        b"old nested workbook bytes"
+    )
+    assert not (project.changes / "nested-record.json").exists()
+    assert not transaction.root.exists()
+
+
+def test_nested_registered_workbook_target_recovers_hard_crash(
+    tmp_path: Path,
+) -> None:
+    project = _make_project(tmp_path / "model")
+    _add_nested_registered_source(project)
+
+    def crash(name: str) -> NoReturn | None:
+        if name == "target:0:Datas/nested/alpha.xlsx":
+            raise _HardCrash(name)
+        return None
+
+    transaction = _stage_nested_transaction(project, checkpoint=crash)
+    with pytest.raises(_HardCrash):
+        transaction.commit()
+
+    assert recover_transactions(project)[0]["code"] == "recovered_transaction"
+    assert (project.datas / "nested" / "alpha.xlsx").read_bytes() == (
+        b"old nested workbook bytes"
+    )
+    assert not (project.changes / "nested-record.json").exists()
+    assert not transaction.root.exists()
+
+
+@pytest.mark.parametrize("target", ["Datas", "../escape.xlsx"])
+def test_source_target_still_rejects_datas_root_and_escape(
+    tmp_path: Path,
+    target: str,
+) -> None:
+    project = _make_project(tmp_path / "model")
+    transaction = Transaction(project, "change-1", project.model_digest())
+    transaction.candidate_dir.mkdir()
+    transaction.staged_change_path.write_bytes(b"audit")
+
+    with pytest.raises((AuthoringError, ValueError)):
+        transaction.prepare(
+            targets=(target,),
+            run_destination=None,
+            change_destination=project.changes / "record.json",
+        )
 
 
 def test_recovery_cleans_transaction_that_crashed_during_staging(

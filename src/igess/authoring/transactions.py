@@ -925,7 +925,7 @@ def _is_allowed_target(relative: PurePosixPath) -> bool:
     return (
         relative == PurePosixPath("economy.yaml")
         or relative == PurePosixPath("luban_exports")
-        or (len(relative.parts) == 2 and relative.parts[0] == "Datas")
+        or (len(relative.parts) >= 2 and relative.parts[0] == "Datas")
     )
 
 
