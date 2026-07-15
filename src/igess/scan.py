@@ -16,6 +16,10 @@ from .simulator import Simulator
 
 
 MAX_SCAN_VARIANTS = 1000
+# Bound fixed-width values before allocating powers of ten or result strings.
+MAX_SCAN_VALUE_CHARS = 4096
+# Bound the aggregate payload produced by one parameter expansion.
+MAX_SCAN_OUTPUT_CHARS = 1_000_000
 
 
 @dataclass(frozen=True)
@@ -67,18 +71,46 @@ def parse_scan_parameter(text: str, max_variants: int = MAX_SCAN_VARIANTS) -> Sc
     if start > end and step > 0:
         raise _invalid_scan_parameter(text, "step must be negative for a descending range")
 
-    precision = max(_decimal_places(start_text), _decimal_places(end_text), _decimal_places(step_text))
-    values = []
-    current = start
-    ascending = step > 0
-    while current <= end if ascending else current >= end:
-        if len(values) >= max_variants:
-            raise ValueError(
-                f"scan parameter {text!r} expands to too many variants (>{max_variants}); "
-                "increase the step or narrow the range"
-            )
-        values.append(f"{current:.{precision}f}")
-        current += step
+    common_exponent = min(
+        start.as_tuple().exponent,
+        end.as_tuple().exponent,
+        step.as_tuple().exponent,
+    )
+    estimated_value_chars = max(
+        _fixed_width_estimate(start, common_exponent),
+        _fixed_width_estimate(end, common_exponent),
+    )
+    estimated_scaled_digits = max(
+        _scaled_integer_digits(start, common_exponent),
+        _scaled_integer_digits(end, common_exponent),
+        _scaled_integer_digits(step, common_exponent),
+    )
+    if max(estimated_value_chars, estimated_scaled_digits) > MAX_SCAN_VALUE_CHARS:
+        raise _invalid_scan_parameter(
+            text,
+            f"expanded values are too large (limit: {MAX_SCAN_VALUE_CHARS} characters each)",
+        )
+
+    start_integer = _to_scaled_integer(start, common_exponent)
+    end_integer = _to_scaled_integer(end, common_exponent)
+    step_integer = _to_scaled_integer(step, common_exponent)
+    distance = abs(end_integer - start_integer)
+    count = distance // abs(step_integer) + 1
+    if count > max_variants:
+        raise ValueError(
+            f"scan parameter {text!r} expands to too many variants (>{max_variants}); "
+            "increase the step or narrow the range"
+        )
+    if count * estimated_value_chars > MAX_SCAN_OUTPUT_CHARS:
+        raise _invalid_scan_parameter(
+            text,
+            f"expanded output is too large (limit: {MAX_SCAN_OUTPUT_CHARS} characters total)",
+        )
+
+    values = [
+        _format_scaled_integer(start_integer + index * step_integer, common_exponent)
+        for index in range(count)
+    ]
     return ScanParameter(table=table, row_id=row_id, field=field, values=values)
 
 
@@ -88,6 +120,49 @@ def _invalid_scan_parameter(text: str, reason: str) -> ValueError:
         "Expected PATH=START..STOP:STEP; for example, "
         "generators.fisherman.cost_growth=1.14..1.18:0.01"
     )
+
+
+def _fixed_width_estimate(value: Decimal, exponent: int) -> int:
+    if value == 0:
+        return 1 if exponent >= 0 else 2 - exponent
+    integer_digits = max(1, value.adjusted() + 1)
+    sign_chars = 1 if value.is_signed() and value != 0 else 0
+    if exponent >= 0:
+        return sign_chars + integer_digits
+    return sign_chars + integer_digits + 1 - exponent
+
+
+def _scaled_integer_digits(value: Decimal, exponent: int) -> int:
+    if value == 0:
+        return 1
+    value_tuple = value.as_tuple()
+    return len(value_tuple.digits) + value_tuple.exponent - exponent
+
+
+def _to_scaled_integer(value: Decimal, exponent: int) -> int:
+    value_tuple = value.as_tuple()
+    coefficient = 0
+    for digit in value_tuple.digits:
+        coefficient = coefficient * 10 + digit
+    if coefficient == 0:
+        return 0
+    coefficient *= 10 ** (value_tuple.exponent - exponent)
+    return -coefficient if value_tuple.sign else coefficient
+
+
+def _format_scaled_integer(value: int, exponent: int) -> str:
+    if value == 0:
+        return "0" if exponent >= 0 else "0." + "0" * -exponent
+    sign = "-" if value < 0 else ""
+    digits = str(abs(value))
+    if exponent >= 0:
+        return sign + digits + "0" * exponent
+
+    precision = -exponent
+    if len(digits) <= precision:
+        digits = "0" * (precision - len(digits) + 1) + digits
+    split_at = len(digits) - precision
+    return sign + digits[:split_at] + "." + digits[split_at:]
 
 
 def run_scan(
@@ -170,7 +245,3 @@ def _apply_override(raw, parameter: ScanParameter, value: str) -> None:
             setattr(row, parameter.field, value)
             return
     raise ValueError(f"{parameter.table}.{parameter.row_id} not found")
-
-
-def _decimal_places(text: str) -> int:
-    return max(0, -Decimal(text).as_tuple().exponent)
