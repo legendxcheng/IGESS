@@ -21,6 +21,7 @@ from .status import ModelStatus
 
 
 CHANGE_RECORD_VERSION = 1
+MAX_CHANGE_RECORD_BYTES = 4 * 1024 * 1024
 _CHANGE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$")
 _DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 _RECORD_NAME_RE = re.compile(
@@ -206,9 +207,17 @@ class ChangeRecordStore:
                 identity = path.lstat()
                 if stat.S_ISLNK(identity.st_mode) or not stat.S_ISREG(identity.st_mode):
                     raise ValueError("record path is not a regular file")
-                payload = json.loads(path.read_text(encoding="utf-8"))
+                payload = _load_record_json(path, identity)
                 timestamp = _validate_loaded_record(path, payload, expected_outcome)
-            except (OSError, UnicodeError, ValueError, TypeError, KeyError) as error:
+            except (
+                OSError,
+                UnicodeError,
+                ValueError,
+                TypeError,
+                KeyError,
+                RecursionError,
+                MemoryError,
+            ) as error:
                 _warnings.warn(
                     f"Skipped malformed change record {path}: {type(error).__name__}",
                     ChangeRecordWarning,
@@ -397,6 +406,25 @@ def _atomic_json_write(path: Path, payload: Mapping[str, Any]) -> None:
         except OSError:
             pass
         raise
+
+
+def _load_record_json(path: Path, identity: os.stat_result) -> object:
+    if identity.st_size > MAX_CHANGE_RECORD_BYTES:
+        raise ValueError("record exceeds the size limit")
+    with path.open("rb") as handle:
+        opened = os.fstat(handle.fileno())
+        if not os.path.samestat(identity, opened):
+            raise ValueError("record changed before it could be read")
+        content = handle.read(MAX_CHANGE_RECORD_BYTES + 1)
+        after = os.fstat(handle.fileno())
+    if len(content) > MAX_CHANGE_RECORD_BYTES:
+        raise ValueError("record exceeds the size limit")
+    if not os.path.samestat(opened, after) or len(content) != after.st_size:
+        raise ValueError("record changed while it was read")
+    try:
+        return json.loads(content.decode("utf-8"))
+    except (UnicodeError, json.JSONDecodeError, RecursionError, MemoryError) as error:
+        raise ValueError("record JSON is malformed") from error
 
 
 def _fsync_directory(path: Path) -> None:
@@ -619,6 +647,7 @@ def _audit_error(
 
 __all__ = [
     "CHANGE_RECORD_VERSION",
+    "MAX_CHANGE_RECORD_BYTES",
     "ChangeRecordStore",
     "ChangeRecordWarning",
 ]

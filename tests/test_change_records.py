@@ -480,3 +480,31 @@ def test_write_failure_rejects_an_invalid_error_envelope_before_persistence(
         )
 
     assert not (tmp_path / "changes" / "failed").exists()
+
+
+def test_list_and_latest_skip_excessively_deep_json_without_recursion_escape(
+    tmp_path: Path,
+) -> None:
+    store = _store(tmp_path)
+    path = tmp_path / "changes" / "20260715T040506789012Z-deep.json"
+    path.write_text("[" * 10_000 + "0" + "]" * 10_000, encoding="utf-8")
+
+    with pytest.warns(ChangeRecordWarning, match=r"deep.json.*ValueError"):
+        assert store.list_records() == []
+    with pytest.warns(ChangeRecordWarning, match=r"deep.json.*ValueError"):
+        assert store.latest() is None
+
+
+def test_list_and_latest_skip_record_larger_than_four_mibibytes_boundedly(
+    tmp_path: Path,
+) -> None:
+    store = _store(tmp_path)
+    path = tmp_path / "changes" / "20260715T040506789012Z-oversized.json"
+    with path.open("wb") as handle:
+        handle.seek(4 * 1024 * 1024)
+        handle.write(b"}")
+
+    with pytest.warns(ChangeRecordWarning, match=r"oversized.json.*ValueError"):
+        assert store.list_records() == []
+    with pytest.warns(ChangeRecordWarning, match=r"oversized.json.*ValueError"):
+        assert store.latest() is None
