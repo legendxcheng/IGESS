@@ -12,6 +12,7 @@ import math
 import os
 from pathlib import Path
 import shutil
+import stat
 import tempfile
 from typing import Any, NoReturn
 
@@ -40,6 +41,8 @@ from ..schema import (
     Rules,
     RuntimeConfig,
     Scenario,
+    SimulationResult,
+    TimelineRow,
     UpgradeRow,
 )
 from .response import AuthoringError
@@ -150,7 +153,7 @@ def run_ten_tick_probe(
 
     try:
         result = simulator.run_scenario(scenario_id)
-        observable = _probe_has_observable_change(result.timeline)
+        observable = _probe_has_observable_change(result, probe_model, scenario_id)
     except Exception as exc:
         _raise_smoke_failed("execution", exc)
 
@@ -299,7 +302,9 @@ def _publishable_target_identity(target: Path) -> os.stat_result | None:
         identity = target.lstat()
     except FileNotFoundError:
         return None
-    if target.is_symlink() or not target.is_dir():
+    if _path_is_indirection(target, identity):
+        raise FileExistsError(f"artifact target is an unsafe path indirection: {target}")
+    if not target.is_dir():
         raise FileExistsError(f"artifact target is not a directory: {target}")
     try:
         next(target.iterdir())
@@ -342,9 +347,11 @@ def _publish_probe_tree(
             raise FileExistsError(f"artifact target appeared before publication: {target}")
         try:
             os.replace(staging, target)
-        except BaseException:
+        except BaseException as primary:
             if _path_matches_identity(target, staging_identity):
-                return
+                if isinstance(primary, Exception):
+                    return
+                raise
             raise
         if not _path_matches_identity(target, staging_identity):
             raise OSError("staged probe artifact tree was not published")
@@ -374,8 +381,10 @@ def _publish_probe_tree(
         os.replace(staging, target)
     except BaseException as primary:
         if _path_matches_identity(target, staging_identity):
-            _cleanup_empty_backup(backup, target_identity)
-            return
+            if isinstance(primary, Exception):
+                _cleanup_empty_backup(backup, target_identity)
+                return
+            raise
         _restore_empty_target_after_primary(primary, backup, target, target_identity)
         raise
     if not _path_matches_identity(target, staging_identity):
@@ -439,6 +448,16 @@ def _path_lexists(path: Path) -> bool:
     return os.path.lexists(path)
 
 
+def _path_is_indirection(path: Path, identity: os.stat_result) -> bool:
+    if path.is_symlink():
+        return True
+    is_junction = getattr(path, "is_junction", None)
+    if callable(is_junction) and is_junction():
+        return True
+    reparse_flag = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+    return bool(getattr(identity, "st_file_attributes", 0) & reparse_flag)
+
+
 def _path_matches_identity(path: Path, identity: os.stat_result) -> bool:
     try:
         current = path.lstat()
@@ -451,28 +470,109 @@ def _path_matches_identity(path: Path, identity: os.stat_result) -> bool:
     )
 
 
-def _probe_has_observable_change(timeline: Sequence[Any]) -> bool:
-    by_profile: dict[str, list[Any]] = {}
-    for row in timeline:
-        by_profile.setdefault(row.profile_id, []).append(row)
-    for profile_id in sorted(by_profile):
-        rows = by_profile[profile_id]
-        first, last = rows[0], rows[-1]
-        first_resources = {
-            key: SimNumber.parse(value) for key, value in first.resources.items()
-        }
-        last_resources = {
-            key: SimNumber.parse(value) for key, value in last.resources.items()
-        }
-        if first_resources != last_resources:
-            return True
-        if first.generators_owned != last.generators_owned:
-            return True
-        if set(first.upgrades_purchased) != set(last.upgrades_purchased):
-            return True
-        if getattr(first, "prestige_counts", {}) != getattr(last, "prestige_counts", {}):
+def _probe_has_observable_change(
+    result: SimulationResult,
+    model: EconomyModel,
+    scenario_id: str,
+) -> bool:
+    if not isinstance(result, SimulationResult):
+        raise TypeError("simulator must return a SimulationResult")
+    if result.scenario_id != scenario_id:
+        raise ValueError("simulation result scenario does not match the probe scenario")
+    if not isinstance(result.timeline, list):
+        raise TypeError("simulation timeline must be a list")
+
+    requested_profiles = model.scenarios[scenario_id].profiles
+    if len(set(requested_profiles)) != len(requested_profiles):
+        raise ValueError("probe scenario contains duplicate profile ids")
+    expected_profiles = set(requested_profiles)
+    if len(result.timeline) != len(requested_profiles) * 11:
+        raise ValueError("simulation timeline must contain exactly eleven rows per profile")
+
+    by_profile: dict[str, list[tuple[Any, ...]]] = {
+        profile_id: [] for profile_id in requested_profiles
+    }
+    for row in result.timeline:
+        if not isinstance(row, TimelineRow):
+            raise TypeError("simulation timeline must contain TimelineRow values")
+        if row.scenario_id != scenario_id:
+            raise ValueError("timeline row scenario does not match the probe scenario")
+        if not isinstance(row.profile_id, str) or row.profile_id not in expected_profiles:
+            raise ValueError("timeline row contains an unexpected profile")
+        if isinstance(row.time_seconds, bool) or not isinstance(row.time_seconds, int):
+            raise TypeError("timeline row time_seconds must be an integer")
+        by_profile[row.profile_id].append(_validated_probe_snapshot(row))
+
+    expected_times = [model.config.tick_seconds * index for index in range(11)]
+    for profile_id in requested_profiles:
+        snapshots = by_profile[profile_id]
+        times = [snapshot[0] for snapshot in snapshots]
+        if times != expected_times:
+            raise ValueError(
+                f"timeline rows for profile '{profile_id}' do not cover exactly ten ticks"
+            )
+        first, last = snapshots[0], snapshots[-1]
+        if first[1:] != last[1:]:
             return True
     return False
+
+
+def _validated_probe_snapshot(row: TimelineRow) -> tuple[Any, ...]:
+    resources = _validated_number_mapping(row.resources, "resources")
+    generators = _validated_count_mapping(row.generators_owned, "generators_owned")
+    upgrades = row.upgrades_purchased
+    if not isinstance(upgrades, list):
+        raise TypeError("timeline upgrades_purchased must be a list")
+    if any(not isinstance(item, str) or not item for item in upgrades):
+        raise TypeError("timeline upgrades_purchased must contain non-empty strings")
+    if len(set(upgrades)) != len(upgrades):
+        raise ValueError("timeline upgrades_purchased must not contain duplicates")
+    prestige = _validated_count_mapping(row.prestige_counts, "prestige_counts")
+    if not isinstance(row.total_cps, str) or not row.total_cps:
+        raise TypeError("timeline total_cps must be a non-empty string")
+    try:
+        SimNumber.parse(row.total_cps)
+    except Exception as exc:
+        raise ValueError("timeline total_cps must be an exact number") from exc
+    return (
+        row.time_seconds,
+        resources,
+        generators,
+        frozenset(upgrades),
+        prestige,
+    )
+
+
+def _validated_number_mapping(value: Any, name: str) -> tuple[tuple[str, SimNumber], ...]:
+    if not isinstance(value, Mapping):
+        raise TypeError(f"timeline {name} must be a mapping")
+    normalized: list[tuple[str, SimNumber]] = []
+    for key, raw_number in value.items():
+        if not isinstance(key, str) or not key:
+            raise TypeError(f"timeline {name} keys must be non-empty strings")
+        if not isinstance(raw_number, str) or not raw_number:
+            raise TypeError(f"timeline {name} values must be non-empty strings")
+        try:
+            number = SimNumber.parse(raw_number)
+        except Exception as exc:
+            raise ValueError(f"timeline {name} contains an invalid number") from exc
+        normalized.append((key, number))
+    return tuple(sorted(normalized, key=lambda item: item[0]))
+
+
+def _validated_count_mapping(value: Any, name: str) -> tuple[tuple[str, int], ...]:
+    if not isinstance(value, Mapping):
+        raise TypeError(f"timeline {name} must be a mapping")
+    normalized: list[tuple[str, int]] = []
+    for key, count in value.items():
+        if not isinstance(key, str) or not key:
+            raise TypeError(f"timeline {name} keys must be non-empty strings")
+        if isinstance(count, bool) or not isinstance(count, int):
+            raise TypeError(f"timeline {name} values must be integers")
+        if count < 0:
+            raise ValueError(f"timeline {name} values must be non-negative")
+        normalized.append((key, count))
+    return tuple(sorted(normalized))
 
 
 def static_smoke_eligibility(raw: RawConfig, model: EconomyModel) -> EligibilityResult:

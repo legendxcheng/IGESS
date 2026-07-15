@@ -6,6 +6,7 @@ from datetime import date
 import json
 import os
 from pathlib import Path
+import subprocess
 
 import pytest
 
@@ -933,6 +934,21 @@ def _timeline_row(
     )
 
 
+def _full_probe_timeline(
+    profile_ids: tuple[str, ...] = ("alpha",),
+    *,
+    final: TimelineRow | None = None,
+) -> list[TimelineRow]:
+    rows: list[TimelineRow] = []
+    for profile_id in profile_ids:
+        for time_seconds in range(11):
+            if final is not None and profile_id == final.profile_id and time_seconds == 10:
+                rows.append(final)
+            else:
+                rows.append(_timeline_row(profile_id, time_seconds))
+    return rows
+
+
 @pytest.mark.parametrize(
     "final",
     [
@@ -947,7 +963,7 @@ def test_ten_tick_probe_detects_each_exact_state_category(monkeypatch, final) ->
     model = ModelBuilder.build(_raw())
     simulation = SimulationResult(
         "smoke",
-        [_timeline_row("alpha", 0), final],
+        _full_probe_timeline(final=final),
         [],
     )
     monkeypatch.setattr(
@@ -962,15 +978,25 @@ def test_ten_tick_probe_detects_each_exact_state_category(monkeypatch, final) ->
 
 
 def test_elapsed_cps_unlocks_events_and_decimal_spelling_do_not_count(monkeypatch) -> None:
-    model = ModelBuilder.build(_raw())
+    model = ModelBuilder.build(
+        _raw(profiles=(_profile("alpha"), _profile("zeta")))
+    )
+    timeline = _full_probe_timeline(("zeta", "alpha"))
+    timeline = [
+        replace(
+            row,
+            resources={"gold": "1.0" if row.time_seconds == 10 else "1"},
+        )
+        if row.profile_id == "zeta"
+        else replace(
+            row,
+            resources={"gold": "0e99" if row.time_seconds == 10 else "0"},
+        )
+        for row in timeline
+    ]
     simulation = SimulationResult(
         "smoke",
-        [
-            _timeline_row("zeta", 0, resource="1"),
-            _timeline_row("zeta", 10, resource="1.0"),
-            _timeline_row("alpha", 0, resource="0"),
-            _timeline_row("alpha", 10, resource="0e99"),
-        ],
+        timeline,
         [Event("smoke", "alpha", 0, "unlock_generator", "mine", {})],
     )
     monkeypatch.setattr(
@@ -988,6 +1014,73 @@ def test_elapsed_cps_unlocks_events_and_decimal_spelling_do_not_count(monkeypatc
             "message": "The ten-tick smoke probe completed without an observable state change.",
         }
     ]
+
+
+@pytest.mark.parametrize(
+    "corruption",
+    [
+        "empty",
+        "single",
+        "truncated",
+        "out_of_order",
+        "duplicate_time",
+        "extra_row",
+        "extra_profile",
+        "wrong_result_scenario",
+        "wrong_row_scenario",
+        "malformed_resources",
+        "malformed_generators",
+        "malformed_upgrades",
+        "malformed_prestige",
+        "malformed_number",
+    ],
+)
+def test_ten_tick_probe_rejects_corrupt_simulation_timelines(
+    monkeypatch, corruption
+) -> None:
+    model = ModelBuilder.build(_raw())
+    rows = _full_probe_timeline()
+    result_scenario = "smoke"
+    if corruption == "empty":
+        rows = []
+    elif corruption == "single":
+        rows = rows[:1]
+    elif corruption == "truncated":
+        rows = rows[:-1]
+    elif corruption == "out_of_order":
+        rows[4], rows[5] = rows[5], rows[4]
+    elif corruption == "duplicate_time":
+        rows[10] = replace(rows[10], time_seconds=9)
+    elif corruption == "extra_row":
+        rows.append(_timeline_row("alpha", 11))
+    elif corruption == "extra_profile":
+        rows.append(_timeline_row("intruder", 0))
+    elif corruption == "wrong_result_scenario":
+        result_scenario = "other"
+    elif corruption == "wrong_row_scenario":
+        rows[4] = replace(rows[4], scenario_id="other")
+    elif corruption == "malformed_resources":
+        rows[4] = replace(rows[4], resources=[])  # type: ignore[arg-type]
+    elif corruption == "malformed_generators":
+        rows[4] = replace(rows[4], generators_owned={"mine": True})
+    elif corruption == "malformed_upgrades":
+        rows[4] = replace(rows[4], upgrades_purchased=["boost", "boost"])
+    elif corruption == "malformed_prestige":
+        rows[4] = replace(rows[4], prestige_counts={"rebirth": -1})
+    elif corruption == "malformed_number":
+        rows[4] = replace(rows[4], resources={"gold": "not-a-number"})
+    simulation = SimulationResult(result_scenario, rows, [])
+    monkeypatch.setattr(
+        "igess.authoring.probe.Simulator.run_scenario",
+        lambda self, scenario_id: simulation,
+    )
+
+    with pytest.raises(AuthoringError) as caught:
+        run_ten_tick_probe(model)
+
+    assert caught.value.code == "smoke_failed"
+    assert caught.value.details["phase"] == "execution"
+    assert caught.value.details["original_type"] in {"TypeError", "ValueError"}
 
 
 @pytest.mark.parametrize(
@@ -1176,6 +1269,36 @@ def test_ten_tick_probe_treats_publish_replace_then_raise_as_committed(
     assert artifact_root.is_dir()
 
 
+@pytest.mark.parametrize("target_exists", [False, True], ids=("absent", "existing"))
+@pytest.mark.parametrize(
+    "cancellation_type", [KeyboardInterrupt, SystemExit, GeneratorExit]
+)
+def test_ten_tick_probe_preserves_committed_tree_but_rethrows_publish_cancellation(
+    tmp_path, monkeypatch, target_exists, cancellation_type
+) -> None:
+    model = ModelBuilder.build(_raw(route="activity"))
+    artifact_root = tmp_path / "probe"
+    if target_exists:
+        artifact_root.mkdir()
+    real_replace = os.replace
+    primary = cancellation_type("cancel final publish")
+
+    def publish_then_cancel(source, target):
+        real_replace(source, target)
+        if Path(target) == artifact_root and Path(source).name.startswith(".probe-probe-"):
+            raise primary
+
+    monkeypatch.setattr("igess.authoring.probe.os.replace", publish_then_cancel)
+
+    with pytest.raises(cancellation_type) as caught:
+        run_ten_tick_probe(model, artifact_root=artifact_root)
+
+    assert caught.value is primary
+    assert (artifact_root / "run" / "timeline.json").is_file()
+    assert (artifact_root / "report" / "index.html").is_file()
+    assert not list(tmp_path.glob(".probe-probe-*"))
+
+
 @pytest.mark.parametrize("cancellation_type", [KeyboardInterrupt, SystemExit])
 def test_ten_tick_probe_restores_original_target_when_backup_rename_raises_after_commit(
     tmp_path, monkeypatch, cancellation_type
@@ -1246,3 +1369,38 @@ def test_ten_tick_probe_preserves_primary_and_recoverable_backup_when_restore_fa
     )
     assert any(str(backups[0]) in note for note in (primary.__notes__ or []))
     assert not list(tmp_path.glob(".probe-probe-*"))
+
+
+@pytest.mark.skipif(
+    os.name != "nt" or not hasattr(Path, "is_junction"),
+    reason="Windows directory junction support is required",
+)
+def test_ten_tick_probe_rejects_artifact_root_directory_junction(tmp_path) -> None:
+    model = ModelBuilder.build(_raw(route="activity"))
+    real_target = tmp_path / "real-target"
+    real_target.mkdir()
+    artifact_root = tmp_path / "probe"
+    created = subprocess.run(
+        ["cmd", "/c", "mklink", "/J", str(artifact_root), str(real_target)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if created.returncode != 0:
+        pytest.skip(f"could not create test junction: {created.stderr or created.stdout}")
+    assert artifact_root.is_junction()
+    try:
+        with pytest.raises(AuthoringError) as caught:
+            run_ten_tick_probe(model, artifact_root=artifact_root)
+
+        assert caught.value.code == "smoke_failed"
+        assert caught.value.details["phase"] == "artifact"
+        assert "indirection" in str(caught.value.__cause__).lower()
+        assert artifact_root.is_junction()
+        assert list(real_target.iterdir()) == []
+    finally:
+        subprocess.run(
+            ["cmd", "/c", "rmdir", str(artifact_root)],
+            capture_output=True,
+            check=False,
+        )
