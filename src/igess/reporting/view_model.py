@@ -158,14 +158,28 @@ def _event_series(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 def _diagnostics(data: ReportData) -> dict[str, Any]:
     analysis = data.analysis
+    bottlenecks = analysis.get("bottleneck_report", {})
     return {
-        "bottlenecks": analysis.get("bottleneck_report", {}),
+        "bottlenecks": bottlenecks,
+        "bottleneck_gap_counts": _bottleneck_gap_counts(bottlenecks),
         "invalid_content": analysis.get("invalid_content_report", {}),
         "overpowered_content": analysis.get("overpowered_content_report", []),
         "payback": [
             _payback_diagnostic(row)
             for row in data.payback_rows
         ],
+    }
+
+
+def _bottleneck_gap_counts(bottlenecks: Any) -> dict[str, dict[str, Any]]:
+    if not isinstance(bottlenecks, dict):
+        return {}
+    return {
+        str(profile_id): chart_point(len(gaps) if isinstance(gaps, list) else 0)
+        for profile_id, gaps in sorted(
+            bottlenecks.items(),
+            key=lambda item: str(item[0]),
+        )
     }
 
 

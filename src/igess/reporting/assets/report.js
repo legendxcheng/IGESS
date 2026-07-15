@@ -264,7 +264,7 @@ function renderDiagnostics(report) {
   if (!target) return;
   const diagnostics = report.diagnostics || {};
   const invalid = diagnostics.invalid_content || {};
-  const bottlenecks = diagnostics.bottlenecks || {};
+  const bottleneckGapCounts = diagnostics.bottleneck_gap_counts || {};
   const infinitePaybacks = (diagnostics.payback || [])
     .filter(row => row.payback_seconds && row.payback_seconds.exact_value === 'Infinity')
     .slice(0, 10);
@@ -272,7 +272,9 @@ function renderDiagnostics(report) {
     diagnosticBlock('Never purchased', invalid.never_purchased || []),
     diagnosticBlock('Never unlocked', invalid.never_unlocked || []),
     diagnosticBlock('Overpowered', (diagnostics.overpowered_content || []).map(row => row.item_id)),
-    diagnosticBlock('Bottlenecks', Object.entries(bottlenecks).map(([profile, gaps]) => `${profile}: ${gaps.length} gaps`)),
+    diagnosticHtmlBlock('Bottlenecks', Object.entries(bottleneckGapCounts).map(([profile, count]) =>
+      `${escapeHtml(profile)}: ${numericTooltip(count)} gaps`
+    )),
     diagnosticBlock('Infinite payback', infinitePaybacks.map(row => `${row.profile_id} ${row.kind}:${row.item_id}`)),
   ].join('');
 }
@@ -280,6 +282,13 @@ function renderDiagnostics(report) {
 function diagnosticBlock(title, values) {
   const body = values.length
     ? `<ul>${values.map(value => `<li>${escapeHtml(value)}</li>`).join('')}</ul>`
+    : '<p>None</p>';
+  return `<div class="metric"><strong>${escapeHtml(title)}</strong>${body}</div>`;
+}
+
+function diagnosticHtmlBlock(title, safeRows) {
+  const body = safeRows.length
+    ? `<ul>${safeRows.map(row => `<li>${row}</li>`).join('')}</ul>`
     : '<p>None</p>';
   return `<div class="metric"><strong>${escapeHtml(title)}</strong>${body}</div>`;
 }
@@ -294,21 +303,28 @@ function renderEvidence(report) {
     target.innerHTML = '<div class="empty">No trace evidence available.</div>';
     return;
   }
+  const traceRows = traces.map(trace => [
+    escapeHtml(trace.profile_id || ''),
+    numericTooltip(trace.time, 's'),
+    `${escapeHtml(trace.kind || '')}:${escapeHtml(trace.item_id || '')}`,
+    `<code>${escapeHtml(trace.formula_trace || '')}</code>`,
+  ].join(' '));
+  const referenceRows = refs.map(ref => [
+    escapeHtml(ref.profile_id || ''),
+    `${escapeHtml(ref.kind || '')}:${escapeHtml(ref.item_id || '')}`,
+    `<code>${escapeHtml(ref.source_ref || '')}</code>`,
+  ].join(' '));
   target.innerHTML = [
-    evidenceDetails('Formula traces', traces.map(trace =>
-      `${trace.profile_id || ''} ${numericText(trace.time)} ${trace.kind || ''}:${trace.item_id || ''} ${trace.formula_trace || ''}`
-    )),
-    evidenceDetails('Source references', refs.map(ref =>
-      `${ref.profile_id || ''} ${ref.kind || ''}:${ref.item_id || ''} ${ref.source_ref || ''}`
-    )),
+    evidenceHtmlDetails('Formula traces', traceRows),
+    evidenceHtmlDetails('Source references', referenceRows),
   ].join('');
 }
 
-function evidenceDetails(title, rows) {
-  if (!rows.length) return '';
-  return `<details open><summary>${escapeHtml(title)}</summary><ul>${rows
+function evidenceHtmlDetails(title, safeRows) {
+  if (!safeRows.length) return '';
+  return `<details open><summary>${escapeHtml(title)}</summary><ul>${safeRows
     .slice(0, 100)
-    .map(row => `<li><code>${escapeHtml(row)}</code></li>`)
+    .map(row => `<li>${row}</li>`)
     .join('')}</ul></details>`;
 }
 

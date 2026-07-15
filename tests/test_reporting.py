@@ -109,14 +109,25 @@ def test_generate_static_report_writes_chart_rendering_asset(tmp_path):
 
 
 @pytest.mark.skipif(NODE is None, reason="Node.js is required to execute the report renderer")
-def test_report_overview_renders_accessible_escaped_kpis():
+def test_report_renderers_escape_content_and_expose_exact_numeric_values():
     point = {
         "exact_value": '\"><script>alert("exact")</script>',
         "display_value": "<display>",
         "chart_value": None,
     }
+    metric = {
+        "exact_value": "123.456789",
+        "display_value": "123.457",
+        "chart_value": 123.456789,
+    }
+    time_point = {
+        "exact_value": "0.0000123456789",
+        "display_value": "1.23457e-5",
+        "chart_value": 0.0000123456789,
+    }
+    gap_count = {"exact_value": "2", "display_value": "2", "chart_value": 2.0}
     report = {
-        "scenario": {"id": "<scenario>"},
+        "scenario": {"id": "<scenario>", "profiles": ["<profile>"]},
         "overview": {
             "duration_seconds": point,
             "profiles": ["<profile>"],
@@ -139,6 +150,63 @@ def test_report_overview_renders_accessible_escaped_kpis():
             "warning_category_count": point,
             "final_resources": {"<profile>": {"<resource>": point}},
         },
+        "series": {
+            "resources": [
+                {
+                    "time_seconds": time_point["chart_value"],
+                    "time": time_point,
+                    "profile_id": "<profile>",
+                    "resource_id": "<resource>",
+                    **metric,
+                }
+            ],
+            "total_cps": [
+                {
+                    "time_seconds": time_point["chart_value"],
+                    "time": time_point,
+                    "profile_id": "<profile>",
+                    **metric,
+                }
+            ],
+            "events": [
+                {
+                    "time_seconds": time_point["chart_value"],
+                    "time": time_point,
+                    "profile_id": "<profile>",
+                    "kind": "<event-kind>",
+                    "item_id": "</p><script>alert('event')</script>",
+                }
+            ],
+        },
+        "diagnostics": {
+            "invalid_content": {"never_purchased": ["<never>"], "never_unlocked": []},
+            "overpowered_content": [{"item_id": "<overpowered>"}],
+            "bottlenecks": {"<gap-profile>": [{}, {}]},
+            "bottleneck_gap_counts": {"<gap-profile>": gap_count},
+            "payback": [
+                {
+                    "profile_id": "<pay-profile>",
+                    "kind": "<pay-kind>",
+                    "item_id": "<pay-item>",
+                    "payback_seconds": metric,
+                    "cost": metric,
+                    "delta_cps": metric,
+                    "source_ref": "</p><script>alert('source')</script>",
+                }
+            ],
+        },
+        "evidence": {
+            "traces": [
+                {
+                    "profile_id": "<trace-profile>",
+                    "time": time_point,
+                    "kind": "<trace-kind>",
+                    "item_id": "<trace-item>",
+                    "formula_trace": "</li><script>alert('trace')</script>",
+                }
+            ],
+            "source_refs": [],
+        },
     }
     script_path = Path("src/igess/reporting/assets/report.js").resolve()
     harness = r"""
@@ -149,16 +217,63 @@ const context = { console };
 vm.createContext(context);
 vm.runInContext(source, context);
 const scenario = { textContent: '' };
-const container = { innerHTML: '' };
+const targets = {
+  overview: { innerHTML: '' },
+  diagnostics: { innerHTML: '' },
+  evidence: { innerHTML: '' },
+};
+const chartElements = Object.fromEntries(
+  ['resource-chart', 'cps-chart', 'event-chart', 'payback-chart'].map(id => [id, { id, innerHTML: '' }])
+);
+const options = {};
 context.document = {
   querySelector(selector) {
     if (selector === '[data-scenario]') return scenario;
-    if (selector === '[data-overview-kpis]') return container;
+    if (selector === '[data-overview-kpis]') return targets.overview;
+    if (selector === '[data-diagnostics]') return targets.diagnostics;
+    if (selector === '[data-evidence]') return targets.evidence;
     return null;
   },
+  getElementById(id) {
+    return chartElements[id] || null;
+  },
 };
-context.renderOverview(JSON.parse(process.argv[2]));
-process.stdout.write(JSON.stringify({ scenario: scenario.textContent, html: container.innerHTML }));
+context.echarts = {
+  init(element) {
+    return {
+      setOption(option) { options[element.id] = option; },
+      dispose() {},
+      resize() {},
+    };
+  },
+};
+const report = JSON.parse(process.argv[2]);
+context.renderOverview(report);
+context.renderDiagnostics(report);
+context.renderEvidence(report);
+context.renderResourceChart(report, '<resource>');
+context.renderCpsChart(report);
+context.renderEventChart(report);
+context.renderPaybackChart(report);
+function lineTooltip(id) {
+  const option = options[id];
+  const datum = option.series[0].data[0];
+  return option.tooltip.formatter([{ seriesName: '<series>', data: datum }]);
+}
+const eventOption = options['event-chart'];
+const eventDatum = eventOption.series[0].data[0];
+const paybackOption = options['payback-chart'];
+const paybackDatum = paybackOption.series[0].data[0];
+process.stdout.write(JSON.stringify({
+  scenario: scenario.textContent,
+  overview: targets.overview.innerHTML,
+  diagnostics: targets.diagnostics.innerHTML,
+  evidence: targets.evidence.innerHTML,
+  resourceTooltip: lineTooltip('resource-chart'),
+  cpsTooltip: lineTooltip('cps-chart'),
+  eventTooltip: eventOption.tooltip.formatter({ data: eventDatum }),
+  paybackTooltip: paybackOption.tooltip.formatter({ data: paybackDatum }),
+}));
 """
 
     completed = subprocess.run(
@@ -170,7 +285,7 @@ process.stdout.write(JSON.stringify({ scenario: scenario.textContent, html: cont
 
     assert completed.returncode == 0, completed.stderr
     rendered = json.loads(completed.stdout)
-    html = rendered["html"]
+    html = rendered["overview"]
     assert rendered["scenario"] == "<scenario>"
     assert html.count('role="listitem"') == 9
     assert '<details class="exact-values">' in html
@@ -178,7 +293,24 @@ process.stdout.write(JSON.stringify({ scenario: scenario.textContent, html: cont
     assert "&lt;profile&gt;" in html
     assert "&lt;resource&gt;" in html
     assert "&lt;display&gt;" in html
-    assert "<script>" not in html
+    assert "&lt;gap-profile&gt;" in rendered["diagnostics"]
+    assert 'title="Exact value: 2"' in rendered["diagnostics"]
+    assert "2</span> gaps" in rendered["diagnostics"]
+    assert "&lt;trace-profile&gt;" in rendered["evidence"]
+    assert "1.23457e-5s" in rendered["evidence"]
+    assert 'title="Exact value: 0.0000123456789"' in rendered["evidence"]
+
+    assert "&lt;series&gt;" in rendered["resourceTooltip"]
+    assert 'title="Exact value: 123.456789"' in rendered["resourceTooltip"]
+    assert 'title="Exact value: 0.0000123456789"' in rendered["resourceTooltip"]
+    assert 'title="Exact value: 123.456789"' in rendered["cpsTooltip"]
+    assert "&lt;event-kind&gt;" in rendered["eventTooltip"]
+    assert 'title="Exact value: 0.0000123456789"' in rendered["eventTooltip"]
+    assert "&lt;pay-profile&gt;" in rendered["paybackTooltip"]
+    assert 'title="Exact value: 123.456789"' in rendered["paybackTooltip"]
+
+    for value in rendered.values():
+        assert "<script>" not in value
 
 
 def test_generate_static_report_embeds_parseable_json_payload(tmp_path):

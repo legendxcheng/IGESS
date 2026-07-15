@@ -166,6 +166,21 @@ def test_report_view_model_preserves_profile_order_and_resource_controls(tmp_pat
     assert list(payload["overview"]["final_resources"]) == ["beta", "alpha"]
 
 
+def test_report_view_model_wraps_sorted_bottleneck_gap_counts(tmp_path):
+    data = _synthetic_report_data(tmp_path)
+    data.analysis["bottleneck_report"] = {
+        "z<profile>": [{"duration": 1}, {"duration": 2}],
+        "a&profile": [{"duration": 3}],
+    }
+
+    diagnostics = build_report_view_model(data)["diagnostics"]
+
+    assert list(diagnostics["bottleneck_gap_counts"]) == ["a&profile", "z<profile>"]
+    _assert_numeric_point(diagnostics["bottleneck_gap_counts"]["a&profile"], "1")
+    _assert_numeric_point(diagnostics["bottleneck_gap_counts"]["z<profile>"], "2")
+    assert diagnostics["bottlenecks"] == data.analysis["bottleneck_report"]
+
+
 def test_chart_value_preserves_display_for_unplottable_values():
     assert chart_value("Infinity") is None
     assert chart_value("1e309") is None
