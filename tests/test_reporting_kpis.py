@@ -230,6 +230,81 @@ def test_worst_finite_payback_uses_decimal_order_and_tuple_tie_break(tmp_path):
     }
 
 
+@pytest.mark.parametrize(
+    "invalid_time",
+    [None, "invalid", "NaN", "Infinity", "-Infinity", "-1"],
+)
+def test_timeline_ignores_values_outside_the_time_domain(tmp_path, invalid_time):
+    data = replace(
+        _report_data(tmp_path),
+        manifest={"scenario_id": "fixture", "profiles": ["alpha", "beta"]},
+        timeline=[
+            {"profile_id": "alpha", "time_seconds": 2, "resources": {"gold": "2"}},
+            {
+                "profile_id": "alpha",
+                "time_seconds": invalid_time,
+                "resources": {"gold": "999"},
+            },
+            {
+                "profile_id": "beta",
+                "time_seconds": invalid_time,
+                "resources": {"gold": "999"},
+            },
+        ],
+    )
+
+    overview = build_overview(data)
+
+    assert overview["duration_seconds"] == "2"
+    assert overview["final_resources"] == {"alpha": {"gold": "2"}}
+
+
+@pytest.mark.parametrize(
+    "invalid_time",
+    [None, "invalid", "NaN", "Infinity", "-Infinity", "-1"],
+)
+def test_first_key_unlock_ignores_values_outside_the_time_domain(
+    tmp_path, invalid_time
+):
+    data = replace(
+        _report_data(tmp_path),
+        events=[
+            {
+                "profile_id": "alpha",
+                "time_seconds": invalid_time,
+                "kind": "unlock_activity",
+                "item_id": "invalid_time",
+            }
+        ],
+    )
+
+    assert build_overview(data)["first_key_unlock"] is None
+
+
+@pytest.mark.parametrize(
+    "invalid_payback",
+    [None, "invalid", "NaN", "-Infinity", "-1"],
+)
+def test_payback_ignores_values_outside_its_numeric_domain(tmp_path, invalid_payback):
+    data = replace(
+        _report_data(tmp_path),
+        analysis={},
+        payback_rows=[
+            {
+                "profile_id": "alpha",
+                "kind": "upgrade",
+                "item_id": "invalid_payback",
+                "payback_seconds": invalid_payback,
+            }
+        ],
+    )
+
+    overview = build_overview(data)
+
+    assert overview["worst_payback"] is None
+    assert overview["warning_category_count"] == 0
+
+
 def test_empty_report_inputs_return_stable_defaults(tmp_path):
     data = ReportData(
         run_dir=tmp_path,
@@ -245,7 +320,7 @@ def test_empty_report_inputs_return_stable_defaults(tmp_path):
 
     assert overview["duration_seconds"] == "0"
     assert overview["profiles"] == ["beta", "alpha"]
-    assert overview["final_resources"] == {"beta": {}, "alpha": {}}
+    assert overview["final_resources"] == {}
     assert overview["purchase_count"] == 0
     assert overview["first_key_unlock"] is None
     assert overview["prestige_reset_count"] == 0

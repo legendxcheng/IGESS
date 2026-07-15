@@ -58,7 +58,10 @@ def _final_resources(
 
     result: dict[str, dict[str, str]] = {}
     for profile_id in profiles:
-        row = latest.get(profile_id, (Decimal(0), {}))[1]
+        current = latest.get(profile_id)
+        if current is None:
+            continue
+        row = current[1]
         resources = _mapping(row.get("resources"))
         result[profile_id] = {str(key): str(value) for key, value in resources.items()}
     return result
@@ -68,7 +71,7 @@ def _first_key_unlock(events: list[dict[str, Any]]) -> dict[str, str] | None:
     candidates: list[tuple[Decimal, tuple[str, str, str], dict[str, Any]]] = []
     for event in events:
         kind = str(event.get("kind", ""))
-        time_seconds = _decimal(event.get("time_seconds"))
+        time_seconds = _time_decimal(event.get("time_seconds"))
         if kind not in _KEY_UNLOCK_KINDS or time_seconds is None or time_seconds <= 0:
             continue
         identity = (
@@ -92,7 +95,7 @@ def _first_key_unlock(events: list[dict[str, Any]]) -> dict[str, str] | None:
 def _worst_payback(payback_rows: list[dict[str, str]]) -> dict[str, str] | None:
     candidates: list[tuple[Decimal, tuple[str, str, str], dict[str, str]]] = []
     for row in payback_rows:
-        payback = _decimal(row.get("payback_seconds"))
+        payback = _payback_decimal(row.get("payback_seconds"))
         if payback is None:
             continue
         identity = (
@@ -120,7 +123,7 @@ def _warning_category_count(data: ReportData) -> int:
         bool(_sequence(invalid_content.get("never_unlocked"))),
         bool(_sequence(data.analysis.get("overpowered_content_report"))),
         any(
-            _decimal(row.get("payback_seconds")) == Decimal("Infinity")
+            _payback_decimal(row.get("payback_seconds")) == Decimal("Infinity")
             for row in data.payback_rows
         ),
         any(bool(_sequence(gaps)) for gaps in bottlenecks.values()),
@@ -133,13 +136,31 @@ def _rows_with_decimal_time(
 ) -> list[tuple[Decimal, dict[str, Any]]]:
     result: list[tuple[Decimal, dict[str, Any]]] = []
     for row in rows:
-        time_seconds = _decimal(row.get("time_seconds"))
+        time_seconds = _time_decimal(row.get("time_seconds"))
         if time_seconds is not None:
             result.append((time_seconds, row))
     return result
 
 
-def _decimal(value: Any) -> Decimal | None:
+def _time_decimal(value: Any) -> Decimal | None:
+    result = _parse_decimal(value)
+    if result is None or not result.is_finite() or result < 0:
+        return None
+    return result
+
+
+def _payback_decimal(value: Any) -> Decimal | None:
+    result = _parse_decimal(value)
+    if result is None:
+        return None
+    if result == Decimal("Infinity"):
+        return result
+    if not result.is_finite() or result < 0:
+        return None
+    return result
+
+
+def _parse_decimal(value: Any) -> Decimal | None:
     try:
         result = Decimal(str(value))
     except (InvalidOperation, ValueError):
