@@ -28,6 +28,10 @@ _ENVELOPE_KEYS = _REQUIRED_ENVELOPE_KEYS + _OPTIONAL_ENVELOPE_KEYS
 _DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 _PATH_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*$")
 _MAX_DIAGNOSTIC_PATH = 512
+_MAX_SOURCE_BYTES = 1_048_576
+_MAX_NESTING_DEPTH = 64
+_MAX_UNIQUE_CONTAINERS = 4_096
+_MAX_TRAVERSAL_VISITS = 16_384
 
 # PyYAML 6 does not recognize unquoted ``1e3`` as a float.  The protocol does,
 # because accepting it as a string would make quoting change numeric semantics.
@@ -48,6 +52,10 @@ class _DuplicateKey(ValueError):
     pass
 
 
+class _UnsupportedYamlFeature(ValueError):
+    pass
+
+
 class _ExactChangeLoader(yaml.SafeLoader):
     """SafeLoader variant that rejects floats and duplicate mapping keys."""
 
@@ -59,6 +67,11 @@ class _ExactChangeLoader(yaml.SafeLoader):
                 f"expected a mapping node, but found {node.id}",
                 node.start_mark,
             )
+        if any(
+            key_node.tag == "tag:yaml.org,2002:merge"
+            for key_node, _ in node.value
+        ):
+            raise _UnsupportedYamlFeature("merge_key")
         self.flatten_mapping(node)
         mapping: dict[Any, Any] = {}
         for key_node, value_node in node.value:
@@ -116,6 +129,143 @@ def _deep_thaw(value: Any) -> Any:
     return value
 
 
+def _validate_direct_header(
+    version: Any,
+    operation: Any,
+    entity: Any,
+    entity_id: Any,
+    digest: Any,
+) -> EntitySchema:
+    if type(version) is not int or version != 1:
+        _invalid_field(
+            entity=entity,
+            entity_id=entity_id,
+            field="version",
+            value=version,
+            allowed=(1,),
+            message="Change version must be the native integer 1",
+        )
+    if operation != "upsert":
+        _invalid_field(
+            entity=entity,
+            entity_id=entity_id,
+            field="operation",
+            value=operation,
+            allowed=("upsert",),
+            message="Only the upsert change operation is supported",
+        )
+    if not isinstance(entity, str):
+        _invalid_field(
+            entity=entity,
+            entity_id=entity_id,
+            field="entity",
+            value=entity,
+            allowed=tuple(ENTITY_SCHEMAS),
+            message="Change entity must be a supported entity name",
+        )
+    schema = get_entity_schema(entity)
+    validate_entity_fields(entity, entity_id, {}, require_complete=False)
+    if digest is not None and (
+        not isinstance(digest, str) or _DIGEST_RE.fullmatch(digest) is None
+    ):
+        _invalid_field(
+            entity=entity,
+            entity_id=entity_id,
+            field="if_model_digest",
+            value=digest,
+            allowed=("null", "sha256:<64 lowercase hex>"),
+            message="if_model_digest must be null or a lowercase SHA-256 digest",
+        )
+    return schema
+
+
+def _canonical_json_tree(value: Any, root_path: str) -> Any:
+    memo: dict[int, Any] = {}
+
+    def convert(node: Any, path: str) -> Any:
+        if isinstance(node, Mapping):
+            marker = id(node)
+            if marker in memo:
+                return memo[marker]
+            result: dict[str, Any] = {}
+            memo[marker] = result
+            for key, item in node.items():
+                if not isinstance(key, str):
+                    _unsupported_value(
+                        path,
+                        key,
+                        "Change mappings require string keys",
+                    )
+                result[key] = convert(item, _mapping_path(path, key))
+            return result
+        if isinstance(node, (list, tuple)):
+            marker = id(node)
+            if marker in memo:
+                return memo[marker]
+            result_list: list[Any] = []
+            memo[marker] = result_list
+            for index, item in enumerate(node):
+                result_list.append(
+                    convert(item, _bounded_path(f"{path}[{index}]"))
+                )
+            return result_list
+        if node is None or type(node) in {bool, str}:
+            return node
+        if type(node) is int:
+            try:
+                json.dumps(node, allow_nan=False)
+            except (TypeError, ValueError, OverflowError):
+                _unsupported_value(path, node, "Integer is too large for JSON")
+            return node
+        _unsupported_value(
+            path,
+            node,
+            "Change values must use strict JSON scalar types",
+        )
+
+    return convert(value, root_path)
+
+
+def _unsupported_value(path: str, value: Any, message: str) -> NoReturn:
+    raise AuthoringError(
+        "invalid_change",
+        message,
+        {
+            "reason": "unsupported_value",
+            "path": _bounded_path(path),
+            "value": _json_safe_diagnostic(value),
+            "value_type": type(value).__name__,
+        },
+    )
+
+
+def _verify_strict_json_payload(
+    version: int,
+    operation: str,
+    entity: str,
+    entity_id: str,
+    fields: Mapping[str, Any],
+    digest: str | None,
+) -> None:
+    payload = {
+        "version": version,
+        "operation": operation,
+        "entity": entity,
+        "id": entity_id,
+        "fields": _deep_thaw(fields),
+    }
+    if digest is not None:
+        payload["if_model_digest"] = digest
+    try:
+        json.dumps(payload, allow_nan=False)
+    except (TypeError, ValueError, OverflowError, RecursionError):
+        _unsupported_value(
+            "$.fields",
+            fields,
+            "ModelChange payload is not strict JSON",
+        )
+
+
 @dataclass(frozen=True, slots=True)
 class ModelChange:
     """A validated complete entity candidate produced from one upsert patch."""
@@ -130,8 +280,38 @@ class ModelChange:
     def __post_init__(self) -> None:
         _ensure_acyclic_tree(self.fields, "$.fields")
         if not isinstance(self.fields, Mapping):
-            raise TypeError("ModelChange fields must be a mapping")
-        object.__setattr__(self, "fields", _deep_freeze(self.fields))
+            _invalid_field(
+                entity=self.entity,
+                entity_id=self.id,
+                field="fields",
+                value=self.fields,
+                allowed=("mapping",),
+                message="ModelChange fields must be a mapping",
+            )
+
+        schema = _validate_direct_header(
+            self.version,
+            self.operation,
+            self.entity,
+            self.id,
+            self.if_model_digest,
+        )
+        canonical = _canonical_json_tree(self.fields, "$.fields")
+        normalized = validate_entity_fields(
+            schema.entity,
+            self.id,
+            canonical,
+        )
+        frozen = _deep_freeze(normalized)
+        object.__setattr__(self, "fields", frozen)
+        _verify_strict_json_payload(
+            self.version,
+            self.operation,
+            self.entity,
+            self.id,
+            frozen,
+            self.if_model_digest,
+        )
 
     def to_payload(self) -> dict[str, Any]:
         """Return a strict-JSON-serializable defensive audit payload."""
@@ -373,21 +553,40 @@ def _contains_null(value: Any) -> bool:
 
 
 def _ensure_acyclic_tree(value: Any, root_path: str) -> None:
-    """Reject cycles while allowing aliases shared by independent branches."""
+    """Reject cycles and boundedly traverse aliases shared across branches."""
 
     active: dict[int, str] = {}
-    stack: list[tuple[bool, Any, str]] = [(False, value, root_path)]
+    seen_containers: set[int] = set()
+    visits = 0
+    stack: list[tuple[bool, Any, str, int]] = [
+        (False, value, root_path, 0)
+    ]
     while stack:
-        exiting, node, path = stack.pop()
+        exiting, node, path, depth = stack.pop()
         is_mapping = isinstance(node, Mapping)
         is_sequence = isinstance(node, (list, tuple))
-        if not is_mapping and not is_sequence:
-            continue
-
         marker = id(node)
         if exiting:
             active.pop(marker, None)
             continue
+
+        visits += 1
+        if visits > _MAX_TRAVERSAL_VISITS:
+            _budget_error(
+                "traversal_visits",
+                _MAX_TRAVERSAL_VISITS,
+                visits,
+                path,
+            )
+        if not is_mapping and not is_sequence:
+            continue
+        if depth > _MAX_NESTING_DEPTH:
+            _budget_error(
+                "nesting_depth",
+                _MAX_NESTING_DEPTH,
+                depth,
+                path,
+            )
 
         cycle_to = active.get(marker)
         if cycle_to is not None:
@@ -401,8 +600,26 @@ def _ensure_acyclic_tree(value: Any, root_path: str) -> None:
                 },
             )
 
+        if marker not in seen_containers:
+            seen_containers.add(marker)
+            if len(seen_containers) > _MAX_UNIQUE_CONTAINERS:
+                _budget_error(
+                    "unique_containers",
+                    _MAX_UNIQUE_CONTAINERS,
+                    len(seen_containers),
+                    path,
+                )
+
         active[marker] = path
-        stack.append((True, node, path))
+        stack.append((True, node, path, depth))
+        child_count = len(node)
+        if visits + child_count > _MAX_TRAVERSAL_VISITS:
+            _budget_error(
+                "traversal_visits",
+                _MAX_TRAVERSAL_VISITS,
+                visits + child_count,
+                path,
+            )
         if is_mapping:
             children = [
                 (item, _mapping_path(path, key))
@@ -414,7 +631,7 @@ def _ensure_acyclic_tree(value: Any, root_path: str) -> None:
                 for index, item in enumerate(node)
             ]
         for child, child_path in reversed(children):
-            stack.append((False, child, child_path))
+            stack.append((False, child, child_path, depth + 1))
 
 
 def _mapping_path(parent: str, key: Any) -> str:
@@ -435,12 +652,52 @@ def _bounded_path(path: str) -> str:
     return path[: _MAX_DIAGNOSTIC_PATH - 3] + "..."
 
 
+def _budget_error(
+    budget: str,
+    limit: int,
+    actual: int,
+    path: str,
+) -> NoReturn:
+    raise AuthoringError(
+        "invalid_change",
+        "Change document exceeds a structural safety budget",
+        {
+            "reason": "budget_exceeded",
+            "budget": budget,
+            "limit": limit,
+            "actual": actual,
+            "path": _bounded_path(path),
+        },
+    )
+
+
 def _parse_document(text: str, format_name: str) -> Any:
     if format_name not in {"json", "yaml"}:
         _parse_error(
             "Unsupported change document format",
             reason="unsupported_format",
             format_name=format_name,
+        )
+    if not isinstance(text, str):
+        _parse_error(
+            "Change document text must be a string",
+            reason="invalid_syntax",
+            format_name=format_name,
+        )
+    try:
+        source_bytes = len(text.encode("utf-8"))
+    except UnicodeError:
+        _parse_error(
+            "Change document has invalid Unicode text",
+            reason="invalid_syntax",
+            format_name=format_name,
+        )
+    if source_bytes > _MAX_SOURCE_BYTES:
+        _budget_error(
+            "source_bytes",
+            _MAX_SOURCE_BYTES,
+            source_bytes,
+            "$",
         )
     try:
         if format_name == "json":
@@ -463,6 +720,23 @@ def _parse_document(text: str, format_name: str) -> Any:
             "Duplicate mapping keys are not allowed in changes",
             reason="duplicate_key",
             format_name=format_name,
+        )
+    except _UnsupportedYamlFeature:
+        raise AuthoringError(
+            "invalid_change",
+            "YAML merge keys are not supported in changes",
+            {
+                "format": format_name,
+                "reason": "unsupported_yaml_feature",
+                "feature": "merge_key",
+            },
+        )
+    except RecursionError:
+        _budget_error(
+            "parser_depth",
+            _MAX_NESTING_DEPTH,
+            _MAX_NESTING_DEPTH + 1,
+            "$",
         )
     except (json.JSONDecodeError, yaml.YAMLError, UnicodeError, TypeError, ValueError):
         _parse_error(

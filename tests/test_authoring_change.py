@@ -311,6 +311,54 @@ fields:
     }
 
 
+def test_yaml_alias_fanout_is_rejected_by_a_deterministic_visit_budget() -> None:
+    aliases = ["a0: &a0 [0]"]
+    for level in range(1, 18):
+        aliases.append(f"a{level}: &a{level} [*a{level - 1}, *a{level - 1}]")
+    text = "\n".join(aliases) + "\n"
+
+    error = _assert_invalid(text, "yaml")
+
+    assert error.details["reason"] == "budget_exceeded"
+    assert error.details["budget"] == "traversal_visits"
+    assert error.details["actual"] > error.details["limit"]
+    json.dumps(dict(error.details), allow_nan=False)
+
+
+def test_yaml_merge_keys_are_rejected_before_alias_expansion() -> None:
+    text = """\
+version: 1
+operation: upsert
+entity: resource
+id: gold
+defaults: &defaults
+  name: Gold
+  dimension: currency
+fields:
+  <<: *defaults
+"""
+    error = _assert_invalid(text, "yaml")
+    assert error.details["reason"] == "unsupported_yaml_feature"
+    assert error.details["feature"] == "merge_key"
+
+
+def test_deep_yaml_is_a_typed_budget_error_not_a_recursion_error() -> None:
+    text = "value: " + ("[" * 2000) + "0" + ("]" * 2000) + "\n"
+
+    error = _assert_invalid(text, "yaml")
+
+    assert error.details["reason"] == "budget_exceeded"
+    assert error.details["budget"] in {"parser_depth", "nesting_depth"}
+    json.dumps(dict(error.details), allow_nan=False)
+
+
+def test_change_source_text_has_an_explicit_byte_budget() -> None:
+    error = _assert_invalid(" " * 1_100_000, "yaml")
+    assert error.details["reason"] == "budget_exceeded"
+    assert error.details["budget"] == "source_bytes"
+    assert error.details["actual"] > error.details["limit"]
+
+
 @pytest.mark.parametrize(
     ("text", "format_name", "reason"),
     [
@@ -621,15 +669,70 @@ def test_mappingproxy_backed_cycle_is_rejected_before_copying() -> None:
 def test_shared_acyclic_mapping_is_not_mistaken_for_a_cycle() -> None:
     shared: UserDict[str, object] = UserDict({"active": "1"})
     fields: UserDict[str, object] = UserDict(
-        {"source_efficiency": shared, "activity_weights": shared}
+        {
+            "source_efficiency": shared,
+            "behavior_policy": "cheap",
+            "session_pattern": "authoring",
+            "prestige_policy": "conservative",
+            "activity_weights": shared,
+        }
     )
 
     change = ModelChange(1, "upsert", "player_profile", "default", fields)
 
     assert change.to_payload()["fields"] == {
         "source_efficiency": {"active": "1"},
+        "behavior_policy": "cheap",
+        "session_pattern": "authoring",
+        "prestige_policy": "conservative",
         "activity_weights": {"active": "1"},
     }
+
+
+@pytest.mark.parametrize(
+    ("fields", "expected_path"),
+    [
+        ({"name": bytearray(b"Gold"), "dimension": "currency"}, "$.fields.name"),
+        ({"value": float("nan")}, "$.fields.value"),
+        ({"value": float("inf")}, "$.fields.value"),
+        ({1: "not-a-string-key", "value": "1"}, "$.fields"),
+    ],
+)
+def test_direct_model_change_rejects_non_json_values_with_safe_diagnostics(
+    fields: Mapping[object, object], expected_path: str
+) -> None:
+    entity = "resource" if "name" in fields else "constant"
+    with pytest.raises(AuthoringError) as caught:
+        ModelChange(1, "upsert", entity, "x", fields)  # type: ignore[arg-type]
+    error = caught.value
+    assert error.code == "invalid_change"
+    assert error.details["reason"] == "unsupported_value"
+    assert error.details["path"] == expected_path
+    json.dumps(dict(error.details), allow_nan=False)
+
+
+def test_direct_valid_nested_construction_is_immutable_detached_and_strict_json() -> None:
+    shared = {"active": 1}
+    fields = UserDict(
+        {
+            "source_efficiency": shared,
+            "behavior_policy": "cheap",
+            "session_pattern": "authoring",
+            "prestige_policy": "conservative",
+            "activity_weights": shared,
+        }
+    )
+
+    change = ModelChange(1, "upsert", "player_profile", "default", fields)
+    shared["active"] = bytearray(b"mutated")
+    fields["behavior_policy"] = bytearray(b"mutated")
+
+    assert change.fields["source_efficiency"] == {"active": "1"}
+    assert change.fields["activity_weights"] == {"active": "1"}
+    with pytest.raises(TypeError):
+        change.fields["source_efficiency"]["active"] = "2"  # type: ignore[index]
+    payload = change.to_payload()
+    assert json.loads(json.dumps(payload, allow_nan=False)) == payload
 
 
 def test_create_with_empty_current_argument_is_an_update_but_still_requires_complete_result() -> None:
