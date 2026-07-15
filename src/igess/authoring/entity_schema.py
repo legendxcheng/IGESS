@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from decimal import Decimal, InvalidOperation
+import math
 import re
 from types import MappingProxyType
-from typing import Any, Literal, Mapping
+from typing import Any, Literal, Mapping, NoReturn
 
 from ..formula import FormulaCompileError, FormulaEngine
 from ..numbers import SimNumber
@@ -506,6 +508,20 @@ def _parse_exact_decimal(value: Any) -> SimNumber | None:
         return None
 
 
+def _exact_decimal_value(value: Any) -> Decimal | None:
+    if type(value) is int:
+        text = str(value)
+    elif isinstance(value, str) and _DECIMAL_RE.fullmatch(value):
+        text = value
+    else:
+        return None
+    try:
+        parsed = Decimal(text)
+    except InvalidOperation:
+        return None
+    return parsed if parsed.is_finite() else None
+
+
 def _validate_decimal_map(value: Any, *, id_keys: bool) -> dict[str, str] | None:
     if type(value) is not dict:
         return None
@@ -522,15 +538,22 @@ def _validate_decimal_map(value: Any, *, id_keys: bool) -> dict[str, str] | None
 def _validate_rng_rarities(value: Any) -> dict[str, str] | None:
     if type(value) is not dict or not value:
         return None
-    parsed_rows: list[tuple[SimNumber, str, str]] = []
-    seen: set[SimNumber] = set()
+    parsed_rows: list[tuple[Decimal, str, str]] = []
+    seen: set[Decimal] = set()
     for rarity_id, denominator in value.items():
-        parsed = _parse_exact_decimal(denominator)
-        if not _is_id(rarity_id) or parsed is None or parsed <= SimNumber.zero() or parsed in seen:
+        domain_value = _parse_exact_decimal(denominator)
+        exact_value = _exact_decimal_value(denominator)
+        if (
+            not _is_id(rarity_id)
+            or domain_value is None
+            or domain_value <= SimNumber.zero()
+            or exact_value is None
+            or exact_value in seen
+        ):
             return None
-        seen.add(parsed)
+        seen.add(exact_value)
         normalized = str(denominator) if type(denominator) is int else denominator
-        parsed_rows.append((parsed, rarity_id, normalized))
+        parsed_rows.append((exact_value, rarity_id, normalized))
     parsed_rows.sort(key=lambda row: row[0])
     return {rarity_id: denominator for _, rarity_id, denominator in parsed_rows}
 
@@ -595,18 +618,73 @@ def _invalid(
     value: Any,
     allowed: tuple[Any, ...],
     message: str,
-) -> None:
+) -> NoReturn:
     raise AuthoringError(
         "invalid_change",
         message,
         {
-            "entity": entity,
-            "id": entity_id,
-            "field": field,
-            "value": value,
-            "allowed": allowed,
+            "entity": _json_safe_diagnostic(entity),
+            "id": _json_safe_diagnostic(entity_id),
+            "field": _json_safe_diagnostic(field),
+            "value": _json_safe_diagnostic(value),
+            "allowed": [_json_safe_diagnostic(item) for item in allowed],
         },
     )
+
+
+def _json_safe_diagnostic(
+    value: Any,
+    *,
+    _seen: set[int] | None = None,
+    _depth: int = 0,
+) -> Any:
+    """Return a bounded, strict-JSON-safe representation of diagnostic input."""
+
+    if value is None or type(value) in {bool, int, str}:
+        return value
+    if type(value) is float:
+        if math.isnan(value):
+            return "NaN"
+        if math.isinf(value):
+            return "Infinity" if value > 0 else "-Infinity"
+        return value
+    if isinstance(value, Decimal):
+        return str(value)
+    if _depth >= 16:
+        return f"<{type(value).__name__}:max-depth>"
+
+    if type(value) in {dict, list}:
+        seen = _seen if _seen is not None else set()
+        marker = id(value)
+        if marker in seen:
+            return f"<{type(value).__name__}:cycle>"
+        seen.add(marker)
+        try:
+            if type(value) is list:
+                items = [
+                    _json_safe_diagnostic(item, _seen=seen, _depth=_depth + 1)
+                    for item in value[:100]
+                ]
+                if len(value) > 100:
+                    items.append(f"<{len(value) - 100} more items>")
+                return items
+
+            result: dict[str, Any] = {}
+            for index, (key, item) in enumerate(value.items()):
+                if index >= 100:
+                    result["<truncated>"] = f"{len(value) - 100} more items"
+                    break
+                safe_key = key if isinstance(key, str) else str(_json_safe_diagnostic(key))
+                result[safe_key] = _json_safe_diagnostic(
+                    item,
+                    _seen=seen,
+                    _depth=_depth + 1,
+                )
+            return result
+        finally:
+            seen.remove(marker)
+
+    return f"<{type(value).__name__}>"
 
 
 __all__ = [

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from collections import UserDict
 from collections.abc import Mapping
+from decimal import Decimal
+import json
 from types import MappingProxyType
 
 import pytest
@@ -14,7 +16,7 @@ from igess.authoring.entity_schema import (
     get_entity_schema,
     validate_entity_fields,
 )
-from igess.authoring.response import AuthoringError
+from igess.authoring.response import AuthoringError, CommandResponse
 
 
 TABLE_FIELDS = {
@@ -440,6 +442,36 @@ def test_rng_rarities_accept_unordered_input_and_normalize_by_exact_denominator(
     assert result["rarities"] == {"common": "1", "rare": "10", "epic": "100"}
 
 
+def test_rng_rarities_preserve_exact_order_for_huge_near_neighbors() -> None:
+    slightly_larger = "1." + ("0" * 69) + "1e1000000"
+    result = validate_entity_fields(
+        "rng_table",
+        "astronomical",
+        {
+            "algorithm": "rarity_score",
+            "rarities": {
+                "slightly_larger": slightly_larger,
+                "base": "1e1000000",
+            },
+        },
+    )
+    assert result["rarities"] == {
+        "base": "1e1000000",
+        "slightly_larger": slightly_larger,
+    }
+
+
+@pytest.mark.parametrize("equivalent", ["1.0e1000000", "10e999999"])
+def test_rng_rarities_reject_exactly_equal_huge_denominators(equivalent: str) -> None:
+    _assert_invalid(
+        "rng_table",
+        "astronomical",
+        {"rarities": {"base": "1e1000000", "equivalent": equivalent}},
+        field="rarities",
+        require_complete=False,
+    )
+
+
 @pytest.mark.parametrize(
     "rarities",
     [
@@ -514,6 +546,53 @@ def test_regression_gate_accepts_zero_values_in_each_supported_map() -> None:
 )
 def test_regression_gate_nested_maps_must_be_native_dict(field: str, value: object) -> None:
     _assert_invalid("regression_gate", "scenario", {field: value}, field=field)
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (float("nan"), "NaN"),
+        (float("inf"), "Infinity"),
+        (float("-inf"), "-Infinity"),
+        (Decimal("1.25"), "1.25"),
+        (
+            {"items": [float("nan"), Decimal("2.5"), {"inner": float("inf")}]},
+            {"items": ["NaN", "2.5", {"inner": "Infinity"}]},
+        ),
+        (MappingProxyType({"value": float("nan")}), "<mappingproxy>"),
+        (object(), "<object>"),
+    ],
+)
+def test_invalid_details_are_strict_json_safe(value: object, expected: object) -> None:
+    error = _assert_invalid(
+        "constant",
+        "c",
+        {"unknown": value},
+        field="unknown",
+        require_complete=False,
+    )
+    response = CommandResponse(
+        command="model.apply",
+        ok=False,
+        code=error.code,
+        message=error.message,
+        details=error.details,
+    )
+    payload = response.to_payload()
+    assert payload["details"]["value"] == expected
+    encoded = json.dumps(payload, allow_nan=False)
+    assert json.loads(encoded) == payload
+
+
+def test_invalid_non_json_envelope_id_is_sanitized_in_full_details() -> None:
+    with pytest.raises(AuthoringError) as caught:
+        validate_entity_fields("constant", object(), {"value": "1"})  # type: ignore[arg-type]
+    error = caught.value
+    assert error.details["id"] == "<object>"
+    payload = CommandResponse(
+        "model.apply", False, error.code, error.message, error.details
+    ).to_payload()
+    json.dumps(payload, allow_nan=False)
 
 
 def test_every_complete_entity_schema_has_a_valid_representative() -> None:
