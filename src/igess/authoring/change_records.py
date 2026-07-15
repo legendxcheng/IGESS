@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 import errno
 import json
 import os
-from pathlib import Path, PurePosixPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 import re
 import stat
 import tempfile
@@ -126,6 +126,14 @@ class ChangeRecordStore:
             raise ValueError("status model_digest must match post_digest")
         timestamp = _utc_timestamp(self._clock())
         destination = self.changes_root / _record_filename(timestamp, change_id)
+        try:
+            _require_real_directory(self.changes_root, "change audit registry")
+        except OSError as error:
+            _audit_error(
+                "The change audit registry is unsafe",
+                self.changes_root,
+                error=error,
+            )
         if destination.exists():
             _audit_error("A success audit destination already exists", destination)
 
@@ -206,17 +214,61 @@ class ChangeRecordStore:
     def list_records(self, *, include_failed: bool = False) -> list[dict[str, Any]]:
         """Return valid records oldest-first, skipping malformed media safely."""
 
-        candidates: list[tuple[Path, str]] = []
-        if self.changes_root.exists():
-            candidates.extend((path, "success") for path in self.changes_root.glob("*.json"))
-        if include_failed and self.failed_root.exists():
-            candidates.extend((path, "failure") for path in self.failed_root.glob("*.json"))
+        candidates: list[tuple[Path, str, Path, tuple[int, ...]]] = []
+        unsafe = self.changes_root
+        try:
+            if _lstat_or_none(self.changes_root) is not None:
+                before = _require_real_directory(
+                    self.changes_root,
+                    "change audit registry",
+                )
+                snapshot = _file_snapshot(before)
+                candidates.extend(
+                    (path, "success", self.changes_root, snapshot)
+                    for path in self.changes_root.glob("*.json")
+                )
+                after = _require_real_directory(
+                    self.changes_root,
+                    "change audit registry",
+                )
+                if _file_snapshot(after) != snapshot:
+                    raise OSError("change audit registry changed during enumeration")
+            if include_failed and _lstat_or_none(self.failed_root) is not None:
+                unsafe = self.failed_root
+                before = _require_real_directory(
+                    self.failed_root,
+                    "failed change audit registry",
+                )
+                snapshot = _file_snapshot(before)
+                candidates.extend(
+                    (path, "failure", self.failed_root, snapshot)
+                    for path in self.failed_root.glob("*.json")
+                )
+                after = _require_real_directory(
+                    self.failed_root,
+                    "failed change audit registry",
+                )
+                if _file_snapshot(after) != snapshot:
+                    raise OSError("failed audit registry changed during enumeration")
+        except OSError as error:
+            _audit_error("The change audit registry is unsafe", unsafe, error=error)
 
         loaded: list[tuple[datetime, str, dict[str, Any]]] = []
-        for path, expected_outcome in candidates:
+        for path, expected_outcome, registry, registry_snapshot in candidates:
+            try:
+                current_registry = _require_real_directory(
+                    registry,
+                    "change audit registry",
+                )
+            except OSError as error:
+                _audit_error("The change audit registry is unsafe", registry, error=error)
+            if _file_snapshot(current_registry) != registry_snapshot:
+                _audit_error("The change audit registry changed", registry)
             try:
                 identity = path.lstat()
-                if stat.S_ISLNK(identity.st_mode) or not stat.S_ISREG(identity.st_mode):
+                if _is_path_indirection(path, identity) or not stat.S_ISREG(
+                    identity.st_mode
+                ):
                     raise ValueError("record path is not a regular file")
                 payload = _load_record_json(path, identity)
                 timestamp = _validate_loaded_record(path, payload, expected_outcome)
@@ -298,8 +350,15 @@ def _affected_files(values: Sequence[str]) -> list[str]:
     for value in values:
         if not isinstance(value, str) or not value:
             raise TypeError("affected file paths must be non-empty strings")
+        windows_path = PureWindowsPath(value)
         path = PurePosixPath(value.replace("\\", "/"))
-        if path.is_absolute() or any(part in {"", ".", ".."} for part in path.parts):
+        if (
+            windows_path.drive
+            or windows_path.root
+            or windows_path.is_absolute()
+            or path.is_absolute()
+            or any(part in {"", ".", ".."} for part in path.parts)
+        ):
             raise ValueError("affected file paths must be safe project-relative paths")
         normalized.add(path.as_posix())
     return sorted(normalized)
@@ -369,10 +428,8 @@ def _lstat_or_none(path: Path) -> os.stat_result | None:
         return None
 
 
-def _require_real_directory(path: Path, role: str) -> None:
-    identity = _lstat_or_none(path)
-    if identity is None:
-        raise OSError(f"{role} is missing: {path}")
+def _require_real_directory(path: Path, role: str) -> os.stat_result:
+    identity = _require_safe_path_chain(path, role)
     reparse_flag = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
     attributes = getattr(identity, "st_file_attributes", 0)
     if (
@@ -381,6 +438,47 @@ def _require_real_directory(path: Path, role: str) -> None:
         or not stat.S_ISDIR(identity.st_mode)
     ):
         raise OSError(f"{role} is not a real directory: {path}")
+    return identity
+
+
+def _require_safe_path_chain(path: Path, role: str) -> os.stat_result:
+    target = path.absolute()
+    chain: list[Path] = []
+    current = target
+    while True:
+        chain.append(current)
+        parent = current.parent
+        if parent == current:
+            break
+        current = parent
+    leaf_identity: os.stat_result | None = None
+    for component in reversed(chain):
+        identity = _lstat_or_none(component)
+        if identity is None:
+            raise OSError(f"{role} has a missing path component: {component}")
+        if _is_path_indirection(component, identity):
+            raise OSError(f"{role} crosses a path indirection: {component}")
+        if component != target and not stat.S_ISDIR(identity.st_mode):
+            raise OSError(f"{role} ancestor is not a directory: {component}")
+        if component == target:
+            leaf_identity = identity
+    assert leaf_identity is not None
+    return leaf_identity
+
+
+def _is_path_indirection(path: Path, identity: os.stat_result) -> bool:
+    reparse_flag = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+    if stat.S_ISLNK(identity.st_mode) or bool(
+        getattr(identity, "st_file_attributes", 0) & reparse_flag
+    ):
+        return True
+    is_junction = getattr(path, "is_junction", None)
+    if callable(is_junction):
+        try:
+            return bool(is_junction())
+        except OSError:
+            return True
+    return False
 
 
 def _ensure_real_directory(path: Path, role: str) -> None:
@@ -427,22 +525,89 @@ def _encode_record_json(payload: Mapping[str, Any]) -> bytes:
 
 
 def _load_record_json(path: Path, identity: os.stat_result) -> object:
+    try:
+        current = _require_safe_path_chain(path, "change record path")
+    except OSError as error:
+        raise ValueError("record path is unsafe before open") from error
+    if _file_snapshot(identity) != _file_snapshot(current):
+        raise ValueError("record changed before it could be opened")
+    identity = current
     if identity.st_size > MAX_CHANGE_RECORD_BYTES:
         raise ValueError("record exceeds the size limit")
-    with path.open("rb") as handle:
-        opened = os.fstat(handle.fileno())
-        if not os.path.samestat(identity, opened):
+    if _is_path_indirection(path, identity) or not stat.S_ISREG(identity.st_mode):
+        raise ValueError("record path is not a regular file")
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_BINARY", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOINHERIT", 0)
+    )
+    try:
+        descriptor = os.open(path, flags)
+    except OSError as error:
+        raise ValueError("record could not be opened without following links") from error
+    try:
+        opened = os.fstat(descriptor)
+        if _file_identity(identity) != _file_identity(opened):
             raise ValueError("record changed before it could be read")
-        content = handle.read(MAX_CHANGE_RECORD_BYTES + 1)
-        after = os.fstat(handle.fileno())
+        chunks: list[bytes] = []
+        remaining = MAX_CHANGE_RECORD_BYTES + 1
+        while remaining:
+            chunk = os.read(descriptor, min(64 * 1024, remaining))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        content = b"".join(chunks)
+        after = os.fstat(descriptor)
+    finally:
+        os.close(descriptor)
     if len(content) > MAX_CHANGE_RECORD_BYTES:
         raise ValueError("record exceeds the size limit")
-    if not os.path.samestat(opened, after) or len(content) != after.st_size:
+    try:
+        final = _require_safe_path_chain(path, "change record path")
+    except OSError as error:
+        raise ValueError("record path changed while it was read") from error
+    if (
+        _file_snapshot(identity) != _file_snapshot(final)
+        or _file_snapshot(opened) != _file_snapshot(after)
+        or _file_identity(final) != _file_identity(after)
+        or len(content) != after.st_size
+    ):
         raise ValueError("record changed while it was read")
     try:
         return json.loads(content.decode("utf-8"))
     except (UnicodeError, json.JSONDecodeError, RecursionError, MemoryError) as error:
         raise ValueError("record JSON is malformed") from error
+
+
+def _file_snapshot(identity: os.stat_result) -> tuple[int, ...]:
+    mtime_ns = getattr(identity, "st_mtime_ns", None)
+    ctime_ns = getattr(identity, "st_ctime_ns", None)
+    return (
+        stat.S_IFMT(identity.st_mode),
+        int(identity.st_dev),
+        int(identity.st_ino),
+        int(identity.st_size),
+        int(identity.st_mtime * 1_000_000_000) if mtime_ns is None else int(mtime_ns),
+        int(identity.st_ctime * 1_000_000_000) if ctime_ns is None else int(ctime_ns),
+        int(getattr(identity, "st_nlink", 0)),
+        int(getattr(identity, "st_file_attributes", 0)),
+    )
+
+
+def _file_identity(identity: os.stat_result) -> tuple[int, ...]:
+    mtime_ns = getattr(identity, "st_mtime_ns", None)
+    return (
+        stat.S_IFMT(identity.st_mode),
+        int(identity.st_dev),
+        int(identity.st_ino),
+        int(identity.st_size),
+        int(identity.st_mtime * 1_000_000_000) if mtime_ns is None else int(mtime_ns),
+        int(getattr(identity, "st_nlink", 0)),
+        int(getattr(identity, "st_file_attributes", 0)),
+    )
 
 
 def _fsync_directory(path: Path) -> None:
@@ -480,7 +645,10 @@ def _validate_loaded_record(
 ) -> datetime:
     if not isinstance(payload, dict):
         raise ValueError("record is not an object")
-    if payload.get("version") != CHANGE_RECORD_VERSION:
+    if (
+        type(payload.get("version")) is not int
+        or payload["version"] != CHANGE_RECORD_VERSION
+    ):
         raise ValueError("unsupported record version")
     outcome = payload.get("outcome")
     if outcome != expected_outcome:

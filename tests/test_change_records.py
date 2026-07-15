@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+import igess.authoring.change_records as change_records_module
 from igess.authoring.change import ModelChange
 from igess.authoring.change_records import ChangeRecordStore, ChangeRecordWarning
 from igess.authoring.probe import EligibilityFinding
@@ -625,3 +626,200 @@ def test_write_failure_accepts_exact_size_limit_and_atomically_rejects_one_byte_
     assert caught.value.details["path"] == str(oversized)
     assert not oversized.exists()
     assert not list(oversized.parent.glob(f".{oversized.name}.*.tmp"))
+
+
+def _directory_symlink(target: Path, link: Path) -> None:
+    try:
+        link.symlink_to(target, target_is_directory=True)
+    except OSError as error:
+        pytest.skip(f"directory symlinks are unavailable: {error}")
+
+
+def test_registry_root_symlink_is_rejected_before_read_or_write(tmp_path: Path) -> None:
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    outside_store = ChangeRecordStore(outside, clock=lambda: UTC_INSTANT)
+    outside_stage = _stage_path(tmp_path, "outside.json")
+    outside_destination = outside_store.stage_success(
+        outside_stage,
+        change_id="outside",
+        change=_change(),
+        pre_digest=PRE_DIGEST,
+        post_digest=POST_DIGEST,
+        affected_files=[],
+        status=_status(),
+    )
+    _publish(outside_stage, outside_destination)
+
+    project = tmp_path / "project"
+    project.mkdir()
+    linked_changes = project / "changes"
+    _directory_symlink(outside, linked_changes)
+    store = ChangeRecordStore(linked_changes, clock=lambda: UTC_INSTANT)
+
+    with pytest.raises(AuthoringError) as list_error:
+        store.list_records()
+    assert list_error.value.code == "audit_failed"
+    with pytest.raises(AuthoringError) as latest_error:
+        store.latest()
+    assert latest_error.value.code == "audit_failed"
+
+    staged = _stage_path(tmp_path, "linked-root.json")
+    with pytest.raises(AuthoringError) as stage_error:
+        store.stage_success(
+            staged,
+            change_id="must-not-stage",
+            change=_change(),
+            pre_digest=PRE_DIGEST,
+            post_digest=POST_DIGEST,
+            affected_files=[],
+            status=_status(),
+        )
+    assert stage_error.value.code == "audit_failed"
+    assert not staged.exists()
+
+    with pytest.raises(AuthoringError) as failure_error:
+        store.write_failure(
+            change_id="must-not-fail",
+            change=_change(),
+            pre_digest=PRE_DIGEST,
+            affected_files=[],
+            error=AuthoringError("model_invalid", "Candidate validation failed"),
+        )
+    assert failure_error.value.code == "audit_failed"
+    assert not (outside / "failed" / "20260715T040506789012Z-must-not-fail.json").exists()
+
+
+def test_failed_registry_symlink_is_rejected_before_enumeration(tmp_path: Path) -> None:
+    changes = tmp_path / "changes"
+    changes.mkdir()
+    outside_failed = tmp_path / "outside-failed"
+    outside_failed.mkdir()
+    failed_link = changes / "failed"
+    _directory_symlink(outside_failed, failed_link)
+    store = ChangeRecordStore(changes, clock=lambda: UTC_INSTANT)
+
+    with pytest.raises(AuthoringError) as caught:
+        store.list_records(include_failed=True)
+
+    assert caught.value.code == "audit_failed"
+
+
+def test_same_inode_same_length_rewrite_during_read_is_skipped(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store, path = _published_success(tmp_path)
+    real_read = os.read
+    mutated = False
+
+    def mutating_read(descriptor: int, count: int) -> bytes:
+        nonlocal mutated
+        content = real_read(descriptor, count)
+        if not mutated:
+            before = path.read_bytes()
+            after = before.replace(b"Review", b"Beware", 1)
+            assert after != before and len(after) == len(before)
+            path.write_bytes(after)
+            mutated = True
+        return content
+
+    monkeypatch.setattr(change_records_module.os, "read", mutating_read)
+
+    with pytest.warns(ChangeRecordWarning, match=r"valid.json.*ValueError"):
+        assert store.list_records() == []
+    assert mutated
+
+
+def test_rename_then_symlink_back_to_original_inode_during_read_is_skipped(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store, path = _published_success(tmp_path)
+    original = tmp_path / "original-record.json"
+    real_read = os.read
+    retargeted = False
+
+    def retargeting_read(descriptor: int, count: int) -> bytes:
+        nonlocal retargeted
+        content = real_read(descriptor, count)
+        if not retargeted:
+            try:
+                path.replace(original)
+                path.symlink_to(original)
+            except OSError as error:
+                pytest.skip(f"open-file retargeting is unavailable: {error}")
+            retargeted = True
+        return content
+
+    monkeypatch.setattr(change_records_module.os, "read", retargeting_read)
+
+    with pytest.warns(ChangeRecordWarning, match=r"valid.json.*ValueError"):
+        assert store.list_records() == []
+    assert retargeted
+
+
+@pytest.mark.parametrize(
+    "unsafe_path",
+    [
+        "C:/outside/file.json",
+        "C:\\outside\\file.json",
+        "\\\\server\\share\\file.json",
+        "\\rooted\\file.json",
+        "/rooted/file.json",
+    ],
+)
+def test_stage_success_rejects_windows_and_posix_absolute_affected_files(
+    tmp_path: Path,
+    unsafe_path: str,
+) -> None:
+    store = _store(tmp_path)
+    staged = _stage_path(tmp_path)
+
+    with pytest.raises(ValueError, match="project-relative"):
+        store.stage_success(
+            staged,
+            change_id="unsafe-path",
+            change=_change(),
+            pre_digest=PRE_DIGEST,
+            post_digest=POST_DIGEST,
+            affected_files=[unsafe_path],
+            status=_status(),
+        )
+
+    assert not staged.exists()
+
+
+def test_reader_skips_windows_drive_affected_file_path(tmp_path: Path) -> None:
+    store, path = _published_success(tmp_path)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["affected_files"] = ["C:/outside/file.json"]
+    _rewrite_payload(path, payload)
+
+    with pytest.warns(ChangeRecordWarning, match=r"valid.json.*ValueError"):
+        assert store.list_records() == []
+
+
+@pytest.mark.parametrize(
+    "corrupt",
+    [
+        lambda payload: payload.__setitem__("version", True),
+        lambda payload: payload["change"].__setitem__("version", True),
+        lambda payload: payload["status"]["entity_counts"].__setitem__(
+            "resource", True
+        ),
+    ],
+    ids=["record-version", "change-version", "status-count"],
+)
+def test_reader_rejects_bool_values_in_integer_fields(
+    tmp_path: Path,
+    corrupt: object,
+) -> None:
+    store, path = _published_success(tmp_path)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    assert callable(corrupt)
+    corrupt(payload)
+    _rewrite_payload(path, payload)
+
+    with pytest.warns(ChangeRecordWarning, match=r"valid.json.*ValueError"):
+        assert store.list_records() == []
