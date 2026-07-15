@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from copy import deepcopy
 from dataclasses import dataclass, field
 import json
 import re
+from types import MappingProxyType
 from typing import Any, Mapping, Sequence
 
 
@@ -22,8 +22,19 @@ class AuthoringError(Exception):
         super().__init__(message)
         self.code = code
         self.message = message
-        self.details = deepcopy(dict(details or {}))
-        self.result = deepcopy(dict(result or {}))
+        self.details = _deep_freeze(dict(details or {}))
+        self.result = _deep_freeze(dict(result or {}))
+
+    def __reduce__(self) -> tuple[Any, tuple[Any, ...]]:
+        return (
+            type(self),
+            (
+                self.code,
+                self.message,
+                _deep_thaw(self.details),
+                _deep_thaw(self.result),
+            ),
+        )
 
 
 _ARTIFACT_KEYS = (
@@ -46,12 +57,12 @@ class CommandResponse:
     ok: bool
     code: str
     message: str
-    details: dict[str, Any] = field(default_factory=dict)
-    result: dict[str, Any] = field(default_factory=dict)
+    details: Mapping[str, Any] = field(default_factory=dict)
+    result: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "details", deepcopy(dict(self.details)))
-        object.__setattr__(self, "result", deepcopy(dict(self.result)))
+        object.__setattr__(self, "details", _deep_freeze(self.details))
+        object.__setattr__(self, "result", _deep_freeze(self.result))
 
     def to_payload(self) -> dict[str, Any]:
         """Return a defensive copy with the protocol's fixed outer key order."""
@@ -62,8 +73,8 @@ class CommandResponse:
             "ok": self.ok,
             "code": self.code,
             "message": self.message,
-            "details": deepcopy(self.details),
-            "result": deepcopy(self.result),
+            "details": _deep_thaw(self.details),
+            "result": _deep_thaw(self.result),
         }
 
     def to_json(self) -> str:
@@ -133,8 +144,9 @@ def _issue_messages(value: Any) -> list[str]:
         entity = issue.get("entity")
         entity_id = issue.get("id")
         reference_parts = [part for part in (entity, entity_id) if isinstance(part, str) and part]
-        if reference_parts and not all(_contains_reference(message, part) for part in reference_parts):
-            message = f"[{':'.join(reference_parts)}] {message}"
+        missing_parts = [part for part in reference_parts if not _contains_reference(message, part)]
+        if missing_parts:
+            message = f"[{':'.join(missing_parts)}] {message}"
         messages.append(message)
     return messages
 
@@ -145,3 +157,27 @@ def _contains_reference(message: str, part: str) -> bool:
         message,
         flags=re.IGNORECASE,
     ) is not None
+
+
+def _deep_freeze(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        items = list(value.items())
+        if all(isinstance(key, str) for key, _ in items):
+            items.sort(key=lambda item: item[0])
+        return MappingProxyType({key: _deep_freeze(item) for key, item in items})
+    if isinstance(value, (list, tuple)):
+        return tuple(_deep_freeze(item) for item in value)
+    if isinstance(value, (set, frozenset)):
+        return frozenset(_deep_freeze(item) for item in value)
+    return value
+
+
+def _deep_thaw(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {key: _deep_thaw(item) for key, item in value.items()}
+    if isinstance(value, tuple):
+        return [_deep_thaw(item) for item in value]
+    if isinstance(value, frozenset):
+        thawed = [_deep_thaw(item) for item in value]
+        return sorted(thawed, key=lambda item: (type(item).__name__, repr(item)))
+    return value
