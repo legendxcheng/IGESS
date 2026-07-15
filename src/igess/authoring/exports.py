@@ -34,6 +34,8 @@ class StagedSources:
 
     root: Path
     origin_root: Path
+    origin_config: Path
+    origin_datas: Path
     committed_exports: Path
     config: Path
     datas: Path
@@ -102,7 +104,13 @@ def export_candidate(
     candidate: StagedSources,
     out: str | os.PathLike[str],
 ) -> ExportResult:
-    """Run the real Luban exporter and atomically publish a complete tree."""
+    """Run the real Luban exporter and atomically publish a complete tree.
+
+    Replacing an existing output first renames the old tree to a uniquely
+    named sibling backup.  Once the new tree is published, a backup that
+    cannot be cleaned is deliberately retained for later recovery without
+    turning the already-committed publication into a false command failure.
+    """
 
     if not isinstance(candidate, StagedSources):
         raise TypeError("candidate must be StagedSources returned by stage_sources")
@@ -472,9 +480,14 @@ def _reject_protected_output(
         return
     try:
         requested = Path(value).expanduser().resolve(strict=False)
-        committed = candidate.committed_exports.resolve(strict=True)
-        candidate_root = candidate.root.resolve(strict=True)
-        candidate_datas = candidate.datas.resolve(strict=True)
+        intended_exports = candidate.exports.resolve(strict=True)
+        protected = (
+            ("committed_exports", candidate.committed_exports.resolve(strict=True)),
+            ("origin_config", candidate.origin_config.resolve(strict=True)),
+            ("origin_datas", candidate.origin_datas.resolve(strict=True)),
+            ("candidate_config", candidate.config.resolve(strict=True)),
+            ("candidate_datas", candidate.datas.resolve(strict=True)),
+        )
     except (OSError, RuntimeError, ValueError) as error:
         _export_error(
             "invalid_output_path",
@@ -482,18 +495,25 @@ def _reject_protected_output(
             error_type=type(error).__name__,
             path=str(value),
         )
-    if requested == committed:
-        _export_error(
-            "committed_export_target",
-            "Candidate exports may not overwrite the project's committed exports",
-            path=str(requested),
-        )
-    if requested in {candidate_root, candidate_datas}:
-        _export_error(
-            "candidate_source_target",
-            "Runtime exports may not replace the candidate source tree",
-            path=str(requested),
-        )
+    if requested == intended_exports:
+        return
+    for role, source in protected:
+        if _paths_overlap(requested, source):
+            _export_error(
+                "protected_source_target",
+                "Runtime exports may not overlap original or candidate sources",
+                path=str(requested),
+                protected_path=str(source),
+                protected_role=role,
+            )
+
+
+def _paths_overlap(first: Path, second: Path) -> bool:
+    return (
+        first == second
+        or first.is_relative_to(second)
+        or second.is_relative_to(first)
+    )
 
 
 def _validate_export_output(
@@ -767,6 +787,11 @@ def _publish_export_tree(
             shutil.rmtree(backup)
         except FileNotFoundError:
             pass
+        except Exception:
+            # Publication is already committed.  Keep the uniquely named old
+            # tree intact for manual/later recovery instead of reporting the
+            # successful export as failed or risking deletion of another path.
+            pass
         return
 
     if output.exists() or output.is_symlink():
@@ -866,6 +891,8 @@ def _copy_authoritative_sources(
     return StagedSources(
         root=candidate,
         origin_root=project.root,
+        origin_config=project.config,
+        origin_datas=project.datas,
         committed_exports=project.exports,
         config=candidate / "economy.yaml",
         datas=candidate / "Datas",

@@ -396,8 +396,100 @@ def test_export_candidate_refuses_to_overwrite_project_committed_exports(
     with pytest.raises(AuthoringError) as caught:
         export_candidate(candidate, project.exports)
 
-    assert caught.value.details["reason"] == "committed_export_target"
+    assert caught.value.details["reason"] == "protected_source_target"
     assert _tree_bytes(project.exports) == before
+
+
+@pytest.mark.parametrize(
+    "target_kind",
+    (
+        "committed_exports",
+        "committed_exports_descendant",
+        "origin_datas",
+        "origin_datas_descendant",
+        "origin_config",
+        "origin_config_descendant",
+        "origin_root",
+        "origin_ancestor",
+        "candidate_datas",
+        "candidate_datas_descendant",
+        "candidate_config",
+        "candidate_root",
+        "candidate_ancestor",
+    ),
+)
+def test_export_candidate_rejects_every_original_or_candidate_source_overlap(
+    tmp_path: Path,
+    target_kind: str,
+) -> None:
+    project, candidate = _populated_candidate(tmp_path)
+    original_before = _tree_bytes(project.root)
+    targets = {
+        "committed_exports": project.exports,
+        "committed_exports_descendant": project.exports / "nested",
+        "origin_datas": project.datas,
+        "origin_datas_descendant": project.datas / "nested",
+        "origin_config": project.config,
+        "origin_config_descendant": project.config / "nested",
+        "origin_root": project.root,
+        "origin_ancestor": project.root.parent,
+        "candidate_datas": candidate.datas,
+        "candidate_datas_descendant": candidate.datas / "nested",
+        "candidate_config": candidate.config,
+        "candidate_root": candidate.root,
+        "candidate_ancestor": candidate.root.parent,
+    }
+
+    with pytest.raises(AuthoringError) as caught:
+        export_candidate(candidate, targets[target_kind])
+
+    assert caught.value.details["reason"] == "protected_source_target"
+    assert _tree_bytes(project.root) == original_before
+
+
+def test_export_candidate_allows_candidate_exports_and_transaction_siblings(
+    tmp_path: Path,
+) -> None:
+    project, candidate = _populated_candidate(tmp_path)
+    original_before = _tree_bytes(project.root)
+
+    candidate_result = export_candidate(candidate, candidate.exports)
+    sibling_result = export_candidate(candidate, candidate.root.parent / "runtime")
+    outer_sibling_result = export_candidate(candidate, tmp_path / "runtime")
+
+    assert candidate_result.root == candidate.exports
+    assert sibling_result.root == candidate.root.parent / "runtime"
+    assert outer_sibling_result.root == tmp_path / "runtime"
+    assert _tree_bytes(project.root) == original_before
+
+
+def test_export_publish_succeeds_when_old_output_backup_cleanup_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project, candidate = _populated_candidate(tmp_path)
+    original_before = _tree_bytes(project.root)
+    out = tmp_path / "runtime"
+    out.mkdir()
+    (out / "old.json").write_text("old", encoding="utf-8")
+    real_rmtree = exports_module.shutil.rmtree
+
+    def fail_backup_cleanup(path: Path, *args: object, **kwargs: object) -> None:
+        if Path(path).name.startswith(".runtime-backup-"):
+            raise PermissionError("backup retained")
+        real_rmtree(path, *args, **kwargs)
+
+    monkeypatch.setattr(exports_module.shutil, "rmtree", fail_backup_cleanup)
+
+    result = export_candidate(candidate, out)
+
+    assert result.root == out
+    assert not (out / "old.json").exists()
+    assert len(result.written_paths) == 8
+    backups = list(tmp_path.glob(".runtime-backup-*"))
+    assert len(backups) == 1
+    assert (backups[0] / "old.json").read_text(encoding="utf-8") == "old"
+    assert _tree_bytes(project.root) == original_before
 
 
 def test_export_digest_is_order_independent_and_path_and_byte_sensitive(
