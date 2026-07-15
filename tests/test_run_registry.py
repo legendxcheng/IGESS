@@ -8,6 +8,7 @@ import pytest
 
 from igess.authoring import AuthoringProject
 from igess.authoring.templates import initialize_authoring_project
+from igess import run_registry as registry_module
 from igess.run_registry import RunRecord, RunRegistry
 
 
@@ -305,6 +306,147 @@ def test_list_runs_skips_corrupt_or_unsafe_records_without_losing_valid_history(
     assert registry.list_runs() == [valid]
 
 
+@pytest.mark.parametrize("version", [True, 1.0])
+def test_version_requires_the_exact_integer_one(tmp_path: Path, version: object) -> None:
+    registry = RunRegistry(tmp_path / "runs")
+    record = _write(
+        registry,
+        "20260715T010203000000Z-day_1",
+        kind="formal",
+    )
+    payload = json.loads(record.status_path.read_text(encoding="utf-8"))
+    payload["version"] = version
+    record.status_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    assert registry.list_runs() == []
+
+
+def test_write_status_refuses_status_symlink_without_touching_target(tmp_path: Path) -> None:
+    registry = RunRegistry(tmp_path / "runs")
+    run_dir = registry.runs_root / "20260715T010203000000Z-day_1"
+    run_dir.mkdir(parents=True)
+    outside = tmp_path / "outside.json"
+    outside.write_text("outside-must-stay", encoding="utf-8")
+    status_path = run_dir / "run_status.json"
+    try:
+        status_path.symlink_to(outside)
+    except OSError as error:
+        pytest.skip(f"file links unavailable: {error}")
+
+    with pytest.raises(ValueError, match="link|reparse"):
+        registry.write_status(
+            run_dir,
+            status="success",
+            scenario_id="day_1",
+            message="done",
+            kind="formal",
+            model_digest=_DIGEST,
+            **_paths(run_dir),
+        )
+
+    assert outside.read_text(encoding="utf-8") == "outside-must-stay"
+    assert status_path.is_symlink()
+    assert not list(run_dir.glob(".run_status.*.tmp"))
+
+
+def test_write_status_replace_failure_preserves_old_status_and_cleans_temp(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    registry = RunRegistry(tmp_path / "runs")
+    record = _write(
+        registry,
+        "20260715T010203000000Z-day_1",
+        kind="formal",
+    )
+    before = record.status_path.read_bytes()
+    original_replace = os.replace
+
+    def failing_replace(source: object, destination: object, *args: object, **kwargs: object):
+        if Path(destination) == record.status_path:
+            raise OSError("injected replace failure")
+        return original_replace(source, destination, *args, **kwargs)
+
+    monkeypatch.setattr(os, "replace", failing_replace)
+
+    with pytest.raises(OSError, match="injected replace failure"):
+        registry.write_status(
+            record.run_dir,
+            status="failed",
+            scenario_id="day_1",
+            message="new status",
+            kind="formal",
+            model_digest=_DIGEST,
+            **_paths(record.run_dir),
+        )
+
+    assert record.status_path.read_bytes() == before
+    assert not list(record.run_dir.glob(".run_status.*.tmp"))
+
+
+def test_status_read_rejects_leaf_retargeted_after_its_single_open(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    registry = RunRegistry(tmp_path / "runs")
+    record = _write(
+        registry,
+        "20260715T010203000000Z-day_1",
+        kind="formal",
+    )
+    replacement = record.run_dir / "replacement.json"
+    replacement.write_bytes(record.status_path.read_bytes())
+    original_open = os.open
+    swapped = False
+    status_opens = 0
+
+    def swapping_open(path: object, flags: int, mode: int = 0o777, *, dir_fd=None):
+        nonlocal status_opens, swapped
+        fd = original_open(path, flags, mode, dir_fd=dir_fd)
+        if Path(path) == record.status_path:
+            status_opens += 1
+            if not swapped:
+                swapped = True
+                os.replace(replacement, record.status_path)
+        return fd
+
+    monkeypatch.setattr(os, "open", swapping_open)
+
+    assert registry.list_runs() == []
+    assert swapped
+    assert status_opens == 1
+
+
+def test_status_read_is_bounded_when_file_grows_after_open(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    registry = RunRegistry(tmp_path / "runs")
+    record = _write(
+        registry,
+        "20260715T010203000000Z-day_1",
+        kind="formal",
+    )
+    original_read = os.read
+    requested = 0
+    grown = False
+
+    def growing_read(fd: int, size: int) -> bytes:
+        nonlocal grown, requested
+        requested += size
+        if not grown:
+            grown = True
+            with record.status_path.open("ab") as stream:
+                stream.write(b" " * (registry_module._MAX_STATUS_BYTES + 1))
+        return original_read(fd, size)
+
+    monkeypatch.setattr(os, "read", growing_read)
+
+    assert registry.list_runs() == []
+    assert grown
+    assert requested <= registry_module._MAX_STATUS_BYTES + 1
+
+
 def test_prune_smoke_refuses_a_linked_run_directory(tmp_path: Path) -> None:
     registry = RunRegistry(tmp_path / "runs")
     real = tmp_path / "outside-run"
@@ -338,6 +480,53 @@ def test_prune_smoke_refuses_a_linked_run_directory(tmp_path: Path) -> None:
 
     assert linked.exists()
     assert (real / "run_status.json").exists()
+
+
+def test_prune_smoke_does_not_delete_a_formal_directory_swapped_during_quarantine(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    registry = RunRegistry(tmp_path / "runs")
+    smoke = _write(
+        registry,
+        "20260715T010203000000Z-smoke-rule",
+        kind="smoke",
+        change_id="rule",
+    )
+    formal = _write(
+        registry,
+        "20260715T010204000000Z-day_1",
+        kind="formal",
+    )
+    (smoke.run_dir / "smoke.marker").write_text("smoke", encoding="utf-8")
+    (formal.run_dir / "formal.marker").write_text("formal", encoding="utf-8")
+    original_replace = os.replace
+    raced = False
+
+    def racing_replace(source: object, destination: object, *args: object, **kwargs: object):
+        nonlocal raced
+        source_path = Path(source)
+        destination_path = Path(destination)
+        if (
+            not raced
+            and source_path == smoke.run_dir
+            and destination_path.parent.name == ".run-trash"
+        ):
+            raced = True
+            holding = registry.runs_root / ".race-holding"
+            original_replace(smoke.run_dir, holding)
+            original_replace(formal.run_dir, smoke.run_dir)
+            original_replace(holding, formal.run_dir)
+        return original_replace(source, destination, *args, **kwargs)
+
+    monkeypatch.setattr(os, "replace", racing_replace)
+
+    assert registry.prune_smoke(keep=0) == []
+    assert raced
+    assert sorted(path.read_text(encoding="utf-8") for path in tmp_path.rglob("*.marker")) == [
+        "formal",
+        "smoke",
+    ]
 
 
 def test_prune_smoke_rejects_negative_retention(tmp_path: Path) -> None:
