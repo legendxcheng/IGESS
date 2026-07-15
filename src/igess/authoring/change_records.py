@@ -60,6 +60,17 @@ class ChangeRecordWarning(UserWarning):
     """A stored record was ignored because it could not be trusted."""
 
 
+class _RecordTooLargeError(OSError):
+    """The complete encoded audit exceeds the reader's accepted limit."""
+
+    def __init__(self, actual_bytes: int) -> None:
+        super().__init__(
+            f"encoded change record has {actual_bytes} bytes; "
+            f"limit is {MAX_CHANGE_RECORD_BYTES}"
+        )
+        self.actual_bytes = actual_bytes
+
+
 class ChangeRecordStore:
     """Stage successful audits and persist failed-attempt audits atomically.
 
@@ -384,14 +395,16 @@ def _ensure_real_directory(path: Path, role: str) -> None:
 
 def _atomic_json_write(path: Path, payload: Mapping[str, Any]) -> None:
     _require_real_directory(path.parent, "audit destination directory")
+    content = _encode_record_json(payload)
+    if len(content) > MAX_CHANGE_RECORD_BYTES:
+        raise _RecordTooLargeError(len(content))
     descriptor, temporary_name = tempfile.mkstemp(
         prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
     )
     temporary = Path(temporary_name)
     try:
-        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as handle:
-            json.dump(payload, handle, ensure_ascii=False, indent=2, allow_nan=False)
-            handle.write("\n")
+        with os.fdopen(descriptor, "wb") as handle:
+            handle.write(content)
             handle.flush()
             os.fsync(handle.fileno())
         os.replace(temporary, path)
@@ -406,6 +419,11 @@ def _atomic_json_write(path: Path, payload: Mapping[str, Any]) -> None:
         except OSError:
             pass
         raise
+
+
+def _encode_record_json(payload: Mapping[str, Any]) -> bytes:
+    text = json.dumps(payload, ensure_ascii=False, indent=2, allow_nan=False) + "\n"
+    return text.encode("utf-8")
 
 
 def _load_record_json(path: Path, identity: os.stat_result) -> object:

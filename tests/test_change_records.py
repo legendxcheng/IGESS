@@ -17,6 +17,7 @@ from igess.authoring.status import ModelStatus
 UTC_INSTANT = datetime(2026, 7, 15, 4, 5, 6, 789012, tzinfo=timezone.utc)
 PRE_DIGEST = "sha256:" + "1" * 64
 POST_DIGEST = "sha256:" + "2" * 64
+MAX_RECORD_BYTES = 4 * 1024 * 1024
 
 
 def _change(entity_id: str = "gold") -> ModelChange:
@@ -508,3 +509,119 @@ def test_list_and_latest_skip_record_larger_than_four_mibibytes_boundedly(
         assert store.list_records() == []
     with pytest.warns(ChangeRecordWarning, match=r"oversized.json.*ValueError"):
         assert store.latest() is None
+
+
+def test_stage_success_accepts_exact_size_limit_and_atomically_rejects_one_byte_more(
+    tmp_path: Path,
+) -> None:
+    store = _store(tmp_path)
+    baseline = _stage_path(tmp_path, "baseline.json")
+    store.stage_success(
+        baseline,
+        change_id="baseline",
+        change=_change(),
+        pre_digest=PRE_DIGEST,
+        post_digest=POST_DIGEST,
+        affected_files=[],
+        status=_status(),
+        warnings=[{"code": "padding", "message": "x"}],
+    )
+    padding_length = 1 + MAX_RECORD_BYTES - baseline.stat().st_size
+    baseline.unlink()
+    assert padding_length > 1
+
+    exact_stage = _stage_path(tmp_path, "exact.json")
+    exact_destination = store.stage_success(
+        exact_stage,
+        change_id="exact",
+        change=_change(),
+        pre_digest=PRE_DIGEST,
+        post_digest=POST_DIGEST,
+        affected_files=[],
+        status=_status(),
+        warnings=[{"code": "padding", "message": "x" * padding_length}],
+    )
+    assert exact_stage.stat().st_size == MAX_RECORD_BYTES
+    _publish(exact_stage, exact_destination)
+    assert store.latest() is not None
+
+    oversized_stage = _stage_path(tmp_path, "oversized-stage.json")
+    with pytest.raises(AuthoringError) as caught:
+        store.stage_success(
+            oversized_stage,
+            change_id="too-large",
+            change=_change(),
+            pre_digest=PRE_DIGEST,
+            post_digest=POST_DIGEST,
+            affected_files=[],
+            status=_status(),
+            warnings=[
+                {"code": "padding", "message": "x" * (padding_length + 1)}
+            ],
+        )
+
+    assert caught.value.code == "audit_failed"
+    assert caught.value.details["path"] == str(oversized_stage)
+    assert not oversized_stage.exists()
+    assert not (
+        tmp_path / "changes" / "20260715T040506789012Z-too-large.json"
+    ).exists()
+    assert not list(oversized_stage.parent.glob(f".{oversized_stage.name}.*.tmp"))
+
+
+def test_write_failure_accepts_exact_size_limit_and_atomically_rejects_one_byte_more(
+    tmp_path: Path,
+) -> None:
+    store = _store(tmp_path)
+    baseline = store.write_failure(
+        change_id="baseline",
+        change=_change(),
+        pre_digest=PRE_DIGEST,
+        affected_files=[],
+        error=AuthoringError(
+            "model_invalid",
+            "Candidate validation failed",
+            {"padding": ""},
+        ),
+    )
+    padding_length = MAX_RECORD_BYTES - baseline.stat().st_size
+    baseline.unlink()
+    assert padding_length > 0
+
+    exact = store.write_failure(
+        change_id="exact",
+        change=_change(),
+        pre_digest=PRE_DIGEST,
+        affected_files=[],
+        error=AuthoringError(
+            "model_invalid",
+            "Candidate validation failed",
+            {"padding": "x" * padding_length},
+        ),
+    )
+    assert exact.stat().st_size == MAX_RECORD_BYTES
+    assert store.latest(include_failed=True) is not None
+
+    oversized = (
+        tmp_path
+        / "changes"
+        / "failed"
+        / "20260715T040506789012Z-too-large.json"
+    )
+    with pytest.raises(AuthoringError) as caught:
+        store.write_failure(
+            change_id="too-large",
+            change=_change(),
+            pre_digest=PRE_DIGEST,
+            affected_files=[],
+            error=AuthoringError(
+                "model_invalid",
+                "Candidate validation failed",
+                {"padding": "x" * (padding_length + 1)},
+            ),
+        )
+
+    assert caught.value.code == "audit_failed"
+    assert caught.value.details["path"] == str(oversized)
+    assert not oversized.exists()
+    assert not list(oversized.parent.glob(f".{oversized.name}.*.tmp"))
