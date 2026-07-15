@@ -8,13 +8,17 @@ snapshot of the current source.
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from copy import copy
 from dataclasses import dataclass
+from io import BytesIO
 import os
 from pathlib import Path
+import re
 import stat
 import tempfile
-from typing import Any, NoReturn
+from typing import Any, Iterator, NoReturn
+from xml.etree import ElementTree
 from zipfile import BadZipFile, ZipFile
 
 from openpyxl import load_workbook
@@ -25,6 +29,7 @@ from .change import ModelChange
 from .entity_schema import (
     ENTITY_SCHEMAS,
     EntitySchema,
+    FieldSpec,
     validate_entity_fields,
 )
 from .response import AuthoringError
@@ -32,12 +37,56 @@ from .response import AuthoringError
 
 _MARKERS = ("##var", "##", "##type")
 _MAX_SOURCE_BYTES = 32 * 1024 * 1024
-_MAX_ARCHIVE_BYTES = 128 * 1024 * 1024
-_MAX_ARCHIVE_MEMBER_BYTES = 64 * 1024 * 1024
+_MAX_ARCHIVE_BYTES = 64 * 1024 * 1024
+_MAX_ARCHIVE_MEMBER_BYTES = 32 * 1024 * 1024
 _MAX_ARCHIVE_MEMBERS = 2_048
+_MAX_WORKSHEET_XML_BYTES = 16 * 1024 * 1024
 _MAX_ROWS = 100_000
 _MAX_COLUMNS = 1_024
-_MAX_CELLS = 2_000_000
+_MAX_CELLS = 250_000
+_CELL_REFERENCE_RE = re.compile(r"^([A-Z]+)([1-9][0-9]*)$")
+
+_LOSSY_PACKAGE_PREFIXES = (
+    ("_xmlsignatures/", "digital_signatures"),
+    ("customui/", "custom_ui"),
+    ("customxml/", "custom_xml"),
+    ("xl/activex/", "activex_controls"),
+    ("xl/connections", "data_connections"),
+    ("xl/controls/", "worksheet_controls"),
+    ("xl/ctrlprops/", "worksheet_controls"),
+    ("xl/embeddings/", "embedded_objects"),
+    ("xl/externallinks/", "external_links"),
+    ("xl/metadata", "workbook_metadata"),
+    ("xl/persons/", "threaded_comments"),
+    ("xl/pivotcache/", "pivot_caches"),
+    ("xl/printersettings/", "printer_settings"),
+    ("xl/querytables/", "query_tables"),
+    ("xl/revisions/", "shared_workbook_revisions"),
+    ("xl/richdata/", "rich_data"),
+    ("xl/slicercaches/", "slicers"),
+    ("xl/slicers/", "slicers"),
+    ("xl/threadedcomments/", "threaded_comments"),
+    ("xl/timelinecaches/", "timelines"),
+    ("xl/timelines/", "timelines"),
+    ("xl/vbaproject", "vba_macros"),
+    ("xl/webextensions/", "web_extensions"),
+)
+
+
+@dataclass(frozen=True, slots=True)
+class _FileIdentity:
+    device: int
+    inode: int
+    size: int
+    modified_ns: int
+    mode: int
+
+
+@dataclass(frozen=True, slots=True)
+class _WorkbookSnapshot:
+    content: bytes
+    identity: _FileIdentity
+    source_mode: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -100,9 +149,8 @@ def upsert_workbook_entity(
             path=str(source),
         )
 
-    _check_archive_budget(source)
-    workbook = _load(source, read_only=False)
-    try:
+    snapshot = _read_snapshot(source)
+    with _open_snapshot(snapshot, source, read_only=False) as workbook:
         inspected = _inspect_open(workbook, source, schema)
         if inspected.duplicate_ids:
             _source_error(
@@ -125,6 +173,7 @@ def upsert_workbook_entity(
             _semantic_fields(schema, selected[0].fields)
             == _semantic_fields(schema, normalized)
         ):
+            _require_current_identity(source, snapshot.identity)
             return False
 
         sheet = workbook.active
@@ -148,7 +197,14 @@ def upsert_workbook_entity(
                     path=str(source),
                 )
             style_row = (
-                max((record.row for record in inspected.records if record.row < target_row), default=0)
+                max(
+                    (
+                        record.row
+                        for record in inspected.records
+                        if record.row < target_row
+                    ),
+                    default=0,
+                )
                 or inspected.type_row
             )
             for field in ("id", *schema.field_names):
@@ -170,10 +226,8 @@ def upsert_workbook_entity(
                 _encode_value(field, normalized[field]),
             )
 
-        _replace_atomically(source, workbook, schema, change)
+        _replace_atomically(source, workbook, schema, change, snapshot)
         return True
-    finally:
-        workbook.close()
 
 
 def _coerce_path(path: str | os.PathLike[str]) -> Path:
@@ -203,18 +257,33 @@ def _schema_for_path(path: Path) -> EntitySchema:
 
 
 def _inspect_path(path: Path, schema: EntitySchema) -> TableInspection:
-    _check_archive_budget(path)
-    workbook = _load(path, read_only=True)
-    try:
+    snapshot = _read_snapshot(path)
+    with _open_snapshot(snapshot, path, read_only=True) as workbook:
         return _inspect_open(workbook, path, schema)
-    finally:
-        workbook.close()
 
 
-def _check_archive_budget(path: Path) -> None:
+def _read_snapshot(path: Path) -> _WorkbookSnapshot:
     try:
-        source_size = path.stat().st_size
-    except (OSError, ValueError) as error:
+        with path.open("rb") as handle:
+            before_stat = os.fstat(handle.fileno())
+            before = _identity_from_stat(before_stat)
+            if not stat.S_ISREG(before_stat.st_mode):
+                raise OSError("workbook source is not a regular file")
+            if before.size > _MAX_SOURCE_BYTES:
+                _source_error(
+                    "Workbook exceeds the compressed source size limit",
+                    "source_too_large",
+                    actual_bytes=before.size,
+                    limit_bytes=_MAX_SOURCE_BYTES,
+                    path=str(path),
+                )
+            content = handle.read(_MAX_SOURCE_BYTES + 1)
+            after_stat = os.fstat(handle.fileno())
+            after = _identity_from_stat(after_stat)
+            source_mode = after.mode
+    except AuthoringError:
+        raise
+    except (OSError, MemoryError, ValueError) as error:
         raise AuthoringError(
             "workbook_read_failed",
             "Workbook could not be read",
@@ -224,16 +293,42 @@ def _check_archive_budget(path: Path) -> None:
                 "reason": "read_error",
             },
         ) from None
-    if source_size > _MAX_SOURCE_BYTES:
+
+    if len(content) > _MAX_SOURCE_BYTES:
         _source_error(
             "Workbook exceeds the compressed source size limit",
             "source_too_large",
-            actual_bytes=source_size,
+            actual_bytes=len(content),
             limit_bytes=_MAX_SOURCE_BYTES,
             path=str(path),
         )
+    if before != after or len(content) != after.size:
+        _source_error(
+            "Workbook changed while its immutable snapshot was being read",
+            "source_changed_during_read",
+            actual_bytes=len(content),
+            expected_bytes=after.size,
+            path=str(path),
+        )
+
+    snapshot = _WorkbookSnapshot(content, after, source_mode)
+    _preflight_archive(snapshot, path)
+    return snapshot
+
+
+def _identity_from_stat(source_stat: os.stat_result) -> _FileIdentity:
+    return _FileIdentity(
+        device=source_stat.st_dev,
+        inode=source_stat.st_ino,
+        size=source_stat.st_size,
+        modified_ns=source_stat.st_mtime_ns,
+        mode=stat.S_IMODE(source_stat.st_mode),
+    )
+
+
+def _preflight_archive(snapshot: _WorkbookSnapshot, path: Path) -> None:
     try:
-        with ZipFile(path) as archive:
+        with ZipFile(BytesIO(snapshot.content)) as archive:
             members = archive.infolist()
             if len(members) > _MAX_ARCHIVE_MEMBERS:
                 _source_error(
@@ -244,7 +339,17 @@ def _check_archive_budget(path: Path) -> None:
                     path=str(path),
                 )
             total_size = 0
+            names: set[str] = set()
+            worksheets = []
             for member in members:
+                if member.filename in names:
+                    _source_error(
+                        "Workbook archive contains a duplicate package part",
+                        "unsafe_archive",
+                        member=member.filename,
+                        path=str(path),
+                    )
+                names.add(member.filename)
                 if member.flag_bits & 0x1:
                     _source_error(
                         "Encrypted workbook members are not supported",
@@ -270,6 +375,21 @@ def _check_archive_budget(path: Path) -> None:
                         limit_bytes=_MAX_ARCHIVE_BYTES,
                         path=str(path),
                     )
+                lowered = member.filename.lower()
+                for prefix, feature in _LOSSY_PACKAGE_PREFIXES:
+                    if lowered.startswith(prefix):
+                        _source_error(
+                            "Workbook contains a package part that cannot be preserved safely",
+                            "unsupported_package_part",
+                            feature=feature,
+                            part=member.filename,
+                            path=str(path),
+                        )
+                if lowered.startswith("xl/worksheets/") and lowered.endswith(".xml"):
+                    worksheets.append(member)
+
+            for worksheet in worksheets:
+                _preflight_worksheet(archive, worksheet, path)
     except AuthoringError:
         raise
     except (BadZipFile, OSError, ValueError, RuntimeError) as error:
@@ -284,24 +404,197 @@ def _check_archive_budget(path: Path) -> None:
         ) from None
 
 
-def _load(path: Path, *, read_only: bool) -> Workbook:
-    try:
-        return load_workbook(
-            path,
-            read_only=read_only,
-            data_only=False,
-            keep_links=False,
+class _BudgetedWorksheetReader:
+    def __init__(self, source: Any, path: Path, part: str) -> None:
+        self._source = source
+        self._path = path
+        self._part = part
+        self.bytes_read = 0
+
+    def read(self, size: int = -1) -> bytes:
+        data = self._source.read(size)
+        self.bytes_read += len(data)
+        if self.bytes_read > _MAX_WORKSHEET_XML_BYTES:
+            _source_error(
+                "Worksheet XML exceeds the streaming size limit",
+                "worksheet_xml_limit",
+                actual_bytes=self.bytes_read,
+                limit_bytes=_MAX_WORKSHEET_XML_BYTES,
+                part=self._part,
+                path=str(self._path),
+            )
+        return data
+
+
+def _preflight_worksheet(archive: ZipFile, member: Any, path: Path) -> None:
+    if member.file_size > _MAX_WORKSHEET_XML_BYTES:
+        _source_error(
+            "Worksheet XML exceeds the streaming size limit",
+            "worksheet_xml_limit",
+            actual_bytes=member.file_size,
+            limit_bytes=_MAX_WORKSHEET_XML_BYTES,
+            part=member.filename,
+            path=str(path),
         )
-    except Exception as error:
+
+    cell_count = 0
+    max_row = 0
+    max_column = 0
+    try:
+        with archive.open(member) as raw:
+            reader = _BudgetedWorksheetReader(raw, path, member.filename)
+            for event, element in ElementTree.iterparse(
+                reader,
+                events=("start", "end"),
+            ):
+                if event == "start":
+                    local_name = element.tag.rsplit("}", 1)[-1]
+                    if local_name == "dimension":
+                        reference = element.attrib.get("ref")
+                        if not reference:
+                            _invalid_worksheet_xml(path, member.filename, "missing_dimension_ref")
+                        dimension_parts = reference.split(":")
+                        if len(dimension_parts) not in {1, 2}:
+                            _invalid_worksheet_xml(path, member.filename, "invalid_dimension_ref")
+                        first_column, first_row = _parse_cell_reference(
+                            dimension_parts[0], path, member.filename
+                        )
+                        last_column, last_row = _parse_cell_reference(
+                            dimension_parts[-1], path, member.filename
+                        )
+                        if last_column < first_column or last_row < first_row:
+                            _invalid_worksheet_xml(path, member.filename, "reversed_dimension_ref")
+                        _enforce_worksheet_budget(
+                            last_row,
+                            last_column,
+                            cell_count,
+                            path,
+                            member.filename,
+                        )
+                    elif local_name == "row":
+                        row_text = element.attrib.get("r")
+                        if row_text is not None:
+                            if not row_text.isdigit() or int(row_text) < 1:
+                                _invalid_worksheet_xml(path, member.filename, "invalid_row_number")
+                            max_row = max(max_row, int(row_text))
+                            _enforce_worksheet_budget(
+                                max_row,
+                                max_column,
+                                cell_count,
+                                path,
+                                member.filename,
+                            )
+                    elif local_name == "c":
+                        reference = element.attrib.get("r")
+                        if not reference:
+                            _invalid_worksheet_xml(path, member.filename, "missing_cell_ref")
+                        column, row = _parse_cell_reference(reference, path, member.filename)
+                        cell_count += 1
+                        max_row = max(max_row, row)
+                        max_column = max(max_column, column)
+                        _enforce_worksheet_budget(
+                            max_row,
+                            max_column,
+                            cell_count,
+                            path,
+                            member.filename,
+                        )
+                else:
+                    element.clear()
+    except AuthoringError:
+        raise
+    except (BadZipFile, ElementTree.ParseError, OSError, RuntimeError, ValueError) as error:
         raise AuthoringError(
             "invalid_workbook_source",
-            "Workbook could not be opened safely",
+            "Worksheet XML could not be streamed safely",
             {
                 "error_type": type(error).__name__,
+                "part": member.filename,
                 "path": str(path),
                 "reason": "corrupt_workbook",
             },
         ) from None
+
+
+def _parse_cell_reference(reference: str, path: Path, part: str) -> tuple[int, int]:
+    matched = _CELL_REFERENCE_RE.fullmatch(reference)
+    if matched is None:
+        _invalid_worksheet_xml(path, part, "invalid_cell_ref")
+    column = 0
+    for character in matched.group(1):
+        column = column * 26 + ord(character) - ord("A") + 1
+    return column, int(matched.group(2))
+
+
+def _enforce_worksheet_budget(
+    rows: int,
+    columns: int,
+    cells: int,
+    path: Path,
+    part: str,
+) -> None:
+    if (
+        rows > _MAX_ROWS
+        or columns > _MAX_COLUMNS
+        or rows * columns > _MAX_CELLS
+        or cells > _MAX_CELLS
+    ):
+        _source_error(
+            "Workbook dimensions exceed the authoring safety limit",
+            "dimension_limit",
+            actual_cells=cells,
+            actual_columns=columns,
+            actual_rows=rows,
+            limit_cells=_MAX_CELLS,
+            limit_columns=_MAX_COLUMNS,
+            limit_rows=_MAX_ROWS,
+            part=part,
+            path=str(path),
+        )
+
+
+def _invalid_worksheet_xml(path: Path, part: str, detail: str) -> NoReturn:
+    _source_error(
+        "Worksheet XML contains an invalid coordinate or dimension",
+        "corrupt_workbook",
+        detail=detail,
+        part=part,
+        path=str(path),
+    )
+
+
+@contextmanager
+def _open_snapshot(
+    snapshot: _WorkbookSnapshot,
+    path: Path,
+    *,
+    read_only: bool,
+) -> Iterator[Workbook]:
+    buffer = BytesIO(snapshot.content)
+    workbook: Workbook | None = None
+    try:
+        try:
+            workbook = load_workbook(
+                buffer,
+                read_only=read_only,
+                data_only=False,
+                keep_links=False,
+            )
+        except Exception as error:
+            raise AuthoringError(
+                "invalid_workbook_source",
+                "Workbook could not be opened safely",
+                {
+                    "error_type": type(error).__name__,
+                    "path": str(path),
+                    "reason": "corrupt_workbook",
+                },
+            ) from None
+        yield workbook
+    finally:
+        if workbook is not None:
+            workbook.close()
+        buffer.close()
 
 
 def _inspect_open(
@@ -408,14 +701,16 @@ def _inspect_open(
     seen: set[str] = set()
     id_column = header_columns["id"]
     field_columns = {field: header_columns[field] for field in schema.field_names}
+    field_specs = {field.name: field for field in schema.fields}
     for row_index in range(type_row + 1, sheet.max_row + 1):
-        raw_id = sheet.cell(row_index, id_column).value
-        raw_fields = {
-            field: sheet.cell(row_index, column).value
+        id_cell = sheet.cell(row_index, id_column)
+        raw_id = id_cell.value
+        field_cells = {
+            field: sheet.cell(row_index, column)
             for field, column in field_columns.items()
         }
         if raw_id in (None, ""):
-            if any(value not in (None, "") for value in raw_fields.values()):
+            if any(cell.value not in (None, "") for cell in field_cells.values()):
                 _source_error(
                     "Workbook row has schema values but no entity id",
                     "missing_id",
@@ -424,12 +719,17 @@ def _inspect_open(
                     row=row_index,
                 )
             continue
-        entity_id = str(raw_id)
-        decoded = {
-            field: _decode_value(field, raw_fields[field])
-            for field in schema.field_names
-        }
         try:
+            entity_id = _decode_id_cell(schema.entity, id_cell)
+            decoded = {
+                field: _decode_field_cell(
+                    schema.entity,
+                    entity_id,
+                    field_specs[field],
+                    field_cells[field],
+                )
+                for field in schema.field_names
+            }
             normalized = validate_entity_fields(schema.entity, entity_id, decoded)
         except AuthoringError as error:
             _source_error(
@@ -438,9 +738,10 @@ def _inspect_open(
                 allowed=error.details.get("allowed", ()),
                 entity=schema.entity,
                 field=error.details.get("field"),
-                id=entity_id,
+                id=error.details.get("id", _diagnostic_value(raw_id)),
                 path=str(path),
                 row=row_index,
+                source_type=error.details.get("source_type"),
                 validation_code=error.code,
                 validation_message=error.message,
                 value=error.details.get("value"),
@@ -491,14 +792,112 @@ def _expected_column_type(entity: str, field: str) -> str:
     return "string"
 
 
-def _decode_value(field: str, value: Any) -> Any:
-    if field == "reset_resources":
+def _decode_id_cell(entity: str, cell: Any) -> str:
+    value = cell.value
+    if cell.data_type == "f" or type(value) is not str:
+        _invalid_cell_value(
+            entity,
+            _diagnostic_value(value),
+            "id",
+            value,
+            ("literal string id",),
+            cell.data_type,
+        )
+    return value
+
+
+def _decode_field_cell(
+    entity: str,
+    entity_id: str,
+    spec: FieldSpec,
+    cell: Any,
+) -> Any:
+    value = cell.value
+    if cell.data_type == "f":
+        _invalid_cell_value(
+            entity,
+            entity_id,
+            spec.name,
+            value,
+            ("literal cell value",),
+            cell.data_type,
+        )
+
+    if spec.value_type == "list_id":
         if value in (None, ""):
             return []
-        return [item for item in str(value).split(";") if item]
-    if value is None:
-        return ""
-    return str(value)
+        if type(value) is not str:
+            _invalid_cell_value(
+                entity,
+                entity_id,
+                spec.name,
+                value,
+                ("semicolon-separated string ids",),
+                cell.data_type,
+            )
+        values = value.split(";")
+        if any(item == "" for item in values):
+            _invalid_cell_value(
+                entity,
+                entity_id,
+                spec.name,
+                value,
+                ("semicolon-separated string ids without empty items",),
+                cell.data_type,
+            )
+        return values
+
+    if spec.value_type in {"decimal", "positive_decimal", "nonnegative_decimal"}:
+        if type(value) not in {int, str}:
+            _invalid_cell_value(
+                entity,
+                entity_id,
+                spec.name,
+                value,
+                ("integer cell", "exact decimal string cell"),
+                cell.data_type,
+            )
+        return value
+
+    if type(value) is not str:
+        _invalid_cell_value(
+            entity,
+            entity_id,
+            spec.name,
+            value,
+            ("literal string cell",),
+            cell.data_type,
+        )
+    return value
+
+
+def _invalid_cell_value(
+    entity: str,
+    entity_id: Any,
+    field: str,
+    value: Any,
+    allowed: tuple[str, ...],
+    source_type: str,
+) -> NoReturn:
+    raise AuthoringError(
+        "invalid_change",
+        f"Workbook cell {field!r} has an unsupported exact value type",
+        {
+            "allowed": allowed,
+            "entity": entity,
+            "field": field,
+            "id": entity_id,
+            "source_type": source_type,
+            "value": _diagnostic_value(value),
+            "value_type": type(value).__name__,
+        },
+    )
+
+
+def _diagnostic_value(value: Any) -> str | int | bool | None:
+    if value is None or type(value) in {str, int, bool}:
+        return value
+    return f"<{type(value).__name__}>"
 
 
 def _encode_value(field: str, value: Any) -> str:
@@ -549,12 +948,12 @@ def _replace_atomically(
     workbook: Workbook,
     schema: EntitySchema,
     change: ModelChange,
+    source_snapshot: _WorkbookSnapshot,
 ) -> None:
     temporary: Path | None = None
     phase = "temp_write"
     candidate_bytes: bytes | None = None
     try:
-        source_mode = stat.S_IMODE(path.stat().st_mode)
         descriptor, temporary_name = tempfile.mkstemp(
             prefix=f".{path.name}.",
             suffix=".tmp.xlsx",
@@ -563,7 +962,7 @@ def _replace_atomically(
         os.close(descriptor)
         temporary = Path(temporary_name)
         workbook.save(temporary)
-        os.chmod(temporary, source_mode)
+        os.chmod(temporary, source_snapshot.source_mode)
         candidate_bytes = temporary.read_bytes()
 
         phase = "reload"
@@ -581,6 +980,8 @@ def _replace_atomically(
                 path=str(path),
             )
 
+        phase = "identity"
+        _require_current_identity(path, source_snapshot.identity)
         phase = "replace"
         try:
             os.replace(temporary, path)
@@ -593,6 +994,7 @@ def _replace_atomically(
         reason = {
             "temp_write": "temp_write_error",
             "reload": "reload_error",
+            "identity": "source_changed",
             "replace": "replace_error",
         }[phase]
         raise AuthoringError(
@@ -617,6 +1019,19 @@ def _path_has_exact_bytes(path: Path, expected: bytes) -> bool:
         return path.stat().st_size == len(expected) and path.read_bytes() == expected
     except (OSError, MemoryError, ValueError):
         return False
+
+
+def _require_current_identity(path: Path, expected: _FileIdentity) -> None:
+    try:
+        actual = _identity_from_stat(path.stat())
+    except (OSError, ValueError):
+        actual = None
+    if actual != expected:
+        _source_error(
+            "Workbook path changed after its source snapshot was opened",
+            "source_changed",
+            path=str(path),
+        )
 
 
 def _source_error(message: str, reason: str, **details: Any) -> NoReturn:

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from datetime import date
 import json
 import os
 from pathlib import Path
 import random
+import re
 import stat
 from typing import Any, NoReturn
 from zipfile import ZipFile
@@ -15,7 +17,7 @@ import pytest
 
 from igess.authoring.change import ModelChange
 from igess.authoring.entity_schema import get_entity_schema
-from igess.authoring.response import AuthoringError
+from igess.authoring.response import AuthoringError, CommandResponse
 from igess.authoring.workbook_source import (
     TableInspection,
     WorkbookRecord,
@@ -322,7 +324,12 @@ def test_inspection_finds_shifted_markers_without_changing_the_file(tmp_path: Pa
 
     inspected = inspect_table(path)
 
-    assert (inspected.marker_column, inspected.var_row, inspected.description_row, inspected.type_row) == (
+    assert (
+        inspected.marker_column,
+        inspected.var_row,
+        inspected.description_row,
+        inspected.type_row,
+    ) == (
         3,
         4,
         5,
@@ -539,6 +546,273 @@ def test_missing_corrupt_wrong_named_and_oversized_sources_are_structured(
     assert huge_error.value.details["limit_rows"] == 100_000
 
 
+def test_worksheet_budget_is_enforced_before_openpyxl_materializes_cells(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = _path_for(tmp_path, "resource")
+    _write_table(path, "resource")
+    workbook = load_workbook(path)
+    sheet = workbook.active
+    for column in range(1, 33):
+        sheet.cell(10, column, f"cell-{column}")
+    workbook.save(path)
+    workbook.close()
+
+    monkeypatch.setattr("igess.authoring.workbook_source._MAX_CELLS", 20)
+
+    def must_not_materialize(*args: Any, **kwargs: Any) -> NoReturn:
+        del args, kwargs
+        raise AssertionError("openpyxl was called before worksheet preflight")
+
+    monkeypatch.setattr(
+        "igess.authoring.workbook_source.load_workbook",
+        must_not_materialize,
+    )
+    with pytest.raises(AuthoringError) as caught:
+        inspect_table(path)
+
+    assert caught.value.code == "invalid_workbook_source"
+    assert caught.value.details["reason"] == "dimension_limit"
+    assert caught.value.details["limit_cells"] == 20
+
+
+def test_streaming_preflight_counts_cells_even_when_xml_dimension_lies(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = _path_for(tmp_path, "resource")
+    _write_table(path, "resource")
+    workbook = load_workbook(path)
+    sheet = workbook.active
+    for column in range(1, 33):
+        sheet.cell(10, column, f"cell-{column}")
+    workbook.save(path)
+    workbook.close()
+
+    rewritten = path.with_name("rewritten.xlsx")
+    replaced_dimension = False
+    with ZipFile(path) as source, ZipFile(rewritten, "w") as target:
+        for member in source.infolist():
+            content = source.read(member)
+            if member.filename == "xl/worksheets/sheet1.xml":
+                changed = re.sub(
+                    rb'<dimension ref="[^"]+"\s*/>',
+                    b'<dimension ref="A1"/>',
+                    content,
+                    count=1,
+                )
+                changed = changed.replace(b'<row r="10">', b'<row r="1">')
+                changed = re.sub(
+                    rb'<c r="[A-Z]+10"',
+                    b'<c r="A1"',
+                    changed,
+                )
+                replaced_dimension = changed != content
+                content = changed
+            target.writestr(member, content)
+    assert replaced_dimension is True
+    os.replace(rewritten, path)
+    monkeypatch.setattr("igess.authoring.workbook_source._MAX_CELLS", 20)
+
+    def must_not_materialize(*args: Any, **kwargs: Any) -> NoReturn:
+        del args, kwargs
+        raise AssertionError("openpyxl was called before worksheet cell counting")
+
+    monkeypatch.setattr(
+        "igess.authoring.workbook_source.load_workbook",
+        must_not_materialize,
+    )
+    with pytest.raises(AuthoringError) as caught:
+        inspect_table(path)
+
+    assert caught.value.details["reason"] == "dimension_limit"
+    assert caught.value.details["actual_cells"] == 21
+
+
+def test_inspection_loads_the_preflighted_snapshot_if_path_changes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = _path_for(tmp_path, "resource")
+    replacement = tmp_path / "replacement.xlsx"
+    initial = ENTITY_CASES["resource"][0]
+    _write_table(path, "resource", [("gold", initial)])
+    _write_table(replacement, "resource", [("fish", initial)])
+    replacement_bytes = replacement.read_bytes()
+    real_load = load_workbook
+    swapped = False
+
+    def swap_path_before_load(source: Any, *args: Any, **kwargs: Any) -> Any:
+        nonlocal swapped
+        if not swapped:
+            swapped = True
+            path.write_bytes(replacement_bytes)
+        return real_load(source, *args, **kwargs)
+
+    monkeypatch.setattr(
+        "igess.authoring.workbook_source.load_workbook",
+        swap_path_before_load,
+    )
+
+    inspected = inspect_table(path)
+
+    assert swapped is True
+    assert [record.entity_id for record in inspected.records] == ["gold"]
+
+
+def test_upsert_does_not_overwrite_path_changed_after_snapshot(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = _path_for(tmp_path, "resource")
+    replacement = tmp_path / "replacement.xlsx"
+    _write_table(path, "resource")
+    _write_table(
+        replacement,
+        "resource",
+        [("external", ENTITY_CASES["resource"][0])],
+    )
+    replacement_bytes = replacement.read_bytes()
+    real_load = load_workbook
+    swapped = False
+
+    def swap_path_before_load(source: Any, *args: Any, **kwargs: Any) -> Any:
+        nonlocal swapped
+        if not swapped:
+            swapped = True
+            path.write_bytes(replacement_bytes)
+        return real_load(source, *args, **kwargs)
+
+    monkeypatch.setattr(
+        "igess.authoring.workbook_source.load_workbook",
+        swap_path_before_load,
+    )
+
+    with pytest.raises(AuthoringError) as caught:
+        upsert_workbook_entity(
+            path,
+            _change("resource", "gold", ENTITY_CASES["resource"][0]),
+        )
+
+    assert caught.value.code == "workbook_write_failed"
+    assert caught.value.details["reason"] == "source_changed"
+    assert path.read_bytes() == replacement_bytes
+    assert _temp_files(path) == []
+
+
+@pytest.mark.parametrize(
+    ("part", "feature"),
+    [
+        ("xl/externalLinks/externalLink1.xml", "external_links"),
+        ("xl/vbaProject.bin", "vba_macros"),
+    ],
+)
+def test_lossy_package_parts_are_rejected_before_inspect_or_mutation(
+    tmp_path: Path,
+    part: str,
+    feature: str,
+) -> None:
+    path = _path_for(tmp_path, "resource")
+    _write_table(path, "resource")
+    with ZipFile(path, "a") as archive:
+        archive.writestr(part, b"synthetic unsupported package part")
+    before = path.read_bytes()
+
+    with pytest.raises(AuthoringError) as inspect_error:
+        inspect_table(path)
+    assert inspect_error.value.code == "invalid_workbook_source"
+    assert inspect_error.value.details["reason"] == "unsupported_package_part"
+    assert inspect_error.value.details["feature"] == feature
+    assert inspect_error.value.details["part"] == part
+
+    with pytest.raises(AuthoringError) as upsert_error:
+        upsert_workbook_entity(
+            path,
+            _change("resource", "gold", ENTITY_CASES["resource"][0]),
+        )
+    assert upsert_error.value.details["reason"] == "unsupported_package_part"
+    assert path.read_bytes() == before
+
+
+@pytest.mark.parametrize(
+    ("entity", "cell", "raw_value", "field"),
+    [
+        ("resource", "B4", 123, "id"),
+        ("resource", "C4", 123, "name"),
+        ("resource", "D4", True, "dimension"),
+        ("resource", "C4", date(2026, 7, 15), "name"),
+        ("resource", "C4", "=1+1", "name"),
+        ("constant", "C4", 1.25, "value"),
+    ],
+)
+def test_source_cells_keep_exact_types_instead_of_string_coercion(
+    tmp_path: Path,
+    entity: str,
+    cell: str,
+    raw_value: Any,
+    field: str,
+) -> None:
+    path = _path_for(tmp_path, entity)
+    _write_table(path, entity, [("entry", ENTITY_CASES[entity][0])])
+    workbook = load_workbook(path)
+    workbook.active[cell] = raw_value
+    workbook.save(path)
+    workbook.close()
+
+    with pytest.raises(AuthoringError) as caught:
+        inspect_table(path)
+
+    assert caught.value.code == "invalid_workbook_source"
+    assert caught.value.details["reason"] == "invalid_entity_row"
+    assert caught.value.details["field"] == field
+    assert caught.value.details["row"] == 4
+    CommandResponse(
+        command="inspect",
+        ok=False,
+        code=caught.value.code,
+        message=caught.value.message,
+        details=caught.value.details,
+    ).to_json()
+
+
+@pytest.mark.parametrize("raw_value", ["gold;;ore", ";gold", "gold;", 123, True])
+def test_prestige_list_encoding_rejects_empty_tokens_and_non_strings(
+    tmp_path: Path,
+    raw_value: Any,
+) -> None:
+    path = _path_for(tmp_path, "prestige_layer")
+    _write_table(
+        path,
+        "prestige_layer",
+        [("entry", ENTITY_CASES["prestige_layer"][0])],
+    )
+    workbook = load_workbook(path)
+    headers = {
+        workbook.active.cell(1, column).value: column
+        for column in range(2, workbook.active.max_column + 1)
+    }
+    workbook.active.cell(4, headers["reset_resources"], raw_value)
+    workbook.save(path)
+    workbook.close()
+
+    with pytest.raises(AuthoringError) as caught:
+        inspect_table(path)
+
+    assert caught.value.code == "invalid_workbook_source"
+    assert caught.value.details["reason"] == "invalid_entity_row"
+    assert caught.value.details["field"] == "reset_resources"
+
+
+def test_integer_decimal_cells_remain_exact_and_supported(tmp_path: Path) -> None:
+    path = _path_for(tmp_path, "constant")
+    _write_table(path, "constant", [("starting_gold", {"value": 100})])
+
+    inspected = inspect_table(path)
+
+    assert _fields(inspected.records[0]) == {"value": "100"}
+
+
 def test_orphan_schema_values_are_rejected(tmp_path: Path) -> None:
     path = _path_for(tmp_path, "resource")
     _write_table(path, "resource")
@@ -608,9 +882,12 @@ def test_reopen_failure_leaves_original_and_cleans_temp(
     _write_table(path, "resource")
     before = path.read_bytes()
     real_load = load_workbook
+    load_calls = 0
 
     def fail_temp(source: Any, *args: Any, **kwargs: Any) -> Any:
-        if Path(source) != path:
+        nonlocal load_calls
+        load_calls += 1
+        if load_calls == 2:
             raise OSError("reopen failed")
         return real_load(source, *args, **kwargs)
 
