@@ -315,11 +315,11 @@ def _check_generator_routes(
                 f"Model constant 'starting_{generator.cost_resource}' is malformed",
                 "model_mismatch",
             )
-        if base_cost >= zero and starting_amount < base_cost:
+        if computed_cost >= zero and starting_amount < computed_cost:
             blockers.append(
                 EligibilityFinding(
                     "generator_unaffordable",
-                    f"Generator '{generator_id}' costs {base_cost} {generator.cost_resource}, but the smoke start has {starting_amount}.",
+                    f"Generator '{generator_id}' costs {computed_cost} {generator.cost_resource}, but the smoke start has {starting_amount}.",
                     "generator",
                     generator_id,
                 )

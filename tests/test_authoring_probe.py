@@ -21,6 +21,7 @@ from igess.schema import (
     ActivityOutputRow,
     ActivityRow,
     ConstantRow,
+    EconomyModel,
     FormulaDef,
     GeneratorRow,
     ModelSettings,
@@ -29,6 +30,7 @@ from igess.schema import (
     ResourceRow,
     Rules,
     Scenario,
+    SimulationState,
 )
 
 
@@ -346,6 +348,27 @@ def test_generator_computed_cost_must_be_nonnegative() -> None:
     assert "generator_cost_negative" in _codes(result)
 
 
+def test_generator_affordability_uses_computed_cost_when_formula_multiplies() -> None:
+    raw = _raw(route="generator", starting_cost="15")
+    raw.rules.formulas["generator_cost"].expr = "base_cost * 2"
+
+    result = _evaluate(raw)
+
+    assert not result.eligible
+    assert "generator_unaffordable" in _codes(result)
+    finding = next(
+        item for item in result.findings if item.code == "generator_unaffordable"
+    )
+    assert "costs 20 energy" in finding.message
+
+
+def test_generator_affordability_uses_computed_cost_when_formula_divides() -> None:
+    raw = _raw(route="generator", starting_cost="6")
+    raw.rules.formulas["generator_cost"].expr = "base_cost / 2"
+
+    assert _evaluate(raw).eligible
+
+
 @pytest.mark.parametrize("expr", ["base_output * 0", "-base_output"])
 def test_generator_computed_production_must_be_positive(expr: str) -> None:
     raw = _raw(route="generator", starting_cost="10")
@@ -631,6 +654,146 @@ scenarios:
     assert raw.rules.player_profiles["alpha"].activity_weights == {}
     assert set(model.activities) == {"gather"}
     assert set(model.activity_outputs) == {"gather_gold"}
+
+
+def test_activity_schema_additions_preserve_all_legacy_constructor_signatures() -> None:
+    profile_positional = PlayerProfile(
+        "legacy",
+        {"active": _number("1")},
+        "default",
+        "default",
+        "conservative",
+    )
+    profile_keyword = PlayerProfile(
+        id="legacy",
+        source_efficiency={"active": _number("1")},
+        behavior_policy="default",
+        session_pattern="default",
+        prestige_policy="conservative",
+    )
+    profile_modern = PlayerProfile(
+        id="modern",
+        source_efficiency={"active": _number("1")},
+        behavior_policy="default",
+        session_pattern="default",
+        prestige_policy="conservative",
+        activity_weights={"gather": _number("2")},
+    )
+    assert profile_positional.activity_weights == {}
+    assert profile_keyword.activity_weights == {}
+    assert profile_modern.activity_weights == {"gather": _number("2")}
+
+    source = _raw()
+    raw_values = (
+        source.rules,
+        source.resources,
+        source.generators,
+        source.upgrades,
+        source.constants,
+        source.milestones,
+        source.prestige_layers,
+    )
+    raw_positional = RawConfig(*raw_values)
+    raw_keyword = RawConfig(
+        rules=source.rules,
+        resources=source.resources,
+        generators=source.generators,
+        upgrades=source.upgrades,
+        constants=source.constants,
+        milestones=source.milestones,
+        prestige_layers=source.prestige_layers,
+    )
+    raw_modern = RawConfig(
+        *raw_values,
+        activities=[ActivityRow("gather", "Gather", "active")],
+        activity_outputs=[
+            ActivityOutputRow("gather_gold", "gather", "gold", "1")
+        ],
+    )
+    assert raw_positional.activities == raw_positional.activity_outputs == []
+    assert raw_keyword.activities == raw_keyword.activity_outputs == []
+    assert [item.id for item in raw_modern.activities] == ["gather"]
+
+    built = ModelBuilder.build(source)
+    model_values = (
+        built.config,
+        built.resources,
+        built.generators,
+        built.upgrades,
+        built.constants,
+        built.milestones,
+        built.prestige_layers,
+        built.formulas,
+        built.generator_types,
+        built.source_types,
+        built.modifier_pipeline,
+        built.modifier_types,
+        built.behavior_policies,
+        built.session_patterns,
+        built.player_profiles,
+        built.scenarios,
+        built.rng_tables,
+        built.rng_scenarios,
+    )
+    model_positional = EconomyModel(*model_values)
+    model_keyword = EconomyModel(
+        config=built.config,
+        resources=built.resources,
+        generators=built.generators,
+        upgrades=built.upgrades,
+        constants=built.constants,
+        milestones=built.milestones,
+        prestige_layers=built.prestige_layers,
+        formulas=built.formulas,
+        generator_types=built.generator_types,
+        source_types=built.source_types,
+        modifier_pipeline=built.modifier_pipeline,
+        modifier_types=built.modifier_types,
+        behavior_policies=built.behavior_policies,
+        session_patterns=built.session_patterns,
+        player_profiles=built.player_profiles,
+        scenarios=built.scenarios,
+        rng_tables=built.rng_tables,
+        rng_scenarios=built.rng_scenarios,
+    )
+    model_modern = EconomyModel(
+        *model_values,
+        activities={"gather": ActivityRow("gather", "Gather", "active")},
+        activity_outputs={
+            "gather_gold": ActivityOutputRow(
+                "gather_gold", "gather", "gold", "1"
+            )
+        },
+    )
+    assert model_positional.activities == model_positional.activity_outputs == {}
+    assert model_keyword.activities == model_keyword.activity_outputs == {}
+    assert set(model_modern.activities) == {"gather"}
+
+    state_values = (
+        {"gold": _number("1")},
+        {"mine": 1},
+        {"upgrade"},
+        {"mine"},
+        {"upgrade"},
+        {"milestone"},
+        {"prestige": 1},
+    )
+    state_positional = SimulationState(*state_values)
+    state_keyword = SimulationState(
+        resources=state_values[0],
+        generators_owned=state_values[1],
+        upgrades_purchased=state_values[2],
+        unlocked_generators=state_values[3],
+        unlocked_upgrades=state_values[4],
+        milestones_claimed=state_values[5],
+        prestige_counts=state_values[6],
+    )
+    state_modern = SimulationState(
+        *state_values, unlocked_activities={"gather"}
+    )
+    assert state_positional.unlocked_activities == set()
+    assert state_keyword.unlocked_activities == set()
+    assert state_modern.unlocked_activities == {"gather"}
 
 
 def test_raw_and_model_must_correspond() -> None:

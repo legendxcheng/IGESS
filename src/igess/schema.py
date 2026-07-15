@@ -142,11 +142,11 @@ class PrestigeLayerRow:
 class PlayerProfile:
     id: str
     source_efficiency: dict[str, SimNumber]
-    activity_weights: dict[str, SimNumber]
     behavior_policy: str
     session_pattern: str
     prestige_policy: str
     luck: SimNumber = field(default_factory=SimNumber.one)
+    activity_weights: dict[str, SimNumber] = field(default_factory=dict)
 
 
 @dataclass
@@ -188,12 +188,12 @@ class RawConfig:
     rules: Rules
     resources: list[ResourceRow]
     generators: list[GeneratorRow]
-    activities: list[ActivityRow]
-    activity_outputs: list[ActivityOutputRow]
     upgrades: list[UpgradeRow]
     constants: list[ConstantRow]
     milestones: list[MilestoneRow]
     prestige_layers: list[PrestigeLayerRow]
+    activities: list[ActivityRow] = field(default_factory=list)
+    activity_outputs: list[ActivityOutputRow] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -209,8 +209,6 @@ class EconomyModel:
     config: RuntimeConfig
     resources: dict[str, ResourceRow]
     generators: dict[str, GeneratorRow]
-    activities: dict[str, ActivityRow]
-    activity_outputs: dict[str, ActivityOutputRow]
     upgrades: dict[str, UpgradeRow]
     constants: dict[str, SimNumber]
     milestones: dict[str, MilestoneRow]
@@ -226,6 +224,8 @@ class EconomyModel:
     scenarios: dict[str, Scenario]
     rng_tables: dict[str, RngTable]
     rng_scenarios: dict[str, RngScenario]
+    activities: dict[str, ActivityRow] = field(default_factory=dict)
+    activity_outputs: dict[str, ActivityOutputRow] = field(default_factory=dict)
 
     def generator_cost(self, generator_id: str, owned: int) -> SimNumber:
         generator = self.generators[generator_id]
@@ -277,10 +277,10 @@ class SimulationState:
     generators_owned: dict[str, int]
     upgrades_purchased: set[str] = field(default_factory=set)
     unlocked_generators: set[str] = field(default_factory=set)
-    unlocked_activities: set[str] = field(default_factory=set)
     unlocked_upgrades: set[str] = field(default_factory=set)
     milestones_claimed: set[str] = field(default_factory=set)
     prestige_counts: dict[str, int] = field(default_factory=dict)
+    unlocked_activities: set[str] = field(default_factory=set)
 
     @classmethod
     def new(cls, model: EconomyModel) -> "SimulationState":
