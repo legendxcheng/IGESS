@@ -1,6 +1,8 @@
 import json
+import shutil
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -14,6 +16,7 @@ from igess.simulator import Simulator
 
 CONFIG = "examples/shelldiver_v0/economy.yaml"
 TABLES = "examples/shelldiver_v0/luban_exports"
+NODE = shutil.which("node")
 
 
 def _write_sample_run(tmp_path):
@@ -72,6 +75,8 @@ def test_generate_static_report_writes_html_and_assets(tmp_path):
     assert "Event Timeline" in html
     assert "Payback" in html
     assert "Analysis Warnings" in html
+    assert 'data-overview-kpis' in html
+    assert 'class="kpi-grid"' in html
     assert "fisherman" in html
     assert (report_dir / "report_data.json").exists()
     assert (report_dir / "assets" / "echarts.min.js").exists()
@@ -95,6 +100,85 @@ def test_generate_static_report_writes_chart_rendering_asset(tmp_path):
     assert "renderCpsChart" in script
     assert "renderEventChart" in script
     assert "renderPaybackChart" in script
+    assert "renderOverview" in script
+    assert "report.overview" in script
+    assert "display_value" in script
+    assert "exact_value" in script
+    assert "exact-value" in script
+    assert "escapeHtml" in script
+
+
+@pytest.mark.skipif(NODE is None, reason="Node.js is required to execute the report renderer")
+def test_report_overview_renders_accessible_escaped_kpis():
+    point = {
+        "exact_value": '\"><script>alert("exact")</script>',
+        "display_value": "<display>",
+        "chart_value": None,
+    }
+    report = {
+        "scenario": {"id": "<scenario>"},
+        "overview": {
+            "duration_seconds": point,
+            "profiles": ["<profile>"],
+            "purchase_count": point,
+            "first_key_unlock": {
+                "time_seconds": point,
+                "profile_id": "<profile>",
+                "kind": "unlock_activity",
+                "item_id": "</p><script>alert('item')</script>",
+            },
+            "prestige_reset_count": point,
+            "worst_payback": {
+                "payback_seconds": point,
+                "profile_id": "<profile>",
+                "kind": "upgrade",
+                "item_id": "<upgrade>",
+            },
+            "never_purchased_count": point,
+            "never_unlocked_count": point,
+            "warning_category_count": point,
+            "final_resources": {"<profile>": {"<resource>": point}},
+        },
+    }
+    script_path = Path("src/igess/reporting/assets/report.js").resolve()
+    harness = r"""
+const fs = require('fs');
+const vm = require('vm');
+const source = fs.readFileSync(process.argv[1], 'utf8');
+const context = { console };
+vm.createContext(context);
+vm.runInContext(source, context);
+const scenario = { textContent: '' };
+const container = { innerHTML: '' };
+context.document = {
+  querySelector(selector) {
+    if (selector === '[data-scenario]') return scenario;
+    if (selector === '[data-overview-kpis]') return container;
+    return null;
+  },
+};
+context.renderOverview(JSON.parse(process.argv[2]));
+process.stdout.write(JSON.stringify({ scenario: scenario.textContent, html: container.innerHTML }));
+"""
+
+    completed = subprocess.run(
+        [NODE, "-e", harness, str(script_path), json.dumps(report)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    rendered = json.loads(completed.stdout)
+    html = rendered["html"]
+    assert rendered["scenario"] == "<scenario>"
+    assert html.count('role="listitem"') == 9
+    assert '<details class="exact-values">' in html
+    assert 'data-exact-value=' in html
+    assert "&lt;profile&gt;" in html
+    assert "&lt;resource&gt;" in html
+    assert "&lt;display&gt;" in html
+    assert "<script>" not in html
 
 
 def test_generate_static_report_embeds_parseable_json_payload(tmp_path):
@@ -110,8 +194,13 @@ def test_generate_static_report_embeds_parseable_json_payload(tmp_path):
     inline_payload = json.loads(html[start:end])
     file_payload = json.loads((report_dir / "report_data.json").read_text(encoding="utf-8"))
     assert inline_payload == file_payload
-    assert inline_payload["schema_version"] == 1
+    assert inline_payload["schema_version"] == 2
     assert inline_payload["series"]["resources"]
+    assert set(inline_payload["overview"]["duration_seconds"]) == {
+        "exact_value",
+        "display_value",
+        "chart_value",
+    }
     assert "&quot;" not in html[start:end]
 
 

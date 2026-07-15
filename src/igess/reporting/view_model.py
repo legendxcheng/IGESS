@@ -3,6 +3,9 @@ from __future__ import annotations
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
+from igess.human_numbers import human_number
+
+from .kpis import build_overview
 from .loader import ReportData
 
 
@@ -15,18 +18,14 @@ def build_report_view_model(data: ReportData) -> dict[str, Any]:
         }
     )
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "scenario": {
             "id": data.scenario_id,
             "model_id": data.manifest.get("model_id"),
+            "model_digest": data.manifest.get("model_digest"),
             "profiles": data.profiles,
         },
-        "overview": {
-            "timeline_rows": len(data.timeline),
-            "event_count": len(data.events),
-            "missing_artifacts": list(data.missing_artifacts),
-            "resource_ids": resource_ids,
-        },
+        "overview": _overview(data, resource_ids),
         "series": {
             "resources": _resource_series(data.timeline, resource_ids),
             "total_cps": _total_cps_series(data.timeline),
@@ -60,9 +59,54 @@ def chart_value(value: Any) -> float | None:
 
 def chart_point(value: Any) -> dict[str, Any]:
     return {
-        "display_value": "" if value is None else str(value),
+        **human_number(value),
         "chart_value": chart_value(value),
     }
+
+
+def _overview(data: ReportData, resource_ids: list[str]) -> dict[str, Any]:
+    exact = build_overview(data)
+    first_key_unlock = _numeric_record(exact.get("first_key_unlock"), ("time_seconds",))
+    worst_payback = _numeric_record(
+        exact.get("worst_payback"),
+        ("payback_seconds", "cost", "delta_cps"),
+    )
+    final_resources = {
+        profile_id: {
+            resource_id: chart_point(value)
+            for resource_id, value in resources.items()
+        }
+        for profile_id, resources in exact["final_resources"].items()
+    }
+    return {
+        "timeline_rows": chart_point(len(data.timeline)),
+        "event_count": chart_point(len(data.events)),
+        "missing_artifacts": list(data.missing_artifacts),
+        "resource_ids": resource_ids,
+        "duration_seconds": chart_point(exact["duration_seconds"]),
+        "profiles": exact["profiles"],
+        "final_resources": final_resources,
+        "purchase_count": chart_point(exact["purchase_count"]),
+        "first_key_unlock": first_key_unlock,
+        "prestige_reset_count": chart_point(exact["prestige_reset_count"]),
+        "worst_payback": worst_payback,
+        "never_purchased_count": chart_point(exact["never_purchased_count"]),
+        "never_unlocked_count": chart_point(exact["never_unlocked_count"]),
+        "warning_category_count": chart_point(exact["warning_category_count"]),
+    }
+
+
+def _numeric_record(
+    record: dict[str, Any] | None,
+    numeric_fields: tuple[str, ...],
+) -> dict[str, Any] | None:
+    if record is None:
+        return None
+    result = dict(record)
+    for field in numeric_fields:
+        if field in result:
+            result[field] = chart_point(result[field])
+    return result
 
 
 def _resource_series(timeline: list[dict[str, Any]], resource_ids: list[str]) -> list[dict[str, Any]]:
@@ -74,6 +118,7 @@ def _resource_series(timeline: list[dict[str, Any]], resource_ids: list[str]) ->
             rows.append(
                 {
                     "time_seconds": row.get("time_seconds", 0),
+                    "time": chart_point(row.get("time_seconds", 0)),
                     "profile_id": row.get("profile_id", ""),
                     "resource_id": resource_id,
                     **point,
@@ -89,6 +134,7 @@ def _total_cps_series(timeline: list[dict[str, Any]]) -> list[dict[str, Any]]:
         rows.append(
             {
                 "time_seconds": row.get("time_seconds", 0),
+                "time": chart_point(row.get("time_seconds", 0)),
                 "profile_id": row.get("profile_id", ""),
                 **point,
             }
@@ -100,6 +146,7 @@ def _event_series(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [
         {
             "time_seconds": event.get("time_seconds", 0),
+            "time": chart_point(event.get("time_seconds", 0)),
             "profile_id": event.get("profile_id", ""),
             "kind": event.get("kind", ""),
             "item_id": event.get("item_id", ""),
@@ -116,13 +163,17 @@ def _diagnostics(data: ReportData) -> dict[str, Any]:
         "invalid_content": analysis.get("invalid_content_report", {}),
         "overpowered_content": analysis.get("overpowered_content_report", []),
         "payback": [
-            {
-                **row,
-                **chart_point(row.get("payback_seconds")),
-            }
+            _payback_diagnostic(row)
             for row in data.payback_rows
         ],
     }
+
+
+def _payback_diagnostic(row: dict[str, str]) -> dict[str, Any]:
+    result: dict[str, Any] = dict(row)
+    for field in ("payback_seconds", "cost", "delta_cps"):
+        result[field] = chart_point(row.get(field))
+    return result
 
 
 def _evidence(data: ReportData) -> dict[str, Any]:
@@ -135,6 +186,7 @@ def _evidence(data: ReportData) -> dict[str, Any]:
                 {
                     "profile_id": event.get("profile_id", ""),
                     "time_seconds": event.get("time_seconds", 0),
+                    "time": chart_point(event.get("time_seconds", 0)),
                     "kind": event.get("kind", ""),
                     "item_id": event.get("item_id", ""),
                     "formula_trace": details.get("formula_trace", ""),

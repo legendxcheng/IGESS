@@ -60,6 +60,7 @@ def _html(inline_payload: str, title: str) -> str:
             '    <section class="band">',
             "      <h2>Overview</h2>",
             "      <p>Scenario: <code data-scenario></code></p>",
+            '      <div data-overview-kpis class="kpi-grid" role="list" aria-label="Simulation overview"></div>',
             "    </section>",
             '    <section class="band">',
             "      <h2>Resource Curves</h2>",

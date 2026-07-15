@@ -39,6 +39,76 @@ h2 {
   gap: 14px;
 }
 
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.kpi-card {
+  min-width: 0;
+  border: 1px solid #dce4ed;
+  border-radius: 6px;
+  background: #f9fbfd;
+  padding: 14px;
+}
+
+.kpi-card h3 {
+  margin: 0 0 8px;
+  color: #536273;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.kpi-card .kpi-value {
+  color: #17202a;
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.kpi-card .kpi-detail {
+  margin: 7px 0 0;
+  color: #536273;
+  font-size: 13px;
+}
+
+.kpi-card .kpi-pair {
+  display: grid;
+  gap: 6px;
+}
+
+.kpi-card .kpi-pair > span {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  color: #536273;
+}
+
+.kpi-card .kpi-pair .kpi-value {
+  font-size: 17px;
+}
+
+.kpi-card .kpi-resources,
+.kpi-card .exact-values ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.kpi-card .kpi-resources .kpi-value {
+  font-size: 15px;
+}
+
+.kpi-card .exact-values {
+  margin-top: 10px;
+  color: #536273;
+  font-size: 12px;
+}
+
 .metric {
   border: 1px solid #e3e8ef;
   border-radius: 6px;

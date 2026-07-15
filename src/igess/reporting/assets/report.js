@@ -1,4 +1,4 @@
-(async function () {
+async function bootstrapReport() {
   const report = await loadReport();
   renderOverview(report);
   renderResourceControls(report);
@@ -9,7 +9,11 @@
   renderDiagnostics(report);
   renderEvidence(report);
   window.addEventListener('resize', resizeCharts);
-})();
+}
+
+if (typeof document !== 'undefined') {
+  bootstrapReport();
+}
 
 const charts = [];
 
@@ -28,6 +32,86 @@ function renderOverview(report) {
   if (scenario) {
     scenario.textContent = report.scenario.id;
   }
+  const container = document.querySelector('[data-overview-kpis]');
+  if (!container) return;
+  const overview = report.overview || {};
+  const firstUnlock = overview.first_key_unlock;
+  const worstPayback = overview.worst_payback;
+  const profiles = overview.profiles || [];
+  container.innerHTML = [
+    kpiCard('Duration', numericMarkup(overview.duration_seconds, 's')),
+    kpiCard('Profiles', `<span class="kpi-value">${escapeHtml(profiles.join(', ') || 'None')}</span>`),
+    kpiCard('Purchases', numericMarkup(overview.purchase_count)),
+    kpiCard(
+      'First key unlock',
+      firstUnlock ? numericMarkup(firstUnlock.time_seconds, 's') : '<span class="kpi-value">None</span>',
+      firstUnlock ? identityMarkup(firstUnlock) : ''
+    ),
+    kpiCard('Prestige resets', numericMarkup(overview.prestige_reset_count)),
+    kpiCard(
+      'Worst payback',
+      worstPayback ? numericMarkup(worstPayback.payback_seconds, 's') : '<span class="kpi-value">None</span>',
+      worstPayback ? identityMarkup(worstPayback) : ''
+    ),
+    kpiCard(
+      'Never reached',
+      `<div class="kpi-pair"><span>Purchased ${numericMarkup(overview.never_purchased_count)}</span>` +
+        `<span>Unlocked ${numericMarkup(overview.never_unlocked_count)}</span></div>`
+    ),
+    kpiCard('Warning categories', numericMarkup(overview.warning_category_count)),
+    finalResourcesCard(overview.final_resources || {}),
+  ].join('');
+}
+
+function kpiCard(label, valueMarkup, detailMarkup = '') {
+  return [
+    '<article class="kpi-card" role="listitem">',
+    `<h3>${escapeHtml(label)}</h3>`,
+    valueMarkup,
+    detailMarkup,
+    '</article>',
+  ].join('');
+}
+
+function numericMarkup(point, suffix = '') {
+  if (!point || typeof point !== 'object') {
+    return '<span class="kpi-value">—</span>';
+  }
+  const display = point.display_value == null || point.display_value === ''
+    ? '—'
+    : String(point.display_value);
+  const exact = point.exact_value == null ? '' : String(point.exact_value);
+  const exactTitle = exact ? ` title="Exact value: ${escapeHtml(exact)}"` : '';
+  return `<span class="kpi-value" data-exact-value="${escapeHtml(exact)}"${exactTitle}>` +
+    `${escapeHtml(display)}${escapeHtml(suffix)}</span>`;
+}
+
+function identityMarkup(row) {
+  const identity = `${row.profile_id || ''} ${row.kind || ''}:${row.item_id || ''}`.trim();
+  return identity ? `<p class="kpi-detail">${escapeHtml(identity)}</p>` : '';
+}
+
+function finalResourcesCard(finalResources) {
+  const profiles = Object.entries(finalResources);
+  if (!profiles.length) {
+    return kpiCard('Final resources', '<span class="kpi-value">None</span>');
+  }
+  const displayRows = profiles.flatMap(([profileId, resources]) =>
+    Object.entries(resources || {}).map(([resourceId, point]) =>
+      `<li><strong>${escapeHtml(profileId)}</strong> · ${escapeHtml(resourceId)}: ${numericMarkup(point)}</li>`
+    )
+  );
+  const exactRows = profiles.flatMap(([profileId, resources]) =>
+    Object.entries(resources || {}).map(([resourceId, point]) =>
+      `<li><strong>${escapeHtml(profileId)}</strong> · ${escapeHtml(resourceId)}: ` +
+        `<code>${escapeHtml(point && point.exact_value != null ? point.exact_value : '')}</code></li>`
+    )
+  );
+  return kpiCard(
+    'Final resources',
+    `<ul class="kpi-resources">${displayRows.join('')}</ul>`,
+    `<details class="exact-values"><summary>Exact values</summary><ul>${exactRows.join('')}</ul></details>`
+  );
 }
 
 function renderResourceControls(report) {
@@ -89,7 +173,7 @@ function renderEventChart(report) {
         return [
           `<strong>${escapeHtml(event.kind)}</strong>`,
           `Profile: ${escapeHtml(event.profile_id)}`,
-          `Time: ${escapeHtml(event.time_seconds)}s`,
+          `Time: ${numericTooltip(event.time, 's')}`,
           `Item: ${escapeHtml(event.item_id || '')}`,
         ].join('<br>');
       },
@@ -104,8 +188,9 @@ function renderEventChart(report) {
 }
 
 function renderPaybackChart(report) {
-  const rows = finiteRows(report.diagnostics.payback || [])
-    .sort((a, b) => b.chart_value - a.chart_value)
+  const rows = (report.diagnostics.payback || [])
+    .filter(row => Number.isFinite(row.payback_seconds && row.payback_seconds.chart_value))
+    .sort((a, b) => b.payback_seconds.chart_value - a.payback_seconds.chart_value)
     .slice(0, 25);
   if (!rows.length) {
     replaceChart('payback-chart', null);
@@ -118,9 +203,9 @@ function renderPaybackChart(report) {
         const row = params.data.row;
         return [
           `<strong>${escapeHtml(row.profile_id)} ${escapeHtml(row.kind)}:${escapeHtml(row.item_id)}</strong>`,
-          `Payback: ${escapeHtml(row.display_value)}s`,
-          `Cost: ${escapeHtml(row.cost || '')}`,
-          `Delta CPS: ${escapeHtml(row.delta_cps || '')}`,
+          `Payback: ${numericTooltip(row.payback_seconds, 's')}`,
+          `Cost: ${numericTooltip(row.cost)}`,
+          `Delta CPS: ${numericTooltip(row.delta_cps)}`,
           `Source: ${escapeHtml(row.source_ref || '')}`,
         ].join('<br>');
       },
@@ -134,7 +219,7 @@ function renderPaybackChart(report) {
     },
     series: [{
       type: 'bar',
-      data: rows.map(row => ({ value: row.chart_value, row })),
+      data: rows.map(row => ({ value: row.payback_seconds.chart_value, row })),
     }],
   });
 }
@@ -149,7 +234,10 @@ function lineOption(title, rows, valueName) {
       trigger: 'axis',
       formatter: params => params.map(param => {
         const row = param.data.row;
-        return `${escapeHtml(param.seriesName)}: ${escapeHtml(row.display_value)}`;
+        return [
+          `${escapeHtml(param.seriesName)}: ${numericTooltip(row)}`,
+          `Time: ${numericTooltip(row.time, 's')}`,
+        ].join('<br>');
       }).join('<br>'),
     },
     legend: { top: 28 },
@@ -178,7 +266,7 @@ function renderDiagnostics(report) {
   const invalid = diagnostics.invalid_content || {};
   const bottlenecks = diagnostics.bottlenecks || {};
   const infinitePaybacks = (diagnostics.payback || [])
-    .filter(row => row.chart_value === null)
+    .filter(row => row.payback_seconds && row.payback_seconds.exact_value === 'Infinity')
     .slice(0, 10);
   target.innerHTML = [
     diagnosticBlock('Never purchased', invalid.never_purchased || []),
@@ -208,7 +296,7 @@ function renderEvidence(report) {
   }
   target.innerHTML = [
     evidenceDetails('Formula traces', traces.map(trace =>
-      `${trace.profile_id || ''} ${trace.time_seconds || ''} ${trace.kind || ''}:${trace.item_id || ''} ${trace.formula_trace || ''}`
+      `${trace.profile_id || ''} ${numericText(trace.time)} ${trace.kind || ''}:${trace.item_id || ''} ${trace.formula_trace || ''}`
     )),
     evidenceDetails('Source references', refs.map(ref =>
       `${ref.profile_id || ''} ${ref.kind || ''}:${ref.item_id || ''} ${ref.source_ref || ''}`
@@ -230,6 +318,17 @@ function firstResource(report) {
 
 function finiteRows(rows) {
   return rows.filter(row => Number.isFinite(row.chart_value));
+}
+
+function numericText(point) {
+  return point && point.display_value != null ? String(point.display_value) : '';
+}
+
+function numericTooltip(point, suffix = '') {
+  if (!point || typeof point !== 'object') return '';
+  const display = numericText(point);
+  const exact = point.exact_value == null ? '' : String(point.exact_value);
+  return `<span title="Exact value: ${escapeHtml(exact)}">${escapeHtml(display)}${escapeHtml(suffix)}</span>`;
 }
 
 function replaceChart(id, option) {
