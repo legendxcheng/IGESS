@@ -35,6 +35,8 @@ class ConfigLinter:
 
         resource_ids = {row.id for row in raw.resources}
         generator_ids = {row.id for row in raw.generators}
+        activity_ids = {row.id for row in raw.activities}
+        has_runtime_tables = bool(raw.resources or raw.generators or raw.upgrades)
 
         for resource in raw.resources:
             if resource.dimension is None or not str(resource.dimension).strip():
@@ -65,6 +67,28 @@ class ConfigLinter:
                 )
             cls._validate_condition(generator.unlock_condition, generator_ids, generator.id)
         cls._validate_unlock_dependency_cycles(raw)
+
+        for activity in raw.activities:
+            if activity.source_type not in rules.source_types:
+                raise ConfigError(
+                    f"activity '{activity.id}' unknown source_type '{activity.source_type}'"
+                )
+            cls._validate_condition(activity.unlock_condition, generator_ids, activity.id)
+
+        for output in raw.activity_outputs:
+            if output.activity_id not in activity_ids:
+                raise ConfigError(
+                    f"activity_output '{output.id}' unknown activity_id '{output.activity_id}'"
+                )
+            if output.output_resource not in resource_ids:
+                raise ConfigError(
+                    f"activity_output '{output.id}' unknown output_resource "
+                    f"'{output.output_resource}'"
+                )
+            if SimNumber.parse(output.amount_per_second) <= SimNumber.zero():
+                raise ConfigError(
+                    f"activity_output '{output.id}' amount_per_second must be positive"
+                )
 
         for upgrade in raw.upgrades:
             if upgrade.cost_resource not in resource_ids:
@@ -141,6 +165,15 @@ class ConfigLinter:
                 if source_type not in rules.source_types:
                     raise ConfigError(
                         f"profile '{profile_id}' unknown source_efficiency key '{source_type}'"
+                    )
+            for activity_id, weight in profile.activity_weights.items():
+                if has_runtime_tables and activity_id not in activity_ids:
+                    raise ConfigError(
+                        f"profile '{profile_id}' unknown activity_weight '{activity_id}'"
+                    )
+                if weight < SimNumber.zero():
+                    raise ConfigError(
+                        f"profile '{profile_id}' activity_weight '{activity_id}' must be non-negative"
                     )
             if profile.luck <= SimNumber.zero():
                 raise ConfigError(f"profile '{profile_id}' luck must be positive")

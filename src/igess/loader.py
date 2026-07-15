@@ -8,6 +8,8 @@ import yaml
 
 from .numbers import SimNumber
 from .schema import (
+    ActivityOutputRow,
+    ActivityRow,
     ConstantRow,
     FormulaDef,
     GeneratorRow,
@@ -38,6 +40,10 @@ class ConfigLoader:
             rules=rules,
             resources=cls._load_table(tables_dir / "resources.json", ResourceRow),
             generators=cls._load_table(tables_dir / "generators.json", GeneratorRow),
+            activities=cls._load_optional_table(tables_dir / "activities.json", ActivityRow),
+            activity_outputs=cls._load_optional_table(
+                tables_dir / "activity_outputs.json", ActivityOutputRow
+            ),
             upgrades=cls._load_table(tables_dir / "upgrades.json", UpgradeRow),
             constants=cls._load_table(tables_dir / "constants.json", ConstantRow),
             milestones=cls._load_optional_table(tables_dir / "milestones.json", MilestoneRow),
@@ -54,6 +60,8 @@ class ConfigLoader:
             rules=cls._load_rules(data),
             resources=[],
             generators=[],
+            activities=[],
+            activity_outputs=[],
             upgrades=[],
             constants=[],
             milestones=[],
@@ -75,6 +83,10 @@ class ConfigLoader:
                 source_efficiency={
                     key: SimNumber.parse(value)
                     for key, value in sorted(profile_data["source_efficiency"].items())
+                },
+                activity_weights={
+                    key: SimNumber.parse(value)
+                    for key, value in sorted(profile_data.get("activity_weights", {}).items())
                 },
                 behavior_policy=str(profile_data["behavior_policy"]),
                 session_pattern=str(profile_data["session_pattern"]),

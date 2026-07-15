@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 from dataclasses import FrozenInstanceError
+from datetime import date
 import json
 
 import pytest
@@ -14,6 +15,7 @@ from igess.authoring.probe import (
 from igess.authoring.response import AuthoringError
 from igess.builder import ModelBuilder
 from igess.linter import ConfigLinter
+from igess.loader import ConfigLoader
 from igess.numbers import SimNumber
 from igess.schema import (
     ActivityOutputRow,
@@ -344,6 +346,25 @@ def test_generator_computed_cost_must_be_nonnegative() -> None:
     assert "generator_cost_negative" in _codes(result)
 
 
+@pytest.mark.parametrize("expr", ["base_output * 0", "-base_output"])
+def test_generator_computed_production_must_be_positive(expr: str) -> None:
+    raw = _raw(route="generator", starting_cost="10")
+    raw.rules.formulas["generator_output"].expr = expr
+
+    result = _evaluate(raw)
+
+    assert not result.eligible
+    assert "generator_output_nonpositive" in _codes(result)
+
+
+def test_generator_production_formula_evaluation_error_is_structural() -> None:
+    raw = _raw(route="generator", starting_cost="10")
+    raw.rules.formulas["generator_output"].expr = "base_output / (owned - 1)"
+    model = ModelBuilder.build(raw)
+
+    _assert_model_invalid(raw, model)
+
+
 def test_activity_or_generator_alone_is_enough() -> None:
     activity = _raw(route="activity")
     generator = _raw(
@@ -458,6 +479,158 @@ def test_malformed_nested_shapes_are_structural_not_runtime_exceptions(mutate) -
     mutate(raw)
 
     _assert_model_invalid(raw)
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda raw: setattr(raw.generators[0], "output_resource", []),
+        lambda raw: setattr(raw.generators[0], "cost_resource", {}),
+        lambda raw: setattr(raw.generators[0], "source_type", True),
+        lambda raw: setattr(raw.generators[0], "generator_type", date(2026, 7, 15)),
+        lambda raw: setattr(raw.generators[0], "unlock_condition", {}),
+        lambda raw: setattr(raw.generators[0], "base_output", []),
+        lambda raw: setattr(raw.generators[0], "base_cost", {}),
+        lambda raw: setattr(raw.generators[0], "cost_growth", True),
+    ],
+)
+def test_generator_input_shapes_are_rejected_before_lint(mutate) -> None:
+    raw = _raw(route="generator", starting_cost="10")
+    mutate(raw)
+
+    error = _assert_model_invalid(raw)
+
+    assert error.details["reason"] == "malformed_raw_config"
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda raw: setattr(raw.activities[0], "source_type", []),
+        lambda raw: setattr(raw.activities[0], "unlock_condition", {}),
+        lambda raw: setattr(raw.activity_outputs[0], "activity_id", []),
+        lambda raw: setattr(raw.activity_outputs[0], "output_resource", {}),
+        lambda raw: setattr(raw.activity_outputs[0], "amount_per_second", date(2026, 7, 15)),
+        lambda raw: setattr(raw.rules.player_profiles["alpha"], "source_efficiency", []),
+        lambda raw: raw.rules.player_profiles["alpha"].source_efficiency.__setitem__(True, _number("1")),
+        lambda raw: raw.rules.player_profiles["alpha"].activity_weights.__setitem__("gather", date(2026, 7, 15)),
+        lambda raw: setattr(raw.rules.scenarios["smoke"], "profiles", {}),
+        lambda raw: setattr(raw.rules.scenarios["smoke"], "profiles", [True]),
+        lambda raw: setattr(raw.constants[0], "value", []),
+    ],
+)
+def test_activity_profile_scenario_and_constant_shapes_are_rejected_before_lint(
+    mutate,
+) -> None:
+    raw = _raw(route="activity")
+    raw.constants = [ConstantRow("starting_gold", "1")]
+    mutate(raw)
+
+    error = _assert_model_invalid(raw)
+
+    assert error.details["reason"] == "malformed_raw_config"
+
+
+def test_loader_linter_builder_support_activity_tables_and_legacy_profiles(tmp_path) -> None:
+    config = tmp_path / "economy.yaml"
+    tables = tmp_path / "tables"
+    tables.mkdir()
+    config.write_text(
+        """
+model:
+  id: activity_clean_tree
+  tick_seconds: 1
+  number_backend: bignum_log
+  random_seed: 7
+formulas: {}
+generator_types: {}
+source_types:
+  active: {}
+modifier_pipeline:
+  order: []
+modifier_types: {}
+behavior_policies:
+  default:
+    type: cheap_unlock_first
+session_patterns:
+  default: {}
+player_profiles:
+  alpha:
+    source_efficiency:
+      active: "1"
+    behavior_policy: default
+    session_pattern: default
+    prestige_policy: conservative
+scenarios:
+  smoke:
+    duration_hours: 0.1
+    profiles: [alpha]
+    start_state: new_player
+    record_interval_seconds: 1
+    outputs: [timeline]
+""".lstrip(),
+        encoding="utf-8",
+    )
+    source = {"table": "resources", "workbook": "resources.xlsx", "row": 4}
+    (tables / "resources.json").write_text(
+        json.dumps(
+            [
+                {
+                    "id": "gold",
+                    "name": "Gold",
+                    "dimension": "currency",
+                    "_source": source,
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    for name in ("generators", "upgrades", "constants"):
+        (tables / f"{name}.json").write_text("[]", encoding="utf-8")
+    (tables / "activities.json").write_text(
+        json.dumps(
+            [
+                {
+                    "id": "gather",
+                    "name": "Gather",
+                    "source_type": "active",
+                    "unlock_condition": "always",
+                    "_source": {
+                        "table": "activities",
+                        "workbook": "activities.xlsx",
+                        "row": 4,
+                    },
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (tables / "activity_outputs.json").write_text(
+        json.dumps(
+            [
+                {
+                    "id": "gather_gold",
+                    "activity_id": "gather",
+                    "output_resource": "gold",
+                    "amount_per_second": "1",
+                    "_source": {
+                        "table": "activity_outputs",
+                        "workbook": "activity_outputs.xlsx",
+                        "row": 4,
+                    },
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    raw = ConfigLoader.load(config, tables)
+    ConfigLinter.validate(raw)
+    model = ModelBuilder.build(raw)
+
+    assert raw.rules.player_profiles["alpha"].activity_weights == {}
+    assert set(model.activities) == {"gather"}
+    assert set(model.activity_outputs) == {"gather_gold"}
 
 
 def test_raw_and_model_must_correspond() -> None:

@@ -23,6 +23,8 @@ class ModelBuilder:
             ),
             resources={row.id: row for row in raw.resources},
             generators={row.id: row for row in raw.generators},
+            activities={row.id: row for row in raw.activities},
+            activity_outputs={row.id: row for row in raw.activity_outputs},
             upgrades={row.id: row for row in raw.upgrades},
             constants={row.id: SimNumber.parse(row.value) for row in raw.constants},
             milestones={row.id: row for row in raw.milestones},

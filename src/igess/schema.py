@@ -76,6 +76,24 @@ class GeneratorRow:
 
 
 @dataclass
+class ActivityRow:
+    id: str
+    name: str
+    source_type: str
+    unlock_condition: str = "always"
+    source_ref: SourceRef | None = None
+
+
+@dataclass
+class ActivityOutputRow:
+    id: str
+    activity_id: str
+    output_resource: str
+    amount_per_second: str
+    source_ref: SourceRef | None = None
+
+
+@dataclass
 class UpgradeRow:
     id: str
     name: str
@@ -124,6 +142,7 @@ class PrestigeLayerRow:
 class PlayerProfile:
     id: str
     source_efficiency: dict[str, SimNumber]
+    activity_weights: dict[str, SimNumber]
     behavior_policy: str
     session_pattern: str
     prestige_policy: str
@@ -169,6 +188,8 @@ class RawConfig:
     rules: Rules
     resources: list[ResourceRow]
     generators: list[GeneratorRow]
+    activities: list[ActivityRow]
+    activity_outputs: list[ActivityOutputRow]
     upgrades: list[UpgradeRow]
     constants: list[ConstantRow]
     milestones: list[MilestoneRow]
@@ -188,6 +209,8 @@ class EconomyModel:
     config: RuntimeConfig
     resources: dict[str, ResourceRow]
     generators: dict[str, GeneratorRow]
+    activities: dict[str, ActivityRow]
+    activity_outputs: dict[str, ActivityOutputRow]
     upgrades: dict[str, UpgradeRow]
     constants: dict[str, SimNumber]
     milestones: dict[str, MilestoneRow]
@@ -235,6 +258,8 @@ class EconomyModel:
             row = self.generators.get(item_id)
         elif item_kind == "upgrade":
             row = self.upgrades.get(item_id)
+        elif item_kind == "activity":
+            row = self.activities.get(item_id)
         elif item_kind == "milestone":
             row = self.milestones.get(item_id)
         elif item_kind == "prestige":
@@ -252,6 +277,7 @@ class SimulationState:
     generators_owned: dict[str, int]
     upgrades_purchased: set[str] = field(default_factory=set)
     unlocked_generators: set[str] = field(default_factory=set)
+    unlocked_activities: set[str] = field(default_factory=set)
     unlocked_upgrades: set[str] = field(default_factory=set)
     milestones_claimed: set[str] = field(default_factory=set)
     prestige_counts: dict[str, int] = field(default_factory=dict)
@@ -274,6 +300,7 @@ class SimulationState:
             generators_owned=dict(self.generators_owned),
             upgrades_purchased=set(self.upgrades_purchased),
             unlocked_generators=set(self.unlocked_generators),
+            unlocked_activities=set(self.unlocked_activities),
             unlocked_upgrades=set(self.unlocked_upgrades),
             milestones_claimed=set(self.milestones_claimed),
             prestige_counts=dict(self.prestige_counts),

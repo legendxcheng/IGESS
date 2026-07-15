@@ -6,7 +6,7 @@ import ast
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from decimal import DecimalException
+from decimal import Decimal, DecimalException
 from typing import Any, NoReturn
 
 from ..formula import CompiledFormula, FormulaCompileError, FormulaEngine
@@ -284,6 +284,15 @@ def _check_generator_routes(
                     generator_id,
                 )
             )
+        if _computed_output <= zero:
+            blockers.append(
+                EligibilityFinding(
+                    "generator_output_nonpositive",
+                    f"Generator '{generator_id}' has non-positive computed production.",
+                    "generator",
+                    generator_id,
+                )
+            )
         for profile_id, profile in profiles:
             efficiency = _mapping_number(
                 profile.source_efficiency,
@@ -403,6 +412,7 @@ def _validate_input_shapes(raw: RawConfig, model: EconomyModel) -> None:
                 f"Raw table '{table_name}' contains a malformed id",
                 "malformed_raw_config",
             )
+    _validate_raw_table_fields(raw)
 
     rule_maps: tuple[tuple[str, type[Any] | None], ...] = (
         ("formulas", FormulaDef),
@@ -421,7 +431,7 @@ def _validate_input_shapes(raw: RawConfig, model: EconomyModel) -> None:
         value = getattr(raw.rules, name)
         if not isinstance(value, Mapping):
             _raise_invalid(f"Raw rule map '{name}' is malformed", "malformed_raw_config")
-        if any(not isinstance(key, str) for key in value):
+        if any(not isinstance(key, str) or not key for key in value):
             _raise_invalid(f"Raw rule map '{name}' has a malformed id", "malformed_raw_config")
         if value_type is not None and any(not isinstance(item, value_type) for item in value.values()):
             _raise_invalid(f"Raw rule map '{name}' contains a malformed value", "malformed_raw_config")
@@ -447,6 +457,19 @@ def _validate_input_shapes(raw: RawConfig, model: EconomyModel) -> None:
                 f"Raw rule map '{name}' contains a malformed value",
                 "malformed_raw_config",
             )
+    for generator_type, data in raw.rules.generator_types.items():
+        for field in ("cost_formula", "production_formula"):
+            if field in data and not isinstance(data[field], str):
+                _raise_invalid(
+                    f"Generator type '{generator_type}' field '{field}' is malformed",
+                    "malformed_raw_config",
+                )
+    for policy_id, policy in raw.rules.behavior_policies.items():
+        if "type" in policy and not isinstance(policy["type"], str):
+            _raise_invalid(
+                f"Behavior policy '{policy_id}' type is malformed",
+                "malformed_raw_config",
+            )
     if any(not isinstance(item, str) for item in raw.rules.modifier_types.values()):
         _raise_invalid("Raw modifier types are malformed", "malformed_raw_config")
 
@@ -464,9 +487,9 @@ def _validate_input_shapes(raw: RawConfig, model: EconomyModel) -> None:
             )
         if (
             profile.id != profile_id
-            or any(not isinstance(key, str) for key in profile.source_efficiency)
+            or any(not isinstance(key, str) or not key for key in profile.source_efficiency)
             or any(not isinstance(value, SimNumber) for value in profile.source_efficiency.values())
-            or any(not isinstance(key, str) for key in profile.activity_weights)
+            or any(not isinstance(key, str) or not key for key in profile.activity_weights)
             or any(not isinstance(value, SimNumber) for value in profile.activity_weights.values())
             or not isinstance(profile.behavior_policy, str)
             or not isinstance(profile.session_pattern, str)
@@ -556,6 +579,117 @@ def _validate_input_shapes(raw: RawConfig, model: EconomyModel) -> None:
     for name in model_maps:
         if not isinstance(getattr(model, name), Mapping):
             _raise_invalid(f"Runtime model map '{name}' is malformed", "malformed_runtime_model")
+
+
+def _validate_raw_table_fields(raw: RawConfig) -> None:
+    for resource in raw.resources:
+        _require_strings(resource, ("id", "name", "dimension"), "resource")
+    for generator in raw.generators:
+        _require_strings(
+            generator,
+            (
+                "id",
+                "name",
+                "generator_type",
+                "output_resource",
+                "source_type",
+                "cost_resource",
+                "unlock_condition",
+            ),
+            "generator",
+        )
+        for field in ("base_output", "base_cost", "cost_growth"):
+            _require_exact_number(getattr(generator, field), f"generator '{generator.id}' {field}")
+    for activity in raw.activities:
+        _require_strings(
+            activity,
+            ("id", "name", "source_type", "unlock_condition"),
+            "activity",
+        )
+    for output in raw.activity_outputs:
+        _require_strings(
+            output,
+            ("id", "activity_id", "output_resource"),
+            "activity_output",
+        )
+        _require_exact_number(
+            output.amount_per_second,
+            f"activity_output '{output.id}' amount_per_second",
+        )
+    for upgrade in raw.upgrades:
+        _require_strings(
+            upgrade,
+            (
+                "id",
+                "name",
+                "target",
+                "modifier_type",
+                "cost_resource",
+                "unlock_condition",
+            ),
+            "upgrade",
+        )
+        _require_exact_number(upgrade.value, f"upgrade '{upgrade.id}' value")
+        _require_exact_number(upgrade.base_cost, f"upgrade '{upgrade.id}' base_cost")
+    for constant in raw.constants:
+        _require_strings(constant, ("id",), "constant")
+        _require_exact_number(constant.value, f"constant '{constant.id}' value")
+    for milestone in raw.milestones:
+        _require_strings(
+            milestone,
+            ("id", "name", "condition", "reward_resource"),
+            "milestone",
+        )
+        _require_exact_number(
+            milestone.reward_amount, f"milestone '{milestone.id}' reward_amount"
+        )
+    for prestige in raw.prestige_layers:
+        _require_strings(
+            prestige,
+            (
+                "id",
+                "name",
+                "trigger_resource",
+                "reward_resource",
+                "formula",
+                "unlock_condition",
+            ),
+            "prestige_layer",
+        )
+        for field in ("divisor", "exponent", "min_gain"):
+            _require_exact_number(
+                getattr(prestige, field), f"prestige '{prestige.id}' {field}"
+            )
+        if not isinstance(prestige.reset_resources, list) or any(
+            not isinstance(resource_id, str) or not resource_id
+            for resource_id in prestige.reset_resources
+        ):
+            _raise_invalid(
+                f"Prestige layer '{prestige.id}' reset_resources is malformed",
+                "malformed_raw_config",
+            )
+
+
+def _require_strings(value: Any, fields: tuple[str, ...], entity: str) -> None:
+    for field in fields:
+        item = getattr(value, field)
+        if not isinstance(item, str) or not item:
+            _raise_invalid(
+                f"{entity} field '{field}' is malformed", "malformed_raw_config"
+            )
+
+
+def _require_exact_number(value: Any, context: str) -> None:
+    if isinstance(value, bool) or not isinstance(
+        value, (str, int, float, Decimal, SimNumber)
+    ):
+        _raise_invalid(f"{context} is malformed", "malformed_raw_config")
+    try:
+        parsed = SimNumber.parse(value)
+    except (DecimalException, ValueError, OverflowError):
+        _raise_invalid(f"{context} is malformed", "malformed_raw_config")
+    if parsed.log10_abs is not None and not parsed.log10_abs.is_finite():
+        _raise_invalid(f"{context} is malformed", "malformed_raw_config")
 
 
 def _validate_unique_ids(raw: RawConfig) -> None:
