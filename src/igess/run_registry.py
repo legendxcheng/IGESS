@@ -4,7 +4,6 @@ import json
 import os
 import re
 import secrets
-import shutil
 import stat
 from dataclasses import dataclass
 from pathlib import Path
@@ -59,6 +58,15 @@ class _DirectoryBinding:
     identity: os.stat_result
     resolved_path: Path
     fd: int | None = None
+
+
+@dataclass(frozen=True)
+class _WindowsDeleteHandle:
+    fd: int
+    handle: int
+    identity: os.stat_result
+    final_path: Path
+    attributes: int
 
 
 class RunRegistry:
@@ -349,7 +357,19 @@ class RunRegistry:
             if not os.path.samestat(quarantined_identity, final_identity):
                 raise ValueError("quarantined run changed before deletion")
 
-            shutil.rmtree(destination)
+            if not _delete_bound_tombstone(
+                trash,
+                destination,
+                quarantined_identity,
+            ):
+                if _directory_identity_matches(
+                    trash,
+                    destination,
+                    quarantined_identity,
+                ):
+                    moved = False
+                    return False
+                raise ValueError("quarantined run changed at the deletion boundary")
             moved = False
             return True
         except (
@@ -731,6 +751,225 @@ def _ensure_private_trash(root: Path, trash: Path) -> os.stat_result:
     if not _path_exists_or_link(trash):
         trash.mkdir(mode=0o700)
     return _snapshot_owned_run_dir(root, trash)
+
+
+def _delete_bound_tombstone(
+    trash: Path,
+    tombstone: Path,
+    expected_identity: os.stat_result,
+) -> bool:
+    if tombstone.parent != trash or _TOMBSTONE_RE.fullmatch(tombstone.name) is None:
+        return False
+    if os.name == "nt":
+        return _windows_delete_bound_tombstone(tombstone, expected_identity)
+    return _posix_delete_bound_tombstone(trash, tombstone, expected_identity)
+
+
+def _windows_delete_bound_tombstone(
+    tombstone: Path,
+    expected_identity: os.stat_result,
+) -> bool:
+    entry: _WindowsDeleteHandle | None = None
+    try:
+        entry = _windows_open_delete_handle(tombstone)
+        if (
+            not os.path.samestat(expected_identity, entry.identity)
+            or not stat.S_ISDIR(entry.identity.st_mode)
+            or _windows_is_reparse(entry.attributes)
+            or not _same_absolute_path(entry.final_path, tombstone)
+        ):
+            return False
+        if not _windows_delete_children(tombstone):
+            return False
+        current = os.fstat(entry.fd)
+        if not os.path.samestat(expected_identity, current):
+            return False
+        if not _windows_mark_handle_for_deletion(entry.handle):
+            return False
+        return True
+    except (OSError, RuntimeError, ValueError):
+        return False
+    finally:
+        if entry is not None:
+            os.close(entry.fd)
+
+
+def _windows_delete_children(directory: Path) -> bool:
+    try:
+        children = [Path(item.path) for item in os.scandir(directory)]
+    except OSError:
+        return False
+    for child in children:
+        if not _windows_delete_entry(child):
+            return False
+    return True
+
+
+def _windows_delete_entry(path: Path) -> bool:
+    entry: _WindowsDeleteHandle | None = None
+    try:
+        entry = _windows_open_delete_handle(path)
+        if not _same_absolute_path(entry.final_path, path):
+            return False
+        is_directory = stat.S_ISDIR(entry.identity.st_mode)
+        if is_directory and not _windows_is_reparse(entry.attributes):
+            if not _windows_delete_children(path):
+                return False
+        current = os.fstat(entry.fd)
+        if not os.path.samestat(entry.identity, current):
+            return False
+        return _windows_mark_handle_for_deletion(entry.handle)
+    except (OSError, RuntimeError, ValueError):
+        return False
+    finally:
+        if entry is not None:
+            os.close(entry.fd)
+
+
+def _windows_open_delete_handle(path: Path) -> _WindowsDeleteHandle:
+    import ctypes
+    from ctypes import wintypes
+    import msvcrt
+
+    delete_access = 0x00010000
+    file_read_attributes = 0x00000080
+    share_read_write = 0x00000001 | 0x00000002
+    open_existing = 3
+    backup_semantics = 0x02000000
+    open_reparse_point = 0x00200000
+    create_file = ctypes.windll.kernel32.CreateFileW
+    create_file.argtypes = [
+        wintypes.LPCWSTR,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        wintypes.LPVOID,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        wintypes.HANDLE,
+    ]
+    create_file.restype = wintypes.HANDLE
+    handle = create_file(
+        str(path),
+        delete_access | file_read_attributes,
+        share_read_write,
+        None,
+        open_existing,
+        backup_semantics | open_reparse_point,
+        None,
+    )
+    invalid_handle = ctypes.c_void_p(-1).value
+    if ctypes.c_void_p(handle).value == invalid_handle:
+        raise ctypes.WinError()
+    try:
+        fd = msvcrt.open_osfhandle(handle, os.O_RDONLY | getattr(os, "O_BINARY", 0))
+    except BaseException:
+        ctypes.windll.kernel32.CloseHandle(handle)
+        raise
+    try:
+        identity = os.fstat(fd)
+        final_path = _final_path_from_fd(fd)
+        if final_path is None:
+            raise ValueError("delete handle final path could not be resolved")
+        attributes = getattr(identity, "st_file_attributes", 0)
+        return _WindowsDeleteHandle(fd, msvcrt.get_osfhandle(fd), identity, final_path, attributes)
+    except BaseException:
+        os.close(fd)
+        raise
+
+
+def _windows_mark_handle_for_deletion(handle: int) -> bool:
+    import ctypes
+    from ctypes import wintypes
+
+    class FileDispositionInfo(ctypes.Structure):
+        _fields_ = [("DeleteFile", wintypes.BOOLEAN)]
+
+    disposition = FileDispositionInfo(True)
+    set_information = ctypes.windll.kernel32.SetFileInformationByHandle
+    set_information.argtypes = [
+        wintypes.HANDLE,
+        ctypes.c_int,
+        wintypes.LPVOID,
+        wintypes.DWORD,
+    ]
+    set_information.restype = wintypes.BOOL
+    return bool(
+        set_information(
+            handle,
+            4,
+            ctypes.byref(disposition),
+            ctypes.sizeof(disposition),
+        )
+    )
+
+
+def _windows_is_reparse(attributes: int) -> bool:
+    return bool(attributes & 0x00000400)
+
+
+def _same_absolute_path(first: Path, second: Path) -> bool:
+    return os.path.normcase(os.path.abspath(first)) == os.path.normcase(os.path.abspath(second))
+
+
+def _posix_delete_bound_tombstone(
+    trash: Path,
+    tombstone: Path,
+    expected_identity: os.stat_result,
+) -> bool:
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    parent_fd: int | None = None
+    entry_fd: int | None = None
+    try:
+        parent_fd = os.open(trash, flags)
+        entry_fd = os.open(tombstone.name, flags, dir_fd=parent_fd)
+        opened = os.fstat(entry_fd)
+        if not os.path.samestat(expected_identity, opened):
+            return False
+        if not _posix_delete_children(entry_fd):
+            return False
+        current = os.stat(tombstone.name, dir_fd=parent_fd, follow_symlinks=False)
+        if _is_stat_link_like(current) or not os.path.samestat(opened, current):
+            return False
+        os.rmdir(tombstone.name, dir_fd=parent_fd)
+        return True
+    except (OSError, RuntimeError, ValueError):
+        return False
+    finally:
+        if entry_fd is not None:
+            os.close(entry_fd)
+        if parent_fd is not None:
+            os.close(parent_fd)
+
+
+def _posix_delete_children(directory_fd: int) -> bool:
+    try:
+        names = sorted(os.listdir(directory_fd))
+    except OSError:
+        return False
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    for name in names:
+        child_fd: int | None = None
+        try:
+            before = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+            if stat.S_ISDIR(before.st_mode) and not _is_stat_link_like(before):
+                child_fd = os.open(name, flags, dir_fd=directory_fd)
+                opened = os.fstat(child_fd)
+                if not os.path.samestat(before, opened):
+                    return False
+                if not _posix_delete_children(child_fd):
+                    return False
+                current = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+                if not os.path.samestat(opened, current):
+                    return False
+                os.rmdir(name, dir_fd=directory_fd)
+            else:
+                os.unlink(name, dir_fd=directory_fd)
+        except (OSError, RuntimeError, ValueError):
+            return False
+        finally:
+            if child_fd is not None:
+                os.close(child_fd)
+    return True
 
 
 def _new_tombstone_name() -> str:

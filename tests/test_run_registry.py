@@ -579,6 +579,120 @@ def test_prune_smoke_does_not_delete_a_formal_directory_swapped_during_quarantin
     ]
 
 
+def test_prune_final_delete_binding_rejects_a_swapped_formal_directory(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    registry = RunRegistry(tmp_path / "runs")
+    smoke = _write(
+        registry,
+        "20260715T010203000000Z-smoke-rule",
+        kind="smoke",
+        change_id="rule",
+    )
+    formal = _write(
+        registry,
+        "20260715T010204000000Z-day_1",
+        kind="formal",
+    )
+    advice = _write(
+        registry,
+        "20260715T010205000000Z-advice-day_1",
+        kind="advice",
+    )
+    (smoke.run_dir / "smoke.marker").write_text("smoke", encoding="utf-8")
+    (formal.run_dir / "formal.marker").write_text("formal", encoding="utf-8")
+    (advice.run_dir / "advice.marker").write_text("advice", encoding="utf-8")
+    original_delete = getattr(
+        registry_module,
+        "_delete_bound_tombstone",
+        lambda *_args, **_kwargs: False,
+    )
+    raced = False
+
+    def racing_delete(trash: Path, tombstone: Path, identity: os.stat_result) -> bool:
+        nonlocal raced
+        raced = True
+        holding = registry.runs_root / ".final-delete-holding"
+        os.replace(tombstone, holding)
+        os.replace(formal.run_dir, tombstone)
+        os.replace(holding, formal.run_dir)
+        return original_delete(trash, tombstone, identity)
+
+    monkeypatch.setattr(
+        registry_module,
+        "_delete_bound_tombstone",
+        racing_delete,
+        raising=False,
+    )
+
+    assert registry.prune_smoke(keep=0) == []
+    assert raced
+    assert sorted(path.read_text(encoding="utf-8") for path in tmp_path.rglob("*.marker")) == [
+        "advice",
+        "formal",
+        "smoke",
+    ]
+    assert [(item.run_id, item.kind) for item in registry.list_runs()] == [
+        (smoke.run_id, "smoke"),
+        (formal.run_id, "formal"),
+        (advice.run_id, "advice"),
+    ]
+
+
+def test_bound_prune_deletes_reparse_entry_without_following_external_target(
+    tmp_path: Path,
+) -> None:
+    registry = RunRegistry(tmp_path / "runs")
+    smoke = _write(
+        registry,
+        "20260715T010203000000Z-smoke-rule",
+        kind="smoke",
+        change_id="rule",
+    )
+    outside = tmp_path / "outside-prune-target"
+    outside.mkdir()
+    marker = outside / "marker.txt"
+    marker.write_text("keep", encoding="utf-8")
+    link = smoke.run_dir / "outside-link"
+    try:
+        link.symlink_to(outside, target_is_directory=True)
+    except OSError as error:
+        pytest.skip(f"directory links unavailable: {error}")
+
+    assert registry.prune_smoke(keep=0) == [smoke.run_id]
+    assert not smoke.run_dir.exists()
+    assert marker.read_text(encoding="utf-8") == "keep"
+
+
+def test_unsupported_bound_delete_retains_retryable_tombstone_without_success(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    registry = RunRegistry(tmp_path / "runs")
+    smoke = _write(
+        registry,
+        "20260715T010203000000Z-smoke-rule",
+        kind="smoke",
+        change_id="rule",
+    )
+    original_delete = registry_module._delete_bound_tombstone
+    monkeypatch.setattr(
+        registry_module,
+        "_delete_bound_tombstone",
+        lambda *_args, **_kwargs: False,
+    )
+
+    assert registry.prune_smoke(keep=0) == []
+    tombstones = list((registry.runs_root / ".run-trash").glob("tomb-*"))
+    assert len(tombstones) == 1
+    assert not smoke.run_dir.exists()
+
+    monkeypatch.setattr(registry_module, "_delete_bound_tombstone", original_delete)
+    assert registry.prune_smoke(keep=0) == [smoke.run_id]
+    assert not tombstones[0].exists()
+
+
 def test_next_prune_recovers_crash_tombstones_and_ignores_unsafe_trash(
     tmp_path: Path,
 ) -> None:
