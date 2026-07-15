@@ -31,12 +31,19 @@ from .verification import review_proposal, verify_edits
 from .yaml_plan import PlanValidationError, apply_yaml_plan, create_yaml_plan
 
 
-class _HelpFormatter(
-    argparse.ArgumentDefaultsHelpFormatter,
-    argparse.RawDescriptionHelpFormatter,
-):
+class _HelpFormatter(argparse.RawDescriptionHelpFormatter):
     def __init__(self, prog: str) -> None:
         super().__init__(prog, max_help_position=32, width=160)
+
+    def _get_help_string(self, action: argparse.Action) -> str:
+        help_text = action.help or ""
+        if (
+            "%(default)" not in help_text
+            and action.default is not argparse.SUPPRESS
+            and action.default is not None
+        ):
+            help_text += " (default: %(default)s)"
+        return help_text
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -134,7 +141,8 @@ def build_parser() -> argparse.ArgumentParser:
     scan = add_command(
         "scan",
         "Scan a numeric parameter",
-        "igess scan --config economy.yaml --tables luban_exports --scenario day_1 --param constants.spawn_rate=1:5:1 --out scans/spawn-rate",
+        "igess scan --config examples/shelldiver_v0/economy.yaml --tables examples/shelldiver_v0/luban_exports "
+        "--scenario day_1_progression --param generators.fisherman.cost_growth=1.14..1.18:0.01 --out scan-out",
     )
     scan.add_argument("--config", required=True, help="Path to the economy YAML configuration.")
     scan.add_argument(

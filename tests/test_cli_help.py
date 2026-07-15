@@ -3,6 +3,8 @@ import sys
 
 import pytest
 
+from igess.cli import build_parser
+
 
 def run_cli(*args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
@@ -174,7 +176,9 @@ def test_top_level_help_lists_and_describes_all_commands_and_exit_codes():
         ("lint", "igess lint --config economy.yaml --tables luban_exports"),
         (
             "scan",
-            "igess scan --config economy.yaml --tables luban_exports --scenario day_1",
+            "igess scan --config examples/shelldiver_v0/economy.yaml --tables "
+            "examples/shelldiver_v0/luban_exports --scenario day_1_progression --param "
+            "generators.fisherman.cost_growth=1.14..1.18:0.01 --out scan-out",
         ),
         (
             "rng-run",
@@ -205,6 +209,36 @@ def test_every_existing_command_documents_each_argument(command):
     for option, description in COMMAND_ARGUMENT_HELP[command].items():
         assert option in result.stdout
         assert description in result.stdout
+
+
+@pytest.mark.parametrize("command", sorted(COMMAND_ARGUMENT_HELP))
+def test_every_existing_command_has_an_independent_description(command):
+    parser = build_parser()
+    command_group = next(action for action in parser._actions if action.dest == "command")
+    command_parser = command_group.choices[command]
+
+    assert command_parser.description
+    assert command_parser.description.strip()
+    assert "Examples:" not in command_parser.description
+    assert command_parser.description in run_cli(command, "--help").stdout
+
+
+@pytest.mark.parametrize("command", sorted(COMMAND_ARGUMENT_HELP))
+def test_command_help_never_describes_missing_defaults_as_none(command):
+    result = run_cli(command, "--help")
+
+    assert result.returncode == 0, result.stderr
+    assert "(default: None)" not in result.stdout
+
+
+def test_required_init_and_run_arguments_do_not_show_none_defaults():
+    init_help = run_cli("init", "--help").stdout
+    run_help = run_cli("run", "--help").stdout
+
+    assert "--out OUT            Directory to initialize. (default: None)" not in init_help
+    for option in ("--config", "--tables", "--scenario", "--out"):
+        option_line = next(line for line in run_help.splitlines() if option in line)
+        assert "default: None" not in option_line
 
 
 @pytest.mark.parametrize(
