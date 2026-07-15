@@ -379,7 +379,9 @@ def _ensure_acyclic_tree(value: Any, root_path: str) -> None:
     stack: list[tuple[bool, Any, str]] = [(False, value, root_path)]
     while stack:
         exiting, node, path = stack.pop()
-        if type(node) not in {dict, list}:
+        is_mapping = isinstance(node, Mapping)
+        is_sequence = isinstance(node, (list, tuple))
+        if not is_mapping and not is_sequence:
             continue
 
         marker = id(node)
@@ -401,7 +403,7 @@ def _ensure_acyclic_tree(value: Any, root_path: str) -> None:
 
         active[marker] = path
         stack.append((True, node, path))
-        if type(node) is dict:
+        if is_mapping:
             children = [
                 (item, _mapping_path(path, key))
                 for key, item in node.items()

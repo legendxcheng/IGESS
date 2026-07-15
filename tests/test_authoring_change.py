@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections import UserDict
+from collections.abc import Mapping
 from dataclasses import FrozenInstanceError
 import json
 from types import MappingProxyType
@@ -559,6 +561,75 @@ def test_direct_model_change_rejects_cycle_before_recursive_freeze() -> None:
     with pytest.raises(AuthoringError) as caught:
         ModelChange(1, "upsert", "resource", "gold", fields)
     assert caught.value.details["reason"] == "cyclic_structure"
+
+
+def test_direct_model_change_rejects_cyclic_userdict_before_recursive_freeze() -> None:
+    fields: UserDict[str, object] = UserDict()
+    fields["loop"] = fields
+    with pytest.raises(AuthoringError) as caught:
+        ModelChange(1, "upsert", "resource", "gold", fields)
+    assert caught.value.details["reason"] == "cyclic_structure"
+    assert caught.value.details["path"] == "$.fields.loop"
+
+
+def test_direct_model_change_rejects_cycle_crossing_tuple_and_list() -> None:
+    loop_list: list[object] = []
+    loop_tuple = (loop_list,)
+    loop_list.append(loop_tuple)
+    with pytest.raises(AuthoringError) as caught:
+        ModelChange(1, "upsert", "resource", "gold", {"loop": loop_tuple})
+    assert caught.value.details["reason"] == "cyclic_structure"
+    assert caught.value.details["path"] == "$.fields.loop[0][0]"
+
+
+@pytest.mark.parametrize("cyclic_side", ["current", "patch"])
+def test_merge_fields_rejects_cyclic_userdict_inputs(cyclic_side: str) -> None:
+    schema = get_entity_schema("player_profile")
+    current: Mapping[str, object] = {
+        "source_efficiency": {"active": "1"},
+        "behavior_policy": "cheap",
+        "session_pattern": "authoring",
+        "prestige_policy": "conservative",
+    }
+    patch: Mapping[str, object] = {"activity_weights": {"gather": "1"}}
+    loop: UserDict[str, object] = UserDict()
+    loop["self"] = loop
+    if cyclic_side == "current":
+        current = UserDict({"source_efficiency": loop})
+    else:
+        patch = UserDict({"activity_weights": loop})
+
+    with pytest.raises(AuthoringError) as caught:
+        merge_fields(current, patch, schema)
+
+    assert caught.value.details["reason"] == "cyclic_structure"
+    assert caught.value.details["path"].endswith(".self")
+
+
+def test_mappingproxy_backed_cycle_is_rejected_before_copying() -> None:
+    backing: dict[str, object] = {}
+    proxy = MappingProxyType(backing)
+    backing["self"] = proxy
+
+    with pytest.raises(AuthoringError) as caught:
+        merge_fields(proxy, {}, get_entity_schema("resource"))
+
+    assert caught.value.details["reason"] == "cyclic_structure"
+    assert caught.value.details["path"] == "$.current.self"
+
+
+def test_shared_acyclic_mapping_is_not_mistaken_for_a_cycle() -> None:
+    shared: UserDict[str, object] = UserDict({"active": "1"})
+    fields: UserDict[str, object] = UserDict(
+        {"source_efficiency": shared, "activity_weights": shared}
+    )
+
+    change = ModelChange(1, "upsert", "player_profile", "default", fields)
+
+    assert change.to_payload()["fields"] == {
+        "source_efficiency": {"active": "1"},
+        "activity_weights": {"active": "1"},
+    }
 
 
 def test_create_with_empty_current_argument_is_an_update_but_still_requires_complete_result() -> None:
