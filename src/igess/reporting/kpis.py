@@ -7,6 +7,9 @@ from typing import Any
 from .loader import ReportData
 
 
+_KEY_UNLOCK_KINDS = frozenset({"unlock_generator", "unlock_upgrade", "unlock_activity"})
+
+
 def build_overview(data: ReportData) -> dict[str, Any]:
     """Derive stable, exact KPI values from report artifacts."""
     profiles = data.profiles
@@ -66,7 +69,7 @@ def _first_key_unlock(events: list[dict[str, Any]]) -> dict[str, str] | None:
     for event in events:
         kind = str(event.get("kind", ""))
         time_seconds = _decimal(event.get("time_seconds"))
-        if not kind.startswith("unlock_") or time_seconds is None or time_seconds <= 0:
+        if kind not in _KEY_UNLOCK_KINDS or time_seconds is None or time_seconds <= 0:
             continue
         identity = (
             str(event.get("profile_id", "")),

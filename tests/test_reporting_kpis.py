@@ -123,6 +123,39 @@ def test_build_overview_derives_decision_kpis(tmp_path):
     assert overview["warning_category_count"] == 5
 
 
+def test_first_key_unlock_ignores_non_key_unlock_events(tmp_path):
+    data = replace(
+        _report_data(tmp_path),
+        events=[
+            {
+                "profile_id": "alpha",
+                "time_seconds": 1,
+                "kind": "unlock_milestone",
+                "item_id": "chapter_one",
+            },
+            {
+                "profile_id": "alpha",
+                "time_seconds": 2,
+                "kind": "unlock_other",
+                "item_id": "future_kind",
+            },
+            {
+                "profile_id": "beta",
+                "time_seconds": 3,
+                "kind": "unlock_generator",
+                "item_id": "mine",
+            },
+        ],
+    )
+
+    assert build_overview(data)["first_key_unlock"] == {
+        "time_seconds": "3",
+        "profile_id": "beta",
+        "kind": "unlock_generator",
+        "item_id": "mine",
+    }
+
+
 @pytest.mark.parametrize(
     "category",
     [
