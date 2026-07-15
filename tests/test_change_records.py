@@ -294,4 +294,3 @@ def test_latest_is_none_when_registry_has_no_valid_success_record(tmp_path: Path
     store = _store(tmp_path)
 
     assert store.latest() is None
-
