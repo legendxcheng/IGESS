@@ -10,6 +10,7 @@ import pytest
 from igess.authoring import AuthoringProject, ModelChange
 from igess.authoring import exports as exports_module
 from igess.authoring.exports import (
+    StagedSources,
     apply_to_candidate,
     compute_export_digest,
     ephemeral_export,
@@ -114,6 +115,73 @@ def test_stage_sources_rejects_source_changed_during_copy_and_cleans(
 
     assert caught.value.details["reason"] == "source_identity_changed"
     assert not (tmp_path / "transaction" / "candidate").exists()
+
+
+def test_stage_sources_revalidates_first_source_after_every_copy_finishes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project = _blank_project(tmp_path)
+    transaction = tmp_path / "transaction"
+    candidate_root = transaction / "candidate"
+    original_copy = exports_module._copy_opened_source
+    first_live_source: Path | None = None
+    copy_count = 0
+
+    def mutate_first_while_copying_later(*args: object, **kwargs: object) -> None:
+        nonlocal copy_count, first_live_source
+        destination = Path(args[1])
+        copy_count += 1
+        if copy_count == 1:
+            first_live_source = project.root / destination.relative_to(candidate_root)
+        elif copy_count == 2:
+            assert first_live_source is not None
+            first_live_source.write_bytes(first_live_source.read_bytes() + b"drift")
+        original_copy(*args, **kwargs)
+
+    monkeypatch.setattr(
+        exports_module,
+        "_copy_opened_source",
+        mutate_first_while_copying_later,
+    )
+
+    with pytest.raises(AuthoringError) as caught:
+        stage_sources(project, transaction)
+
+    assert caught.value.details["reason"] == "source_identity_changed"
+    assert not candidate_root.exists()
+
+
+def test_staged_sources_cannot_be_constructed_directly(tmp_path: Path) -> None:
+    project = _blank_project(tmp_path)
+
+    with pytest.raises(TypeError):
+        StagedSources(
+            root=tmp_path / "candidate",
+            origin_root=project.root,
+            origin_config=project.config,
+            origin_datas=project.datas,
+            committed_exports=project.exports,
+            config=tmp_path / "candidate" / "economy.yaml",
+            datas=tmp_path / "candidate" / "Datas",
+            exports=tmp_path / "candidate" / "luban_exports",
+            source_paths=(),
+            source_digest="sha256:" + "0" * 64,
+        )
+
+
+def test_forged_staged_protection_metadata_cannot_overwrite_committed_exports(
+    tmp_path: Path,
+) -> None:
+    project, candidate = _populated_candidate(tmp_path)
+    (project.exports / "committed.json").write_text("committed", encoding="utf-8")
+    original_before = _tree_bytes(project.root)
+    object.__setattr__(candidate, "committed_exports", tmp_path / "fake-exports")
+
+    with pytest.raises(AuthoringError) as caught:
+        export_candidate(candidate, project.exports)
+
+    assert caught.value.details["reason"] == "invalid_candidate_provenance"
+    assert _tree_bytes(project.root) == original_before
 
 
 def _change(entity: str, entity_id: str, fields: dict[str, object]) -> ModelChange:
@@ -492,6 +560,143 @@ def test_export_publish_succeeds_when_old_output_backup_cleanup_fails(
     assert _tree_bytes(project.root) == original_before
 
 
+def test_export_publish_infers_committed_second_rename_after_call_raises(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, candidate = _populated_candidate(tmp_path)
+    out = tmp_path / "runtime"
+    out.mkdir()
+    (out / "old.json").write_text("old", encoding="utf-8")
+    real_replace = exports_module.os.replace
+
+    class RaisedAfterRename(BaseException):
+        pass
+
+    def replace_then_raise_on_publish(source: Path, target: Path) -> None:
+        real_replace(source, target)
+        if Path(target) == out and Path(source).name.startswith(".runtime-export-"):
+            raise RaisedAfterRename
+
+    monkeypatch.setattr(exports_module.os, "replace", replace_then_raise_on_publish)
+
+    result = export_candidate(candidate, out)
+
+    assert result.root == out
+    assert not (out / "old.json").exists()
+    assert len(result.written_paths) == 8
+    assert not list(tmp_path.glob(".runtime-backup-*"))
+
+
+def test_export_publish_restores_original_when_first_rename_raises_after_effect(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, candidate = _populated_candidate(tmp_path)
+    out = tmp_path / "runtime"
+    out.mkdir()
+    (out / "old.json").write_text("old", encoding="utf-8")
+    real_replace = exports_module.os.replace
+    raised = False
+
+    class PublishInterrupted(BaseException):
+        pass
+
+    def interrupt_after_moving_old(source: Path, target: Path) -> None:
+        nonlocal raised
+        real_replace(source, target)
+        if Path(source) == out and not raised:
+            raised = True
+            raise PublishInterrupted
+
+    monkeypatch.setattr(exports_module.os, "replace", interrupt_after_moving_old)
+
+    with pytest.raises(PublishInterrupted):
+        export_candidate(candidate, out)
+
+    assert (out / "old.json").read_text(encoding="utf-8") == "old"
+    assert not list(tmp_path.glob(".runtime-backup-*"))
+    assert not list(tmp_path.glob(".runtime-export-*"))
+
+
+def test_export_publish_preserves_primary_and_recovery_backup_if_rollback_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, candidate = _populated_candidate(tmp_path)
+    out = tmp_path / "runtime"
+    out.mkdir()
+    (out / "old.json").write_text("old", encoding="utf-8")
+    real_replace = exports_module.os.replace
+    real_rmtree = exports_module.shutil.rmtree
+    call_count = 0
+
+    class PublishFailed(Exception):
+        pass
+
+    class RollbackFailed(Exception):
+        pass
+
+    def fail_publish_and_rollback(source: Path, target: Path) -> None:
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            real_replace(source, target)
+            return
+        if call_count == 2:
+            raise PublishFailed("new tree not published")
+        raise RollbackFailed("old tree retained as backup")
+
+    monkeypatch.setattr(exports_module.os, "replace", fail_publish_and_rollback)
+
+    class TemporaryCleanupFailed(Exception):
+        pass
+
+    def fail_temporary_cleanup(path: Path, *args: object, **kwargs: object) -> None:
+        if Path(path).name.startswith(".runtime-export-"):
+            raise TemporaryCleanupFailed("new tree retained for diagnosis")
+        real_rmtree(path, *args, **kwargs)
+
+    monkeypatch.setattr(exports_module.shutil, "rmtree", fail_temporary_cleanup)
+
+    with pytest.raises(PublishFailed) as caught:
+        export_candidate(candidate, out)
+
+    assert any("RollbackFailed" in note for note in caught.value.__notes__)
+    assert any("TemporaryCleanupFailed" in note for note in caught.value.__notes__)
+    backups = list(tmp_path.glob(".runtime-backup-*"))
+    assert len(backups) == 1
+    assert (backups[0] / "old.json").read_text(encoding="utf-8") == "old"
+    assert not out.exists()
+    assert len(list(tmp_path.glob(".runtime-export-*"))) == 1
+
+
+def test_export_publish_ignores_backup_cleanup_keyboard_interrupt_after_commit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, candidate = _populated_candidate(tmp_path)
+    out = tmp_path / "runtime"
+    out.mkdir()
+    (out / "old.json").write_text("old", encoding="utf-8")
+    real_rmtree = exports_module.shutil.rmtree
+
+    def interrupt_backup_cleanup(path: Path, *args: object, **kwargs: object) -> None:
+        if Path(path).name.startswith(".runtime-backup-"):
+            raise KeyboardInterrupt
+        real_rmtree(path, *args, **kwargs)
+
+    monkeypatch.setattr(exports_module.shutil, "rmtree", interrupt_backup_cleanup)
+
+    result = export_candidate(candidate, out)
+
+    assert result.root == out
+    assert len(result.written_paths) == 8
+    backups = list(tmp_path.glob(".runtime-backup-*"))
+    assert len(backups) == 1
+    assert (backups[0] / "old.json").read_text(encoding="utf-8") == "old"
+
+
 def test_export_digest_is_order_independent_and_path_and_byte_sensitive(
     tmp_path: Path,
 ) -> None:
@@ -511,6 +716,20 @@ def test_export_digest_is_order_independent_and_path_and_byte_sensitive(
     (second / "a.json").write_bytes(b"a")
     (second / "z.json").rename(second / "y.json")
     assert baseline != compute_export_digest(second)
+
+
+def test_export_digest_framing_distinguishes_path_content_boundaries(
+    tmp_path: Path,
+) -> None:
+    two_files = tmp_path / "two-files"
+    one_file = tmp_path / "one-file"
+    two_files.mkdir()
+    one_file.mkdir()
+    (two_files / "a").write_bytes(b"")
+    (two_files / "b").write_bytes(b"")
+    (one_file / "a").write_bytes(b"b\0")
+
+    assert compute_export_digest(two_files) != compute_export_digest(one_file)
 
 
 def test_export_digest_rejects_symlinks_and_enforces_file_budget(

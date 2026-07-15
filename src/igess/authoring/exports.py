@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from contextlib import ExitStack, contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import gc
 import hashlib
 import os
@@ -26,9 +26,27 @@ from .yaml_source import upsert_yaml_entity
 _COPY_CHUNK_SIZE = 1024 * 1024
 _MAX_EXPORT_FILES = 4_096
 _MAX_EXPORT_BYTES = 512 * 1024 * 1024
+_STAGED_SOURCES_TOKEN = object()
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(slots=True, eq=False)
+class _StagedProvenance:
+    root: Path
+    root_identity: os.stat_result
+    origin_root: Path
+    origin_root_identity: os.stat_result
+    origin_config: Path
+    origin_config_identity: os.stat_result
+    origin_datas: Path
+    origin_datas_identity: os.stat_result
+    committed_exports: Path
+    committed_exports_identity: os.stat_result
+    source_paths: tuple[str, ...]
+    initial_digest: str
+    current_digest: str
+
+
+@dataclass(frozen=True, slots=True, init=False)
 class StagedSources:
     """One isolated, validated copy of the model's authoritative sources."""
 
@@ -42,6 +60,41 @@ class StagedSources:
     exports: Path
     source_paths: tuple[str, ...]
     source_digest: str
+    _provenance: _StagedProvenance = field(repr=False, compare=False)
+
+    def __init__(
+        self,
+        *,
+        root: Path,
+        origin_root: Path,
+        origin_config: Path,
+        origin_datas: Path,
+        committed_exports: Path,
+        config: Path,
+        datas: Path,
+        exports: Path,
+        source_paths: tuple[str, ...],
+        source_digest: str,
+        _token: object | None = None,
+        _provenance: _StagedProvenance | None = None,
+    ) -> None:
+        if _token is not _STAGED_SOURCES_TOKEN or _provenance is None:
+            raise TypeError("StagedSources instances are created only by stage_sources")
+        values = {
+            "root": root,
+            "origin_root": origin_root,
+            "origin_config": origin_config,
+            "origin_datas": origin_datas,
+            "committed_exports": committed_exports,
+            "config": config,
+            "datas": datas,
+            "exports": exports,
+            "source_paths": source_paths,
+            "source_digest": source_digest,
+            "_provenance": _provenance,
+        }
+        for name, value in values.items():
+            object.__setattr__(self, name, value)
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,6 +120,51 @@ class EphemeralExport:
     written_paths: tuple[Path, ...]
 
 
+def _create_staged_sources(
+    project: AuthoringProject,
+    candidate: Path,
+    source_paths: tuple[str, ...],
+    source_digest: str,
+) -> StagedSources:
+    try:
+        provenance = _StagedProvenance(
+            root=candidate,
+            root_identity=candidate.lstat(),
+            origin_root=project.root,
+            origin_root_identity=project.root.lstat(),
+            origin_config=project.config,
+            origin_config_identity=project.config.lstat(),
+            origin_datas=project.datas,
+            origin_datas_identity=project.datas.lstat(),
+            committed_exports=project.exports,
+            committed_exports_identity=project.exports.lstat(),
+            source_paths=source_paths,
+            initial_digest=source_digest,
+            current_digest=source_digest,
+        )
+    except (OSError, ValueError) as error:
+        _export_error(
+            "invalid_candidate_provenance",
+            "Candidate provenance identities could not be captured",
+            error_type=type(error).__name__,
+            path=str(candidate),
+        )
+    return StagedSources(
+        root=candidate,
+        origin_root=project.root,
+        origin_config=project.config,
+        origin_datas=project.datas,
+        committed_exports=project.exports,
+        config=candidate / "economy.yaml",
+        datas=candidate / "Datas",
+        exports=candidate / "luban_exports",
+        source_paths=source_paths,
+        source_digest=source_digest,
+        _token=_STAGED_SOURCES_TOKEN,
+        _provenance=provenance,
+    )
+
+
 def apply_to_candidate(
     candidate: StagedSources,
     change: ModelChange,
@@ -81,7 +179,7 @@ def apply_to_candidate(
         raise TypeError("candidate must be StagedSources returned by stage_sources")
     if not isinstance(change, ModelChange):
         raise TypeError("change must be a ModelChange")
-    _require_candidate_layout(candidate)
+    provenance, candidate_project, _ = _validate_staged_candidate(candidate)
     schema = get_entity_schema(change.entity)
     if schema.storage_kind == "yaml":
         changed = upsert_yaml_entity(candidate.config, change)
@@ -97,6 +195,15 @@ def apply_to_candidate(
             entity=change.entity,
             storage_kind=schema.storage_kind,
         )
+    current_digest = candidate_project.model_digest()
+    current_paths = _canonical_project_source_paths(candidate_project)
+    if current_paths != provenance.source_paths:
+        _export_error(
+            "invalid_candidate_provenance",
+            "Candidate source registration changed while applying a change",
+            path=str(provenance.root),
+        )
+    provenance.current_digest = current_digest
     return (relative,) if changed else ()
 
 
@@ -114,16 +221,17 @@ def export_candidate(
 
     if not isinstance(candidate, StagedSources):
         raise TypeError("candidate must be StagedSources returned by stage_sources")
-    _require_candidate_layout(candidate)
-    _reject_protected_output(candidate, out)
-    candidate_project = AuthoringProject.discover(candidate.root)
-    source_identities_before = _candidate_source_identities(candidate)
-    source_digest_before = candidate_project.model_digest()
+    provenance, candidate_project, source_digest_before = _validate_staged_candidate(
+        candidate
+    )
+    _reject_protected_output(provenance, out)
+    source_identities_before = _candidate_source_identities(provenance)
     output, output_existed, output_identity = _prepare_export_target(out)
     temporary = Path(
         tempfile.mkdtemp(prefix=f".{output.name}-export-", dir=output.parent)
     )
     published = False
+    primary_error: BaseException | None = None
     try:
         try:
             try:
@@ -145,7 +253,7 @@ def export_candidate(
 
         written_relative = _validate_export_output(temporary, raw_written)
         source_digest_after = candidate_project.model_digest()
-        source_identities_after = _candidate_source_identities(candidate)
+        source_identities_after = _candidate_source_identities(provenance)
         if (
             source_digest_after != source_digest_before
             or source_identities_after != source_identities_before
@@ -170,24 +278,38 @@ def export_candidate(
             written_paths=tuple(output.joinpath(*Path(path).parts) for path in written_relative),
             digest=digest,
         )
+    except BaseException as error:
+        primary_error = error
+        raise
     finally:
         if not published:
             try:
                 shutil.rmtree(temporary)
             except FileNotFoundError:
                 pass
+            except BaseException as cleanup_error:
+                if primary_error is not None:
+                    primary_error.add_note(
+                        "Temporary export cleanup failed with "
+                        f"{type(cleanup_error).__name__}: {cleanup_error}. "
+                        f"Recovery artifact remains at {temporary}."
+                    )
 
 
 def compute_export_digest(root: str | os.PathLike[str]) -> str:
-    """Hash sorted export-relative POSIX paths and bytes using bounded streams."""
+    """Hash a collision-framed export tree using bounded content streams."""
 
     export_root = _require_real_directory(root, role="export root")
     files = _walk_export_files(export_root)
     digest = hashlib.sha256()
+    digest.update(b"IGESS_EXPORT_DIGEST_V1\0")
     total_bytes = 0
     for relative, path, identity in files:
-        digest.update(relative.encode("utf-8"))
-        digest.update(b"\0")
+        path_bytes = relative.encode("utf-8")
+        digest.update(len(path_bytes).to_bytes(8, "big"))
+        digest.update(path_bytes)
+        digest.update(identity.st_size.to_bytes(8, "big"))
+        file_bytes = 0
         try:
             with path.open("rb") as handle:
                 opened = os.fstat(handle.fileno())
@@ -201,6 +323,7 @@ def compute_export_digest(root: str | os.PathLike[str]) -> str:
                     chunk = handle.read(_COPY_CHUNK_SIZE)
                     if not chunk:
                         break
+                    file_bytes += len(chunk)
                     total_bytes += len(chunk)
                     if total_bytes > _MAX_EXPORT_BYTES:
                         _export_error(
@@ -222,7 +345,7 @@ def compute_export_digest(root: str | os.PathLike[str]) -> str:
                 error_type=type(error).__name__,
                 path=str(path),
             )
-        if not (
+        if file_bytes != identity.st_size or not (
             _same_source_identity(identity, after)
             and _same_source_identity(identity, current)
         ):
@@ -339,6 +462,190 @@ def _prepare_transaction_directory(value: str | os.PathLike[str]) -> Path:
             reason="indirection_or_wrong_type",
         )
     return resolved
+
+
+def _validate_staged_candidate(
+    candidate: StagedSources,
+) -> tuple[_StagedProvenance, AuthoringProject, str]:
+    try:
+        provenance = candidate._provenance
+    except AttributeError:
+        _export_error(
+            "invalid_candidate_provenance",
+            "Staged candidate has no trusted provenance",
+        )
+    if type(provenance) is not _StagedProvenance:
+        _export_error(
+            "invalid_candidate_provenance",
+            "Staged candidate provenance has an invalid type",
+            provenance_type=type(provenance).__name__,
+        )
+
+    _require_candidate_layout(candidate)
+    public_bindings = (
+        ("root", candidate.root, provenance.root),
+        ("origin_root", candidate.origin_root, provenance.origin_root),
+        ("origin_config", candidate.origin_config, provenance.origin_config),
+        ("origin_datas", candidate.origin_datas, provenance.origin_datas),
+        (
+            "committed_exports",
+            candidate.committed_exports,
+            provenance.committed_exports,
+        ),
+        ("source_paths", candidate.source_paths, provenance.source_paths),
+        ("source_digest", candidate.source_digest, provenance.initial_digest),
+    )
+    for field_name, actual, trusted in public_bindings:
+        if actual != trusted:
+            _export_error(
+                "invalid_candidate_provenance",
+                "A staged candidate provenance field was replaced",
+                field=field_name,
+            )
+
+    _validate_provenance_paths(provenance)
+    try:
+        candidate_project = AuthoringProject.discover(provenance.root)
+    except AuthoringError:
+        raise
+    canonical_paths = _canonical_project_source_paths(candidate_project)
+    if canonical_paths != provenance.source_paths:
+        _export_error(
+            "invalid_candidate_provenance",
+            "Candidate source paths no longer match its registered provenance",
+            actual=list(canonical_paths),
+            expected=list(provenance.source_paths),
+            path=str(provenance.root),
+        )
+    current_digest = candidate_project.model_digest()
+    if current_digest != provenance.current_digest:
+        _export_error(
+            "invalid_candidate_provenance",
+            "Candidate source bytes changed outside an authoring operation",
+            actual=current_digest,
+            expected=provenance.current_digest,
+            path=str(provenance.root),
+        )
+    return provenance, candidate_project, current_digest
+
+
+def _validate_provenance_paths(provenance: _StagedProvenance) -> None:
+    bindings = (
+        (
+            "candidate root",
+            provenance.root,
+            provenance.root,
+            provenance.root_identity,
+            "directory",
+        ),
+        (
+            "origin root",
+            provenance.origin_root,
+            provenance.origin_root,
+            provenance.origin_root_identity,
+            "directory",
+        ),
+        (
+            "origin config",
+            provenance.origin_config,
+            provenance.origin_root / "economy.yaml",
+            provenance.origin_config_identity,
+            "file",
+        ),
+        (
+            "origin Datas",
+            provenance.origin_datas,
+            provenance.origin_root / "Datas",
+            provenance.origin_datas_identity,
+            "directory",
+        ),
+        (
+            "committed exports",
+            provenance.committed_exports,
+            provenance.origin_root / "luban_exports",
+            provenance.committed_exports_identity,
+            "directory",
+        ),
+    )
+    for role, path, expected_path, expected_identity, expected_kind in bindings:
+        if path != expected_path:
+            _export_error(
+                "invalid_candidate_provenance",
+                "A provenance path is not canonical",
+                path=str(path),
+                role=role,
+            )
+        try:
+            identity = path.lstat()
+            resolved = path.resolve(strict=True)
+            expected_resolved = expected_path.resolve(strict=True)
+        except (OSError, RuntimeError, ValueError) as error:
+            _export_error(
+                "invalid_candidate_provenance",
+                "A provenance path could not be revalidated",
+                error_type=type(error).__name__,
+                path=str(path),
+                role=role,
+            )
+        matches_kind = (
+            stat.S_ISREG(identity.st_mode)
+            if expected_kind == "file"
+            else stat.S_ISDIR(identity.st_mode)
+        )
+        if (
+            stat.S_ISLNK(identity.st_mode)
+            or not matches_kind
+            or resolved != expected_resolved
+            or not os.path.samestat(identity, expected_identity)
+        ):
+            _export_error(
+                "invalid_candidate_provenance",
+                "A provenance path identity changed",
+                path=str(path),
+                role=role,
+            )
+
+
+def _canonical_project_source_paths(
+    project: AuthoringProject,
+) -> tuple[str, ...]:
+    config = _project_module._current_required_path(
+        project,
+        "economy.yaml",
+        "file",
+        "project config",
+        "project_config",
+    )
+    datas = _project_module._current_required_path(
+        project,
+        "Datas",
+        "directory",
+        "source tables",
+        "source_tables",
+    )
+    registry = _project_module._resolve_registry(datas / "__tables__.xlsx", datas)
+    registry_snapshot = _project_module._snapshot_source(
+        "registry", registry, registry=registry
+    )
+    with _project_module._open_validated_source(
+        registry_snapshot,
+        root=project.root,
+        boundary=datas,
+        direct=True,
+    ) as opened_registry:
+        registrations = _project_module._read_registration_paths(
+            opened_registry.handle, registry
+        )
+        workbook_snapshots = _project_module._validate_registration_paths(
+            datas, registry, registrations
+        )
+    paths = [config, registry, *(snapshot.path for snapshot in workbook_snapshots)]
+    return tuple(
+        sorted(
+            _project_module._root_relative_posix(project.root, path)
+            for path in paths
+        )
+    )
 
 
 def _require_candidate_layout(candidate: StagedSources) -> None:
@@ -473,20 +780,20 @@ def _prepare_export_target(
 
 
 def _reject_protected_output(
-    candidate: StagedSources,
+    provenance: _StagedProvenance,
     value: str | os.PathLike[str],
 ) -> None:
     if not isinstance(value, (str, os.PathLike)):
         return
     try:
         requested = Path(value).expanduser().resolve(strict=False)
-        intended_exports = candidate.exports.resolve(strict=True)
+        intended_exports = (provenance.root / "luban_exports").resolve(strict=True)
         protected = (
-            ("committed_exports", candidate.committed_exports.resolve(strict=True)),
-            ("origin_config", candidate.origin_config.resolve(strict=True)),
-            ("origin_datas", candidate.origin_datas.resolve(strict=True)),
-            ("candidate_config", candidate.config.resolve(strict=True)),
-            ("candidate_datas", candidate.datas.resolve(strict=True)),
+            ("committed_exports", provenance.committed_exports.resolve(strict=True)),
+            ("origin_config", provenance.origin_config.resolve(strict=True)),
+            ("origin_datas", provenance.origin_datas.resolve(strict=True)),
+            ("candidate_config", (provenance.root / "economy.yaml").resolve(strict=True)),
+            ("candidate_datas", (provenance.root / "Datas").resolve(strict=True)),
         )
     except (OSError, RuntimeError, ValueError) as error:
         _export_error(
@@ -596,10 +903,10 @@ def _validate_export_output(
 
 
 def _candidate_source_identities(
-    candidate: StagedSources,
+    provenance: _StagedProvenance,
 ) -> tuple[tuple[str, int, int, int, int, int], ...]:
     identities: list[tuple[str, int, int, int, int, int]] = []
-    for relative in candidate.source_paths:
+    for relative in provenance.source_paths:
         relative_path = Path(relative)
         if relative_path.is_absolute() or ".." in relative_path.parts:
             _export_error(
@@ -607,11 +914,11 @@ def _candidate_source_identities(
                 "Candidate source list contains an unsafe relative path",
                 path=relative,
             )
-        path = candidate.root.joinpath(*relative_path.parts)
+        path = provenance.root.joinpath(*relative_path.parts)
         try:
             identity = path.lstat()
             resolved = path.resolve(strict=True)
-            resolved.relative_to(candidate.root)
+            resolved.relative_to(provenance.root)
         except (OSError, RuntimeError, ValueError) as error:
             _export_error(
                 "candidate_invalid",
@@ -752,6 +1059,16 @@ def _publish_export_tree(
     output_existed: bool,
     output_identity: os.stat_result | None,
 ) -> None:
+    try:
+        temporary_identity = temporary.lstat()
+    except OSError as error:
+        _export_error(
+            "output_publish_failed",
+            "Complete export tree disappeared before publication",
+            error_type=type(error).__name__,
+            path=str(temporary),
+        )
+
     if output_existed:
         try:
             current = output.lstat()
@@ -774,24 +1091,47 @@ def _publish_export_tree(
         os.close(descriptor)
         backup = Path(backup_name)
         backup.unlink()
-        moved_old = False
         try:
             os.replace(output, backup)
-            moved_old = True
-            os.replace(temporary, output)
-        except BaseException:
-            if moved_old and not output.exists():
-                os.replace(backup, output)
+        except BaseException as primary:
+            if _path_matches_identity(backup, output_identity):
+                _restore_original_output(primary, backup, output, output_identity)
             raise
+
+        if not _path_matches_identity(backup, output_identity):
+            primary = AuthoringError(
+                "authoring_export_failed",
+                "Existing export output was not moved to its recovery backup",
+                {
+                    "path": str(output),
+                    "reason": "output_publish_failed",
+                },
+            )
+            _restore_original_output(primary, backup, output, output_identity)
+            raise primary
+
         try:
-            shutil.rmtree(backup)
-        except FileNotFoundError:
-            pass
-        except Exception:
-            # Publication is already committed.  Keep the uniquely named old
-            # tree intact for manual/later recovery instead of reporting the
-            # successful export as failed or risking deletion of another path.
-            pass
+            os.replace(temporary, output)
+        except BaseException as primary:
+            if not _path_matches_identity(output, temporary_identity):
+                _restore_original_output(primary, backup, output, output_identity)
+                raise
+            # The rename committed before the call raised.  Its observed
+            # on-disk identity is authoritative, so publication succeeded.
+
+        if not _path_matches_identity(output, temporary_identity):
+            primary = AuthoringError(
+                "authoring_export_failed",
+                "Complete export tree was not published at the output path",
+                {
+                    "path": str(output),
+                    "reason": "output_publish_failed",
+                },
+            )
+            _restore_original_output(primary, backup, output, output_identity)
+            raise primary
+
+        _cleanup_committed_backup(backup, output_identity)
         return
 
     if output.exists() or output.is_symlink():
@@ -802,13 +1142,73 @@ def _publish_export_tree(
         )
     try:
         os.replace(temporary, output)
-    except (OSError, ValueError) as error:
+    except BaseException:
+        if _path_matches_identity(output, temporary_identity):
+            return
+        raise
+    if not _path_matches_identity(output, temporary_identity):
         _export_error(
             "output_publish_failed",
-            "Complete export tree could not be published atomically",
-            error_type=type(error).__name__,
+            "Complete export tree was not published at the output path",
             path=str(output),
         )
+
+
+def _restore_original_output(
+    primary: BaseException,
+    backup: Path,
+    output: Path,
+    original_identity: os.stat_result,
+) -> None:
+    if not _path_matches_identity(backup, original_identity):
+        primary.add_note(
+            f"Original export backup could not be identified at {backup}; "
+            "recovery artifacts were left untouched."
+        )
+        return
+    if output.exists() or output.is_symlink():
+        primary.add_note(
+            f"Original export remains at {backup}, but output path {output} "
+            "is occupied; recovery artifacts were left untouched."
+        )
+        return
+    try:
+        os.replace(backup, output)
+    except BaseException as rollback_error:
+        if _path_matches_identity(output, original_identity):
+            primary.add_note(
+                "Rollback restored the original output but its rename call raised "
+                f"{type(rollback_error).__name__}: {rollback_error}"
+            )
+        else:
+            primary.add_note(
+                f"Rollback failed with {type(rollback_error).__name__}: "
+                f"{rollback_error}. Original output remains recoverable at {backup}."
+            )
+
+
+def _cleanup_committed_backup(
+    backup: Path,
+    original_identity: os.stat_result,
+) -> None:
+    if not _path_matches_identity(backup, original_identity):
+        return
+    try:
+        shutil.rmtree(backup)
+    except BaseException:
+        # The new output is already committed.  Retain the uniquely named,
+        # identity-checked old tree for later recovery and report success.
+        pass
+
+
+def _path_matches_identity(path: Path, expected: os.stat_result | None) -> bool:
+    if expected is None:
+        return False
+    try:
+        actual = path.lstat()
+    except OSError:
+        return False
+    return os.path.samestat(actual, expected)
 def _copy_authoritative_sources(
     project: AuthoringProject,
     candidate: Path,
@@ -878,6 +1278,7 @@ def _copy_authoritative_sources(
         )
         digest = hashlib.sha256()
         relative_paths: list[str] = []
+        source_digests: list[tuple[object, bytes]] = []
         for opened in ordered:
             relative = _project_module._root_relative_posix(project.root, opened.path)
             relative_paths.append(relative)
@@ -885,20 +1286,35 @@ def _copy_authoritative_sources(
             digest.update(b"\0")
             destination = candidate.joinpath(*Path(relative).parts)
             destination.parent.mkdir(parents=True, exist_ok=True)
-            _copy_opened_source(opened.handle, destination, digest, opened.identity)
+            source_digest = hashlib.sha256()
+            _copy_opened_source(
+                opened.handle,
+                destination,
+                digest,
+                opened.identity,
+                source_digest,
+            )
+            source_digests.append((opened, source_digest.digest()))
             _require_unchanged_opened_source(opened)
 
-    return StagedSources(
-        root=candidate,
-        origin_root=project.root,
-        origin_config=project.config,
-        origin_datas=project.datas,
-        committed_exports=project.exports,
-        config=candidate / "economy.yaml",
-        datas=candidate / "Datas",
-        exports=candidate / "luban_exports",
-        source_paths=tuple(relative_paths),
-        source_digest=f"sha256:{digest.hexdigest()}",
+        final_digests = [
+            (opened, expected, _digest_opened_source(opened))
+            for opened, expected in source_digests
+        ]
+        for opened, expected, actual in final_digests:
+            _require_unchanged_opened_source(opened)
+            if actual != expected:
+                _export_error(
+                    "source_identity_changed",
+                    "An authoritative source changed after it was copied",
+                    path=str(opened.path),
+                )
+
+    return _create_staged_sources(
+        project,
+        candidate,
+        tuple(relative_paths),
+        f"sha256:{digest.hexdigest()}",
     )
 
 
@@ -907,6 +1323,7 @@ def _copy_opened_source(
     destination: Path,
     digest: "hashlib._Hash",
     identity: os.stat_result,
+    source_digest: "hashlib._Hash",
 ) -> None:
     try:
         source.seek(0)
@@ -917,6 +1334,7 @@ def _copy_opened_source(
                     break
                 target.write(chunk)
                 digest.update(chunk)
+                source_digest.update(chunk)
             target.flush()
         os.chmod(destination, stat.S_IMODE(identity.st_mode))
     except (OSError, MemoryError, ValueError) as error:
@@ -926,6 +1344,25 @@ def _copy_opened_source(
             error_type=type(error).__name__,
             path=str(destination),
         )
+
+
+def _digest_opened_source(opened: object) -> bytes:
+    digest = hashlib.sha256()
+    try:
+        opened.handle.seek(0)
+        while True:
+            chunk = opened.handle.read(_COPY_CHUNK_SIZE)
+            if not chunk:
+                break
+            digest.update(chunk)
+    except (OSError, MemoryError, ValueError) as error:
+        _export_error(
+            "source_identity_changed",
+            "An authoritative source could not be re-read after staging",
+            error_type=type(error).__name__,
+            path=str(opened.path),
+        )
+    return digest.digest()
 
 
 def _require_unchanged_opened_source(opened: object) -> None:
