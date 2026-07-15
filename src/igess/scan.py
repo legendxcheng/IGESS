@@ -4,7 +4,7 @@ import csv
 import copy
 import json
 from dataclasses import dataclass
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from .builder import ModelBuilder
@@ -30,24 +30,64 @@ class ScanParameter:
 
 
 def parse_scan_parameter(text: str, max_variants: int = MAX_SCAN_VARIANTS) -> ScanParameter:
-    path, range_text = text.split("=", 1)
-    table, row_id, field = path.split(".", 2)
-    bounds, step_text = range_text.split(":", 1)
-    start_text, end_text = bounds.split("..", 1)
-    start = Decimal(start_text)
-    end = Decimal(end_text)
-    step = Decimal(step_text)
-    if step <= 0:
-        raise ValueError("scan step must be positive")
+    assignment_parts = text.split("=")
+    if len(assignment_parts) != 2:
+        raise _invalid_scan_parameter(text, "the expression must contain exactly one '='")
+    path, range_text = assignment_parts
+
+    path_parts = path.split(".")
+    if len(path_parts) != 3 or any(not part for part in path_parts):
+        raise _invalid_scan_parameter(text, "the path must be table.row_id.field")
+    table, row_id, field = path_parts
+
+    step_parts = range_text.split(":")
+    if len(step_parts) != 2:
+        raise _invalid_scan_parameter(text, "the range must contain exactly one ':'")
+    bounds, step_text = step_parts
+
+    separator_index = bounds.find("..")
+    if separator_index < 0 or separator_index != bounds.rfind(".."):
+        raise _invalid_scan_parameter(text, "the range must contain exactly one '..'")
+    start_text = bounds[:separator_index]
+    end_text = bounds[separator_index + 2 :]
+
+    try:
+        start = Decimal(start_text)
+        end = Decimal(end_text)
+        step = Decimal(step_text)
+    except (InvalidOperation, ValueError):
+        raise _invalid_scan_parameter(text, "start, stop, and step must be decimal numbers") from None
+
+    if not all(number.is_finite() for number in (start, end, step)):
+        raise _invalid_scan_parameter(text, "start, stop, and step must be finite")
+    if step == 0:
+        raise _invalid_scan_parameter(text, "step must not be zero")
+    if start < end and step < 0:
+        raise _invalid_scan_parameter(text, "step must be positive for an ascending range")
+    if start > end and step > 0:
+        raise _invalid_scan_parameter(text, "step must be negative for a descending range")
+
     precision = max(_decimal_places(start_text), _decimal_places(end_text), _decimal_places(step_text))
     values = []
     current = start
-    while current <= end:
+    ascending = step > 0
+    while current <= end if ascending else current >= end:
         if len(values) >= max_variants:
-            raise ValueError(f"scan parameter expands to too many variants (>{max_variants})")
+            raise ValueError(
+                f"scan parameter {text!r} expands to too many variants (>{max_variants}); "
+                "increase the step or narrow the range"
+            )
         values.append(f"{current:.{precision}f}")
         current += step
     return ScanParameter(table=table, row_id=row_id, field=field, values=values)
+
+
+def _invalid_scan_parameter(text: str, reason: str) -> ValueError:
+    return ValueError(
+        f"rejected scan parameter {text!r}: {reason}. "
+        "Expected PATH=START..STOP:STEP; for example, "
+        "generators.fisherman.cost_growth=1.14..1.18:0.01"
+    )
 
 
 def run_scan(
@@ -133,6 +173,4 @@ def _apply_override(raw, parameter: ScanParameter, value: str) -> None:
 
 
 def _decimal_places(text: str) -> int:
-    if "." not in text:
-        return 0
-    return len(text.split(".", 1)[1])
+    return max(0, -Decimal(text).as_tuple().exponent)
