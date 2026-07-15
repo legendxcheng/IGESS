@@ -884,6 +884,41 @@ def test_initialize_authoring_project_restores_original_directory_if_backup_rena
     assert list(tmp_path.iterdir()) == [target]
 
 
+def test_initialize_authoring_project_recovers_if_backup_rename_completes_then_raises(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "empty"
+    target.mkdir()
+    os.utime(target, ns=(1_700_000_000_000_000_000,) * 2)
+    original = target.stat()
+
+    class InjectedInterrupt(BaseException):
+        pass
+
+    injected = InjectedInterrupt("after completed backup rename")
+    real_rename = os.rename
+    raised = False
+
+    def rename_then_raise(source: object, destination: object) -> None:
+        nonlocal raised
+        real_rename(source, destination)
+        if Path(source) == target and not raised:
+            raised = True
+            raise injected
+
+    monkeypatch.setattr(templates_module.os, "rename", rename_then_raise)
+
+    with pytest.raises(InjectedInterrupt) as captured:
+        initialize_authoring_project(target)
+
+    restored = target.stat()
+    assert captured.value is injected
+    assert os.path.samestat(original, restored)
+    assert restored.st_mtime_ns == original.st_mtime_ns
+    assert list(target.iterdir()) == []
+    assert list(tmp_path.iterdir()) == [target]
+
+
 def test_initialize_authoring_project_restores_original_directory_if_install_fails(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -910,6 +945,88 @@ def test_initialize_authoring_project_restores_original_directory_if_install_fai
     assert restored.st_mtime_ns == original.st_mtime_ns
     assert list(target.iterdir()) == []
     assert list(tmp_path.iterdir()) == [target]
+
+
+def test_initialize_authoring_project_recovers_if_install_completes_then_raises(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "empty"
+    target.mkdir()
+    os.utime(target, ns=(1_700_000_000_000_000_000,) * 2)
+    original = target.stat()
+    injected = OSError("after completed staged install")
+    real_replace = os.replace
+
+    def replace_then_raise(source: object, destination: object) -> None:
+        real_replace(source, destination)
+        if Path(destination) == target:
+            raise injected
+
+    monkeypatch.setattr(templates_module.os, "replace", replace_then_raise)
+
+    with pytest.raises(OSError) as captured:
+        initialize_authoring_project(target)
+
+    restored = target.stat()
+    assert captured.value is injected
+    assert os.path.samestat(original, restored)
+    assert restored.st_mtime_ns == original.st_mtime_ns
+    assert list(target.iterdir()) == []
+    assert list(tmp_path.iterdir()) == [target]
+
+
+def test_initialize_authoring_project_removes_completed_install_after_absent_target_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "absent"
+    injected = OSError("after completed absent-target install")
+    real_replace = os.replace
+
+    def replace_then_raise(source: object, destination: object) -> None:
+        real_replace(source, destination)
+        if Path(destination) == target:
+            raise injected
+
+    monkeypatch.setattr(templates_module.os, "replace", replace_then_raise)
+
+    with pytest.raises(OSError) as captured:
+        initialize_authoring_project(target)
+
+    assert captured.value is injected
+    assert not target.exists()
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_initialize_authoring_project_never_deletes_unknown_content_during_recovery(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "empty"
+    target.mkdir()
+    original = target.stat()
+    injected = OSError("after install with raced content")
+    real_replace = os.replace
+
+    def replace_add_content_then_raise(source: object, destination: object) -> None:
+        real_replace(source, destination)
+        if Path(destination) == target:
+            (target / "unknown.txt").write_bytes(b"preserve me")
+            raise injected
+
+    monkeypatch.setattr(
+        templates_module.os, "replace", replace_add_content_then_raise
+    )
+
+    with pytest.raises(OSError) as captured:
+        initialize_authoring_project(target)
+
+    assert captured.value is injected
+    assert os.path.samestat(original, target.stat())
+    preserved = [
+        path for path in tmp_path.rglob("unknown.txt") if path.read_bytes() == b"preserve me"
+    ]
+    assert len(preserved) == 1
+    assert not preserved[0].is_relative_to(target)
+    assert any("preserv" in note.lower() for note in captured.value.__notes__)
 
 
 def test_initialize_authoring_project_preserves_raced_content_when_revalidating_backup(

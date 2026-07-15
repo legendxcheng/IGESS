@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+import hashlib
 from io import BytesIO
 import os
 from pathlib import Path
@@ -168,12 +169,11 @@ def initialize_authoring_project(
     )
     backup_container: Path | None = None
     backup: Path | None = None
-    original_backed_up = False
-    staged_installed = False
-    staged_identity: os.stat_result | None = None
+    staged_identity = staging.lstat()
+    staged_snapshot: dict[str, tuple[str, str]] | None = None
     try:
         _write_project(staging, effective_model_id)
-        staged_identity = staging.stat()
+        staged_snapshot = _tree_snapshot(staging)
         current_target_identity = _validate_empty_target(target)
         if target_identity is None:
             if current_target_identity is not None:
@@ -188,35 +188,33 @@ def initialize_authoring_project(
             )
             backup = backup_container / "original"
             os.rename(target, backup)
-            original_backed_up = True
             backup_identity = _validate_empty_target(backup)
             _require_same_identity(backup, target_identity, backup_identity)
             if _validate_empty_target(target) is not None:
                 _occupied_target(target, "target_reappeared")
         os.replace(staging, target)
-        staged_installed = True
         if backup is not None:
             backup_identity = _validate_empty_target(backup)
             _require_same_identity(backup, target_identity, backup_identity)
             backup.rmdir()
-            original_backed_up = False
             backup_container.rmdir()
     except BaseException as primary:
-        restored = True
-        if original_backed_up and backup is not None:
-            restored = _restore_original_target(
+        try:
+            _recover_initialization(
                 target,
                 backup,
+                backup_container,
                 staging,
                 target_identity,
                 staged_identity,
-                staged_installed,
+                staged_snapshot,
                 primary,
             )
-        if staging.exists() and not staged_installed:
-            _cleanup_generated_tree(staging, primary)
-        if restored and backup_container is not None and backup_container.exists():
-            _remove_empty_directory(backup_container, primary)
+        except BaseException as recovery_error:
+            primary.add_note(
+                "Initialization recovery was interrupted by "
+                f"{type(recovery_error).__name__}: {recovery_error}"
+            )
         raise
     return target
 
@@ -301,63 +299,195 @@ def _require_same_identity(
     )
 
 
-def _restore_original_target(
+def _recover_initialization(
     target: Path,
-    backup: Path,
+    backup: Path | None,
+    backup_container: Path | None,
     staging: Path,
     original_identity: os.stat_result | None,
-    staged_identity: os.stat_result | None,
-    staged_installed: bool,
+    staged_identity: os.stat_result,
+    staged_snapshot: dict[str, tuple[str, str]] | None,
+    primary: BaseException,
+) -> None:
+    original_at_target = _matches_identity(target, original_identity, primary)
+    original_at_backup = (
+        backup is not None and _matches_identity(backup, original_identity, primary)
+    )
+    staged_at_target = _matches_identity(target, staged_identity, primary)
+    staged_locations = [staging]
+
+    if original_identity is None and staged_at_target:
+        if _path_is_absent(staging, primary):
+            _rename_during_recovery(target, staging, primary)
+        else:
+            primary.add_note(
+                "Generated target was preserved because its staging path was occupied"
+            )
+    elif not original_at_target and original_at_backup and backup is not None:
+        if staged_at_target:
+            recovered_staging = staging
+            if not _path_is_absent(recovered_staging, primary):
+                if backup_container is None:
+                    primary.add_note(
+                        "Generated target could not be moved aside because its staging "
+                        "path was occupied"
+                    )
+                    return
+                recovered_staging = backup_container / "staged-output"
+                if not _path_is_absent(recovered_staging, primary):
+                    primary.add_note(
+                        "Generated target could not be moved aside because all recovery "
+                        "paths were occupied"
+                    )
+                    return
+                staged_locations.append(recovered_staging)
+            _rename_during_recovery(target, recovered_staging, primary)
+
+        if _path_is_absent(target, primary):
+            _rename_during_recovery(backup, target, primary)
+        original_at_target = _matches_identity(target, original_identity, primary)
+
+    if original_identity is not None and not original_at_target:
+        preserved_at = backup if original_at_backup else "an unknown location"
+        primary.add_note(
+            f"Original empty target could not be restored; it remains at {preserved_at}"
+        )
+
+    for candidate in dict.fromkeys(staged_locations):
+        _cleanup_known_staging(
+            candidate,
+            staged_identity,
+            staged_snapshot,
+            primary,
+        )
+
+    if backup_container is not None:
+        _remove_recovery_container_if_empty(backup_container, primary)
+
+
+def _matches_identity(
+    path: Path,
+    expected: os.stat_result | None,
     primary: BaseException,
 ) -> bool:
-    try:
-        backup_identity = backup.lstat()
-        if original_identity is None or not os.path.samestat(
-            original_identity, backup_identity
-        ):
-            raise OSError("original backup identity changed before rollback")
-        if _is_path_indirection(backup, backup_identity):
-            raise OSError("original backup became a path indirection before rollback")
-        if staged_installed:
-            installed_identity = target.lstat()
-            if staged_identity is None or not os.path.samestat(
-                staged_identity, installed_identity
-            ):
-                raise OSError("installed target identity changed before rollback")
-            os.rename(target, staging)
-        try:
-            target.lstat()
-        except FileNotFoundError:
-            pass
-        else:
-            raise OSError("target path was occupied before original could be restored")
-        os.rename(backup, target)
-        return True
-    except OSError as rollback_error:
-        primary.add_note(
-            "Original empty target remains preserved at "
-            f"{backup}; rollback failed with {type(rollback_error).__name__}: "
-            f"{rollback_error}"
-        )
+    if expected is None:
         return False
+    identity = _lstat_during_recovery(path, primary)
+    return identity is not None and os.path.samestat(expected, identity)
 
 
-def _cleanup_generated_tree(path: Path, primary: BaseException) -> None:
+def _lstat_during_recovery(
+    path: Path, primary: BaseException
+) -> os.stat_result | None:
+    try:
+        return path.lstat()
+    except FileNotFoundError:
+        return None
+    except BaseException as inspection_error:
+        primary.add_note(
+            f"Recovery could not inspect {path}: "
+            f"{type(inspection_error).__name__}: {inspection_error}"
+        )
+        return None
+
+
+def _path_is_absent(path: Path, primary: BaseException) -> bool:
+    try:
+        path.lstat()
+    except FileNotFoundError:
+        return True
+    except BaseException as inspection_error:
+        primary.add_note(
+            f"Recovery could not verify that {path} was absent: "
+            f"{type(inspection_error).__name__}: {inspection_error}"
+        )
+    return False
+
+
+def _rename_during_recovery(
+    source: Path, destination: Path, primary: BaseException
+) -> None:
+    try:
+        os.rename(source, destination)
+    except BaseException as rename_error:
+        primary.add_note(
+            f"Recovery rename {source} -> {destination} raised "
+            f"{type(rename_error).__name__}: {rename_error}"
+        )
+
+
+def _cleanup_known_staging(
+    path: Path,
+    staged_identity: os.stat_result,
+    staged_snapshot: dict[str, tuple[str, str]] | None,
+    primary: BaseException,
+) -> None:
+    if not _matches_identity(path, staged_identity, primary):
+        return
+    if staged_snapshot is None:
+        primary.add_note(
+            f"Generated staging was preserved at {path} because its completed content "
+            "snapshot was unavailable"
+        )
+        return
+    try:
+        current_snapshot = _tree_snapshot(path)
+    except BaseException as snapshot_error:
+        primary.add_note(
+            f"Generated staging was preserved at {path} because recovery could not "
+            f"verify its contents: {type(snapshot_error).__name__}: {snapshot_error}"
+        )
+        return
+    if current_snapshot != staged_snapshot:
+        primary.add_note(
+            f"Generated staging was preserved at {path} because it contains unknown "
+            "or raced content"
+        )
+        return
     try:
         shutil.rmtree(path)
-    except OSError as cleanup_error:
+    except BaseException as cleanup_error:
         primary.add_note(
             f"Generated staging cleanup failed at {path}: "
             f"{type(cleanup_error).__name__}: {cleanup_error}"
         )
 
 
-def _remove_empty_directory(path: Path, primary: BaseException) -> None:
+def _tree_snapshot(root: Path) -> dict[str, tuple[str, str]]:
+    snapshot: dict[str, tuple[str, str]] = {}
+    pending = [root]
+    while pending:
+        directory = pending.pop()
+        with os.scandir(directory) as entries:
+            for entry in sorted(entries, key=lambda item: item.name):
+                path = Path(entry.path)
+                relative = path.relative_to(root).as_posix()
+                identity = path.lstat()
+                if _is_path_indirection(path, identity):
+                    snapshot[relative] = ("indirection", "")
+                elif stat.S_ISDIR(identity.st_mode):
+                    snapshot[relative] = ("directory", "")
+                    pending.append(path)
+                elif stat.S_ISREG(identity.st_mode):
+                    snapshot[relative] = (
+                        "file",
+                        hashlib.sha256(path.read_bytes()).hexdigest(),
+                    )
+                else:
+                    snapshot[relative] = ("other", str(identity.st_mode))
+    return snapshot
+
+
+def _remove_recovery_container_if_empty(
+    path: Path, primary: BaseException
+) -> None:
     try:
         path.rmdir()
-    except OSError as cleanup_error:
+    except FileNotFoundError:
+        return
+    except BaseException as cleanup_error:
         primary.add_note(
-            f"Empty backup container cleanup failed at {path}: "
+            f"Recovery container was preserved at {path}: "
             f"{type(cleanup_error).__name__}: {cleanup_error}"
         )
 
