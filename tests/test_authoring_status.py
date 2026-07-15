@@ -13,6 +13,7 @@ from openpyxl import load_workbook
 import pytest
 
 from igess.authoring import ModelChange
+from igess.authoring import probe as probe_module
 from igess.authoring import status as status_module
 from igess.authoring.entity_schema import get_entity_schema
 from igess.authoring.probe import EligibilityFinding
@@ -23,6 +24,7 @@ from igess.authoring.project import AuthoringProject
 from igess.authoring.response import AuthoringError
 from igess.authoring.workbook_source import upsert_workbook_entity
 from igess.authoring.yaml_source import upsert_yaml_entity
+from igess.schema import Event, SimulationResult, TimelineRow
 
 
 def _blank_project(tmp_path: Path) -> AuthoringProject:
@@ -144,6 +146,42 @@ def _manifest(root: Path) -> dict[str, tuple[str, int, str]]:
                 hashlib.sha256(path.read_bytes()).hexdigest(),
             )
     return result
+
+
+def _classifier_simulation(category: str | None) -> SimulationResult:
+    rows: list[TimelineRow] = []
+    for time_seconds in range(11):
+        final = time_seconds == 10
+        rows.append(
+            TimelineRow(
+                scenario_id="smoke",
+                profile_id="default",
+                time_seconds=time_seconds,
+                resources={
+                    "gold": (
+                        "0.0000000000000000000000000001"
+                        if final and category == "resource_value"
+                        else ("0e99" if final and category is None else "0")
+                    )
+                },
+                generators_owned={
+                    "mine": 1 if final and category == "owned_generator_count" else 0
+                },
+                upgrades_purchased=(
+                    ["boost"] if final and category == "purchased_upgrade_set" else []
+                ),
+                total_cps="999" if final else "0",
+                prestige_counts={
+                    "rebirth": 1 if final and category == "prestige_count" else 0
+                },
+            )
+        )
+    events = (
+        [Event("smoke", "default", 10, "unlock_generator", "mine", {})]
+        if category is None
+        else []
+    )
+    return SimulationResult("smoke", rows, events)
 
 
 def test_model_status_payload_is_frozen_json_safe_and_defensive() -> None:
@@ -362,44 +400,38 @@ def test_no_change_probe_remains_incomplete_not_failed(
 
 
 @pytest.mark.parametrize(
-    ("observable_category", "formal", "expected_state"),
+    "observable_category",
     [
-        ("resource_value", False, "runnable"),
-        ("owned_generator_count", True, "ready"),
-        ("purchased_upgrade_set", False, "runnable"),
-        ("prestige_count", True, "ready"),
+        "resource_value",
+        "owned_generator_count",
+        "purchased_upgrade_set",
+        "prestige_count",
     ],
 )
-def test_every_probe_observable_category_maps_to_runnable_or_ready(
+def test_derive_status_runs_real_probe_classifier_for_each_observable_category(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     observable_category: str,
-    formal: bool,
-    expected_state: str,
 ) -> None:
     project = _blank_project(tmp_path)
     _add_activity_route(project)
-    if formal:
-        _add_formal_scenario(project)
-    calls: list[str] = []
+    simulation = _classifier_simulation(observable_category)
 
-    def category_probe(_model: object) -> TenTickProbeResult:
-        calls.append(observable_category)
-        return TenTickProbeResult(True, ())
+    def run_scenario(_simulator: object, scenario_id: str) -> SimulationResult:
+        assert scenario_id == "smoke"
+        return simulation
 
-    monkeypatch.setattr(status_module, "run_ten_tick_probe", category_probe)
+    monkeypatch.setattr(probe_module.Simulator, "run_scenario", run_scenario)
     before = _manifest(project.root)
 
     status = derive_status(project, lambda: {"run_id": "prior-smoke-1"})
 
-    assert status.state == expected_state
+    assert status.state == "runnable"
     assert status.structural_valid and status.smoke_eligible
-    assert calls == [observable_category]
     assert status.latest_smoke_run_id == "prior-smoke-1"
     assert status.entity_counts["resource"] == 1
-    assert status.available_scenarios == (
-        ("formal", "smoke") if formal else ("smoke",)
-    )
+    assert status.available_scenarios == ("smoke",)
+    assert status.missing_requirements == ()
     assert _manifest(project.root) == before
 
 
@@ -409,19 +441,13 @@ def test_elapsed_time_and_unlock_events_without_observable_state_are_incomplete(
 ) -> None:
     project = _blank_project(tmp_path)
     _add_activity_route(project)
-    monkeypatch.setattr(
-        status_module,
-        "run_ten_tick_probe",
-        lambda _model: TenTickProbeResult(
-            False,
-            (
-                EligibilityFinding(
-                    "smoke_no_state_change",
-                    "Elapsed time and unlock events do not change observable model state.",
-                ),
-            ),
-        ),
-    )
+    simulation = _classifier_simulation(None)
+
+    def run_scenario(_simulator: object, scenario_id: str) -> SimulationResult:
+        assert scenario_id == "smoke"
+        return simulation
+
+    monkeypatch.setattr(probe_module.Simulator, "run_scenario", run_scenario)
     before = _manifest(project.root)
 
     status = derive_status(project, lambda: {"run_id": "prior-smoke-1"})
