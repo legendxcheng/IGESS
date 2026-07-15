@@ -26,12 +26,14 @@ def _make_project(root: Path) -> AuthoringProject:
 def _hold_project_lock(
     root: str,
     exclusive: bool,
-    acquired: Event,
+    attempting: Event,
+    ready: Event,
     release: Event,
 ) -> None:
     project = AuthoringProject.discover(root)
+    attempting.set()
     with project_lock(project, exclusive=exclusive):
-        acquired.set()
+        ready.set()
         release.wait(_PROCESS_TIMEOUT_SECONDS)
 
 
@@ -40,15 +42,16 @@ def _spawn_holder(
     project: AuthoringProject,
     *,
     exclusive: bool,
-) -> tuple[multiprocessing.Process, Event, Event]:
-    acquired = context.Event()
+) -> tuple[multiprocessing.Process, Event, Event, Event]:
+    attempting = context.Event()
+    ready = context.Event()
     release = context.Event()
     process = context.Process(
         target=_hold_project_lock,
-        args=(str(project.root), exclusive, acquired, release),
+        args=(str(project.root), exclusive, attempting, ready, release),
     )
     process.start()
-    return process, acquired, release
+    return process, attempting, ready, release
 
 
 def _finish(process: multiprocessing.Process, release: Event) -> None:
@@ -63,14 +66,14 @@ def _finish(process: multiprocessing.Process, release: Event) -> None:
 def test_shared_processes_overlap(tmp_path: Path) -> None:
     project = _make_project(tmp_path / "model")
     context = multiprocessing.get_context("spawn")
-    first, first_acquired, first_release = _spawn_holder(
+    first, _, first_acquired, first_release = _spawn_holder(
         context, project, exclusive=False
     )
     second = None
     second_release = None
     try:
         assert first_acquired.wait(_PROCESS_TIMEOUT_SECONDS)
-        second, second_acquired, second_release = _spawn_holder(
+        second, _, second_acquired, second_release = _spawn_holder(
             context, project, exclusive=False
         )
 
@@ -90,16 +93,17 @@ def test_exclusive_process_blocks_other_locks(
 ) -> None:
     project = _make_project(tmp_path / "model")
     context = multiprocessing.get_context("spawn")
-    first, first_acquired, first_release = _spawn_holder(
+    first, _, first_acquired, first_release = _spawn_holder(
         context, project, exclusive=True
     )
     second = None
     second_release = None
     try:
         assert first_acquired.wait(_PROCESS_TIMEOUT_SECONDS)
-        second, second_acquired, second_release = _spawn_holder(
+        second, second_attempting, second_acquired, second_release = _spawn_holder(
             context, project, exclusive=waiting_exclusive
         )
+        assert second_attempting.wait(_PROCESS_TIMEOUT_SECONDS)
         assert not second_acquired.wait(_BLOCKED_OBSERVATION_SECONDS)
 
         first_release.set()
@@ -113,16 +117,17 @@ def test_exclusive_process_blocks_other_locks(
 def test_terminated_process_releases_lock(tmp_path: Path) -> None:
     project = _make_project(tmp_path / "model")
     context = multiprocessing.get_context("spawn")
-    holder, holder_acquired, holder_release = _spawn_holder(
+    holder, _, holder_acquired, holder_release = _spawn_holder(
         context, project, exclusive=True
     )
     waiter = None
     waiter_release = None
     try:
         assert holder_acquired.wait(_PROCESS_TIMEOUT_SECONDS)
-        waiter, waiter_acquired, waiter_release = _spawn_holder(
+        waiter, waiter_attempting, waiter_acquired, waiter_release = _spawn_holder(
             context, project, exclusive=True
         )
+        assert waiter_attempting.wait(_PROCESS_TIMEOUT_SECONDS)
         assert not waiter_acquired.wait(_BLOCKED_OBSERVATION_SECONDS)
 
         holder.terminate()
@@ -145,7 +150,7 @@ def test_context_exception_releases_lock(tmp_path: Path) -> None:
         with project_lock(project, exclusive=True):
             raise RuntimeError("stop snapshot")
 
-    waiter, waiter_acquired, waiter_release = _spawn_holder(
+    waiter, _, waiter_acquired, waiter_release = _spawn_holder(
         context, project, exclusive=True
     )
     try:
@@ -160,14 +165,20 @@ def test_recovered_shared_snapshot_recovers_exclusively_then_holds_shared(
     project = _make_project(tmp_path / "model")
     context = multiprocessing.get_context("spawn")
     recovery_waiter = None
+    recovery_attempting = None
     recovery_acquired = None
     recovery_release = None
 
     def recover() -> list[str]:
-        nonlocal recovery_waiter, recovery_acquired, recovery_release
-        recovery_waiter, recovery_acquired, recovery_release = _spawn_holder(
-            context, project, exclusive=False
-        )
+        nonlocal recovery_waiter, recovery_attempting, recovery_acquired
+        nonlocal recovery_release
+        (
+            recovery_waiter,
+            recovery_attempting,
+            recovery_acquired,
+            recovery_release,
+        ) = _spawn_holder(context, project, exclusive=False)
+        assert recovery_attempting.wait(_PROCESS_TIMEOUT_SECONDS)
         assert not recovery_acquired.wait(_BLOCKED_OBSERVATION_SECONDS)
         return ["recovered_transaction"]
 
@@ -177,13 +188,15 @@ def test_recovered_shared_snapshot_recovers_exclusively_then_holds_shared(
         with recovered_shared_snapshot(project, recover) as warnings:
             assert warnings == ["recovered_transaction"]
             assert recovery_waiter is not None
+            assert recovery_attempting is not None
             assert recovery_acquired is not None
             assert recovery_release is not None
             assert recovery_acquired.wait(_PROCESS_TIMEOUT_SECONDS)
 
-            writer, writer_acquired, writer_release = _spawn_holder(
+            writer, writer_attempting, writer_acquired, writer_release = _spawn_holder(
                 context, project, exclusive=True
             )
+            assert writer_attempting.wait(_PROCESS_TIMEOUT_SECONDS)
             assert not writer_acquired.wait(_BLOCKED_OBSERVATION_SECONDS)
             recovery_release.set()
 
