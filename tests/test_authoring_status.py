@@ -265,19 +265,21 @@ def test_model_status_payload_is_frozen_json_safe_and_defensive() -> None:
 
 
 @pytest.mark.parametrize(
-    ("state", "structural_valid", "smoke_eligible"),
+    ("state", "structural_valid", "smoke_eligible", "scenarios"),
     [
-        ("failed", False, False),
-        ("incomplete", True, False),
-        ("incomplete", True, True),
-        ("runnable", True, True),
-        ("ready", True, True),
+        ("failed", False, False, ("formal",)),
+        ("incomplete", True, False, ("formal",)),
+        ("incomplete", True, True, ("smoke",)),
+        ("incomplete", True, True, ("formal", "smoke")),
+        ("runnable", True, True, ("smoke",)),
+        ("ready", True, True, ("formal", "smoke")),
     ],
 )
 def test_model_status_accepts_exact_valid_state_matrix(
     state: str,
     structural_valid: bool,
     smoke_eligible: bool,
+    scenarios: tuple[str, ...],
 ) -> None:
     status = ModelStatus(
         model_digest="sha256:" + "a" * 64,
@@ -287,7 +289,7 @@ def test_model_status_accepts_exact_valid_state_matrix(
         entity_counts={"resource": 0},
         missing_requirements=(),
         warnings=(),
-        available_scenarios=("smoke",),
+        available_scenarios=scenarios,
         latest_smoke_run_id="prior-smoke-1",
     )
 
@@ -296,6 +298,7 @@ def test_model_status_accepts_exact_valid_state_matrix(
     assert payload["structural_valid"] is structural_valid
     assert payload["smoke_eligible"] is smoke_eligible
     assert payload["entity_counts"] == {"resource": 0}
+    assert payload["available_scenarios"] == list(scenarios)
     json.dumps(payload)
 
 
@@ -321,6 +324,11 @@ def test_model_status_rejects_every_contradictory_state_combination(
     structural_valid: bool,
     smoke_eligible: bool,
 ) -> None:
+    scenarios = (
+        ("formal", "smoke")
+        if state == "ready"
+        else (("smoke",) if smoke_eligible else ())
+    )
     with pytest.raises(ValueError):
         ModelStatus(
             model_digest="sha256:" + "a" * 64,
@@ -328,7 +336,56 @@ def test_model_status_rejects_every_contradictory_state_combination(
             smoke_eligible=smoke_eligible,
             state=state,  # type: ignore[arg-type]
             entity_counts={},
+            available_scenarios=scenarios,
         )
+
+
+@pytest.mark.parametrize(
+    ("state", "smoke_eligible", "scenarios"),
+    [
+        ("ready", True, ()),
+        ("ready", True, ("smoke",)),
+        ("ready", True, ("formal",)),
+        ("runnable", True, ()),
+        ("runnable", True, ("formal",)),
+        ("runnable", True, ("formal", "smoke")),
+        ("incomplete", True, ()),
+        ("incomplete", True, ("formal",)),
+    ],
+)
+def test_model_status_rejects_scenario_state_contradictions(
+    state: str,
+    smoke_eligible: bool,
+    scenarios: tuple[str, ...],
+) -> None:
+    with pytest.raises(ValueError):
+        ModelStatus(
+            model_digest="sha256:" + "a" * 64,
+            structural_valid=True,
+            smoke_eligible=smoke_eligible,
+            state=state,  # type: ignore[arg-type]
+            entity_counts={},
+            available_scenarios=scenarios,
+        )
+
+
+def test_model_status_normalizes_scenarios_sorted_unique_and_defensively() -> None:
+    source = ["zeta", "smoke", "alpha", "zeta"]
+    status = ModelStatus(
+        model_digest="sha256:" + "a" * 64,
+        structural_valid=True,
+        smoke_eligible=True,
+        state="incomplete",
+        entity_counts={},
+        available_scenarios=source,  # type: ignore[arg-type]
+    )
+    source.clear()
+
+    assert status.available_scenarios == ("alpha", "smoke", "zeta")
+    payload = status.to_payload()
+    assert payload["available_scenarios"] == ["alpha", "smoke", "zeta"]
+    payload["available_scenarios"].clear()
+    assert status.to_payload()["available_scenarios"] == ["alpha", "smoke", "zeta"]
 
 
 def test_blank_project_derives_complete_incomplete_payload(tmp_path: Path) -> None:

@@ -43,7 +43,11 @@ _YAML_SCHEMAS = tuple(
 
 @dataclass(frozen=True, slots=True)
 class ModelStatus:
-    """One immutable, JSON-safe snapshot of current authoring readiness."""
+    """One immutable, JSON-safe snapshot of current authoring readiness.
+
+    Available scenarios are defensively normalized to sorted, unique ids before
+    their cross-field state invariants are validated.
+    """
 
     model_digest: str
     structural_valid: bool
@@ -93,10 +97,18 @@ class ModelStatus:
         object.__setattr__(self, "missing_requirements", missing)
         object.__setattr__(self, "warnings", warnings)
 
-        scenarios = tuple(self.available_scenarios)
-        if any(not isinstance(value, str) or not value for value in scenarios):
+        scenario_values = tuple(self.available_scenarios)
+        if any(not isinstance(value, str) or not value for value in scenario_values):
             raise TypeError("available_scenarios must contain non-empty strings")
+        scenarios = tuple(sorted(set(scenario_values)))
         object.__setattr__(self, "available_scenarios", scenarios)
+        if self.smoke_eligible and "smoke" not in scenarios:
+            raise ValueError("smoke-eligible status requires the smoke scenario")
+        has_non_smoke_scenario = any(value != "smoke" for value in scenarios)
+        if self.state == "ready" and not has_non_smoke_scenario:
+            raise ValueError("ready status requires a non-smoke scenario")
+        if self.state == "runnable" and has_non_smoke_scenario:
+            raise ValueError("runnable status cannot include a non-smoke scenario")
         if self.latest_smoke_run_id is not None and (
             not isinstance(self.latest_smoke_run_id, str)
             or not self.latest_smoke_run_id
