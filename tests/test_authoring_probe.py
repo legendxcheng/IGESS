@@ -1063,8 +1063,13 @@ def test_ten_tick_probe_does_not_convert_cancellation(monkeypatch) -> None:
         run_ten_tick_probe(model)
 
 
-def test_ten_tick_probe_atomically_publishes_complete_run_and_report(tmp_path) -> None:
-    model = ModelBuilder.build(_raw(route="activity"))
+@pytest.mark.parametrize("tick_seconds", [1, 2, 3, 7, 11, 60])
+def test_ten_tick_probe_atomically_publishes_exactly_ten_full_ticks(
+    tmp_path, tick_seconds
+) -> None:
+    raw = _raw(route="activity")
+    raw.rules.model.tick_seconds = tick_seconds
+    model = ModelBuilder.build(raw)
     artifact_root = tmp_path / "probe"
 
     result = run_ten_tick_probe(model, artifact_root=artifact_root)
@@ -1079,9 +1084,24 @@ def test_ten_tick_probe_atomically_publishes_complete_run_and_report(tmp_path) -
     timeline = json.loads(
         (artifact_root / "run" / "timeline.json").read_text(encoding="utf-8")
     )
-    assert {row["time_seconds"] for row in timeline} == set(range(11))
+    for profile_id in model.scenarios["smoke"].profiles:
+        times = [
+            row["time_seconds"]
+            for row in timeline
+            if row["profile_id"] == profile_id
+        ]
+        assert times == [tick_seconds * index for index in range(11)]
     json.loads((artifact_root / "report" / "report_data.json").read_text(encoding="utf-8"))
     assert not list(tmp_path.glob(".probe-probe-*"))
+
+
+def test_ten_tick_probe_accepts_required_scenario_keyword_and_position() -> None:
+    model = ModelBuilder.build(_raw(route="activity"))
+
+    keyword = run_ten_tick_probe(model, scenario="smoke")
+    positional = run_ten_tick_probe(model, "smoke")
+
+    assert keyword.to_payload() == positional.to_payload()
 
 
 @pytest.mark.parametrize("failure_point", ["writer", "report"])
@@ -1154,3 +1174,75 @@ def test_ten_tick_probe_treats_publish_replace_then_raise_as_committed(
 
     assert Path(result.report_index).is_file()
     assert artifact_root.is_dir()
+
+
+@pytest.mark.parametrize("cancellation_type", [KeyboardInterrupt, SystemExit])
+def test_ten_tick_probe_restores_original_target_when_backup_rename_raises_after_commit(
+    tmp_path, monkeypatch, cancellation_type
+) -> None:
+    model = ModelBuilder.build(_raw(route="activity"))
+    artifact_root = tmp_path / "probe"
+    artifact_root.mkdir()
+    original_identity = artifact_root.lstat()
+    real_replace = os.replace
+    primary = cancellation_type("cancel backup rename")
+
+    def replace_then_cancel(source, target):
+        real_replace(source, target)
+        if Path(source) == artifact_root:
+            raise primary
+
+    monkeypatch.setattr("igess.authoring.probe.os.replace", replace_then_cancel)
+
+    with pytest.raises(cancellation_type) as caught:
+        run_ten_tick_probe(model, artifact_root=artifact_root)
+
+    assert caught.value is primary
+    restored = artifact_root.lstat()
+    assert (restored.st_dev, restored.st_ino, restored.st_mode) == (
+        original_identity.st_dev,
+        original_identity.st_ino,
+        original_identity.st_mode,
+    )
+    assert list(artifact_root.iterdir()) == []
+    assert not list(tmp_path.glob(".probe-probe-*"))
+    assert not list(tmp_path.glob(".probe-backup-*"))
+
+
+def test_ten_tick_probe_preserves_primary_and_recoverable_backup_when_restore_fails(
+    tmp_path, monkeypatch
+) -> None:
+    model = ModelBuilder.build(_raw(route="activity"))
+    artifact_root = tmp_path / "probe"
+    artifact_root.mkdir()
+    original_identity = artifact_root.lstat()
+    real_replace = os.replace
+    primary = KeyboardInterrupt("cancel backup rename")
+
+    def fail_backup_and_restore(source, target):
+        source = Path(source)
+        target = Path(target)
+        if source == artifact_root:
+            real_replace(source, target)
+            raise primary
+        if source.name.startswith(".probe-backup-") and target == artifact_root:
+            raise PermissionError("restore denied")
+        real_replace(source, target)
+
+    monkeypatch.setattr("igess.authoring.probe.os.replace", fail_backup_and_restore)
+
+    with pytest.raises(KeyboardInterrupt) as caught:
+        run_ten_tick_probe(model, artifact_root=artifact_root)
+
+    assert caught.value is primary
+    assert not artifact_root.exists()
+    backups = list(tmp_path.glob(".probe-backup-*"))
+    assert len(backups) == 1
+    backup_identity = backups[0].lstat()
+    assert (backup_identity.st_dev, backup_identity.st_ino, backup_identity.st_mode) == (
+        original_identity.st_dev,
+        original_identity.st_ino,
+        original_identity.st_mode,
+    )
+    assert any(str(backups[0]) in note for note in (primary.__notes__ or []))
+    assert not list(tmp_path.glob(".probe-probe-*"))

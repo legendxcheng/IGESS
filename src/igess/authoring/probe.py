@@ -8,6 +8,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from decimal import Decimal, DecimalException
 import json
+import math
 import os
 from pathlib import Path
 import shutil
@@ -135,11 +136,12 @@ class TenTickProbeResult:
 
 def run_ten_tick_probe(
     model: EconomyModel,
-    scenario_id: str = "smoke",
+    scenario: str = "smoke",
     artifact_root: str | Path | None = None,
 ) -> TenTickProbeResult:
     """Run exactly ten fixed ticks without mutating the caller's model."""
 
+    scenario_id = scenario
     try:
         probe_model = _build_probe_model(model, scenario_id)
         simulator = Simulator(probe_model)
@@ -199,7 +201,7 @@ def _build_probe_model(model: EconomyModel, scenario_id: str) -> EconomyModel:
 
     probe_scenario = replace(
         scenario,
-        duration_hours=Decimal(tick_seconds * 10) / Decimal(3600),
+        duration_hours=_duration_hours_for_exact_seconds(tick_seconds * 10),
         profiles=list(scenario.profiles),
         outputs=list(scenario.outputs),
         record_interval_seconds=tick_seconds,
@@ -209,6 +211,27 @@ def _build_probe_model(model: EconomyModel, scenario_id: str) -> EconomyModel:
         model,
         scenarios={**model.scenarios, scenario_id: probe_scenario},
     )
+
+
+def _duration_hours_for_exact_seconds(seconds: int) -> float:
+    """Return hours whose existing Simulator conversion recovers *seconds*."""
+
+    try:
+        hours = seconds / 3600.0
+    except OverflowError as exc:
+        raise OverflowError("probe duration is too large for the simulator") from exc
+    if not math.isfinite(hours):
+        raise OverflowError("probe duration is too large for the simulator")
+    for _ in range(64):
+        recovered = int(hours * 3600.0)
+        if recovered == seconds:
+            return hours
+        direction = math.inf if recovered < seconds else -math.inf
+        adjusted = math.nextafter(hours, direction)
+        if adjusted == hours or not math.isfinite(adjusted):
+            break
+        hours = adjusted
+    raise OverflowError("probe duration cannot be represented as exact simulator seconds")
 
 
 def _raise_smoke_failed(phase: str, exc: Exception) -> NoReturn:
@@ -335,44 +358,70 @@ def _publish_probe_tree(
     os.close(descriptor)
     backup = Path(backup_name)
     backup.unlink()
-    moved_original = False
     try:
-        try:
-            os.replace(target, backup)
-        except BaseException:
-            if not _path_matches_identity(backup, target_identity):
-                raise
-        moved_original = True
-        try:
-            os.replace(staging, target)
-        except BaseException:
-            if _path_matches_identity(target, staging_identity):
-                _cleanup_empty_backup(backup, target_identity)
-                return
-            _restore_empty_target(backup, target, target_identity)
-            raise
-        if not _path_matches_identity(target, staging_identity):
-            _restore_empty_target(backup, target, target_identity)
-            raise OSError("staged probe artifact tree was not published")
-        _cleanup_empty_backup(backup, target_identity)
-    except BaseException:
-        if moved_original and not _path_lexists(target):
-            _restore_empty_target(backup, target, target_identity)
+        os.replace(target, backup)
+    except BaseException as primary:
+        if _path_matches_identity(backup, target_identity):
+            _restore_empty_target_after_primary(
+                primary,
+                backup,
+                target,
+                target_identity,
+            )
         raise
 
+    try:
+        os.replace(staging, target)
+    except BaseException as primary:
+        if _path_matches_identity(target, staging_identity):
+            _cleanup_empty_backup(backup, target_identity)
+            return
+        _restore_empty_target_after_primary(primary, backup, target, target_identity)
+        raise
+    if not _path_matches_identity(target, staging_identity):
+        primary = OSError("staged probe artifact tree was not published")
+        _restore_empty_target_after_primary(primary, backup, target, target_identity)
+        raise primary
+    _cleanup_empty_backup(backup, target_identity)
 
-def _restore_empty_target(
+
+def _restore_empty_target_after_primary(
+    primary: BaseException,
     backup: Path,
     target: Path,
     target_identity: os.stat_result,
 ) -> None:
-    if not _path_matches_identity(backup, target_identity) or _path_lexists(target):
+    if not _path_matches_identity(backup, target_identity):
+        primary.add_note(
+            f"Original empty artifact target could not be identified at {backup}; "
+            "recovery paths were left untouched."
+        )
+        return
+    if _path_lexists(target):
+        primary.add_note(
+            f"Original empty artifact target remains recoverable at {backup}, "
+            f"but {target} is occupied."
+        )
         return
     try:
         os.replace(backup, target)
-    except BaseException:
-        if not _path_matches_identity(target, target_identity):
-            raise
+    except BaseException as rollback_error:
+        if _path_matches_identity(target, target_identity):
+            primary.add_note(
+                "Rollback restored the original empty artifact target but its "
+                f"rename raised {type(rollback_error).__name__}: {rollback_error}"
+            )
+        else:
+            primary.add_note(
+                f"Rollback failed with {type(rollback_error).__name__}: "
+                f"{rollback_error}. Original target remains recoverable at {backup}."
+            )
+        return
+    if not _path_matches_identity(target, target_identity):
+        primary.add_note(
+            f"Rollback returned without restoring the original target; its backup "
+            f"may remain recoverable at {backup}."
+        )
 
 
 def _cleanup_empty_backup(backup: Path, target_identity: os.stat_result) -> None:
