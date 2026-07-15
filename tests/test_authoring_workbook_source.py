@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import random
 import stat
 from typing import Any, NoReturn
 from zipfile import ZipFile
@@ -217,6 +218,18 @@ def _inspection_fields(entity: str, fields: dict[str, Any]) -> dict[str, Any]:
     return expected
 
 
+def _reversed_fields(fields: dict[str, Any]) -> dict[str, Any]:
+    return dict(reversed(tuple(fields.items())))
+
+
+def _shuffled_fields(fields: dict[str, Any], seed: str) -> dict[str, Any]:
+    items = list(fields.items())
+    random.Random(seed).shuffle(items)
+    if len(items) > 1 and items == list(fields.items()):
+        items = items[1:] + items[:1]
+    return dict(items)
+
+
 @pytest.mark.parametrize("entity", ENTITY_CASES)
 def test_create_and_update_every_workbook_entity(tmp_path: Path, entity: str) -> None:
     initial, updated = ENTITY_CASES[entity]
@@ -236,6 +249,47 @@ def test_create_and_update_every_workbook_entity(tmp_path: Path, entity: str) ->
     assert len(inspected.records) == 1
     assert inspected.records[0].row == created.records[0].row
     assert _fields(inspected.records[0]) == _inspection_fields(entity, updated)
+
+
+@pytest.mark.parametrize("entity", ENTITY_CASES)
+def test_field_insertion_order_does_not_affect_create_noop_or_update(
+    tmp_path: Path,
+    entity: str,
+) -> None:
+    initial, updated = ENTITY_CASES[entity]
+    schema = get_entity_schema(entity)
+    path = _path_for(tmp_path, entity)
+    _write_table(path, entity)
+
+    assert upsert_workbook_entity(
+        path,
+        _change(entity, "entry", _reversed_fields(initial)),
+    ) is True
+    created = inspect_table(path)
+    assert tuple(name for name, _ in created.records[0].fields) == schema.field_names
+    before_noop = path.read_bytes()
+
+    assert upsert_workbook_entity(
+        path,
+        _change(entity, "entry", _shuffled_fields(initial, entity)),
+    ) is False
+    assert path.read_bytes() == before_noop
+
+    assert upsert_workbook_entity(
+        path,
+        _change(entity, "entry", _reversed_fields(updated)),
+    ) is True
+    inspected = inspect_table(path)
+    assert inspected.records[0].row == created.records[0].row
+    assert _fields(inspected.records[0]) == _inspection_fields(entity, updated)
+
+    workbook = load_workbook(path, data_only=False)
+    sheet = workbook.active
+    assert tuple(
+        sheet.cell(inspected.var_row, column).value
+        for column in range(2, 2 + len(schema.field_names) + 1)
+    ) == ("id", *schema.field_names)
+    workbook.close()
 
 
 def test_prestige_list_is_encoded_with_semicolons_and_decoded_as_tuple(

@@ -118,9 +118,12 @@ def upsert_workbook_entity(
             change.id,
             _mutable_workbook_fields(schema, change.fields),
         )
-        selected = [record for record in inspected.records if record.entity_id == change.id]
-        if selected and _semantic_fields(selected[0].fields) == _semantic_fields(
-            tuple(normalized.items())
+        selected = [
+            record for record in inspected.records if record.entity_id == change.id
+        ]
+        if selected and (
+            _semantic_fields(schema, selected[0].fields)
+            == _semantic_fields(schema, normalized)
         ):
             return False
 
@@ -528,8 +531,17 @@ def _semantic_value(field: str, value: Any) -> Any:
     return str(value)
 
 
-def _semantic_fields(fields: tuple[tuple[str, Any], ...]) -> tuple[tuple[str, Any], ...]:
-    return tuple((field, _semantic_value(field, value)) for field, value in fields)
+def _semantic_fields(
+    schema: EntitySchema,
+    fields: Any,
+) -> tuple[tuple[str, Any], ...]:
+    """Canonicalize field equality in schema order, never mapping order."""
+
+    values = dict(fields)
+    return tuple(
+        (field, _semantic_value(field, values[field]))
+        for field in schema.field_names
+    )
 
 
 def _replace_atomically(
@@ -557,8 +569,9 @@ def _replace_atomically(
         phase = "reload"
         reloaded = _inspect_path(temporary, schema)
         matches = [record for record in reloaded.records if record.entity_id == change.id]
-        if len(matches) != 1 or _semantic_fields(matches[0].fields) != _semantic_fields(
-            tuple(change.fields.items())
+        if len(matches) != 1 or (
+            _semantic_fields(schema, matches[0].fields)
+            != _semantic_fields(schema, change.fields)
         ):
             _source_error(
                 "Reloaded workbook does not contain the exact upserted entity",
