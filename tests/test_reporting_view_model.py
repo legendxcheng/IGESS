@@ -198,3 +198,13 @@ def test_chart_value_preserves_display_for_unplottable_values():
 
 def test_chart_value_accepts_finite_decimal_strings():
     assert chart_value("123.5") == 123.5
+
+
+def test_chart_value_rejects_nonzero_values_that_underflow_to_float_zero():
+    assert chart_value("1e-400") is None
+    assert chart_value("-1e-400") is None
+
+
+def test_chart_value_keeps_exact_zero_plottable():
+    assert chart_value("0") == 0.0
+    assert chart_value("-0") == 0.0

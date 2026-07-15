@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -54,7 +55,15 @@ def chart_value(value: Any) -> float | None:
         return None
     if abs(decimal) > Decimal("1e308"):
         return None
-    return float(decimal)
+    try:
+        result = float(decimal)
+    except (OverflowError, ValueError):
+        return None
+    if not math.isfinite(result):
+        return None
+    if not decimal.is_zero() and result == 0.0:
+        return None
+    return result
 
 
 def chart_point(value: Any) -> dict[str, Any]:

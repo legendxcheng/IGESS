@@ -55,8 +55,8 @@ function renderOverview(report) {
     ),
     kpiCard(
       'Never reached',
-      `<div class="kpi-pair"><span>Purchased ${numericMarkup(overview.never_purchased_count)}</span>` +
-        `<span>Unlocked ${numericMarkup(overview.never_unlocked_count)}</span></div>`
+      `<div class="kpi-pair"><div><span>Purchased</span>${numericMarkup(overview.never_purchased_count)}</div>` +
+        `<div><span>Unlocked</span>${numericMarkup(overview.never_unlocked_count)}</div></div>`
     ),
     kpiCard('Warning categories', numericMarkup(overview.warning_category_count)),
     finalResourcesCard(overview.final_resources || {}),
@@ -82,8 +82,11 @@ function numericMarkup(point, suffix = '') {
     : String(point.display_value);
   const exact = point.exact_value == null ? '' : String(point.exact_value);
   const exactTitle = exact ? ` title="Exact value: ${escapeHtml(exact)}"` : '';
+  const exactDetails = exact
+    ? `<details class="exact-value"><summary>Exact</summary><code>${escapeHtml(exact)}</code></details>`
+    : '';
   return `<span class="kpi-value" data-exact-value="${escapeHtml(exact)}"${exactTitle}>` +
-    `${escapeHtml(display)}${escapeHtml(suffix)}</span>`;
+    `${escapeHtml(display)}${escapeHtml(suffix)}</span>${exactDetails}`;
 }
 
 function identityMarkup(row) {

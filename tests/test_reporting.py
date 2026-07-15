@@ -293,6 +293,12 @@ process.stdout.write(JSON.stringify({
     assert "&lt;profile&gt;" in html
     assert "&lt;resource&gt;" in html
     assert "&lt;display&gt;" in html
+    duration_card = html.split("<h3>Duration</h3>", 1)[1].split("</article>", 1)[0]
+    purchases_card = html.split("<h3>Purchases</h3>", 1)[1].split("</article>", 1)[0]
+    assert '<details class="exact-value">' in duration_card
+    assert '<details class="exact-value">' in purchases_card
+    assert "<summary>Exact</summary>" in duration_card
+    assert "<code>&quot;&gt;&lt;script&gt;" in duration_card
     assert "&lt;gap-profile&gt;" in rendered["diagnostics"]
     assert 'title="Exact value: 2"' in rendered["diagnostics"]
     assert "2</span> gaps" in rendered["diagnostics"]
@@ -311,6 +317,172 @@ process.stdout.write(JSON.stringify({
 
     for value in rendered.values():
         assert "<script>" not in value
+
+
+def test_report_script_bootstraps_inline_payload_without_unhandled_rejection():
+    assert NODE is not None, "Node.js is required for report UI bootstrap verification"
+    point = {"exact_value": "2", "display_value": "2", "chart_value": 2.0}
+    time_point = {"exact_value": "1", "display_value": "1", "chart_value": 1.0}
+    report = {
+        "scenario": {"id": "bootstrap", "profiles": ["player"]},
+        "overview": {
+            "resource_ids": ["gold"],
+            "duration_seconds": point,
+            "profiles": ["player"],
+            "purchase_count": point,
+            "first_key_unlock": None,
+            "prestige_reset_count": point,
+            "worst_payback": None,
+            "never_purchased_count": point,
+            "never_unlocked_count": point,
+            "warning_category_count": point,
+            "final_resources": {"player": {"gold": point}},
+        },
+        "series": {
+            "resources": [
+                {
+                    "time_seconds": 1,
+                    "time": time_point,
+                    "profile_id": "player",
+                    "resource_id": "gold",
+                    **point,
+                }
+            ],
+            "total_cps": [
+                {
+                    "time_seconds": 1,
+                    "time": time_point,
+                    "profile_id": "player",
+                    **point,
+                }
+            ],
+            "events": [
+                {
+                    "time_seconds": 1,
+                    "time": time_point,
+                    "profile_id": "player",
+                    "kind": "buy_generator",
+                    "item_id": "mine",
+                }
+            ],
+        },
+        "diagnostics": {
+            "invalid_content": {},
+            "overpowered_content": [],
+            "bottleneck_gap_counts": {"player": point},
+            "payback": [
+                {
+                    "profile_id": "player",
+                    "kind": "generator",
+                    "item_id": "mine",
+                    "payback_seconds": point,
+                    "cost": point,
+                    "delta_cps": point,
+                    "source_ref": "generators:mine",
+                }
+            ],
+        },
+        "evidence": {
+            "traces": [
+                {
+                    "profile_id": "player",
+                    "time": time_point,
+                    "kind": "buy_generator",
+                    "item_id": "mine",
+                    "formula_trace": "base_output * owned",
+                }
+            ],
+            "source_refs": [],
+        },
+    }
+    script_path = Path("src/igess/reporting/assets/report.js").resolve()
+    harness = r"""
+const fs = require('fs');
+const vm = require('vm');
+const source = fs.readFileSync(process.argv[1], 'utf8');
+const inline = { textContent: process.argv[2] };
+const scenario = { textContent: '' };
+const targets = {
+  overview: { innerHTML: '' },
+  controls: { innerHTML: '', querySelectorAll() { return []; } },
+  diagnostics: { innerHTML: '' },
+  evidence: { innerHTML: '' },
+};
+const chartElements = Object.fromEntries(
+  ['resource-chart', 'cps-chart', 'event-chart', 'payback-chart'].map(id => [id, { id, innerHTML: '' }])
+);
+const options = {};
+const resizeEvents = [];
+let unhandled = '';
+process.once('unhandledRejection', reason => {
+  unhandled = String(reason && (reason.stack || reason));
+});
+const documentStub = {
+  getElementById(id) {
+    if (id === 'igess-report-data') return inline;
+    return chartElements[id] || null;
+  },
+  querySelector(selector) {
+    if (selector === '[data-scenario]') return scenario;
+    if (selector === '[data-overview-kpis]') return targets.overview;
+    if (selector === '[data-resource-controls]') return targets.controls;
+    if (selector === '[data-diagnostics]') return targets.diagnostics;
+    if (selector === '[data-evidence]') return targets.evidence;
+    return null;
+  },
+};
+const context = {
+  console,
+  document: documentStub,
+  window: { addEventListener(name) { resizeEvents.push(name); } },
+  echarts: {
+    init(element) {
+      return {
+        setOption(option) { options[element.id] = option; },
+        dispose() {},
+        resize() {},
+      };
+    },
+  },
+};
+vm.createContext(context);
+vm.runInContext(source, context);
+setImmediate(() => {
+  process.stdout.write(JSON.stringify({
+    unhandled,
+    scenario: scenario.textContent,
+    overview: targets.overview.innerHTML,
+    controls: targets.controls.innerHTML,
+    diagnostics: targets.diagnostics.innerHTML,
+    evidence: targets.evidence.innerHTML,
+    charts: Object.keys(options).sort(),
+    resizeEvents,
+  }));
+});
+"""
+
+    completed = subprocess.run(
+        [NODE, "-e", harness, str(script_path), json.dumps(report)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    rendered = json.loads(completed.stdout)
+    assert rendered["unhandled"] == ""
+    assert rendered["scenario"] == "bootstrap"
+    assert '<details class="exact-value">' in rendered["overview"]
+    assert 'data-resource="gold"' in rendered["controls"]
+    assert rendered["charts"] == [
+        "cps-chart",
+        "event-chart",
+        "payback-chart",
+        "resource-chart",
+    ]
+    assert rendered["diagnostics"]
+    assert rendered["evidence"]
+    assert rendered["resizeEvents"] == ["resize"]
 
 
 def test_generate_static_report_embeds_parseable_json_payload(tmp_path):
