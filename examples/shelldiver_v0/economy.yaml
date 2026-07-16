@@ -77,6 +77,9 @@ player_profiles:
     behavior_policy: cheap_unlock_first
     session_pattern: short_sessions
     prestige_policy: conservative
+    activity_weights:
+      gather_shells: 3
+      deep_dive: 1
     luck: 1.5
   optimizer:
     source_efficiency:
@@ -88,6 +91,9 @@ player_profiles:
     behavior_policy: fastest_payback
     session_pattern: long_active
     prestige_policy: efficient_reset
+    activity_weights:
+      gather_shells: 1
+      deep_dive: 3
     luck: 5.65
   explorer:
     source_efficiency:
@@ -99,6 +105,9 @@ player_profiles:
     behavior_policy: new_content_bias
     session_pattern: medium_sessions
     prestige_policy: milestone_based
+    activity_weights:
+      gather_shells: 1
+      deep_dive: 1
     luck: 2.25
 
 scenarios:

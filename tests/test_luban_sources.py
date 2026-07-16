@@ -34,6 +34,8 @@ def test_luban_registry_lists_runtime_tables():
     assert {
         "resources",
         "generators",
+        "activities",
+        "activity_outputs",
         "upgrades",
         "constants",
         "milestones",
@@ -181,7 +183,7 @@ def test_cli_export_tables_matches_checked_in_json(tmp_path):
     )
 
     assert result.returncode == 0, result.stderr
-    assert "Exported 6 tables" in result.stdout
+    assert "Exported 8 tables" in result.stdout
     for expected_path in sorted(EXPORTS.glob("*.json")):
         generated_path = generated / expected_path.name
         assert generated_path.read_bytes() == expected_path.read_bytes()

@@ -46,6 +46,8 @@ def main() -> None:
         [
             ["resources", "resources.xlsx", "map", "id"],
             ["generators", "generators.xlsx", "map", "id"],
+            ["activities", "activities.xlsx", "map", "id"],
+            ["activity_outputs", "activity_outputs.xlsx", "map", "id"],
             ["upgrades", "upgrades.xlsx", "map", "id"],
             ["constants", "constants.xlsx", "map", "id"],
             ["milestones", "milestones.xlsx", "map", "id"],
@@ -57,7 +59,11 @@ def main() -> None:
         ["id", "name", "dimension"],
         ["stable resource id", "display name", "quantity dimension"],
         ["string", "string", "string"],
-        [["fish", "Fish", "fish"], ["prestige_point", "Prestige Point", "prestige"]],
+        [
+            ["fish", "Fish", "fish"],
+            ["shell", "Shell", "shell"],
+            ["prestige_point", "Prestige Point", "prestige"],
+        ],
     )
     write_workbook(
         DATAS / "generators.xlsx",
@@ -93,6 +99,38 @@ def main() -> None:
         ],
     )
     write_workbook(
+        DATAS / "activities.xlsx",
+        ["id", "name", "source_type", "unlock_condition"],
+        [
+            "stable activity id",
+            "display name",
+            "source type id",
+            "deterministic unlock condition",
+        ],
+        ["string", "string", "string", "string"],
+        [
+            ["gather_shells", "Gather Shells", "active", "always"],
+            ["deep_dive", "Deep Dive", "active", "owned(boat) >= 1"],
+        ],
+    )
+    write_workbook(
+        DATAS / "activity_outputs.xlsx",
+        ["id", "activity_id", "output_resource", "amount_per_second"],
+        [
+            "stable output id",
+            "activity id",
+            "produced resource id",
+            "full-time amount per second",
+        ],
+        ["string", "string", "string", "string"],
+        [
+            ["gather_shells_fish", "gather_shells", "fish", "0.25"],
+            ["gather_shells_shell", "gather_shells", "shell", "1"],
+            ["deep_dive_fish", "deep_dive", "fish", "1.5"],
+            ["deep_dive_shell", "deep_dive", "shell", "0.4"],
+        ],
+    )
+    write_workbook(
         DATAS / "upgrades.xlsx",
         ["id", "name", "target", "modifier_type", "value", "cost_resource", "base_cost", "unlock_condition"],
         [
@@ -117,7 +155,7 @@ def main() -> None:
         ["id", "value"],
         ["stable constant id", "string-encoded number"],
         ["string", "string"],
-        [["starting_fish", "100"], ["starting_prestige_point", "0"]],
+        [["starting_fish", "100"], ["starting_shell", "0"], ["starting_prestige_point", "0"]],
     )
     write_workbook(
         DATAS / "milestones.xlsx",

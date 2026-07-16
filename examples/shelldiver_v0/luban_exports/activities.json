@@ -1,0 +1,24 @@
+[
+  {
+    "id": "gather_shells",
+    "name": "Gather Shells",
+    "source_type": "active",
+    "unlock_condition": "always",
+    "_source": {
+      "table": "activities",
+      "workbook": "activities.xlsx",
+      "row": 4
+    }
+  },
+  {
+    "id": "deep_dive",
+    "name": "Deep Dive",
+    "source_type": "active",
+    "unlock_condition": "owned(boat) >= 1",
+    "_source": {
+      "table": "activities",
+      "workbook": "activities.xlsx",
+      "row": 5
+    }
+  }
+]

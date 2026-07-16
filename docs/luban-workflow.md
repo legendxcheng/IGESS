@@ -26,6 +26,8 @@ data-tables/Datas/
   __tables__.xlsx
   resources.xlsx
   generators.xlsx
+  activities.xlsx
+  activity_outputs.xlsx
   upgrades.xlsx
   constants.xlsx
   milestones.xlsx
@@ -50,6 +52,8 @@ For v0.1, the sample runtime data lives in:
 examples/shelldiver_v0/luban_exports/
   resources.json
   generators.json
+  activities.json
+  activity_outputs.json
   upgrades.json
   constants.json
   milestones.json
@@ -94,6 +98,31 @@ Required fields:
 - `cost_resource`
 - `cost_growth`
 - `unlock_condition`
+
+### activities
+
+Optional fields:
+
+- `id`
+- `name`
+- `source_type`
+- `unlock_condition`
+
+Activities model player behavior channels such as active clicking, diving, or
+task selection. Player profiles choose among unlocked activities through
+`activity_weights` in YAML.
+
+### activity_outputs
+
+Optional fields:
+
+- `id`
+- `activity_id`
+- `output_resource`
+- `amount_per_second`
+
+One activity can have multiple output rows, so a single behavior can produce
+several resources in different quantities.
 
 ### upgrades
 

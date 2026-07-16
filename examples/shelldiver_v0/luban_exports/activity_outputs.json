@@ -1,0 +1,46 @@
+[
+  {
+    "id": "gather_shells_fish",
+    "activity_id": "gather_shells",
+    "output_resource": "fish",
+    "amount_per_second": "0.25",
+    "_source": {
+      "table": "activity_outputs",
+      "workbook": "activity_outputs.xlsx",
+      "row": 4
+    }
+  },
+  {
+    "id": "gather_shells_shell",
+    "activity_id": "gather_shells",
+    "output_resource": "shell",
+    "amount_per_second": "1",
+    "_source": {
+      "table": "activity_outputs",
+      "workbook": "activity_outputs.xlsx",
+      "row": 5
+    }
+  },
+  {
+    "id": "deep_dive_fish",
+    "activity_id": "deep_dive",
+    "output_resource": "fish",
+    "amount_per_second": "1.5",
+    "_source": {
+      "table": "activity_outputs",
+      "workbook": "activity_outputs.xlsx",
+      "row": 6
+    }
+  },
+  {
+    "id": "deep_dive_shell",
+    "activity_id": "deep_dive",
+    "output_resource": "shell",
+    "amount_per_second": "0.4",
+    "_source": {
+      "table": "activity_outputs",
+      "workbook": "activity_outputs.xlsx",
+      "row": 7
+    }
+  }
+]

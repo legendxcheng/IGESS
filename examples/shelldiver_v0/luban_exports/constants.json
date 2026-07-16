@@ -9,12 +9,21 @@
     }
   },
   {
-    "id": "starting_prestige_point",
+    "id": "starting_shell",
     "value": "0",
     "_source": {
       "table": "constants",
       "workbook": "constants.xlsx",
       "row": 5
+    }
+  },
+  {
+    "id": "starting_prestige_point",
+    "value": "0",
+    "_source": {
+      "table": "constants",
+      "workbook": "constants.xlsx",
+      "row": 6
     }
   }
 ]

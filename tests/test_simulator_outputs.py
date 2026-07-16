@@ -2,8 +2,10 @@ import json
 import subprocess
 import sys
 
+from activity_fixtures import write_activity_fixture
 from igess.builder import ModelBuilder
 from igess.loader import ConfigLoader
+from igess.numbers import SimNumber
 from igess.outputs import OutputWriter
 from igess.schema import SimulationState
 from igess.simulator import Simulator
@@ -175,6 +177,32 @@ def test_timeline_total_cps_uses_profile_source_efficiency():
 
     assert casual.total_cps == "0.9"
     assert optimizer.total_cps == "1.05"
+
+
+def test_activity_outputs_use_profile_weights_and_multiple_resources(tmp_path):
+    config, tables = write_activity_fixture(tmp_path)
+    model = ModelBuilder.build(ConfigLoader.load(config, tables))
+    simulator = Simulator(model)
+
+    casual_state = SimulationState.new(model)
+    casual_events = []
+    simulator._update_unlocks("synthetic", "casual", 0, casual_state, casual_events)
+
+    assert casual_state.unlocked_activities == {"dive"}
+    assert any(event.kind == "unlock_activity" and event.item_id == "dive" for event in casual_events)
+
+    casual_state.unlocked_activities.add("sort_shells")
+    simulator._produce("casual", casual_state, 10)
+
+    assert casual_state.resources["fish"] == SimNumber.parse("136")
+    assert casual_state.resources["prestige_point"] == SimNumber.parse("6.75")
+
+    optimizer_state = SimulationState.new(model)
+    optimizer_state.unlocked_activities.update({"dive", "sort_shells"})
+    simulator._produce("optimizer", optimizer_state, 10)
+
+    assert optimizer_state.resources["fish"] == SimNumber.parse("140")
+    assert optimizer_state.resources["prestige_point"] == SimNumber.parse("5")
 
 
 def test_analytic_scenario_jumps_between_events_and_records():

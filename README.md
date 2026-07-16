@@ -245,6 +245,7 @@ Implemented now:
 - Config linting for ids, formulas, source types, modifier targets, profiles, policies, and deterministic seed.
 - Resource dimension metadata plus semantic formula-context checks to catch accidental cost/output/prestige parameter mixing.
 - Exponential generator costs, linear production, upgrade modifiers, and the standard modifier pipeline.
+- Player activities with profile-specific behavior weights and multi-resource activity outputs.
 - `casual`, `optimizer`, and `explorer` player profiles in the sample config.
 - `cheap_unlock_first`, `fastest_payback`, and `new_content_bias` behavior policies.
 - Session-pattern-driven offline reward pulses.

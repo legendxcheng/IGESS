@@ -2,9 +2,11 @@ import copy
 
 import pytest
 
+from activity_fixtures import write_activity_fixture
 from igess.builder import ModelBuilder
 from igess.linter import ConfigError, ConfigLinter
 from igess.loader import ConfigLoader
+from igess.numbers import SimNumber
 
 
 CONFIG = "examples/shelldiver_v0/economy.yaml"
@@ -18,13 +20,78 @@ def test_loader_linter_and_builder_accept_sample_config():
     model = ModelBuilder.build(raw)
 
     assert model.config.model_id == "shelldiver_incremental_v0"
-    assert set(model.resources) == {"fish", "prestige_point"}
+    assert set(model.resources) == {"fish", "shell", "prestige_point"}
     assert model.resources["fish"].dimension == "fish"
+    assert model.resources["shell"].dimension == "shell"
     assert model.resources["prestige_point"].dimension == "prestige"
     assert set(model.generators) == {"fisherman", "boat", "net"}
+    assert set(model.activities) == {"gather_shells", "deep_dive"}
+    assert set(model.activity_outputs) == {
+        "gather_shells_fish",
+        "gather_shells_shell",
+        "deep_dive_fish",
+        "deep_dive_shell",
+    }
     assert set(model.milestones) == {"first_boat", "small_fleet"}
     assert set(model.prestige_layers) == {"reef_renown"}
     assert "exponential_cost" in model.formulas
+
+
+def test_loader_linter_and_builder_accept_activity_tables(tmp_path):
+    config, tables = write_activity_fixture(tmp_path)
+    raw = ConfigLoader.load(config, tables)
+
+    ConfigLinter.validate(raw)
+    model = ModelBuilder.build(raw)
+
+    assert set(model.activities) == {"dive", "sort_shells"}
+    assert set(model.activity_outputs) == {
+        "dive_fish",
+        "dive_prestige",
+        "sort_shells_fish",
+    }
+    assert model.player_profiles["casual"].activity_weights["dive"].to_decimal_string() == "3"
+    assert model.activities["dive"].source_ref.workbook == "activities.xlsx"
+
+
+def test_linter_rejects_unknown_activity_source_type(tmp_path):
+    config, tables = write_activity_fixture(tmp_path)
+    raw = ConfigLoader.load(config, tables)
+    broken = copy.deepcopy(raw)
+    broken.activities[0].source_type = "manual"
+
+    with pytest.raises(ConfigError, match="unknown source_type"):
+        ConfigLinter.validate(broken)
+
+
+def test_linter_rejects_unknown_activity_output_resource(tmp_path):
+    config, tables = write_activity_fixture(tmp_path)
+    raw = ConfigLoader.load(config, tables)
+    broken = copy.deepcopy(raw)
+    broken.activity_outputs[0].output_resource = "coin"
+
+    with pytest.raises(ConfigError, match="unknown output_resource"):
+        ConfigLinter.validate(broken)
+
+
+def test_linter_rejects_unknown_activity_output_activity(tmp_path):
+    config, tables = write_activity_fixture(tmp_path)
+    raw = ConfigLoader.load(config, tables)
+    broken = copy.deepcopy(raw)
+    broken.activity_outputs[0].activity_id = "ghost_activity"
+
+    with pytest.raises(ConfigError, match="unknown activity_id"):
+        ConfigLinter.validate(broken)
+
+
+def test_linter_rejects_unknown_profile_activity_weight(tmp_path):
+    config, tables = write_activity_fixture(tmp_path)
+    raw = ConfigLoader.load(config, tables)
+    broken = copy.deepcopy(raw)
+    broken.rules.player_profiles["casual"].activity_weights["ghost_activity"] = SimNumber.parse("1")
+
+    with pytest.raises(ConfigError, match="unknown activity_weight"):
+        ConfigLinter.validate(broken)
 
 
 def test_linter_rejects_missing_resource_reference():

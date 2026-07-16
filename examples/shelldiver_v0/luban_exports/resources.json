@@ -10,13 +10,23 @@
     }
   },
   {
+    "id": "shell",
+    "name": "Shell",
+    "dimension": "shell",
+    "_source": {
+      "table": "resources",
+      "workbook": "resources.xlsx",
+      "row": 5
+    }
+  },
+  {
     "id": "prestige_point",
     "name": "Prestige Point",
     "dimension": "prestige",
     "_source": {
       "table": "resources",
       "workbook": "resources.xlsx",
-      "row": 5
+      "row": 6
     }
   }
 ]
