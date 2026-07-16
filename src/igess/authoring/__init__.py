@@ -4,10 +4,12 @@ from .change import ModelChange, merge_fields, parse_change_text
 from .probe import EligibilityFinding, EligibilityResult, static_smoke_eligibility
 from .project import AuthoringProject
 from .response import AuthoringError, CommandResponse
+from .service import AuthoringService
 
 __all__ = [
     "AuthoringError",
     "AuthoringProject",
+    "AuthoringService",
     "CommandResponse",
     "EligibilityFinding",
     "EligibilityResult",

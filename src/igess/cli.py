@@ -4,6 +4,7 @@ import argparse
 import sys
 
 from .advice import review_run, run_advise
+from .authoring.cli import add_model_parser, dispatch_model
 from .builder import ModelBuilder
 from .cli_support import require_directory, require_file
 from .compare import compare_runs
@@ -65,6 +66,8 @@ def build_parser() -> argparse.ArgumentParser:
         title="Commands",
         metavar="<command>",
     )
+
+    add_model_parser(subparsers)
 
     def add_command(name: str, summary: str, example: str) -> argparse.ArgumentParser:
         return subparsers.add_parser(
@@ -348,6 +351,8 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    if args.command == "model":
+        return dispatch_model(args)
     try:
         if args.command == "export-tables":
             require_directory(args.datas, "source workbook directory")

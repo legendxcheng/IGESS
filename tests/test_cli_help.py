@@ -17,6 +17,7 @@ EXPECTED_COMMANDS = {
     "gate",
     "init",
     "lint",
+    "model",
     "report",
     "review-proposal",
     "review-run",
@@ -107,7 +108,8 @@ CRITICAL_HELP_CASES = (
 )
 
 CRITICAL_COMMANDS = frozenset(case[0] for case in CRITICAL_HELP_CASES)
-OTHER_COMMANDS = tuple(sorted(EXPECTED_COMMANDS - CRITICAL_COMMANDS))
+NESTED_COMMANDS = frozenset({"model"})
+OTHER_COMMANDS = tuple(sorted(EXPECTED_COMMANDS - CRITICAL_COMMANDS - NESTED_COMMANDS))
 
 
 def run_cli(*args: str) -> subprocess.CompletedProcess[str]:
@@ -180,8 +182,19 @@ def test_parameterized_help_cases_cover_every_registered_command():
     commands = command_group(build_parser())
 
     assert set(commands.choices) == EXPECTED_COMMANDS
-    assert CRITICAL_COMMANDS | set(OTHER_COMMANDS) == set(commands.choices)
+    assert CRITICAL_COMMANDS | NESTED_COMMANDS | set(OTHER_COMMANDS) == set(commands.choices)
     assert CRITICAL_COMMANDS.isdisjoint(OTHER_COMMANDS)
+
+
+def test_model_help_is_a_nested_command_group():
+    model = command_group(build_parser()).choices["model"]
+    nested = command_group(model)
+    rendered = model.format_help()
+
+    assert set(nested.choices) == {"init", "status", "apply", "simulate"}
+    assert "Author a game economy one validated rule at a time." in rendered
+    assert "igess model init --out projects/my-game" in rendered
+    assert "Exit codes:" in rendered
 
 
 @pytest.mark.parametrize(
