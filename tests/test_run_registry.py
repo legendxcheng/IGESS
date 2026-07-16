@@ -665,6 +665,80 @@ def test_bound_prune_deletes_reparse_entry_without_following_external_target(
     assert marker.read_text(encoding="utf-8") == "keep"
 
 
+@pytest.mark.skipif(os.name != "nt", reason="Windows handle race")
+def test_windows_bound_prune_rejects_child_replaced_after_enumeration(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    registry = RunRegistry(tmp_path / "runs")
+    smoke = _write(
+        registry,
+        "20260715T010203000000Z-smoke-rule",
+        kind="smoke",
+        change_id="rule",
+    )
+    formal = _write(
+        registry,
+        "20260715T010204000000Z-day_1",
+        kind="formal",
+    )
+    victim = smoke.run_dir / "victim.marker"
+    victim.write_text("smoke-child", encoding="utf-8")
+    formal_marker = formal.run_dir / "formal.marker"
+    formal_marker.write_text("formal-child", encoding="utf-8")
+    original_delete = registry_module._windows_delete_entry
+    raced = False
+
+    def racing_delete(path: Path, *args: object, **kwargs: object) -> bool:
+        nonlocal raced
+        if not raced and path.name == victim.name:
+            raced = True
+            holding = formal.run_dir / ".child-holding"
+            os.replace(path, holding)
+            os.replace(formal_marker, path)
+            os.replace(holding, formal_marker)
+        return original_delete(path, *args, **kwargs)
+
+    monkeypatch.setattr(registry_module, "_windows_delete_entry", racing_delete)
+
+    assert registry.prune_smoke(keep=0) == []
+    assert raced
+    assert sorted(path.read_text(encoding="utf-8") for path in tmp_path.rglob("*.marker")) == [
+        "formal-child",
+        "smoke-child",
+    ]
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows short-path alias")
+def test_windows_short_path_alias_can_prune_verified_tombstone(tmp_path: Path) -> None:
+    import ctypes
+
+    long_root = tmp_path / "Run Registry Alias Project"
+    registry = RunRegistry(long_root / "runs")
+    smoke = _write(
+        registry,
+        "20260715T010203000000Z-smoke-rule",
+        kind="smoke",
+        change_id="rule",
+    )
+    buffer = ctypes.create_unicode_buffer(32768)
+    length = ctypes.windll.kernel32.GetShortPathNameW(
+        str(registry.runs_root),
+        buffer,
+        len(buffer),
+    )
+    if not length or length >= len(buffer):
+        pytest.skip("8.3 short paths are unavailable")
+    short_root = Path(buffer.value)
+    if os.path.normcase(str(short_root)) == os.path.normcase(str(registry.runs_root)):
+        pytest.skip("filesystem did not provide a distinct 8.3 alias")
+
+    aliased = RunRegistry(short_root)
+
+    assert aliased.prune_smoke(keep=0) == [smoke.run_id]
+    assert not smoke.run_dir.exists()
+
+
 def test_unsupported_bound_delete_retains_retryable_tombstone_without_success(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -684,13 +758,58 @@ def test_unsupported_bound_delete_retains_retryable_tombstone_without_success(
     )
 
     assert registry.prune_smoke(keep=0) == []
-    tombstones = list((registry.runs_root / ".run-trash").glob("tomb-*"))
+    tombstones = list(
+        (registry.runs_root / ".run-trash").glob(
+            "tomb-????????????????????????????????"
+        )
+    )
     assert len(tombstones) == 1
     assert not smoke.run_dir.exists()
 
     monkeypatch.setattr(registry_module, "_delete_bound_tombstone", original_delete)
     assert registry.prune_smoke(keep=0) == [smoke.run_id]
     assert not tombstones[0].exists()
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows partial handle deletion")
+def test_partial_tombstone_delete_retries_from_manifest_after_status_is_gone(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    registry = RunRegistry(tmp_path / "runs")
+    smoke = _write(
+        registry,
+        "20260715T010203000000Z-smoke-rule",
+        kind="smoke",
+        change_id="rule",
+    )
+    (smoke.run_dir / "z-fail.marker").write_text("retry", encoding="utf-8")
+    original_delete = registry_module._windows_delete_entry
+    failed = False
+
+    def failing_after_status(
+        path: Path,
+        expected_identity: os.stat_result,
+    ) -> bool:
+        nonlocal failed
+        if path.name == "z-fail.marker" and not failed:
+            failed = True
+            return False
+        return original_delete(path, expected_identity)
+
+    monkeypatch.setattr(registry_module, "_windows_delete_entry", failing_after_status)
+
+    assert registry.prune_smoke(keep=0) == []
+    trash = registry.runs_root / ".run-trash"
+    [tombstone] = list(trash.glob("tomb-????????????????????????????????"))
+    assert failed
+    assert not (tombstone / "run_status.json").exists()
+    assert (trash / f"{tombstone.name}.json").is_file()
+
+    monkeypatch.setattr(registry_module, "_windows_delete_entry", original_delete)
+    assert registry.prune_smoke(keep=0) == [smoke.run_id]
+    assert not tombstone.exists()
+    assert not (trash / f"{tombstone.name}.json").exists()
 
 
 def test_next_prune_recovers_crash_tombstones_and_ignores_unsafe_trash(
@@ -724,6 +843,8 @@ def test_next_prune_recovers_crash_tombstones_and_ignores_unsafe_trash(
     corrupt = trash / ("tomb-" + "c" * 32)
     corrupt.mkdir()
     (corrupt / "run_status.json").write_text("{", encoding="utf-8")
+    corrupt_manifest = trash / f"{corrupt.name}.json"
+    corrupt_manifest.write_text("{", encoding="utf-8")
     outside = tmp_path / "outside-trash-target"
     outside.mkdir()
     outside_marker = outside / "marker.txt"
@@ -731,6 +852,8 @@ def test_next_prune_recovers_crash_tombstones_and_ignores_unsafe_trash(
     linked = trash / ("tomb-" + "d" * 32)
     try:
         linked.symlink_to(outside, target_is_directory=True)
+        linked_manifest = trash / f"{linked.name}.json"
+        linked_manifest.symlink_to(outside_marker)
     except OSError as error:
         pytest.skip(f"directory links unavailable: {error}")
 
@@ -745,7 +868,9 @@ def test_next_prune_recovers_crash_tombstones_and_ignores_unsafe_trash(
     assert not formal_tomb.exists()
     assert not advice_tomb.exists()
     assert corrupt.exists()
+    assert corrupt_manifest.exists()
     assert linked.is_symlink()
+    assert linked_manifest.is_symlink()
     assert outside_marker.read_text(encoding="utf-8") == "keep"
 
 

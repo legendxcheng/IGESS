@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -21,6 +22,10 @@ _STATUS_TEMP_PREFIX = ".run_status."
 _STATUS_TEMP_SUFFIX = ".tmp"
 _TRASH_NAME = ".run-trash"
 _TOMBSTONE_RE = re.compile(r"^tomb-[0-9a-f]{32}$")
+_TOMBSTONE_MANIFEST_RE = re.compile(r"^(tomb-[0-9a-f]{32})\.json$")
+_PRIVATE_CHILD_PREFIX = ".delete-quarantine-"
+_TOMBSTONE_MANIFEST_VERSION = 1
+_MAX_MANIFEST_BYTES = 2 * 1024 * 1024
 
 
 @dataclass(frozen=True)
@@ -56,7 +61,6 @@ class _BoundRunRecord:
 @dataclass(frozen=True)
 class _DirectoryBinding:
     identity: os.stat_result
-    resolved_path: Path
     fd: int | None = None
 
 
@@ -65,8 +69,18 @@ class _WindowsDeleteHandle:
     fd: int
     handle: int
     identity: os.stat_result
-    final_path: Path
     attributes: int
+
+
+@dataclass(frozen=True)
+class _TombstoneManifest:
+    tombstone: str
+    run_id: str
+    kind: RunKind
+    directory_dev: int
+    directory_ino: int
+    status_payload: dict[str, Any]
+    file_identity: os.stat_result
 
 
 class RunRegistry:
@@ -208,7 +222,7 @@ class RunRegistry:
 
         if isinstance(keep, bool) or not isinstance(keep, int) or keep < 0:
             raise ValueError("keep must be a non-negative integer")
-        self._recover_run_trash()
+        recovered_deletions = self._recover_run_trash()
         smoke = sorted(
             (
                 bound
@@ -218,7 +232,7 @@ class RunRegistry:
             key=lambda bound: bound.record.run_id,
         )
         to_delete = smoke[: max(0, len(smoke) - keep)]
-        deleted: list[str] = []
+        deleted: list[str] = list(recovered_deletions)
         for bound in to_delete:
             if self._quarantine_and_delete_smoke(bound):
                 deleted.append(bound.record.run_id)
@@ -303,6 +317,8 @@ class RunRegistry:
     def _quarantine_and_delete_smoke(self, original: _BoundRunRecord) -> bool:
         record = original.record
         destination: Path | None = None
+        manifest_path: Path | None = None
+        manifest_identity: os.stat_result | None = None
         moved = False
         try:
             current = self._load_bound_record(self.runs_root, record.run_dir)
@@ -357,6 +373,14 @@ class RunRegistry:
             if not os.path.samestat(quarantined_identity, final_identity):
                 raise ValueError("quarantined run changed before deletion")
 
+            manifest_path, manifest_identity = _write_tombstone_manifest(
+                self.runs_root,
+                trash,
+                trash_identity,
+                destination,
+                quarantined,
+            )
+
             if not _delete_bound_tombstone(
                 trash,
                 destination,
@@ -371,6 +395,13 @@ class RunRegistry:
                     return False
                 raise ValueError("quarantined run changed at the deletion boundary")
             moved = False
+            _delete_bound_manifest(
+                self.runs_root,
+                trash,
+                trash_identity,
+                manifest_path,
+                manifest_identity,
+            )
             return True
         except (
             OSError,
@@ -385,8 +416,8 @@ class RunRegistry:
             if moved and destination is not None:
                 self._recover_run_trash()
 
-    def _recover_run_trash(self) -> None:
-        _recover_run_trash(self.runs_root)
+    def _recover_run_trash(self) -> list[str]:
+        return _recover_run_trash(self.runs_root)
 
 
 def _parse_run_metadata(
@@ -548,11 +579,350 @@ def _read_status_payload(root: Path, run_dir: Path) -> _LoadedStatus:
     return _LoadedStatus(payload, directory_after, opened_after)
 
 
+def _canonical_status_bytes(payload: dict[str, Any]) -> bytes:
+    return json.dumps(
+        payload,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+
+def _write_tombstone_manifest(
+    root: Path,
+    trash: Path,
+    trash_identity: os.stat_result,
+    tombstone: Path,
+    loaded: _LoadedStatus,
+) -> tuple[Path, os.stat_result]:
+    if tombstone.parent != trash or _TOMBSTONE_RE.fullmatch(tombstone.name) is None:
+        raise ValueError("tombstone manifest target is invalid")
+    current_tombstone = _snapshot_owned_run_dir(trash, tombstone)
+    if not os.path.samestat(loaded.directory_identity, current_tombstone):
+        raise ValueError("tombstone changed before its manifest was written")
+    run_id = _stored_run_id(loaded.payload)
+    metadata = _parse_run_metadata(loaded.payload, expected_run_id=run_id)
+    if metadata[2] != "smoke":
+        raise ValueError("only smoke tombstones can have deletion manifests")
+    _validate_manifest_status_payload(loaded.payload, run_id)
+
+    status_digest = "sha256:" + hashlib.sha256(
+        _canonical_status_bytes(loaded.payload)
+    ).hexdigest()
+    document = {
+        "version": _TOMBSTONE_MANIFEST_VERSION,
+        "tombstone": tombstone.name,
+        "run_id": run_id,
+        "kind": metadata[2],
+        "directory_identity": {
+            "dev": current_tombstone.st_dev,
+            "ino": current_tombstone.st_ino,
+        },
+        "status_sha256": status_digest,
+        "status": loaded.payload,
+    }
+    data = (
+        json.dumps(document, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    ).encode("utf-8")
+    if len(data) > _MAX_MANIFEST_BYTES:
+        raise ValueError("tombstone manifest exceeds the maximum supported size")
+
+    manifest_path = trash / f"{tombstone.name}.json"
+    binding = _bind_directory(root, trash)
+    temp_path: Path | None = None
+    temp_cleanup_path: Path | None = None
+    temp_identity: os.stat_result | None = None
+    installed = False
+    try:
+        if not os.path.samestat(trash_identity, binding.identity):
+            raise ValueError("run trash changed before manifest creation")
+        if _path_exists_or_link(manifest_path):
+            raise ValueError("tombstone manifest path is already occupied")
+        for _ in range(8):
+            candidate = trash / (
+                f".{tombstone.name}.manifest-{secrets.token_hex(16)}.tmp"
+            )
+            try:
+                if binding.fd is None:
+                    fd = _open_exclusive_regular(candidate)
+                else:
+                    fd = _open_exclusive_regular(candidate.name, dir_fd=binding.fd)
+            except FileExistsError:
+                continue
+            temp_path = candidate
+            break
+        else:
+            raise OSError("unable to allocate a private tombstone-manifest file")
+
+        try:
+            temp_identity = os.fstat(fd)
+            if not stat.S_ISREG(temp_identity.st_mode):
+                raise ValueError("tombstone-manifest temporary path is not a regular file")
+            temp_cleanup_path = _validate_opened_temp_parent(
+                root,
+                trash,
+                binding,
+                fd,
+                candidate,
+                temp_identity,
+            )
+            _write_all(fd, data)
+            os.fsync(fd)
+            temp_identity = os.fstat(fd)
+        finally:
+            os.close(fd)
+
+        if not _binding_matches(root, trash, binding):
+            raise ValueError("run trash changed before manifest replacement")
+        if _path_exists_or_link(manifest_path):
+            raise ValueError("tombstone manifest path changed before replacement")
+        current_temp = _required_regular_leaf(
+            temp_path,
+            "tombstone-manifest temporary file",
+        )
+        if (
+            temp_identity is None
+            or not os.path.samestat(temp_identity, current_temp)
+            or _stat_signature(temp_identity) != _stat_signature(current_temp)
+        ):
+            raise ValueError("tombstone-manifest temporary file changed")
+
+        if binding.fd is None:
+            os.replace(temp_path, manifest_path)
+        else:
+            os.replace(
+                temp_path.name,
+                manifest_path.name,
+                src_dir_fd=binding.fd,
+                dst_dir_fd=binding.fd,
+            )
+        installed = True
+        if not _binding_matches(root, trash, binding):
+            raise ValueError("run trash changed during manifest replacement")
+        manifest_identity = _required_regular_leaf(
+            manifest_path,
+            "tombstone manifest",
+        )
+        if not os.path.samestat(temp_identity, manifest_identity):
+            raise ValueError("installed tombstone manifest does not match its staged file")
+        _fsync_directory(trash)
+        return manifest_path, manifest_identity
+    finally:
+        if not installed and temp_path is not None and temp_identity is not None:
+            _remove_bound_temp(
+                binding,
+                temp_path,
+                temp_cleanup_path,
+                temp_identity,
+            )
+        if binding.fd is not None:
+            os.close(binding.fd)
+
+
+def _read_tombstone_manifest(
+    root: Path,
+    trash: Path,
+    manifest_path: Path,
+) -> _TombstoneManifest:
+    match = _TOMBSTONE_MANIFEST_RE.fullmatch(manifest_path.name)
+    if manifest_path.parent != trash or match is None:
+        raise ValueError("tombstone manifest name is invalid")
+    directory_before = _snapshot_owned_run_dir(root, trash)
+    leaf_before = _required_regular_leaf(manifest_path, "tombstone manifest")
+    if leaf_before.st_size > _MAX_MANIFEST_BYTES:
+        raise ValueError("tombstone manifest exceeds the maximum supported size")
+
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(manifest_path, flags)
+    try:
+        opened_before = os.fstat(fd)
+        if (
+            not stat.S_ISREG(opened_before.st_mode)
+            or not os.path.samestat(leaf_before, opened_before)
+            or _stat_signature(leaf_before) != _stat_signature(opened_before)
+            or opened_before.st_size > _MAX_MANIFEST_BYTES
+        ):
+            raise ValueError("tombstone manifest changed while it was opened")
+        data = _read_bounded(fd, _MAX_MANIFEST_BYTES)
+        opened_after = os.fstat(fd)
+        if _stat_signature(opened_before) != _stat_signature(opened_after):
+            raise ValueError("tombstone manifest changed while it was read")
+    finally:
+        os.close(fd)
+
+    leaf_after = _required_regular_leaf(manifest_path, "tombstone manifest")
+    if (
+        not os.path.samestat(opened_after, leaf_after)
+        or _stat_signature(opened_after) != _stat_signature(leaf_after)
+    ):
+        raise ValueError("tombstone manifest path changed while it was read")
+    directory_after = _snapshot_owned_run_dir(root, trash)
+    if not os.path.samestat(directory_before, directory_after):
+        raise ValueError("run trash changed while its manifest was read")
+
+    document = json.loads(data.decode("utf-8"))
+    if not isinstance(document, dict) or set(document) != {
+        "version",
+        "tombstone",
+        "run_id",
+        "kind",
+        "directory_identity",
+        "status_sha256",
+        "status",
+    }:
+        raise ValueError("tombstone manifest schema is invalid")
+    if type(document["version"]) is not int or document["version"] != _TOMBSTONE_MANIFEST_VERSION:
+        raise ValueError("unsupported tombstone manifest version")
+    tombstone = document["tombstone"]
+    if not isinstance(tombstone, str) or tombstone != match.group(1):
+        raise ValueError("tombstone manifest does not match its filename")
+    run_id = document["run_id"]
+    if not isinstance(run_id, str):
+        raise ValueError("tombstone manifest run_id is invalid")
+    run_id = _stored_run_id({"run_id": run_id})
+    kind_value = document["kind"]
+    _require_kind(kind_value)
+    kind: RunKind = kind_value
+    if kind != "smoke":
+        raise ValueError("tombstone manifest is not for a smoke run")
+    directory_identity = document["directory_identity"]
+    if (
+        not isinstance(directory_identity, dict)
+        or set(directory_identity) != {"dev", "ino"}
+        or type(directory_identity["dev"]) is not int
+        or type(directory_identity["ino"]) is not int
+        or directory_identity["dev"] < 0
+        or directory_identity["ino"] < 0
+    ):
+        raise ValueError("tombstone manifest directory identity is invalid")
+    status_payload = document["status"]
+    if not isinstance(status_payload, dict):
+        raise ValueError("tombstone manifest status must be an object")
+    _validate_manifest_status_payload(status_payload, run_id)
+    metadata = _parse_run_metadata(status_payload, expected_run_id=run_id)
+    if metadata[2] != kind:
+        raise ValueError("tombstone manifest kind does not match its status")
+    status_digest = document["status_sha256"]
+    if not isinstance(status_digest, str) or _DIGEST.fullmatch(status_digest) is None:
+        raise ValueError("tombstone manifest status digest is invalid")
+    expected_digest = "sha256:" + hashlib.sha256(
+        _canonical_status_bytes(status_payload)
+    ).hexdigest()
+    if status_digest != expected_digest:
+        raise ValueError("tombstone manifest status digest does not match its status")
+    return _TombstoneManifest(
+        tombstone=tombstone,
+        run_id=run_id,
+        kind=kind,
+        directory_dev=directory_identity["dev"],
+        directory_ino=directory_identity["ino"],
+        status_payload=status_payload,
+        file_identity=leaf_after,
+    )
+
+
+def _validate_manifest_status_payload(
+    payload: dict[str, Any],
+    run_id: str,
+) -> None:
+    _parse_run_metadata(payload, expected_run_id=run_id)
+    _required_text(payload, "status")
+    _optional_text(payload, "scenario_id")
+    _optional_text(payload, "message")
+    for key in ("output_dir", "report_dir", "report_index"):
+        value = payload.get(key)
+        if value is not None and not isinstance(value, str):
+            raise ValueError(f"{key} must be a path string")
+
+
+def _manifest_matches_directory(
+    manifest: _TombstoneManifest,
+    identity: os.stat_result,
+) -> bool:
+    return (
+        stat.S_ISDIR(identity.st_mode)
+        and not _is_stat_link_like(identity)
+        and identity.st_dev == manifest.directory_dev
+        and identity.st_ino == manifest.directory_ino
+    )
+
+
+def _delete_bound_manifest(
+    root: Path,
+    trash: Path,
+    trash_identity: os.stat_result,
+    manifest_path: Path,
+    manifest_identity: os.stat_result,
+) -> bool:
+    if (
+        manifest_path.parent != trash
+        or _TOMBSTONE_MANIFEST_RE.fullmatch(manifest_path.name) is None
+    ):
+        return False
+    binding: _DirectoryBinding | None = None
+    try:
+        binding = _bind_directory(root, trash)
+        if not os.path.samestat(trash_identity, binding.identity):
+            return False
+        current = _required_regular_leaf(manifest_path, "tombstone manifest")
+        if (
+            not os.path.samestat(manifest_identity, current)
+            or _stat_signature(manifest_identity) != _stat_signature(current)
+        ):
+            return False
+        if binding.fd is None:
+            deleted = _windows_delete_entry(manifest_path, manifest_identity)
+        else:
+            private_name = f"{_PRIVATE_CHILD_PREFIX}{secrets.token_hex(16)}"
+            os.rename(
+                manifest_path.name,
+                private_name,
+                src_dir_fd=binding.fd,
+                dst_dir_fd=binding.fd,
+            )
+            quarantined = os.stat(
+                private_name,
+                dir_fd=binding.fd,
+                follow_symlinks=False,
+            )
+            if (
+                _is_stat_link_like(quarantined)
+                or not stat.S_ISREG(quarantined.st_mode)
+                or not os.path.samestat(manifest_identity, quarantined)
+                or _stat_signature(manifest_identity) != _stat_signature(quarantined)
+            ):
+                try:
+                    os.stat(
+                        manifest_path.name,
+                        dir_fd=binding.fd,
+                        follow_symlinks=False,
+                    )
+                except FileNotFoundError:
+                    os.rename(
+                        private_name,
+                        manifest_path.name,
+                        src_dir_fd=binding.fd,
+                        dst_dir_fd=binding.fd,
+                    )
+                return False
+            os.unlink(private_name, dir_fd=binding.fd)
+            try:
+                os.fsync(binding.fd)
+            except OSError:
+                pass
+            deleted = True
+        return deleted and _binding_matches(root, trash, binding)
+    except (OSError, RuntimeError, ValueError):
+        return False
+    finally:
+        if binding is not None and binding.fd is not None:
+            os.close(binding.fd)
+
+
 def _bind_directory(root: Path, run_dir: Path) -> _DirectoryBinding:
     identity = _snapshot_owned_run_dir(root, run_dir)
-    resolved = run_dir.resolve(strict=True)
     if os.name == "nt":
-        return _DirectoryBinding(identity, resolved)
+        return _DirectoryBinding(identity)
 
     flags = (
         os.O_RDONLY
@@ -571,7 +941,7 @@ def _bind_directory(root: Path, run_dir: Path) -> _DirectoryBinding:
     except BaseException:
         os.close(fd)
         raise
-    return _DirectoryBinding(opened, resolved, fd)
+    return _DirectoryBinding(opened, fd)
 
 
 def _binding_matches(root: Path, run_dir: Path, binding: _DirectoryBinding) -> bool:
@@ -604,11 +974,16 @@ def _validate_opened_temp_parent(
         raise ValueError("temporary-file parent identity could not be verified")
     try:
         final_parent = final_path.parent.resolve(strict=True)
+        final_parent_identity = final_parent.lstat()
     except (OSError, RuntimeError, ValueError) as error:
         raise ValueError(
             f"temporary-file parent could not be resolved: {type(error).__name__}"
         ) from None
-    if os.path.normcase(str(final_parent)) != os.path.normcase(str(binding.resolved_path)):
+    if (
+        _is_stat_link_like(final_parent_identity)
+        or not stat.S_ISDIR(final_parent_identity.st_mode)
+        or not os.path.samestat(final_parent_identity, binding.identity)
+    ):
         raise ValueError("temporary file was created outside the bound run directory")
     if not _binding_matches(root, run_dir, binding):
         raise ValueError("run directory changed before temporary-file write")
@@ -776,7 +1151,6 @@ def _windows_delete_bound_tombstone(
             not os.path.samestat(expected_identity, entry.identity)
             or not stat.S_ISDIR(entry.identity.st_mode)
             or _windows_is_reparse(entry.attributes)
-            or not _same_absolute_path(entry.final_path, tombstone)
         ):
             return False
         if not _windows_delete_children(tombstone):
@@ -796,20 +1170,26 @@ def _windows_delete_bound_tombstone(
 
 def _windows_delete_children(directory: Path) -> bool:
     try:
-        children = [Path(item.path) for item in os.scandir(directory)]
+        children = sorted(
+            (
+                (Path(item.path), Path(item.path).lstat())
+                for item in os.scandir(directory)
+            ),
+            key=lambda item: item[0].name,
+        )
     except OSError:
         return False
-    for child in children:
-        if not _windows_delete_entry(child):
+    for child, expected_identity in children:
+        if not _windows_delete_entry(child, expected_identity):
             return False
     return True
 
 
-def _windows_delete_entry(path: Path) -> bool:
+def _windows_delete_entry(path: Path, expected_identity: os.stat_result) -> bool:
     entry: _WindowsDeleteHandle | None = None
     try:
         entry = _windows_open_delete_handle(path)
-        if not _same_absolute_path(entry.final_path, path):
+        if not os.path.samestat(expected_identity, entry.identity):
             return False
         is_directory = stat.S_ISDIR(entry.identity.st_mode)
         if is_directory and not _windows_is_reparse(entry.attributes):
@@ -867,11 +1247,8 @@ def _windows_open_delete_handle(path: Path) -> _WindowsDeleteHandle:
         raise
     try:
         identity = os.fstat(fd)
-        final_path = _final_path_from_fd(fd)
-        if final_path is None:
-            raise ValueError("delete handle final path could not be resolved")
         attributes = getattr(identity, "st_file_attributes", 0)
-        return _WindowsDeleteHandle(fd, msvcrt.get_osfhandle(fd), identity, final_path, attributes)
+        return _WindowsDeleteHandle(fd, msvcrt.get_osfhandle(fd), identity, attributes)
     except BaseException:
         os.close(fd)
         raise
@@ -905,10 +1282,6 @@ def _windows_mark_handle_for_deletion(handle: int) -> bool:
 
 def _windows_is_reparse(attributes: int) -> bool:
     return bool(attributes & 0x00000400)
-
-
-def _same_absolute_path(first: Path, second: Path) -> bool:
-    return os.path.normcase(os.path.abspath(first)) == os.path.normcase(os.path.abspath(second))
 
 
 def _posix_delete_bound_tombstone(
@@ -948,6 +1321,8 @@ def _posix_delete_children(directory_fd: int) -> bool:
         return False
     flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
     for name in names:
+        if name.startswith(_PRIVATE_CHILD_PREFIX):
+            return False
         child_fd: int | None = None
         try:
             before = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
@@ -963,7 +1338,30 @@ def _posix_delete_children(directory_fd: int) -> bool:
                     return False
                 os.rmdir(name, dir_fd=directory_fd)
             else:
-                os.unlink(name, dir_fd=directory_fd)
+                private_name = f"{_PRIVATE_CHILD_PREFIX}{secrets.token_hex(16)}"
+                os.rename(
+                    name,
+                    private_name,
+                    src_dir_fd=directory_fd,
+                    dst_dir_fd=directory_fd,
+                )
+                quarantined = os.stat(
+                    private_name,
+                    dir_fd=directory_fd,
+                    follow_symlinks=False,
+                )
+                if not os.path.samestat(before, quarantined):
+                    try:
+                        os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+                    except FileNotFoundError:
+                        os.rename(
+                            private_name,
+                            name,
+                            src_dir_fd=directory_fd,
+                            dst_dir_fd=directory_fd,
+                        )
+                    return False
+                os.unlink(private_name, dir_fd=directory_fd)
         except (OSError, RuntimeError, ValueError):
             return False
         finally:
@@ -976,24 +1374,41 @@ def _new_tombstone_name() -> str:
     return f"tomb-{secrets.token_hex(16)}"
 
 
-def _recover_run_trash(root: Path) -> None:
+def _recover_run_trash(root: Path) -> list[str]:
     trash = root / _TRASH_NAME
     try:
         if not _path_exists_or_link(trash):
-            return
+            return []
         trash_identity = _snapshot_owned_run_dir(root, trash)
         candidates = _strict_tombstones(trash)
     except (OSError, RuntimeError, ValueError):
-        return
+        return []
+
+    deleted: list[str] = []
+    protected_tombstones: set[str] = set()
+    for manifest_path in _strict_tombstone_manifests(trash):
+        run_id, protected = _recover_one_manifest(
+            root,
+            trash,
+            trash_identity,
+            manifest_path,
+        )
+        if run_id is not None and run_id not in deleted:
+            deleted.append(run_id)
+        if protected is not None:
+            protected_tombstones.add(protected)
 
     max_rounds = max(1, len(candidates) * 2 + 2)
     for _ in range(max_rounds):
         progress = False
         for tombstone in _strict_tombstones(trash):
+            if tombstone.name in protected_tombstones:
+                continue
             if _recover_one_tombstone(root, trash, trash_identity, tombstone):
                 progress = True
         if not progress:
             break
+    return deleted
 
 
 def _strict_tombstones(trash: Path) -> list[Path]:
@@ -1002,6 +1417,65 @@ def _strict_tombstones(trash: Path) -> list[Path]:
     except OSError:
         return []
     return [child for child in children if _TOMBSTONE_RE.fullmatch(child.name)]
+
+
+def _strict_tombstone_manifests(trash: Path) -> list[Path]:
+    try:
+        children = sorted(trash.iterdir(), key=lambda path: path.name)
+    except OSError:
+        return []
+    return [
+        child
+        for child in children
+        if _TOMBSTONE_MANIFEST_RE.fullmatch(child.name)
+    ]
+
+
+def _recover_one_manifest(
+    root: Path,
+    trash: Path,
+    trash_identity: os.stat_result,
+    manifest_path: Path,
+) -> tuple[str | None, str | None]:
+    try:
+        if not _directory_identity_matches(root, trash, trash_identity):
+            return None, None
+        manifest = _read_tombstone_manifest(root, trash, manifest_path)
+        if not os.path.samestat(manifest.file_identity, manifest_path.lstat()):
+            return None, None
+        tombstone = trash / manifest.tombstone
+        if not _path_exists_or_link(tombstone):
+            _delete_bound_manifest(
+                root,
+                trash,
+                trash_identity,
+                manifest_path,
+                manifest.file_identity,
+            )
+            return None, None
+
+        tombstone_identity = _snapshot_owned_run_dir(trash, tombstone)
+        if not _manifest_matches_directory(manifest, tombstone_identity):
+            return None, None
+        if not _delete_bound_tombstone(trash, tombstone, tombstone_identity):
+            return None, tombstone.name
+        _delete_bound_manifest(
+            root,
+            trash,
+            trash_identity,
+            manifest_path,
+            manifest.file_identity,
+        )
+        return manifest.run_id, None
+    except (
+        OSError,
+        RuntimeError,
+        UnicodeError,
+        ValueError,
+        TypeError,
+        json.JSONDecodeError,
+    ):
+        return None, None
 
 
 def _recover_one_tombstone(
