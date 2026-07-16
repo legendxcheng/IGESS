@@ -16,6 +16,7 @@ class OutputWriter:
         output_dir: str | Path,
         model: EconomyModel | None = None,
         overrides: list[str] | None = None,
+        model_digest: str | None = None,
     ) -> None:
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -28,7 +29,13 @@ class OutputWriter:
         (output_dir / "analysis.md").write_text(
             Analyzer.markdown(result, model), encoding="utf-8", newline="\n"
         )
-        cls.write_manifest(result, model, output_dir / "run_manifest.json", overrides or [])
+        cls.write_manifest(
+            result,
+            model,
+            output_dir / "run_manifest.json",
+            overrides or [],
+            model_digest=model_digest,
+        )
 
     @classmethod
     def write_manifest(
@@ -37,6 +44,7 @@ class OutputWriter:
         model: EconomyModel | None,
         path: Path,
         overrides: list[str],
+        model_digest: str | None = None,
     ) -> None:
         payload = {
             "schema_version": 1,
@@ -54,6 +62,8 @@ class OutputWriter:
             ],
             "overrides": list(overrides),
         }
+        if model_digest is not None:
+            payload["model_digest"] = model_digest
         path.write_text(
             json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
