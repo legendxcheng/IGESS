@@ -943,6 +943,80 @@ def test_manifest_orphan_before_move_is_cleaned_only_for_the_same_live_run(
     assert not manifests[0].exists()
 
 
+def test_mismatched_orphan_manifest_protects_live_run_across_prune_calls(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    registry = RunRegistry(tmp_path / "runs")
+    smoke = _write(
+        registry,
+        "20260715T010203000000Z-smoke-rule",
+        kind="smoke",
+        change_id="rule",
+    )
+    formal = _write(
+        registry,
+        "20260715T010204000000Z-day_1",
+        kind="formal",
+    )
+    formal_marker = formal.run_dir / "formal.marker"
+    formal_marker.write_text("formal-child", encoding="utf-8")
+    original_replace = os.replace
+    injected = False
+    failed = False
+
+    def injecting_then_failing_replace(
+        source: object,
+        destination: object,
+        *args: object,
+        **kwargs: object,
+    ) -> None:
+        nonlocal injected, failed
+        source_path = Path(source)
+        destination_path = Path(destination)
+        if (
+            not failed
+            and source_path == smoke.run_dir
+            and destination_path.parent.name == ".run-trash"
+        ):
+            failed = True
+            raise OSError("injected move failure after manifest install")
+        original_replace(source, destination, *args, **kwargs)
+        if (
+            not injected
+            and re.fullmatch(
+                r"tomb-[0-9a-f]{32}\.json",
+                destination_path.name,
+            )
+        ):
+            injected = True
+            original_replace(
+                formal_marker,
+                smoke.run_dir / "foreign.marker",
+            )
+
+    monkeypatch.setattr(os, "replace", injecting_then_failing_replace)
+
+    assert registry.prune_smoke(keep=0) == []
+    assert injected and failed
+    trash = registry.runs_root / ".run-trash"
+    manifests = list(trash.glob("tomb-????????????????????????????????.json"))
+    assert len(manifests) == 1
+    assert not list(trash.glob("tomb-????????????????????????????????"))
+
+    monkeypatch.setattr(os, "replace", original_replace)
+    assert registry.prune_smoke(keep=0) == []
+    assert registry.prune_smoke(keep=0) == []
+    assert manifests[0].is_file()
+    assert (smoke.run_dir / "foreign.marker").read_text(encoding="utf-8") == (
+        "formal-child"
+    )
+    assert [(item.run_id, item.kind) for item in registry.list_runs()] == [
+        (smoke.run_id, "smoke"),
+        (formal.run_id, "formal"),
+    ]
+
+
 @pytest.mark.skipif(os.name == "nt", reason="POSIX dirfd race")
 def test_posix_bound_prune_rejects_child_replacement_across_retries(
     tmp_path: Path,

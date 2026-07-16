@@ -104,6 +104,12 @@ class _TombstoneDeletionPlan:
     entries: dict[str, _TombstoneEntry]
 
 
+@dataclass(frozen=True)
+class _TrashRecovery:
+    deleted_run_ids: tuple[str, ...] = ()
+    protected_live_run_ids: frozenset[str] = frozenset()
+
+
 class RunRegistry:
     """Read and write simulation run records.
 
@@ -243,17 +249,20 @@ class RunRegistry:
 
         if isinstance(keep, bool) or not isinstance(keep, int) or keep < 0:
             raise ValueError("keep must be a non-negative integer")
-        recovered_deletions = self._recover_run_trash()
+        recovery = self._recover_run_trash()
         smoke = sorted(
             (
                 bound
                 for bound in self._bound_records_from_root(self.runs_root)
-                if bound.record.kind == "smoke"
+                if (
+                    bound.record.kind == "smoke"
+                    and bound.record.run_id not in recovery.protected_live_run_ids
+                )
             ),
             key=lambda bound: bound.record.run_id,
         )
         to_delete = smoke[: max(0, len(smoke) - keep)]
-        deleted: list[str] = list(recovered_deletions)
+        deleted: list[str] = list(recovery.deleted_run_ids)
         for bound in to_delete:
             if self._quarantine_and_delete_smoke(bound):
                 deleted.append(bound.record.run_id)
@@ -478,7 +487,7 @@ class RunRegistry:
             if moved and destination is not None:
                 self._recover_run_trash()
 
-    def _recover_run_trash(self) -> list[str]:
+    def _recover_run_trash(self) -> _TrashRecovery:
         return _recover_run_trash(self.runs_root)
 
 
@@ -1267,6 +1276,27 @@ def _manifest_matches_live_run(
         return False
 
 
+def _manifest_matches_live_tree(
+    root: Path,
+    manifest: _TombstoneManifest,
+) -> bool:
+    if not _manifest_matches_live_run(root, manifest):
+        return False
+    live = root / manifest.run_id
+    try:
+        live_identity = _snapshot_owned_run_dir(root, live)
+    except (OSError, RuntimeError, ValueError):
+        return False
+    return _manifest_matches_directory(
+        manifest,
+        live_identity,
+    ) and _tombstone_tree_matches_exact(
+        live,
+        live_identity,
+        manifest.entries,
+    )
+
+
 def _delete_bound_manifest(
     root: Path,
     trash: Path,
@@ -2026,20 +2056,21 @@ def _new_tombstone_name() -> str:
     return f"tomb-{secrets.token_hex(16)}"
 
 
-def _recover_run_trash(root: Path) -> list[str]:
+def _recover_run_trash(root: Path) -> _TrashRecovery:
     trash = root / _TRASH_NAME
     try:
         if not _path_exists_or_link(trash):
-            return []
+            return _TrashRecovery()
         trash_identity = _snapshot_owned_run_dir(root, trash)
         candidates = _strict_tombstones(trash)
     except (OSError, RuntimeError, ValueError):
-        return []
+        return _TrashRecovery()
 
     deleted: list[str] = []
     protected_tombstones: set[str] = set()
+    protected_live_run_ids: set[str] = set()
     for manifest_path in _strict_tombstone_manifests(trash):
-        run_id, protected = _recover_one_manifest(
+        run_id, protected_tombstone, protected_live_run_id = _recover_one_manifest(
             root,
             trash,
             trash_identity,
@@ -2047,8 +2078,10 @@ def _recover_run_trash(root: Path) -> list[str]:
         )
         if run_id is not None and run_id not in deleted:
             deleted.append(run_id)
-        if protected is not None:
-            protected_tombstones.add(protected)
+        if protected_tombstone is not None:
+            protected_tombstones.add(protected_tombstone)
+        if protected_live_run_id is not None:
+            protected_live_run_ids.add(protected_live_run_id)
 
     max_rounds = max(1, len(candidates) * 2 + 2)
     for _ in range(max_rounds):
@@ -2060,7 +2093,10 @@ def _recover_run_trash(root: Path) -> list[str]:
                 progress = True
         if not progress:
             break
-    return deleted
+    return _TrashRecovery(
+        deleted_run_ids=tuple(deleted),
+        protected_live_run_ids=frozenset(protected_live_run_ids),
+    )
 
 
 def _strict_tombstones(trash: Path) -> list[Path]:
@@ -2088,33 +2124,37 @@ def _recover_one_manifest(
     trash: Path,
     trash_identity: os.stat_result,
     manifest_path: Path,
-) -> tuple[str | None, str | None]:
+) -> tuple[str | None, str | None, str | None]:
     try:
         if not _directory_identity_matches(root, trash, trash_identity):
-            return None, None
+            return None, None, None
         manifest = _read_tombstone_manifest(root, trash, manifest_path)
         if not os.path.samestat(manifest.file_identity, manifest_path.lstat()):
-            return None, None
+            return None, None, None
         tombstone = trash / manifest.tombstone
         if not _path_exists_or_link(tombstone):
             live = root / manifest.run_id
-            if _path_exists_or_link(live) and not _manifest_matches_live_run(
-                root,
-                manifest,
+            if _path_exists_or_link(live) and not _manifest_matches_live_tree(
+                root, manifest
             ):
-                return None, None
-            _delete_bound_manifest(
+                return None, None, manifest.run_id
+            if not _delete_bound_manifest(
                 root,
                 trash,
                 trash_identity,
                 manifest_path,
                 manifest.file_identity,
-            )
-            return None, None
+            ):
+                return (
+                    None,
+                    None,
+                    manifest.run_id if _path_exists_or_link(live) else None,
+                )
+            return None, None, None
 
         tombstone_identity = _snapshot_owned_run_dir(trash, tombstone)
         if not _manifest_matches_directory(manifest, tombstone_identity):
-            return None, None
+            return None, None, None
         if not _delete_bound_tombstone(
             trash,
             tombstone,
@@ -2122,7 +2162,7 @@ def _recover_one_manifest(
             expected_entries=manifest.entries,
             expected_trash_identity=trash_identity,
         ):
-            return None, tombstone.name
+            return None, tombstone.name, None
         _delete_bound_manifest(
             root,
             trash,
@@ -2130,7 +2170,7 @@ def _recover_one_manifest(
             manifest_path,
             manifest.file_identity,
         )
-        return manifest.run_id, None
+        return manifest.run_id, None, None
     except (
         OSError,
         RuntimeError,
@@ -2139,7 +2179,7 @@ def _recover_one_manifest(
         TypeError,
         json.JSONDecodeError,
     ):
-        return None, None
+        return None, None, None
 
 
 def _recover_one_tombstone(
