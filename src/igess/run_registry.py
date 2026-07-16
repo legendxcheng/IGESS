@@ -7,11 +7,12 @@ import re
 import secrets
 import stat
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Iterable, Literal
 
 
 RunKind = Literal["smoke", "formal", "advice"]
+TombstoneEntryType = Literal["directory", "file", "link", "other"]
 
 _RUN_STATUS_VERSION = 1
 _RUN_KINDS = frozenset({"smoke", "formal", "advice"})
@@ -24,7 +25,7 @@ _TRASH_NAME = ".run-trash"
 _TOMBSTONE_RE = re.compile(r"^tomb-[0-9a-f]{32}$")
 _TOMBSTONE_MANIFEST_RE = re.compile(r"^(tomb-[0-9a-f]{32})\.json$")
 _PRIVATE_CHILD_PREFIX = ".delete-quarantine-"
-_TOMBSTONE_MANIFEST_VERSION = 1
+_TOMBSTONE_MANIFEST_VERSION = 2
 _MAX_MANIFEST_BYTES = 2 * 1024 * 1024
 
 
@@ -80,7 +81,27 @@ class _TombstoneManifest:
     directory_dev: int
     directory_ino: int
     status_payload: dict[str, Any]
+    entries: tuple[_TombstoneEntry, ...]
     file_identity: os.stat_result
+
+
+@dataclass(frozen=True)
+class _TombstoneEntry:
+    path: str
+    entry_type: TombstoneEntryType
+    dev: int
+    ino: int
+    mode: int
+    size: int
+    mtime_ns: int
+
+
+@dataclass(frozen=True)
+class _TombstoneDeletionPlan:
+    root: Path
+    trash: Path
+    trash_identity: os.stat_result
+    entries: dict[str, _TombstoneEntry]
 
 
 class RunRegistry:
@@ -319,6 +340,7 @@ class RunRegistry:
         destination: Path | None = None
         manifest_path: Path | None = None
         manifest_identity: os.stat_result | None = None
+        manifest_entries: tuple[_TombstoneEntry, ...] | None = None
         moved = False
         try:
             current = self._load_bound_record(self.runs_root, record.run_dir)
@@ -373,7 +395,7 @@ class RunRegistry:
             if not os.path.samestat(quarantined_identity, final_identity):
                 raise ValueError("quarantined run changed before deletion")
 
-            manifest_path, manifest_identity = _write_tombstone_manifest(
+            manifest_path, manifest_identity, manifest_entries = _write_tombstone_manifest(
                 self.runs_root,
                 trash,
                 trash_identity,
@@ -385,6 +407,8 @@ class RunRegistry:
                 trash,
                 destination,
                 quarantined_identity,
+                expected_entries=manifest_entries,
+                expected_trash_identity=trash_identity,
             ):
                 if _directory_identity_matches(
                     trash,
@@ -588,13 +612,206 @@ def _canonical_status_bytes(payload: dict[str, Any]) -> bytes:
     ).encode("utf-8")
 
 
+def _strict_relative_posix_path(parts: tuple[str, ...]) -> str:
+    if not parts or any(
+        not part or part in {".", ".."} or "/" in part or "\\" in part or "\x00" in part
+        for part in parts
+    ):
+        raise ValueError("tombstone entry path is not a strict relative POSIX path")
+    value = PurePosixPath(*parts).as_posix()
+    if value.startswith("/") or value in {".", ".."}:
+        raise ValueError("tombstone entry path is not a strict relative POSIX path")
+    return value
+
+
+def _tombstone_entry_type(
+    identity: os.stat_result,
+    *,
+    windows_attributes: int | None = None,
+) -> TombstoneEntryType:
+    attributes = (
+        getattr(identity, "st_file_attributes", 0)
+        if windows_attributes is None
+        else windows_attributes
+    )
+    if _is_stat_link_like(identity) or _windows_is_reparse(attributes):
+        return "link"
+    if stat.S_ISDIR(identity.st_mode):
+        return "directory"
+    if stat.S_ISREG(identity.st_mode):
+        return "file"
+    return "other"
+
+
+def _tombstone_entry(
+    parts: tuple[str, ...],
+    identity: os.stat_result,
+    *,
+    windows_attributes: int | None = None,
+) -> _TombstoneEntry:
+    return _TombstoneEntry(
+        path=_strict_relative_posix_path(parts),
+        entry_type=_tombstone_entry_type(
+            identity,
+            windows_attributes=windows_attributes,
+        ),
+        dev=identity.st_dev,
+        ino=identity.st_ino,
+        mode=identity.st_mode,
+        size=identity.st_size,
+        mtime_ns=identity.st_mtime_ns,
+    )
+
+
+def _entry_matches_identity(
+    entry: _TombstoneEntry,
+    identity: os.stat_result,
+    *,
+    windows_attributes: int | None = None,
+) -> bool:
+    if (
+        entry.entry_type
+        != _tombstone_entry_type(identity, windows_attributes=windows_attributes)
+        or entry.dev != identity.st_dev
+        or entry.ino != identity.st_ino
+    ):
+        return False
+    if entry.entry_type in {"directory", "link"}:
+        return True
+    return (
+        entry.mode == identity.st_mode
+        and entry.size == identity.st_size
+        and entry.mtime_ns == identity.st_mtime_ns
+    )
+
+
+def _snapshot_tombstone_entries(
+    tombstone: Path,
+    expected_identity: os.stat_result,
+) -> tuple[_TombstoneEntry, ...]:
+    if os.name == "nt":
+        root_handle: _WindowsDeleteHandle | None = None
+        try:
+            root_handle = _windows_open_delete_handle(tombstone)
+            if (
+                not os.path.samestat(expected_identity, root_handle.identity)
+                or not stat.S_ISDIR(root_handle.identity.st_mode)
+                or _windows_is_reparse(root_handle.attributes)
+            ):
+                raise ValueError("tombstone changed before its tree was recorded")
+            entries = _windows_snapshot_entries(tombstone, ())
+            current = os.fstat(root_handle.fd)
+            if not os.path.samestat(expected_identity, current):
+                raise ValueError("tombstone changed while its tree was recorded")
+        finally:
+            if root_handle is not None:
+                os.close(root_handle.fd)
+    else:
+        flags = (
+            os.O_RDONLY
+            | getattr(os, "O_DIRECTORY", 0)
+            | getattr(os, "O_NOFOLLOW", 0)
+        )
+        root_fd = os.open(tombstone, flags)
+        try:
+            opened = os.fstat(root_fd)
+            if not os.path.samestat(expected_identity, opened):
+                raise ValueError("tombstone changed before its tree was recorded")
+            entries = _posix_snapshot_entries(root_fd, ())
+            current = os.fstat(root_fd)
+            if not os.path.samestat(expected_identity, current):
+                raise ValueError("tombstone changed while its tree was recorded")
+        finally:
+            os.close(root_fd)
+    return tuple(sorted(entries, key=lambda entry: entry.path))
+
+
+def _windows_snapshot_entries(
+    directory: Path,
+    prefix: tuple[str, ...],
+) -> list[_TombstoneEntry]:
+    children = sorted(
+        (
+            (Path(item.path), Path(item.path).lstat())
+            for item in os.scandir(directory)
+        ),
+        key=lambda item: item[0].name,
+    )
+    result: list[_TombstoneEntry] = []
+    for child, enumerated_identity in children:
+        handle: _WindowsDeleteHandle | None = None
+        try:
+            handle = _windows_open_delete_handle(child)
+            if not os.path.samestat(enumerated_identity, handle.identity):
+                raise ValueError("tombstone entry changed while its tree was recorded")
+            parts = (*prefix, child.name)
+            entry = _tombstone_entry(
+                parts,
+                handle.identity,
+                windows_attributes=handle.attributes,
+            )
+            result.append(entry)
+            if entry.entry_type == "directory":
+                result.extend(_windows_snapshot_entries(child, parts))
+            current = os.fstat(handle.fd)
+            if not os.path.samestat(handle.identity, current):
+                raise ValueError("tombstone entry changed while its tree was recorded")
+        finally:
+            if handle is not None:
+                os.close(handle.fd)
+    return result
+
+
+def _posix_snapshot_entries(
+    directory_fd: int,
+    prefix: tuple[str, ...],
+) -> list[_TombstoneEntry]:
+    names = sorted(os.listdir(directory_fd))
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    result: list[_TombstoneEntry] = []
+    for name in names:
+        before = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+        parts = (*prefix, name)
+        entry = _tombstone_entry(parts, before)
+        result.append(entry)
+        if entry.entry_type != "directory":
+            continue
+        child_fd = os.open(name, flags, dir_fd=directory_fd)
+        try:
+            opened = os.fstat(child_fd)
+            if not os.path.samestat(before, opened):
+                raise ValueError("tombstone entry changed while its tree was recorded")
+            result.extend(_posix_snapshot_entries(child_fd, parts))
+            current = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+            if not os.path.samestat(opened, current):
+                raise ValueError("tombstone entry changed while its tree was recorded")
+        finally:
+            os.close(child_fd)
+    return result
+
+
+def _entry_documents(entries: tuple[_TombstoneEntry, ...]) -> list[dict[str, Any]]:
+    return [
+        {
+            "path": entry.path,
+            "type": entry.entry_type,
+            "dev": entry.dev,
+            "ino": entry.ino,
+            "mode": entry.mode,
+            "size": entry.size,
+            "mtime_ns": entry.mtime_ns,
+        }
+        for entry in entries
+    ]
+
+
 def _write_tombstone_manifest(
     root: Path,
     trash: Path,
     trash_identity: os.stat_result,
     tombstone: Path,
     loaded: _LoadedStatus,
-) -> tuple[Path, os.stat_result]:
+) -> tuple[Path, os.stat_result, tuple[_TombstoneEntry, ...]]:
     if tombstone.parent != trash or _TOMBSTONE_RE.fullmatch(tombstone.name) is None:
         raise ValueError("tombstone manifest target is invalid")
     current_tombstone = _snapshot_owned_run_dir(trash, tombstone)
@@ -605,9 +822,26 @@ def _write_tombstone_manifest(
     if metadata[2] != "smoke":
         raise ValueError("only smoke tombstones can have deletion manifests")
     _validate_manifest_status_payload(loaded.payload, run_id)
+    entries = _snapshot_tombstone_entries(tombstone, current_tombstone)
+    entries_by_path = {entry.path: entry for entry in entries}
+    status_entry = entries_by_path.get("run_status.json")
+    if (
+        status_entry is None
+        or not _entry_matches_identity(status_entry, loaded.status_identity)
+    ):
+        raise ValueError("recorded tombstone tree does not match its validated status")
 
     status_digest = "sha256:" + hashlib.sha256(
         _canonical_status_bytes(loaded.payload)
+    ).hexdigest()
+    entry_documents = _entry_documents(entries)
+    entries_digest = "sha256:" + hashlib.sha256(
+        json.dumps(
+            entry_documents,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
     ).hexdigest()
     document = {
         "version": _TOMBSTONE_MANIFEST_VERSION,
@@ -620,6 +854,8 @@ def _write_tombstone_manifest(
         },
         "status_sha256": status_digest,
         "status": loaded.payload,
+        "entries_sha256": entries_digest,
+        "entries": entry_documents,
     }
     data = (
         json.dumps(document, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
@@ -706,7 +942,7 @@ def _write_tombstone_manifest(
         if not os.path.samestat(temp_identity, manifest_identity):
             raise ValueError("installed tombstone manifest does not match its staged file")
         _fsync_directory(trash)
-        return manifest_path, manifest_identity
+        return manifest_path, manifest_identity, entries
     finally:
         if not installed and temp_path is not None and temp_identity is not None:
             _remove_bound_temp(
@@ -769,6 +1005,8 @@ def _read_tombstone_manifest(
         "directory_identity",
         "status_sha256",
         "status",
+        "entries_sha256",
+        "entries",
     }:
         raise ValueError("tombstone manifest schema is invalid")
     if type(document["version"]) is not int or document["version"] != _TOMBSTONE_MANIFEST_VERSION:
@@ -810,6 +1048,26 @@ def _read_tombstone_manifest(
     ).hexdigest()
     if status_digest != expected_digest:
         raise ValueError("tombstone manifest status digest does not match its status")
+    entries = _parse_tombstone_entries(document["entries"])
+    entries_digest = document["entries_sha256"]
+    if not isinstance(entries_digest, str) or _DIGEST.fullmatch(entries_digest) is None:
+        raise ValueError("tombstone manifest entries digest is invalid")
+    expected_entries_digest = "sha256:" + hashlib.sha256(
+        json.dumps(
+            _entry_documents(entries),
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+    if entries_digest != expected_entries_digest:
+        raise ValueError("tombstone manifest entries digest does not match its entries")
+    status_entry = next(
+        (entry for entry in entries if entry.path == "run_status.json"),
+        None,
+    )
+    if status_entry is None or status_entry.entry_type != "file":
+        raise ValueError("tombstone manifest does not bind its run status")
     return _TombstoneManifest(
         tombstone=tombstone,
         run_id=run_id,
@@ -817,8 +1075,68 @@ def _read_tombstone_manifest(
         directory_dev=directory_identity["dev"],
         directory_ino=directory_identity["ino"],
         status_payload=status_payload,
+        entries=entries,
         file_identity=leaf_after,
     )
+
+
+def _parse_tombstone_entries(value: object) -> tuple[_TombstoneEntry, ...]:
+    if not isinstance(value, list):
+        raise ValueError("tombstone manifest entries must be an array")
+    entries: list[_TombstoneEntry] = []
+    paths: set[str] = set()
+    for item in value:
+        if not isinstance(item, dict) or set(item) != {
+            "path",
+            "type",
+            "dev",
+            "ino",
+            "mode",
+            "size",
+            "mtime_ns",
+        }:
+            raise ValueError("tombstone manifest entry schema is invalid")
+        path = item["path"]
+        if not isinstance(path, str):
+            raise ValueError("tombstone manifest entry path is invalid")
+        parts = tuple(path.split("/"))
+        if _strict_relative_posix_path(parts) != path or path in paths:
+            raise ValueError("tombstone manifest entry path is invalid or duplicated")
+        entry_type = item["type"]
+        if entry_type not in {"directory", "file", "link", "other"}:
+            raise ValueError("tombstone manifest entry type is invalid")
+        for key in ("dev", "ino", "mode", "size", "mtime_ns"):
+            if type(item[key]) is not int:
+                raise ValueError("tombstone manifest entry identity is invalid")
+        if (
+            item["dev"] < 0
+            or item["ino"] < 0
+            or item["mode"] < 0
+            or item["size"] < 0
+        ):
+            raise ValueError("tombstone manifest entry identity is invalid")
+        entries.append(
+            _TombstoneEntry(
+                path=path,
+                entry_type=entry_type,
+                dev=item["dev"],
+                ino=item["ino"],
+                mode=item["mode"],
+                size=item["size"],
+                mtime_ns=item["mtime_ns"],
+            )
+        )
+        paths.add(path)
+    if [entry.path for entry in entries] != sorted(paths):
+        raise ValueError("tombstone manifest entries must be sorted")
+    by_path = {entry.path: entry for entry in entries}
+    for entry in entries:
+        parts = entry.path.split("/")
+        for index in range(1, len(parts)):
+            parent = by_path.get("/".join(parts[:index]))
+            if parent is None or parent.entry_type != "directory":
+                raise ValueError("tombstone manifest entry parent is not a directory")
+    return tuple(entries)
 
 
 def _validate_manifest_status_payload(
@@ -1132,17 +1450,45 @@ def _delete_bound_tombstone(
     trash: Path,
     tombstone: Path,
     expected_identity: os.stat_result,
+    *,
+    expected_entries: tuple[_TombstoneEntry, ...] | None = None,
+    expected_trash_identity: os.stat_result | None = None,
 ) -> bool:
     if tombstone.parent != trash or _TOMBSTONE_RE.fullmatch(tombstone.name) is None:
         return False
+    plan: _TombstoneDeletionPlan | None = None
+    if expected_entries is not None:
+        if expected_trash_identity is None:
+            return False
+        if not _directory_identity_matches(
+            trash.parent,
+            trash,
+            expected_trash_identity,
+        ):
+            return False
+        entries = {entry.path: entry for entry in expected_entries}
+        if len(entries) != len(expected_entries):
+            return False
+        plan = _TombstoneDeletionPlan(
+            root=trash.parent,
+            trash=trash,
+            trash_identity=expected_trash_identity,
+            entries=entries,
+        )
     if os.name == "nt":
-        return _windows_delete_bound_tombstone(tombstone, expected_identity)
-    return _posix_delete_bound_tombstone(trash, tombstone, expected_identity)
+        return _windows_delete_bound_tombstone(tombstone, expected_identity, plan)
+    return _posix_delete_bound_tombstone(
+        trash,
+        tombstone,
+        expected_identity,
+        plan,
+    )
 
 
 def _windows_delete_bound_tombstone(
     tombstone: Path,
     expected_identity: os.stat_result,
+    plan: _TombstoneDeletionPlan | None = None,
 ) -> bool:
     entry: _WindowsDeleteHandle | None = None
     try:
@@ -1153,7 +1499,7 @@ def _windows_delete_bound_tombstone(
             or _windows_is_reparse(entry.attributes)
         ):
             return False
-        if not _windows_delete_children(tombstone):
+        if not _windows_delete_children(tombstone, plan=plan):
             return False
         current = os.fstat(entry.fd)
         if not os.path.samestat(expected_identity, current):
@@ -1168,7 +1514,12 @@ def _windows_delete_bound_tombstone(
             os.close(entry.fd)
 
 
-def _windows_delete_children(directory: Path) -> bool:
+def _windows_delete_children(
+    directory: Path,
+    *,
+    plan: _TombstoneDeletionPlan | None = None,
+    prefix: tuple[str, ...] = (),
+) -> bool:
     try:
         children = sorted(
             (
@@ -1180,23 +1531,83 @@ def _windows_delete_children(directory: Path) -> bool:
     except OSError:
         return False
     for child, expected_identity in children:
-        if not _windows_delete_entry(child, expected_identity):
+        child_parts = (*prefix, child.name)
+        allowed: _TombstoneEntry | None = None
+        if plan is not None:
+            try:
+                relative_path = _strict_relative_posix_path(child_parts)
+            except ValueError:
+                return False
+            allowed = plan.entries.get(relative_path)
+            attributes = getattr(expected_identity, "st_file_attributes", 0)
+            if allowed is None or not _entry_matches_identity(
+                allowed,
+                expected_identity,
+                windows_attributes=attributes,
+            ):
+                if (
+                    stat.S_ISDIR(expected_identity.st_mode)
+                    and not _windows_is_reparse(attributes)
+                ):
+                    _route_foreign_run_directory(
+                        plan,
+                        directory,
+                        child,
+                        expected_identity,
+                    )
+                return False
+        if not _windows_delete_entry(
+            child,
+            expected_identity,
+            plan=plan,
+            child_parts=child_parts,
+            allowed=allowed,
+        ):
             return False
     return True
 
 
-def _windows_delete_entry(path: Path, expected_identity: os.stat_result) -> bool:
+def _windows_delete_entry(
+    path: Path,
+    expected_identity: os.stat_result,
+    *,
+    plan: _TombstoneDeletionPlan | None = None,
+    child_parts: tuple[str, ...] = (),
+    allowed: _TombstoneEntry | None = None,
+) -> bool:
     entry: _WindowsDeleteHandle | None = None
     try:
         entry = _windows_open_delete_handle(path)
         if not os.path.samestat(expected_identity, entry.identity):
             return False
+        if plan is not None and (
+            allowed is None
+            or not _entry_matches_identity(
+                allowed,
+                entry.identity,
+                windows_attributes=entry.attributes,
+            )
+        ):
+            return False
         is_directory = stat.S_ISDIR(entry.identity.st_mode)
         if is_directory and not _windows_is_reparse(entry.attributes):
-            if not _windows_delete_children(path):
+            if not _windows_delete_children(
+                path,
+                plan=plan,
+                prefix=child_parts,
+            ):
                 return False
         current = os.fstat(entry.fd)
         if not os.path.samestat(entry.identity, current):
+            return False
+        if plan is not None and (
+            allowed is None
+            or not _entry_matches_identity(
+                allowed,
+                current,
+                windows_attributes=getattr(current, "st_file_attributes", 0),
+            )
+        ):
             return False
         return _windows_mark_handle_for_deletion(entry.handle)
     except (OSError, RuntimeError, ValueError):
@@ -1288,6 +1699,7 @@ def _posix_delete_bound_tombstone(
     trash: Path,
     tombstone: Path,
     expected_identity: os.stat_result,
+    plan: _TombstoneDeletionPlan | None = None,
 ) -> bool:
     flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
     parent_fd: int | None = None
@@ -1298,7 +1710,15 @@ def _posix_delete_bound_tombstone(
         opened = os.fstat(entry_fd)
         if not os.path.samestat(expected_identity, opened):
             return False
-        if not _posix_delete_children(entry_fd):
+        if plan is not None:
+            trash_opened = os.fstat(parent_fd)
+            if not os.path.samestat(plan.trash_identity, trash_opened):
+                return False
+        if not _posix_delete_children(
+            entry_fd,
+            directory_path=tombstone,
+            plan=plan,
+        ):
             return False
         current = os.stat(tombstone.name, dir_fd=parent_fd, follow_symlinks=False)
         if _is_stat_link_like(current) or not os.path.samestat(opened, current):
@@ -1314,7 +1734,13 @@ def _posix_delete_bound_tombstone(
             os.close(parent_fd)
 
 
-def _posix_delete_children(directory_fd: int) -> bool:
+def _posix_delete_children(
+    directory_fd: int,
+    *,
+    directory_path: Path | None = None,
+    plan: _TombstoneDeletionPlan | None = None,
+    prefix: tuple[str, ...] = (),
+) -> bool:
     try:
         names = sorted(os.listdir(directory_fd))
     except OSError:
@@ -1326,15 +1752,53 @@ def _posix_delete_children(directory_fd: int) -> bool:
         child_fd: int | None = None
         try:
             before = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+            child_parts = (*prefix, name)
+            allowed: _TombstoneEntry | None = None
+            if plan is not None:
+                relative_path = _strict_relative_posix_path(child_parts)
+                allowed = plan.entries.get(relative_path)
+                if allowed is None or not _entry_matches_identity(allowed, before):
+                    if (
+                        directory_path is not None
+                        and stat.S_ISDIR(before.st_mode)
+                        and not _is_stat_link_like(before)
+                    ):
+                        _route_foreign_run_directory(
+                            plan,
+                            directory_path,
+                            directory_path / name,
+                            before,
+                            parent_fd=directory_fd,
+                        )
+                    return False
             if stat.S_ISDIR(before.st_mode) and not _is_stat_link_like(before):
                 child_fd = os.open(name, flags, dir_fd=directory_fd)
                 opened = os.fstat(child_fd)
-                if not os.path.samestat(before, opened):
+                if not os.path.samestat(before, opened) or (
+                    plan is not None
+                    and (
+                        allowed is None
+                        or not _entry_matches_identity(allowed, opened)
+                    )
+                ):
                     return False
-                if not _posix_delete_children(child_fd):
+                if not _posix_delete_children(
+                    child_fd,
+                    directory_path=(
+                        None if directory_path is None else directory_path / name
+                    ),
+                    plan=plan,
+                    prefix=child_parts,
+                ):
                     return False
                 current = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
-                if not os.path.samestat(opened, current):
+                if not os.path.samestat(opened, current) or (
+                    plan is not None
+                    and (
+                        allowed is None
+                        or not _entry_matches_identity(allowed, current)
+                    )
+                ):
                     return False
                 os.rmdir(name, dir_fd=directory_fd)
             else:
@@ -1350,7 +1814,13 @@ def _posix_delete_children(directory_fd: int) -> bool:
                     dir_fd=directory_fd,
                     follow_symlinks=False,
                 )
-                if not os.path.samestat(before, quarantined):
+                if not os.path.samestat(before, quarantined) or (
+                    plan is not None
+                    and (
+                        allowed is None
+                        or not _entry_matches_identity(allowed, quarantined)
+                    )
+                ):
                     try:
                         os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
                     except FileNotFoundError:
@@ -1368,6 +1838,86 @@ def _posix_delete_children(directory_fd: int) -> bool:
             if child_fd is not None:
                 os.close(child_fd)
     return True
+
+
+def _route_foreign_run_directory(
+    plan: _TombstoneDeletionPlan,
+    parent: Path,
+    child: Path,
+    expected_identity: os.stat_result,
+    *,
+    parent_fd: int | None = None,
+) -> bool:
+    binding: _DirectoryBinding | None = None
+    try:
+        if child.parent != parent:
+            return False
+        if not _directory_identity_matches(plan.root, plan.trash, plan.trash_identity):
+            return False
+        loaded = _read_status_payload(parent, child)
+        run_id = _stored_run_id(loaded.payload)
+        _parse_run_metadata(loaded.payload, expected_run_id=run_id)
+        if not os.path.samestat(expected_identity, loaded.directory_identity):
+            return False
+
+        binding = _bind_directory(plan.root, plan.trash)
+        if not os.path.samestat(plan.trash_identity, binding.identity):
+            return False
+        if parent_fd is None:
+            current = _snapshot_owned_run_dir(parent, child)
+        else:
+            current = os.stat(
+                child.name,
+                dir_fd=parent_fd,
+                follow_symlinks=False,
+            )
+        if (
+            _is_stat_link_like(current)
+            or not stat.S_ISDIR(current.st_mode)
+            or not os.path.samestat(expected_identity, current)
+        ):
+            return False
+
+        for _ in range(8):
+            candidate = plan.trash / _new_tombstone_name()
+            if not _path_exists_or_link(candidate):
+                displaced = candidate
+                break
+        else:
+            return False
+        if parent_fd is not None and binding.fd is not None:
+            os.rename(
+                child.name,
+                displaced.name,
+                src_dir_fd=parent_fd,
+                dst_dir_fd=binding.fd,
+            )
+        else:
+            os.replace(child, displaced)
+        if not _binding_matches(plan.root, plan.trash, binding):
+            return False
+        isolated = _snapshot_owned_run_dir(plan.trash, displaced)
+        if not os.path.samestat(expected_identity, isolated):
+            return False
+        _recover_one_tombstone(
+            plan.root,
+            plan.trash,
+            plan.trash_identity,
+            displaced,
+        )
+        return True
+    except (
+        OSError,
+        RuntimeError,
+        UnicodeError,
+        ValueError,
+        TypeError,
+        json.JSONDecodeError,
+    ):
+        return False
+    finally:
+        if binding is not None and binding.fd is not None:
+            os.close(binding.fd)
 
 
 def _new_tombstone_name() -> str:
@@ -1457,7 +2007,13 @@ def _recover_one_manifest(
         tombstone_identity = _snapshot_owned_run_dir(trash, tombstone)
         if not _manifest_matches_directory(manifest, tombstone_identity):
             return None, None
-        if not _delete_bound_tombstone(trash, tombstone, tombstone_identity):
+        if not _delete_bound_tombstone(
+            trash,
+            tombstone,
+            tombstone_identity,
+            expected_entries=manifest.entries,
+            expected_trash_identity=trash_identity,
+        ):
             return None, tombstone.name
         _delete_bound_manifest(
             root,

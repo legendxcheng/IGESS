@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 
 import pytest
@@ -363,7 +364,7 @@ def test_write_status_replace_failure_preserves_old_status_and_cleans_temp(
     original_replace = os.replace
 
     def failing_replace(source: object, destination: object, *args: object, **kwargs: object):
-        if Path(destination) == record.status_path:
+        if Path(destination).name == record.status_path.name:
             raise OSError("injected replace failure")
         return original_replace(source, destination, *args, **kwargs)
 
@@ -610,14 +611,20 @@ def test_prune_final_delete_binding_rejects_a_swapped_formal_directory(
     )
     raced = False
 
-    def racing_delete(trash: Path, tombstone: Path, identity: os.stat_result) -> bool:
+    def racing_delete(
+        trash: Path,
+        tombstone: Path,
+        identity: os.stat_result,
+        *args: object,
+        **kwargs: object,
+    ) -> bool:
         nonlocal raced
         raced = True
         holding = registry.runs_root / ".final-delete-holding"
         os.replace(tombstone, holding)
         os.replace(formal.run_dir, tombstone)
         os.replace(holding, formal.run_dir)
-        return original_delete(trash, tombstone, identity)
+        return original_delete(trash, tombstone, identity, *args, **kwargs)
 
     monkeypatch.setattr(
         registry_module,
@@ -708,6 +715,197 @@ def test_windows_bound_prune_rejects_child_replaced_after_enumeration(
         "smoke-child",
     ]
 
+    assert registry.prune_smoke(keep=0) == []
+    assert sorted(
+        path.read_text(encoding="utf-8") for path in tmp_path.rglob("*.marker")
+    ) == [
+        "formal-child",
+        "smoke-child",
+    ]
+    assert [(item.run_id, item.kind) for item in registry.list_runs()] == [
+        (formal.run_id, "formal"),
+    ]
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX dirfd race")
+def test_posix_bound_prune_rejects_child_replacement_across_retries(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    registry = RunRegistry(tmp_path / "runs")
+    smoke = _write(
+        registry,
+        "20260715T010203000000Z-smoke-rule",
+        kind="smoke",
+        change_id="rule",
+    )
+    formal = _write(
+        registry,
+        "20260715T010204000000Z-day_1",
+        kind="formal",
+    )
+    victim = smoke.run_dir / "victim.marker"
+    victim.write_text("smoke-child", encoding="utf-8")
+    formal_marker = formal.run_dir / "formal.marker"
+    formal_marker.write_text("formal-child", encoding="utf-8")
+    original_rename = registry_module.os.rename
+    raced = False
+
+    def racing_rename(
+        source: object,
+        destination: object,
+        *args: object,
+        **kwargs: object,
+    ) -> None:
+        nonlocal raced
+        if not raced and source == victim.name:
+            raced = True
+            [tombstone] = list(
+                (registry.runs_root / ".run-trash").glob(
+                    "tomb-????????????????????????????????"
+                )
+            )
+            holding = formal.run_dir / ".child-holding"
+            os.replace(tombstone / victim.name, holding)
+            os.replace(formal_marker, tombstone / victim.name)
+            os.replace(holding, formal_marker)
+        original_rename(source, destination, *args, **kwargs)
+
+    monkeypatch.setattr(registry_module.os, "rename", racing_rename)
+
+    assert registry.prune_smoke(keep=0) == []
+    assert raced
+    assert registry.prune_smoke(keep=0) == []
+    assert sorted(
+        path.read_text(encoding="utf-8") for path in tmp_path.rglob("*.marker")
+    ) == [
+        "formal-child",
+        "smoke-child",
+    ]
+    assert [(item.run_id, item.kind) for item in registry.list_runs()] == [
+        (formal.run_id, "formal"),
+    ]
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows handle race")
+def test_windows_retry_routes_a_swapped_foreign_run_directory_without_deleting_it(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    registry = RunRegistry(tmp_path / "runs")
+    smoke = _write(
+        registry,
+        "20260715T010203000000Z-smoke-rule",
+        kind="smoke",
+        change_id="rule",
+    )
+    formal = _write(
+        registry,
+        "20260715T010204000000Z-day_1",
+        kind="formal",
+    )
+    victim = smoke.run_dir / "victim-run"
+    victim.mkdir()
+    (victim / "smoke.marker").write_text("smoke-child", encoding="utf-8")
+    formal_marker = formal.run_dir / "formal.marker"
+    formal_marker.write_text("formal-child", encoding="utf-8")
+    original_delete = registry_module._windows_delete_entry
+    raced = False
+
+    def racing_delete(path: Path, *args: object, **kwargs: object) -> bool:
+        nonlocal raced
+        if not raced and path.name == victim.name:
+            raced = True
+            holding = registry.runs_root / ".foreign-holding"
+            os.replace(path, holding)
+            os.replace(formal.run_dir, path)
+        return original_delete(path, *args, **kwargs)
+
+    monkeypatch.setattr(registry_module, "_windows_delete_entry", racing_delete)
+
+    assert registry.prune_smoke(keep=0) == []
+    assert raced
+    assert registry.prune_smoke(keep=0) == []
+    assert [(item.run_id, item.kind) for item in registry.list_runs()] == [
+        (formal.run_id, "formal"),
+    ]
+    assert (formal.run_dir / formal_marker.name).read_text(encoding="utf-8") == (
+        "formal-child"
+    )
+    trash = registry.runs_root / ".run-trash"
+    assert list(trash.glob("tomb-????????????????????????????????"))
+    assert list(trash.glob("tomb-????????????????????????????????.json"))
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX dirfd race")
+def test_posix_retry_routes_a_swapped_foreign_run_directory_without_deleting_it(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    registry = RunRegistry(tmp_path / "runs")
+    smoke = _write(
+        registry,
+        "20260715T010203000000Z-smoke-rule",
+        kind="smoke",
+        change_id="rule",
+    )
+    formal = _write(
+        registry,
+        "20260715T010204000000Z-day_1",
+        kind="formal",
+    )
+    victim = smoke.run_dir / "victim-run"
+    victim.mkdir()
+    (victim / "smoke.marker").write_text("smoke-child", encoding="utf-8")
+    formal_marker = formal.run_dir / "formal.marker"
+    formal_marker.write_text("formal-child", encoding="utf-8")
+    original_open = registry_module.os.open
+    raced = False
+
+    def racing_open(
+        path: object,
+        flags: int,
+        mode: int = 0o777,
+        *,
+        dir_fd: int | None = None,
+    ) -> int:
+        nonlocal raced
+        trash = registry.runs_root / ".run-trash"
+        manifest_exists = bool(
+            list(trash.glob("tomb-????????????????????????????????.json"))
+        )
+        if (
+            not raced
+            and manifest_exists
+            and path == victim.name
+            and dir_fd is not None
+        ):
+            raced = True
+            [tombstone] = list(
+                trash.glob(
+                    "tomb-????????????????????????????????"
+                )
+            )
+            holding = registry.runs_root / ".foreign-holding"
+            os.replace(tombstone / victim.name, holding)
+            os.replace(formal.run_dir, tombstone / victim.name)
+        return original_open(path, flags, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(registry_module.os, "open", racing_open)
+
+    assert registry.prune_smoke(keep=0) == []
+    assert raced
+    assert registry.prune_smoke(keep=0) == []
+    assert [(item.run_id, item.kind) for item in registry.list_runs()] == [
+        (formal.run_id, "formal"),
+    ]
+    assert (formal.run_dir / formal_marker.name).read_text(encoding="utf-8") == (
+        "formal-child"
+    )
+    trash = registry.runs_root / ".run-trash"
+    assert list(trash.glob("tomb-????????????????????????????????"))
+    assert list(trash.glob("tomb-????????????????????????????????.json"))
+
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows short-path alias")
 def test_windows_short_path_alias_can_prune_verified_tombstone(tmp_path: Path) -> None:
@@ -790,12 +988,14 @@ def test_partial_tombstone_delete_retries_from_manifest_after_status_is_gone(
     def failing_after_status(
         path: Path,
         expected_identity: os.stat_result,
+        *args: object,
+        **kwargs: object,
     ) -> bool:
         nonlocal failed
         if path.name == "z-fail.marker" and not failed:
             failed = True
             return False
-        return original_delete(path, expected_identity)
+        return original_delete(path, expected_identity, *args, **kwargs)
 
     monkeypatch.setattr(registry_module, "_windows_delete_entry", failing_after_status)
 
@@ -804,12 +1004,64 @@ def test_partial_tombstone_delete_retries_from_manifest_after_status_is_gone(
     [tombstone] = list(trash.glob("tomb-????????????????????????????????"))
     assert failed
     assert not (tombstone / "run_status.json").exists()
-    assert (trash / f"{tombstone.name}.json").is_file()
+    manifest_path = trash / f"{tombstone.name}.json"
+    assert manifest_path.is_file()
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["version"] == 2
+    assert [entry["path"] for entry in manifest["entries"]] == [
+        "run_status.json",
+        "z-fail.marker",
+    ]
+    assert re.fullmatch(r"sha256:[0-9a-f]{64}", manifest["entries_sha256"])
 
     monkeypatch.setattr(registry_module, "_windows_delete_entry", original_delete)
     assert registry.prune_smoke(keep=0) == [smoke.run_id]
     assert not tombstone.exists()
-    assert not (trash / f"{tombstone.name}.json").exists()
+    assert not manifest_path.exists()
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX partial dirfd deletion")
+def test_posix_partial_tombstone_delete_retries_from_allowlist_manifest(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    registry = RunRegistry(tmp_path / "runs")
+    smoke = _write(
+        registry,
+        "20260715T010203000000Z-smoke-rule",
+        kind="smoke",
+        change_id="rule",
+    )
+    (smoke.run_dir / "z-fail.marker").write_text("retry", encoding="utf-8")
+    original_rename = registry_module.os.rename
+    failed = False
+
+    def failing_after_status(
+        source: object,
+        destination: object,
+        *args: object,
+        **kwargs: object,
+    ) -> None:
+        nonlocal failed
+        if source == "z-fail.marker" and not failed:
+            failed = True
+            raise OSError("injected child deletion failure")
+        original_rename(source, destination, *args, **kwargs)
+
+    monkeypatch.setattr(registry_module.os, "rename", failing_after_status)
+
+    assert registry.prune_smoke(keep=0) == []
+    trash = registry.runs_root / ".run-trash"
+    [tombstone] = list(trash.glob("tomb-????????????????????????????????"))
+    manifest_path = trash / f"{tombstone.name}.json"
+    assert failed
+    assert not (tombstone / "run_status.json").exists()
+    assert manifest_path.is_file()
+
+    monkeypatch.setattr(registry_module.os, "rename", original_rename)
+    assert registry.prune_smoke(keep=0) == [smoke.run_id]
+    assert not tombstone.exists()
+    assert not manifest_path.exists()
 
 
 def test_next_prune_recovers_crash_tombstones_and_ignores_unsafe_trash(
