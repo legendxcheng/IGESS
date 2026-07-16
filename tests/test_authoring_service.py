@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from datetime import datetime, timezone
 import json
+import os
 from pathlib import Path
+import shutil
+import threading
 from typing import Any
 
 import pytest
@@ -17,7 +21,7 @@ from igess.authoring.service import AuthoringService
 from igess.authoring.probe import EligibilityFinding, TenTickProbeResult, run_ten_tick_probe
 from igess.authoring.status import derive_status
 from igess.authoring.templates import initialize_authoring_project
-from igess.authoring.transactions import Transaction
+from igess.authoring.transactions import Transaction, recover_transactions
 from igess.outputs import OutputWriter
 from igess.run_registry import RunRegistry
 
@@ -92,6 +96,37 @@ def _formal_bytes(root: Path) -> dict[str, bytes]:
         path.relative_to(root).as_posix(): path.read_bytes()
         for path in sorted(paths, key=lambda item: item.as_posix())
     }
+
+
+def _interrupt_with_live_sources_in_backups(root: Path) -> dict[str, bytes]:
+    project = AuthoringProject.discover(root)
+    before = _formal_bytes(root)
+    transaction = Transaction(project, "crashed-change", project.model_digest())
+    transaction.candidate_dir.mkdir()
+    shutil.copy2(project.config, transaction.candidate_dir / "economy.yaml")
+    shutil.copytree(project.exports, transaction.candidate_dir / "luban_exports")
+    transaction.staged_change_path.write_text(
+        '{"outcome":"success"}\n',
+        encoding="utf-8",
+    )
+    transaction.prepare(
+        targets=("economy.yaml", "luban_exports"),
+        run_destination=None,
+        change_destination=project.changes / "crashed-change.json",
+    )
+    os.replace(project.config, transaction.backups_dir / "economy.yaml")
+    os.replace(project.exports, transaction.backups_dir / "luban_exports")
+    journal = json.loads(transaction.journal_path.read_text(encoding="utf-8"))
+    journal["phase"] = "committing"
+    journal["last_completed_checkpoint"] = "journal_committing"
+    transaction.journal_path.write_text(
+        json.dumps(journal, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    assert not (root / "economy.yaml").exists()
+    assert not (root / "luban_exports").exists()
+    return before
 
 
 class _CountingStore:
@@ -733,10 +768,7 @@ def test_lock_and_recovery_event_order_for_all_four_model_commands(tmp_path: Pat
         return []
 
     @contextmanager
-    def recovered_snapshot(_project: object, callback: object):
-        events.append("exclusive_enter")
-        recovered = callback()  # type: ignore[operator]
-        events.append("exclusive_exit")
+    def recovered_snapshot(_project: object, recovered: object):
         events.append("shared_enter")
         try:
             yield recovered
@@ -750,11 +782,12 @@ def test_lock_and_recovery_event_order_for_all_four_model_commands(tmp_path: Pat
         recoverer=recover,
     ).init(root, "order_test")
     assert init_response.ok is True
-    assert events == ["discover", "exclusive_enter", "recover", "exclusive_exit"]
+    assert events == ["exclusive_enter", "recover", "discover", "exclusive_exit"]
 
     events.clear()
     status_response = AuthoringService(
         root,
+        lock_factory=exclusive,
         shared_snapshot_factory=recovered_snapshot,
         recoverer=recover,
     ).status()
@@ -781,6 +814,7 @@ def test_lock_and_recovery_event_order_for_all_four_model_commands(tmp_path: Pat
     events.clear()
     simulate_response = AuthoringService(
         root,
+        lock_factory=exclusive,
         shared_snapshot_factory=recovered_snapshot,
         recoverer=recover,
     ).simulate()
@@ -976,3 +1010,254 @@ def test_journal_committed_checkpoint_error_is_committed_success_with_cleanup_wa
     assert payload["details"]["warnings"][-1]["code"] == (
         "transaction_cleanup_pending"
     )
+
+
+@pytest.mark.parametrize("command", ["status", "apply", "simulate"])
+def test_commands_recover_missing_live_sources_before_strict_discovery(
+    tmp_path: Path,
+    command: str,
+) -> None:
+    root = initialize_authoring_project(tmp_path / command, "recover_before_discover")
+    before = _interrupt_with_live_sources_in_backups(root)
+    calls: list[str] = []
+
+    def recover(project: object) -> list[dict[str, str]]:
+        calls.append(type(project).__name__)
+        return recover_transactions(project)  # type: ignore[arg-type]
+
+    service = _service(root, recoverer=recover)
+    if command == "status":
+        response = service.status()
+    elif command == "apply":
+        response = service.apply(_resource())
+    else:
+        response = service.simulate()
+
+    assert calls == ["RecoveryProjectContext"]
+    assert (root / "economy.yaml").is_file()
+    assert (root / "luban_exports").is_dir()
+    assert not (root / ".igess" / "transactions" / "crashed-change").exists()
+    if command == "apply":
+        assert response.ok is True
+    else:
+        assert response.code in {"status", "simulated"}
+        assert _formal_bytes(root) == before
+
+
+def test_existing_init_recovers_missing_live_sources_before_strict_discovery(
+    tmp_path: Path,
+) -> None:
+    root = initialize_authoring_project(tmp_path / "model", "existing_recovery")
+    before = _interrupt_with_live_sources_in_backups(root)
+    calls: list[str] = []
+
+    def recover(project: object) -> list[dict[str, str]]:
+        calls.append(type(project).__name__)
+        return recover_transactions(project)  # type: ignore[arg-type]
+
+    response = AuthoringService(recoverer=recover).init(root)
+
+    assert response.ok is False
+    assert calls == ["RecoveryProjectContext"]
+    assert _formal_bytes(root) == before
+    assert not (root / ".igess" / "transactions" / "crashed-change").exists()
+
+
+def test_recovery_context_rejects_a_symlink_root_before_recovery(tmp_path: Path) -> None:
+    root = initialize_authoring_project(tmp_path / "model", "safe_root")
+    link = tmp_path / "linked-model"
+    try:
+        link.symlink_to(root, target_is_directory=True)
+    except OSError:
+        pytest.skip("directory symlinks are unavailable")
+    calls: list[str] = []
+
+    response = AuthoringService(
+        link,
+        recoverer=lambda _project: calls.append("recover") or [],
+    ).status()
+
+    assert response.ok is False
+    assert response.code == "project_root_unsafe"
+    assert calls == []
+
+
+def test_commit_in_doubt_never_writes_a_conflicting_failed_audit(tmp_path: Path) -> None:
+    root = initialize_authoring_project(tmp_path / "model", "in_doubt")
+    stores: list[_CountingStore] = []
+
+    class CommittedThenUncertain:
+        def __init__(self, delegate: Transaction) -> None:
+            self._delegate = delegate
+
+        def __getattr__(self, name: str) -> object:
+            return getattr(self._delegate, name)
+
+        def prepare(self, **kwargs: object) -> None:
+            self._delegate.prepare(**kwargs)  # type: ignore[arg-type]
+
+        def commit(self) -> tuple[dict[str, str], ...]:
+            self._delegate.commit()
+            raise AuthoringError(
+                "commit_in_doubt",
+                "Committed state is visible but durability is uncertain",
+                {"phase": "committed", "checkpoint": "journal_committed"},
+            )
+
+        def abort(self) -> None:
+            self._delegate.abort()
+
+    def transaction_factory(
+        project: AuthoringProject,
+        change_id: str,
+        digest: str,
+    ) -> CommittedThenUncertain:
+        return CommittedThenUncertain(Transaction(project, change_id, digest))
+
+    response = _service(
+        root,
+        transaction_factory=transaction_factory,
+        record_store_factory=_counting_store_factory(root, stores),
+    ).apply(_resource())
+    details = response.to_payload()["details"]
+
+    assert response.ok is False
+    assert response.code == "commit_in_doubt"
+    assert details["phase"] == "committed"
+    assert details["success_audit_present"] is True
+    assert details["formal_state"] == "committed_or_recoverable"
+    assert len(list((root / "changes").glob("*.json"))) == 1
+    assert not (root / "changes" / "failed").exists()
+    assert stores[0].failure_calls == 0
+    assert _service(root).status().result["entity_counts"]["resource"] == 1
+
+
+def test_concurrent_manual_simulations_reserve_distinct_colliding_run_ids(
+    tmp_path: Path,
+) -> None:
+    root = initialize_authoring_project(tmp_path / "model", "concurrent_runs")
+    setup = _service(root, ids=["setup-1", "setup-2", "setup-3", "setup-4"])
+    _add_runnable_activity(setup)
+    collision = threading.Barrier(2)
+
+    class CollidingRegistry(RunRegistry):
+        def __init__(self, runs_root: Path) -> None:
+            super().__init__(runs_root)
+            self._guard = threading.Lock()
+            self._calls = 0
+
+        def new_run_dir(self, scenario_id: str, **_kwargs: object) -> Path:
+            with self._guard:
+                self._calls += 1
+                call = self._calls
+            if call <= 2:
+                collision.wait(timeout=10)
+                return self.runs_root / "20260716T000000000000Z-smoke"
+            return self.runs_root / f"20260716T00000000000{call}Z-{scenario_id}"
+
+    registry = CollidingRegistry(root / "runs")
+
+    @contextmanager
+    def unlocked(_project: object, _is_exclusive: bool):
+        yield
+
+    @contextmanager
+    def unlocked_snapshot(_project: object, recovered: object):
+        yield recovered
+
+    def run() -> object:
+        return AuthoringService(
+            root,
+            lock_factory=unlocked,
+            shared_snapshot_factory=unlocked_snapshot,
+            registry_factory=lambda _project: registry,
+        ).simulate()
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        responses = [
+            future.result(timeout=60)
+            for future in (executor.submit(run), executor.submit(run))
+        ]
+
+    assert all(response.ok for response in responses), [  # type: ignore[attr-defined]
+        response.to_payload() for response in responses  # type: ignore[attr-defined]
+    ]
+    run_ids = {response.result["run_id"] for response in responses}  # type: ignore[attr-defined]
+    assert len(run_ids) == 2
+    for run_id in run_ids:
+        run_dir = root / "runs" / run_id
+        assert (run_dir / "run_status.json").is_file()
+        assert (run_dir / "output" / "run_manifest.json").is_file()
+        assert (run_dir / "report" / "index.html").is_file()
+
+
+def test_apply_smoke_retries_an_existing_run_destination(tmp_path: Path) -> None:
+    root = initialize_authoring_project(tmp_path / "model", "smoke_collision")
+    setup = _service(root, ids=["setup-1", "setup-2", "setup-3", "setup-4"])
+    _add_runnable_activity(setup)
+    collision = root / "runs" / "20260716T000000000000Z-smoke-change-1"
+    collision.mkdir()
+    (collision / "sentinel.txt").write_text("foreign", encoding="utf-8")
+    available = root / "runs" / "20260716T000000000001Z-smoke-change-1"
+
+    class CollidingSmokeRegistry(RunRegistry):
+        def __init__(self, runs_root: Path) -> None:
+            super().__init__(runs_root)
+            self.calls = 0
+
+        def new_run_dir(self, _scenario_id: str, **_kwargs: object) -> Path:
+            self.calls += 1
+            return collision if self.calls == 1 else available
+
+    registry = CollidingSmokeRegistry(root / "runs")
+    response = _service(
+        root,
+        ids=["change-1"],
+        registry_factory=lambda _project: registry,
+    ).apply(
+        _change(
+            "resource",
+            "gold",
+            {"name": "Coins", "dimension": "currency"},
+        )
+    )
+
+    assert response.ok is True
+    assert response.result["smoke"]["run_id"] == available.name
+    assert (collision / "sentinel.txt").read_text(encoding="utf-8") == "foreign"
+    assert (available / "run_status.json").is_file()
+    assert registry.calls == 2
+
+
+def test_failed_run_status_cleanup_removes_only_its_empty_reservation(tmp_path: Path) -> None:
+    root = initialize_authoring_project(tmp_path / "model", "reservation_cleanup")
+    setup = _service(root, ids=["setup-1", "setup-2", "setup-3", "setup-4"])
+    _add_runnable_activity(setup)
+    foreign = root / "runs" / "20260716T000000000000Z-smoke"
+    foreign.mkdir()
+    (foreign / "sentinel.txt").write_text("foreign", encoding="utf-8")
+    owned = root / "runs" / "20260716T000000000001Z-smoke"
+
+    class FailingRegistry(RunRegistry):
+        def __init__(self, runs_root: Path) -> None:
+            super().__init__(runs_root)
+            self.calls = 0
+
+        def new_run_dir(self, _scenario_id: str, **_kwargs: object) -> Path:
+            self.calls += 1
+            return foreign if self.calls == 1 else owned
+
+        def write_status(self, run_dir: Path, **_kwargs: object):
+            if run_dir == foreign:
+                raise AssertionError("an existing foreign run must never be claimed")
+            raise OSError("status media failed")
+
+    response = AuthoringService(
+        root,
+        registry_factory=lambda _project: FailingRegistry(root / "runs"),
+    ).simulate()
+
+    assert response.ok is False
+    assert response.code == "run_status_failed"
+    assert (foreign / "sentinel.txt").read_text(encoding="utf-8") == "foreign"
+    assert not owned.exists()

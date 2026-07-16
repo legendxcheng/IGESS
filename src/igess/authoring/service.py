@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
-from contextlib import AbstractContextManager
+from contextlib import AbstractContextManager, contextmanager
 from dataclasses import replace
 from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
 import re
+import stat
 from typing import Any
 import uuid
 
@@ -34,7 +35,7 @@ from .exports import (
     export_candidate,
     stage_sources,
 )
-from .locking import project_lock, recovered_shared_snapshot
+from .locking import project_lock
 from .probe import EligibilityFinding, TenTickProbeResult, run_ten_tick_probe
 from .project import AuthoringProject
 from .response import AuthoringError, CommandResponse
@@ -46,6 +47,90 @@ from .yaml_source import read_yaml_entity
 
 
 _CHANGE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$")
+_RUN_ID_ATTEMPTS = 16
+
+
+class RecoveryProjectContext(AuthoringProject):
+    """A source-independent, safety-validated project view used only for recovery."""
+
+    __slots__ = ()
+
+    def __init__(self, root: str | os.PathLike[str]) -> None:
+        if not isinstance(root, (str, os.PathLike)):
+            raise TypeError("Recovery project root must be path-like")
+        path = Path(root).expanduser()
+        try:
+            direct = path.lstat()
+        except FileNotFoundError:
+            raise AuthoringError(
+                "project_root_missing",
+                f"Authoring project root is missing: {path}",
+                {"path": str(path), "reason": "missing"},
+            ) from None
+        except (OSError, ValueError) as error:
+            raise AuthoringError(
+                "project_root_inaccessible",
+                f"Authoring project root could not be inspected: {path}",
+                {
+                    "error_type": type(error).__name__,
+                    "path": str(path),
+                    "reason": "access_error",
+                },
+            ) from None
+        if _is_path_indirection(direct):
+            raise AuthoringError(
+                "project_root_unsafe",
+                f"Authoring project root must not be a link or reparse point: {path}",
+                {"path": str(path), "reason": "indirection"},
+            )
+        if not stat.S_ISDIR(direct.st_mode):
+            raise AuthoringError(
+                "project_root_wrong_type",
+                f"Authoring project root is not a directory: {path}",
+                {"path": str(path), "reason": "wrong_type"},
+            )
+        try:
+            canonical = path.resolve(strict=True)
+            canonical_identity = canonical.lstat()
+        except (OSError, RuntimeError, ValueError) as error:
+            raise AuthoringError(
+                "project_root_inaccessible",
+                f"Authoring project root could not be resolved: {path}",
+                {
+                    "error_type": type(error).__name__,
+                    "path": str(path),
+                    "reason": "resolve_error",
+                },
+            ) from None
+        if _is_path_indirection(canonical_identity) or not stat.S_ISDIR(
+            canonical_identity.st_mode
+        ):
+            raise AuthoringError(
+                "project_root_unsafe",
+                f"Authoring project root is not a stable real directory: {path}",
+                {"path": str(path), "reason": "canonical_indirection"},
+            )
+
+        metadata = canonical / ".igess"
+        object.__setattr__(self, "root", canonical)
+        object.__setattr__(self, "config", canonical / "economy.yaml")
+        object.__setattr__(self, "datas", canonical / "Datas")
+        object.__setattr__(self, "exports", canonical / "luban_exports")
+        object.__setattr__(self, "runs", canonical / "runs")
+        object.__setattr__(self, "legacy_runs", metadata / "runs")
+        object.__setattr__(self, "reports", canonical / "reports")
+        object.__setattr__(self, "changes", canonical / "changes")
+        object.__setattr__(self, "transactions", metadata / "transactions")
+        object.__setattr__(self, "lock", metadata / "model.lock")
+
+
+@contextmanager
+def _shared_project_snapshot(
+    project: AuthoringProject,
+    recovery_result: object,
+):
+    with project_lock(project, exclusive=False):
+        yield recovery_result
 
 
 def _default_registry(project: AuthoringProject) -> RunRegistry:
@@ -81,8 +166,8 @@ class AuthoringService:
         recoverer: Callable[[AuthoringProject], list[dict[str, str]]] = recover_transactions,
         lock_factory: Callable[[AuthoringProject, bool], AbstractContextManager[None]] = project_lock,
         shared_snapshot_factory: Callable[
-            [AuthoringProject, Callable[[], object]], AbstractContextManager[object]
-        ] = recovered_shared_snapshot,
+            [AuthoringProject, object], AbstractContextManager[object]
+        ] = _shared_project_snapshot,
         source_stager: Callable[[AuthoringProject, str | os.PathLike[str]], StagedSources] = stage_sources,
         candidate_mapper: Callable[[StagedSources, ModelChange], tuple[str, ...]] = apply_to_candidate,
         candidate_exporter: Callable[[StagedSources, str | os.PathLike[str]], ExportResult] = export_candidate,
@@ -133,19 +218,23 @@ class AuthoringService:
         phase = "init"
         try:
             target = Path(out).expanduser()
-            if _looks_like_authoring_project(target):
-                existing = self._project_factory(target)
+            if _should_recover_existing_init(target):
+                existing_context = RecoveryProjectContext(target)
                 phase = "recovery"
-                with self._lock_factory(existing, True):
-                    recovery = _warning_sequence(self._recoverer(existing))
+                with self._lock_factory(existing_context, True):
+                    recovery = _warning_sequence(
+                        self._recoverer(existing_context)
+                    )
+                    self._project_factory(existing_context.root)
                 phase = "init"
             created = Path(self._initializer(out, model_id)).absolute()
-            created_project = self._project_factory(created)
+            created_context = RecoveryProjectContext(created)
             phase = "recovery"
-            with self._lock_factory(created_project, True):
+            with self._lock_factory(created_context, True):
                 post_init_recovery = _warning_sequence(
-                    self._recoverer(created_project)
+                    self._recoverer(created_context)
                 )
+                self._project_factory(created_context.root)
             recovery = (*recovery, *post_init_recovery)
             phase = "init"
             payload = yaml.safe_load((created / "economy.yaml").read_text(encoding="utf-8"))
@@ -181,20 +270,18 @@ class AuthoringService:
     ) -> CommandResponse:
         """Return a complete typed status, including on validation failure."""
 
-        try:
-            project = self._discover(project_root)
-        except Exception as exc:
-            error = _phase_error(exc, "project")
-            return _status_error(error, _failed_status(error))
-
         recovery: Sequence[Mapping[str, object]] = ()
         phase = "recovery"
         try:
-            with self._shared_snapshot_factory(
-                project,
-                lambda: self._recoverer(project),
-            ) as recovered:
-                recovery = _warning_sequence(recovered)
+            recovery_context = self._recovery_context(project_root)
+            with self._lock_factory(recovery_context, True):
+                recovery = _warning_sequence(
+                    self._recoverer(recovery_context)
+                )
+            phase = "project"
+            project = self._project_factory(recovery_context.root)
+            phase = "recovery"
+            with self._shared_snapshot_factory(project, recovery):
                 phase = "status"
                 registry = self._registry_factory(project)
                 status = self._status_deriver(project, registry.latest_smoke)
@@ -234,15 +321,17 @@ class AuthoringService:
     ) -> CommandResponse:
         """Apply exactly one validated model change as a recoverable transaction."""
 
-        try:
-            project = self._discover(project_root)
-        except Exception as exc:
-            return _error_response("model.apply", _phase_error(exc, "project"))
-
         recovered: Sequence[Mapping[str, object]] = ()
+        phase = "recovery"
         try:
-            with self._lock_factory(project, True):
-                recovered = _warning_sequence(self._recoverer(project))
+            recovery_context = self._recovery_context(project_root)
+            with self._lock_factory(recovery_context, True):
+                recovered = _warning_sequence(
+                    self._recoverer(recovery_context)
+                )
+                phase = "project"
+                project = self._project_factory(recovery_context.root)
+                phase = "apply"
                 if isinstance(change, str):
                     try:
                         parsed = _parse_change_against_current(
@@ -252,11 +341,13 @@ class AuthoringService:
                         )
                     except Exception as exc:
                         error = _phase_error(exc, "mapping")
-                        return _error_response(
+                        response = _error_response(
                             "model.apply",
                             error,
                             details=_details_with_warnings(error.details, recovered),
                         )
+                        phase = "recovery"
+                        return response
                 elif isinstance(change, ModelChange):
                     parsed = change
                 else:
@@ -265,14 +356,18 @@ class AuthoringService:
                         "Apply requires one change document or validated ModelChange",
                         {"value_type": type(change).__name__},
                     )
-                    return _error_response(
+                    response = _error_response(
                         "model.apply",
                         error,
                         details=_details_with_warnings(error.details, recovered),
                     )
-                return self._apply_locked(project, parsed, recovered)
+                    phase = "recovery"
+                    return response
+                response = self._apply_locked(project, parsed, recovered)
+                phase = "recovery"
+                return response
         except Exception as exc:
-            error = _phase_error(exc, "recovery")
+            error = _phase_error(exc, phase)
             return _error_response(
                 "model.apply",
                 error,
@@ -286,20 +381,23 @@ class AuthoringService:
     ) -> CommandResponse:
         """Run one manual/formal scenario from a source-consistent snapshot."""
 
-        try:
-            project = self._discover(project_root)
-        except Exception as exc:
-            return _error_response("model.simulate", _phase_error(exc, "project"))
         warnings: Sequence[Mapping[str, object]] = ()
+        phase = "recovery"
         try:
-            with self._shared_snapshot_factory(
-                project,
-                lambda: self._recoverer(project),
-            ) as recovered:
-                warnings = _warning_sequence(recovered)
-                return self._simulate_shared(project, scenario_id, warnings)
+            recovery_context = self._recovery_context(project_root)
+            with self._lock_factory(recovery_context, True):
+                warnings = _warning_sequence(
+                    self._recoverer(recovery_context)
+                )
+            phase = "project"
+            project = self._project_factory(recovery_context.root)
+            phase = "recovery"
+            with self._shared_snapshot_factory(project, warnings):
+                response = self._simulate_shared(project, scenario_id, warnings)
+                phase = "recovery"
+                return response
         except Exception as exc:
-            error = _phase_error(exc, "recovery")
+            error = _phase_error(exc, phase)
             return _error_response(
                 "model.simulate",
                 error,
@@ -314,6 +412,15 @@ class AuthoringService:
         if root is None:
             root = Path.cwd()
         return self._project_factory(root)
+
+    def _recovery_context(
+        self,
+        override: str | os.PathLike[str] | None,
+    ) -> RecoveryProjectContext:
+        root = Path(override) if override is not None else self.project_root
+        if root is None:
+            root = Path.cwd()
+        return RecoveryProjectContext(root)
 
     def _apply_locked(
         self,
@@ -350,6 +457,7 @@ class AuthoringService:
         commit_started = False
         affected_files: list[str] = []
         run_id: str | None = None
+        change_destination: Path | None = None
         phase = "stale"
         try:
             if change.if_model_digest is not None and change.if_model_digest != pre_digest:
@@ -404,7 +512,9 @@ class AuthoringService:
             smoke = {"status": "not_run", "run_id": None, "findings": []}
             run_destination: Path | None = None
             if status.smoke_eligible:
-                run_destination = registry.new_run_dir(
+                phase = "reservation"
+                run_destination = _select_available_run_dir(
+                    registry,
                     "smoke",
                     kind="smoke",
                     change_id=change_id,
@@ -479,6 +589,17 @@ class AuthoringService:
             )
         except Exception as exc:
             error = _phase_error(exc, phase)
+            if commit_started and error.code == "commit_in_doubt":
+                return self._commit_in_doubt_response(
+                    project,
+                    error=error,
+                    change_id=change_id,
+                    change=change,
+                    affected_files=affected_files,
+                    change_destination=change_destination,
+                    warnings=recovered,
+                    run_id=run_id,
+                )
             if transaction is not None and not commit_started:
                 try:
                     transaction.abort()
@@ -494,6 +615,64 @@ class AuthoringService:
                 warnings=recovered,
                 run_id=run_id,
             )
+
+    def _commit_in_doubt_response(
+        self,
+        project: AuthoringProject,
+        *,
+        error: AuthoringError,
+        change_id: str,
+        change: ModelChange,
+        affected_files: Sequence[str],
+        change_destination: Path | None,
+        warnings: Sequence[Mapping[str, object]],
+        run_id: str | None,
+    ) -> CommandResponse:
+        recovery_warnings: Sequence[Mapping[str, object]] = ()
+        recovery_error: AuthoringError | None = None
+        try:
+            recovery_context = RecoveryProjectContext(project.root)
+            recovery_warnings = _warning_sequence(
+                self._recoverer(recovery_context)
+            )
+        except Exception as exc:
+            recovery_error = _phase_error(exc, "recovery")
+
+        success_audit_present = bool(
+            change_destination is not None
+            and change_destination.is_file()
+        )
+        details = dict(error.details)
+        details.update(
+            {
+                "change_id": change_id,
+                "formal_state": "committed_or_recoverable",
+                "recovery_attempted": True,
+                "success_audit_present": success_audit_present,
+            }
+        )
+        if change_destination is not None:
+            details["success_audit_path"] = str(change_destination)
+        if recovery_error is not None:
+            details["recovery_error"] = {
+                "code": recovery_error.code,
+                "message": recovery_error.message,
+                "details": dict(recovery_error.details),
+            }
+        all_warnings = (*warnings, *recovery_warnings)
+        result = {
+            "change_id": change_id,
+            "entity": change.entity,
+            "id": change.id,
+            "changed_files": list(affected_files),
+            "run_id": run_id,
+        }
+        return _error_response(
+            "model.apply",
+            error,
+            result=result,
+            details=_details_with_warnings(details, all_warnings),
+        )
 
     def _stage_smoke_record(
         self,
@@ -613,6 +792,8 @@ class AuthoringService:
     ) -> CommandResponse:
         registry = self._registry_factory(project)
         record: RunRecord | None = None
+        reserved_run_dir: Path | None = None
+        phase = "simulate"
         try:
             if not isinstance(scenario_id, str) or not scenario_id:
                 raise AuthoringError(
@@ -635,8 +816,14 @@ class AuthoringService:
                             "scenario_id": scenario_id,
                         },
                     )
-                run_dir = registry.new_run_dir(scenario_id, kind="formal")
+                phase = "reservation"
+                run_dir = _reserve_manual_run_dir(
+                    registry,
+                    scenario_id,
+                )
+                reserved_run_dir = run_dir
                 paths = _run_paths(run_dir)
+                phase = "run_status"
                 record = registry.write_status(
                     run_dir,
                     status="running",
@@ -647,7 +834,9 @@ class AuthoringService:
                     model_digest=digest,
                     **paths,
                 )
+                phase = "simulate"
                 result = self._simulator_factory(model).run_scenario(scenario_id)
+                phase = "simulation_artifact"
                 self._output_writer(
                     result,
                     paths["output_dir"],
@@ -655,6 +844,7 @@ class AuthoringService:
                     model_digest=digest,
                 )
                 self._report_writer(paths["output_dir"], paths["report_dir"])
+                phase = "run_status"
                 record = registry.write_status(
                     run_dir,
                     status="success",
@@ -666,7 +856,9 @@ class AuthoringService:
                     **paths,
                 )
         except Exception as exc:
-            error = _phase_error(exc, "simulate")
+            error = _phase_error(exc, phase)
+            if record is None and reserved_run_dir is not None:
+                _remove_empty_reservation(reserved_run_dir)
             if record is not None:
                 try:
                     record = registry.write_status(
@@ -738,14 +930,132 @@ def _parse_change_against_current(
         return parse_change_text(text, format_name, current=current)
 
 
-def _looks_like_authoring_project(path: Path) -> bool:
-    """Return whether direct source paths make pre-init recovery meaningful."""
+def _should_recover_existing_init(path: Path) -> bool:
+    """Avoid polluting an allowed empty target while detecting recovery state."""
 
-    return (
-        (path / "economy.yaml").exists()
-        and (path / "Datas").exists()
-        and (path / "luban_exports").exists()
+    return (path / ".igess" / "transactions").exists() or any(
+        (path / name).exists()
+        for name in ("economy.yaml", "Datas", "luban_exports")
     )
+
+
+def _is_path_indirection(identity: os.stat_result) -> bool:
+    attributes = getattr(identity, "st_file_attributes", 0)
+    reparse = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+    return stat.S_ISLNK(identity.st_mode) or bool(attributes & reparse)
+
+
+def _reserve_manual_run_dir(registry: RunRegistry, scenario_id: str) -> Path:
+    runs_root = Path(registry.runs_root)
+    try:
+        runs_root.mkdir(parents=True, exist_ok=True)
+        root_identity = runs_root.lstat()
+        resolved_root = runs_root.resolve(strict=True)
+    except (OSError, RuntimeError, ValueError) as error:
+        raise AuthoringError(
+            "run_reservation_failed",
+            "The run registry could not be prepared safely",
+            {"error_type": type(error).__name__, "path": str(runs_root)},
+        ) from None
+    if _is_path_indirection(root_identity) or not stat.S_ISDIR(root_identity.st_mode):
+        raise AuthoringError(
+            "run_reservation_failed",
+            "The run registry must be a real directory",
+            {"path": str(runs_root), "reason": "indirection_or_wrong_type"},
+        )
+
+    for _attempt in range(_RUN_ID_ATTEMPTS):
+        candidate = Path(registry.new_run_dir(scenario_id, kind="formal"))
+        try:
+            if candidate.parent.resolve(strict=True) != resolved_root:
+                raise AuthoringError(
+                    "run_reservation_failed",
+                    "The run id factory returned a path outside the registry",
+                    {"path": str(candidate)},
+                )
+            candidate.mkdir(exist_ok=False)
+            identity = candidate.lstat()
+        except FileExistsError:
+            continue
+        except AuthoringError:
+            raise
+        except (OSError, RuntimeError, ValueError) as error:
+            raise AuthoringError(
+                "run_reservation_failed",
+                "A run directory could not be reserved",
+                {"error_type": type(error).__name__, "path": str(candidate)},
+            ) from None
+        if _is_path_indirection(identity) or not stat.S_ISDIR(identity.st_mode):
+            _remove_empty_reservation(candidate)
+            raise AuthoringError(
+                "run_reservation_failed",
+                "The reserved run path is not a real directory",
+                {"path": str(candidate)},
+            )
+        return candidate
+    raise AuthoringError(
+        "run_id_collision",
+        "Could not reserve a unique run id after repeated collisions",
+        {"attempts": _RUN_ID_ATTEMPTS, "scenario_id": scenario_id},
+    )
+
+
+def _select_available_run_dir(
+    registry: RunRegistry,
+    scenario_id: str,
+    *,
+    kind: str,
+    change_id: str,
+) -> Path:
+    runs_root = Path(registry.runs_root)
+    try:
+        runs_root.mkdir(parents=True, exist_ok=True)
+        resolved_root = runs_root.resolve(strict=True)
+    except (OSError, RuntimeError, ValueError) as error:
+        raise AuthoringError(
+            "run_reservation_failed",
+            "The smoke run registry could not be prepared",
+            {"error_type": type(error).__name__, "path": str(runs_root)},
+        ) from None
+    for _attempt in range(_RUN_ID_ATTEMPTS):
+        candidate = Path(
+            registry.new_run_dir(
+                scenario_id,
+                kind=kind,
+                change_id=change_id,
+            )
+        )
+        try:
+            if candidate.parent.resolve(strict=True) != resolved_root:
+                raise AuthoringError(
+                    "run_reservation_failed",
+                    "The smoke run id is outside the registry",
+                    {"path": str(candidate)},
+                )
+        except (OSError, RuntimeError, ValueError) as error:
+            raise AuthoringError(
+                "run_reservation_failed",
+                "The smoke run id could not be inspected",
+                {"error_type": type(error).__name__, "path": str(candidate)},
+            ) from None
+        if not os.path.lexists(candidate):
+            return candidate
+    raise AuthoringError(
+        "run_id_collision",
+        "Could not select a unique automatic smoke run id",
+        {
+            "attempts": _RUN_ID_ATTEMPTS,
+            "change_id": change_id,
+            "scenario_id": scenario_id,
+        },
+    )
+
+
+def _remove_empty_reservation(path: Path) -> None:
+    try:
+        path.rmdir()
+    except OSError:
+        pass
 
 
 def _details_with_warnings(
@@ -899,7 +1209,9 @@ def _phase_error(exc: Exception, phase: str) -> AuthoringError:
         "audit": "audit_failed",
         "commit": "commit_failed",
         "run_status": "run_status_failed",
+        "reservation": "run_reservation_failed",
         "simulate": "simulation_failed",
+        "simulation_artifact": "simulation_failed",
         "apply": "commit_failed",
     }
     code = codes.get(phase, "authoring_failed")
