@@ -1,10 +1,19 @@
 import json
+from http.client import HTTPConnection
+from http.server import ThreadingHTTPServer
+from pathlib import Path
 import subprocess
 import sys
 from http import HTTPStatus
+from threading import Thread
+from types import SimpleNamespace
+from urllib.parse import urlencode
 
 from igess import dashboard
-from igess.dashboard import render_dashboard_home
+from igess.authoring import AuthoringProject
+from igess.authoring.response import CommandResponse
+from igess.authoring.templates import initialize_authoring_project
+from igess.dashboard import create_dashboard_context, render_dashboard_home
 from igess.run_registry import RunRegistry
 from igess.workflows import WorkflowService
 
@@ -102,3 +111,262 @@ def test_cli_dashboard_help_exposes_local_server_options():
     assert "--project" in result.stdout
     assert "--host" in result.stdout
     assert "--port" in result.stdout
+
+
+class _DashboardService:
+    def __init__(self, tmp_path: Path):
+        self.is_authoring = True
+        self.calls: list[tuple[str, str]] = []
+        report = tmp_path / "runs" / "smoke-1" / "report"
+        report.mkdir(parents=True)
+        (report / "index.html").write_text("smoke report", encoding="utf-8")
+        self._runs = [
+            SimpleNamespace(
+                run_id="smoke-1",
+                scenario_id="smoke",
+                status="success",
+                message="<probe complete>",
+                kind="smoke",
+                change_id="change-1",
+                report_dir=report,
+                report_index=report / "index.html",
+            ),
+            SimpleNamespace(
+                run_id="formal-1",
+                scenario_id="day<1",
+                status="failed",
+                message="<formal failed>",
+                kind="formal",
+                change_id=None,
+                report_dir=tmp_path / "runs" / "formal-1" / "report",
+                report_index=tmp_path / "runs" / "formal-1" / "report" / "index.html",
+            ),
+        ]
+
+    def lint(self, config, tables):
+        raise AssertionError("authoring dashboard must not lint committed exports")
+
+    def model_status(self):
+        return CommandResponse(
+            "model.status",
+            True,
+            "status",
+            "Model is runnable <now>",
+            result={
+                "model_digest": "sha256:" + "a" * 64,
+                "structural_valid": True,
+                "smoke_eligible": True,
+                "state": "ready",
+                "entity_counts": {"resource<script>": 2, "activity": 1},
+                "missing_requirements": [
+                    {"code": "first", "message": "First <missing>"},
+                    {"code": "second", "message": "Second & missing"},
+                ],
+                "warnings": [
+                    {"code": "recovered", "message": "Recovered <journal>"},
+                    {"code": "exports_stale", "message": "Exports are stale & old"},
+                ],
+                "available_scenarios": ["smoke", "day<1"],
+                "latest_smoke_run_id": "smoke-1",
+            },
+        )
+
+    def latest_change(self):
+        return {
+            "timestamp": "2026-07-16T08:00:00Z",
+            "outcome": "success",
+            "change": {"entity": "resource", "id": "gold<script>"},
+            "status": {"state": "ready"},
+        }
+
+    def list_runs(self):
+        return list(self._runs)
+
+    def latest_advice(self):
+        return {"status": "ok", "summary": "Advice <safe>", "findings": []}
+
+    def run_authoring_scenario(self, scenario: str):
+        self.calls.append(("formal", scenario))
+        return CommandResponse("model.simulate", True, "simulated", "done")
+
+    def run_scenario(self, config, tables, scenario: str):
+        self.calls.append(("legacy", scenario))
+
+    def run_advice(self, config, tables, scenario: str):
+        self.calls.append(("advice", scenario))
+
+
+def test_authoring_dashboard_renders_read_only_observability_with_escaped_values(tmp_path):
+    service = _DashboardService(tmp_path)
+
+    body = render_dashboard_home(service, None, None)
+
+    assert 'class="state-badge ready"' in body
+    assert "resource&lt;script&gt;" in body
+    assert "gold&lt;script&gt;" in body
+    assert "day&lt;1" in body
+    assert "<script>" not in body
+    assert body.index("First &lt;missing&gt;") < body.index("Second &amp; missing")
+    assert "Recovered &lt;journal&gt;" in body
+    assert "Exports are stale &amp; old" in body
+    assert "Latest applied rule" in body
+    assert "Latest smoke" in body
+    assert "kind-smoke" in body and "kind-formal" in body
+    assert '/reports/smoke-1/index.html' in body
+    assert '<select id="scenario" name="scenario">' in body
+    assert '<option value="day&lt;1">day&lt;1</option>' in body
+    assert 'action="/smoke" method="post"' in body
+    assert 'action="/formal" method="post"' in body
+    assert 'action="/advise" method="post"' in body
+    assert 'method="get"' not in body.lower()
+    assert "Run smoke scenario (formal)" in body
+
+
+def test_dashboard_mutations_require_post_and_redirect_home(tmp_path):
+    service = _DashboardService(tmp_path)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), dashboard._handler(service, None, None))
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    connection = HTTPConnection("127.0.0.1", server.server_port, timeout=5)
+    try:
+        for path in ("/smoke", "/formal", "/run", "/advise"):
+            connection.request("GET", path)
+            response = connection.getresponse()
+            response.read()
+            assert response.status == HTTPStatus.METHOD_NOT_ALLOWED
+        assert service.calls == []
+
+        for path, scenario, expected in (
+            ("/smoke", "ignored", ("formal", "smoke")),
+            ("/formal", "day<1", ("formal", "day<1")),
+            ("/advise", "day<1", ("advice", "day<1")),
+        ):
+            encoded = urlencode({"scenario": scenario})
+            connection.request(
+                "POST",
+                path,
+                encoded,
+                {"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            response = connection.getresponse()
+            response.read()
+            assert response.status == HTTPStatus.SEE_OTHER
+            assert response.getheader("Location") == "/"
+            assert service.calls[-1] == expected
+
+        connection.request("GET", "/status")
+        response = connection.getresponse()
+        payload = json.loads(response.read().decode("utf-8"))
+        assert response.status == HTTPStatus.OK
+        assert payload["command"] == "model.status"
+    finally:
+        connection.close()
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def test_dashboard_context_auto_discovers_authoring_and_preserves_legacy_overrides(tmp_path):
+    root = initialize_authoring_project(tmp_path / "model")
+
+    service, config, tables = create_dashboard_context(root, None, None, None)
+    assert service.is_authoring
+    assert config == root / "economy.yaml"
+    assert tables is None
+    assert service.model_status().command == "model.status"
+
+    legacy, config, tables = create_dashboard_context(root, "custom.yaml", None, None)
+    assert not legacy.is_authoring
+    assert config == "custom.yaml"
+    assert tables == "examples/shelldiver_v0/luban_exports"
+
+    plain = tmp_path / "plain"
+    plain.mkdir()
+    legacy, config, tables = create_dashboard_context(plain, None, None, None)
+    assert not legacy.is_authoring
+    assert config == "examples/shelldiver_v0/economy.yaml"
+    assert tables == "examples/shelldiver_v0/luban_exports"
+
+
+def test_workflow_service_merges_authoring_and_legacy_run_history(tmp_path):
+    root = initialize_authoring_project(tmp_path / "model")
+    modern = RunRegistry(root / "runs")
+    legacy = RunRegistry(root / ".igess" / "runs")
+
+    def write(registry, run_id, message):
+        run_dir = registry.runs_root / run_id
+        registry.write_status(
+            run_dir,
+            status="success",
+            scenario_id="smoke",
+            message=message,
+            output_dir=run_dir / "output",
+            report_dir=run_dir / "report",
+            report_index=run_dir / "report" / "index.html",
+        )
+
+    write(legacy, "duplicate", "legacy")
+    write(legacy, "legacy-only", "legacy-only")
+    write(modern, "duplicate", "modern")
+    write(modern, "modern-only", "modern-only")
+
+    service = WorkflowService(root)
+    history = {record.run_id: record for record in service.list_runs()}
+
+    assert set(history) == {"duplicate", "legacy-only", "modern-only"}
+    assert history["duplicate"].message == "modern"
+
+
+def test_workflow_service_authoring_facade_uses_injected_collaborators(tmp_path):
+    root = initialize_authoring_project(tmp_path / "model")
+    project = AuthoringProject.discover(root)
+    status = CommandResponse("model.status", True, "status", "ready", result={"state": "ready"})
+
+    class Authoring:
+        def __init__(self):
+            self.scenarios = []
+
+        def status(self):
+            return status
+
+        def simulate(self, scenario):
+            self.scenarios.append(scenario)
+            return CommandResponse("model.simulate", True, "simulated", "done")
+
+    class Changes:
+        def latest(self):
+            return {"change": {"entity": "resource", "id": "gold"}}
+
+    authoring = Authoring()
+    service = WorkflowService(
+        root,
+        authoring_project=project,
+        authoring_service=authoring,
+        registry=RunRegistry(root / "injected-runs"),
+        change_store=Changes(),
+    )
+
+    assert service.model_status() is status
+    assert service.latest_change()["change"]["id"] == "gold"
+    assert service.run_authoring_scenario("day_1").ok
+    assert authoring.scenarios == ["day_1"]
+
+
+def test_send_report_file_response_rejects_symlinked_assets(tmp_path):
+    service = WorkflowService(project_root=".", runs_root=tmp_path / "runs")
+    record = service.run_scenario(CONFIG, TABLES, "day_1_progression")
+    outside = tmp_path / "outside.txt"
+    outside.write_text("secret", encoding="utf-8")
+    link = record.report_dir / "linked.txt"
+    try:
+        link.symlink_to(outside)
+    except OSError:
+        return
+
+    status, _, body = dashboard.send_report_file_response(
+        service,
+        f"{record.run_id}/linked.txt",
+    )
+
+    assert status == HTTPStatus.NOT_FOUND
+    assert body == b"Not found"

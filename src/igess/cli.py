@@ -310,12 +310,12 @@ def build_parser() -> argparse.ArgumentParser:
     dashboard.add_argument("--project", default=".", help="IGESS project root directory.")
     dashboard.add_argument(
         "--config",
-        default="examples/shelldiver_v0/economy.yaml",
+        default=None,
         help="Economy YAML path, relative to the project root by default.",
     )
     dashboard.add_argument(
         "--tables",
-        default="examples/shelldiver_v0/luban_exports",
+        default=None,
         help="Exported table directory, relative to the project root by default.",
     )
     dashboard.add_argument(

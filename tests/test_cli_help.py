@@ -286,6 +286,8 @@ def test_missing_defaults_are_hidden_but_real_defaults_are_rendered():
     assert "(default: incremental-basic)" in commands["init"].format_help()
 
     dashboard_actions = command_actions(commands["dashboard"])
+    assert dashboard_actions["config"].default is None
+    assert dashboard_actions["tables"].default is None
     assert dashboard_actions["host"].default == "127.0.0.1"
     assert dashboard_actions["port"].default == 8765
     dashboard_help = commands["dashboard"].format_help()
@@ -310,8 +312,8 @@ def test_missing_defaults_are_hidden_but_real_defaults_are_rendered():
             frozenset(),
             (
                 ("project", "."),
-                ("config", "examples/shelldiver_v0/economy.yaml"),
-                ("tables", "examples/shelldiver_v0/luban_exports"),
+                ("config", None),
+                ("tables", None),
                 ("runs_root", None),
                 ("host", "127.0.0.1"),
                 ("port", 8765),
