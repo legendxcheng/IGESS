@@ -354,6 +354,22 @@ class RunRegistry:
             ):
                 return False
 
+            manifest_entries = _snapshot_tombstone_entries(
+                record.run_dir,
+                current.loaded.directory_identity,
+            )
+            status_entry = {
+                entry.path: entry for entry in manifest_entries
+            }.get("run_status.json")
+            if (
+                status_entry is None
+                or not _entry_matches_identity(
+                    status_entry,
+                    current.loaded.status_identity,
+                )
+            ):
+                return False
+
             trash = self.runs_root / _TRASH_NAME
             trash_identity = _ensure_private_trash(self.runs_root, trash)
             destination = trash / _new_tombstone_name()
@@ -395,13 +411,22 @@ class RunRegistry:
             if not os.path.samestat(quarantined_identity, final_identity):
                 raise ValueError("quarantined run changed before deletion")
 
-            manifest_path, manifest_identity, manifest_entries = _write_tombstone_manifest(
+            manifest_path, manifest_identity = _write_tombstone_manifest(
                 self.runs_root,
                 trash,
                 trash_identity,
                 destination,
                 quarantined,
+                manifest_entries,
             )
+
+            if not _tombstone_tree_matches_exact(
+                destination,
+                quarantined_identity,
+                manifest_entries,
+            ):
+                moved = False
+                return False
 
             if not _delete_bound_tombstone(
                 trash,
@@ -689,6 +714,13 @@ def _snapshot_tombstone_entries(
     tombstone: Path,
     expected_identity: os.stat_result,
 ) -> tuple[_TombstoneEntry, ...]:
+    return _record_bound_tombstone_entries(tombstone, expected_identity)
+
+
+def _record_bound_tombstone_entries(
+    tombstone: Path,
+    expected_identity: os.stat_result,
+) -> tuple[_TombstoneEntry, ...]:
     if os.name == "nt":
         root_handle: _WindowsDeleteHandle | None = None
         try:
@@ -724,6 +756,21 @@ def _snapshot_tombstone_entries(
         finally:
             os.close(root_fd)
     return tuple(sorted(entries, key=lambda entry: entry.path))
+
+
+def _tombstone_tree_matches_exact(
+    tombstone: Path,
+    expected_identity: os.stat_result,
+    expected_entries: tuple[_TombstoneEntry, ...],
+) -> bool:
+    try:
+        current_entries = _record_bound_tombstone_entries(
+            tombstone,
+            expected_identity,
+        )
+    except (OSError, RuntimeError, ValueError):
+        return False
+    return current_entries == expected_entries
 
 
 def _windows_snapshot_entries(
@@ -811,7 +858,8 @@ def _write_tombstone_manifest(
     trash_identity: os.stat_result,
     tombstone: Path,
     loaded: _LoadedStatus,
-) -> tuple[Path, os.stat_result, tuple[_TombstoneEntry, ...]]:
+    entries: tuple[_TombstoneEntry, ...],
+) -> tuple[Path, os.stat_result]:
     if tombstone.parent != trash or _TOMBSTONE_RE.fullmatch(tombstone.name) is None:
         raise ValueError("tombstone manifest target is invalid")
     current_tombstone = _snapshot_owned_run_dir(trash, tombstone)
@@ -822,8 +870,9 @@ def _write_tombstone_manifest(
     if metadata[2] != "smoke":
         raise ValueError("only smoke tombstones can have deletion manifests")
     _validate_manifest_status_payload(loaded.payload, run_id)
-    entries = _snapshot_tombstone_entries(tombstone, current_tombstone)
     entries_by_path = {entry.path: entry for entry in entries}
+    if len(entries_by_path) != len(entries):
+        raise ValueError("tombstone manifest entries are duplicated")
     status_entry = entries_by_path.get("run_status.json")
     if (
         status_entry is None
@@ -942,7 +991,7 @@ def _write_tombstone_manifest(
         if not os.path.samestat(temp_identity, manifest_identity):
             raise ValueError("installed tombstone manifest does not match its staged file")
         _fsync_directory(trash)
-        return manifest_path, manifest_identity, entries
+        return manifest_path, manifest_identity
     finally:
         if not installed and temp_path is not None and temp_identity is not None:
             _remove_bound_temp(

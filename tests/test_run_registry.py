@@ -726,6 +726,111 @@ def test_windows_bound_prune_rejects_child_replaced_after_enumeration(
         (formal.run_id, "formal"),
     ]
 
+def test_prune_builds_the_allowlist_before_the_run_enters_trash(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    registry = RunRegistry(tmp_path / "runs")
+    smoke = _write(
+        registry,
+        "20260715T010203000000Z-smoke-rule",
+        kind="smoke",
+        change_id="rule",
+    )
+    formal = _write(
+        registry,
+        "20260715T010204000000Z-day_1",
+        kind="formal",
+    )
+    formal_marker = formal.run_dir / "formal.marker"
+    formal_marker.write_text("formal-child", encoding="utf-8")
+    original_snapshot = registry_module._snapshot_tombstone_entries
+    injected = False
+
+    def injecting_snapshot(
+        run_dir: Path,
+        expected_identity: os.stat_result,
+    ) -> tuple[object, ...]:
+        nonlocal injected
+        if run_dir.parent.name == ".run-trash":
+            injected = True
+            os.replace(formal_marker, run_dir / "foreign.marker")
+        return original_snapshot(run_dir, expected_identity)
+
+    monkeypatch.setattr(
+        registry_module,
+        "_snapshot_tombstone_entries",
+        injecting_snapshot,
+    )
+
+    assert registry.prune_smoke(keep=0) == [smoke.run_id]
+    assert not injected
+    assert formal_marker.read_text(encoding="utf-8") == "formal-child"
+
+
+def test_prune_never_rebaselines_a_child_added_between_snapshot_and_move(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    registry = RunRegistry(tmp_path / "runs")
+    smoke = _write(
+        registry,
+        "20260715T010203000000Z-smoke-rule",
+        kind="smoke",
+        change_id="rule",
+    )
+    formal = _write(
+        registry,
+        "20260715T010204000000Z-day_1",
+        kind="formal",
+    )
+    formal_marker = formal.run_dir / "formal.marker"
+    formal_marker.write_text("formal-child", encoding="utf-8")
+    original_replace = os.replace
+    injected = False
+
+    def injecting_replace(
+        source: object,
+        destination: object,
+        *args: object,
+        **kwargs: object,
+    ) -> None:
+        nonlocal injected
+        source_path = Path(source)
+        destination_path = Path(destination)
+        original_replace(source, destination, *args, **kwargs)
+        if (
+            not injected
+            and source_path == smoke.run_dir
+            and destination_path.parent.name == ".run-trash"
+        ):
+            injected = True
+            original_replace(
+                formal_marker,
+                destination_path / "foreign.marker",
+            )
+
+    monkeypatch.setattr(os, "replace", injecting_replace)
+
+    assert registry.prune_smoke(keep=0) == []
+    assert injected
+    assert [
+        path.read_text(encoding="utf-8")
+        for path in tmp_path.rglob("foreign.marker")
+    ] == ["formal-child"]
+    trash = registry.runs_root / ".run-trash"
+    assert list(trash.glob("tomb-????????????????????????????????"))
+    assert list(trash.glob("tomb-????????????????????????????????.json"))
+    assert [(item.run_id, item.kind) for item in registry.list_runs()] == [
+        (formal.run_id, "formal"),
+    ]
+
+    assert registry.prune_smoke(keep=0) == []
+    assert [
+        path.read_text(encoding="utf-8")
+        for path in tmp_path.rglob("foreign.marker")
+    ] == ["formal-child"]
+
 
 @pytest.mark.skipif(os.name == "nt", reason="POSIX dirfd race")
 def test_posix_bound_prune_rejects_child_replacement_across_retries(
