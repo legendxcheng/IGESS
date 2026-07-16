@@ -19,10 +19,10 @@ tuning. The intended primary user is comfortable with Python; the protocol uses
 small YAML/JSON changes and CLI responses instead of a non-technical form builder.
 
 ```powershell
-igess model init --out projects/my-game --id my_game
-igess model status --project projects/my-game --json
-igess model apply --project projects/my-game --change changes/resource.yaml --json
-igess model simulate --project projects/my-game --scenario smoke --json
+.\.venv\Scripts\python.exe -m igess.cli model init --out projects/my-game --id my_game
+.\.venv\Scripts\python.exe -m igess.cli model status --project projects/my-game --json
+.\.venv\Scripts\python.exe -m igess.cli model apply --project projects/my-game --change changes/resource.yaml --json
+.\.venv\Scripts\python.exe -m igess.cli model simulate --project projects/my-game --scenario smoke --json
 ```
 
 See the [Agent operator guide](docs/agent-operator-guide.md) for the exact

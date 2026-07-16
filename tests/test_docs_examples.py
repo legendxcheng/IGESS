@@ -9,6 +9,7 @@ import yaml
 
 CONFIG = "examples/shelldiver_v0/economy.yaml"
 AGENT_GUIDE = Path("docs/agent-operator-guide.md")
+MODEL_CLI = r".\.venv\Scripts\python.exe -m igess.cli model"
 
 
 ONE_CHANGE_YAML = """version: 1
@@ -37,18 +38,63 @@ def test_agent_first_incremental_authoring_is_the_primary_documented_flow():
     readme = _read("README.md")
     guide = _read(AGENT_GUIDE)
 
-    for command in (
-        "igess model init --out projects/my-game --id my_game",
-        "igess model status --project projects/my-game --json",
-        "igess model apply --project projects/my-game --change changes/resource.yaml --json",
-        "igess model simulate --project projects/my-game --scenario smoke --json",
+    for arguments in (
+        "init --out projects/my-game --id my_game",
+        "status --project projects/my-game --json",
+        "apply --project projects/my-game --change changes/resource.yaml --json",
+        "simulate --project projects/my-game --scenario smoke --json",
     ):
+        command = f"{MODEL_CLI} {arguments}"
         assert command in guide
+        assert command in readme
+
+    assert (
+        "Get-Content -Raw changes/resource.yaml | "
+        f"{MODEL_CLI} apply --project projects/my-game --stdin --format yaml --json"
+    ) in guide
+    for document in (readme, guide):
+        assert "\nigess model init" not in document
 
     assert "Agent 一次协助填写一条规则" in readme
     assert "docs/agent-operator-guide.md" in readme
     assert "10 个 tick" in guide
     assert "首要用户熟悉 Python" in guide
+
+
+def test_documented_model_cli_prefix_runs_help_and_init(tmp_path):
+    executable = Path(".venv/Scripts/python.exe")
+    help_result = subprocess.run(
+        [executable, "-m", "igess.cli", "model", "--help"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert help_result.returncode == 0, help_result.stderr
+    assert "init" in help_result.stdout
+    assert "status" in help_result.stdout
+    assert "apply" in help_result.stdout
+    assert "simulate" in help_result.stdout
+
+    project = tmp_path / "documented-model"
+    init_result = subprocess.run(
+        [
+            executable,
+            "-m",
+            "igess.cli",
+            "model",
+            "init",
+            "--out",
+            project,
+            "--id",
+            "documented_model",
+            "--json",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert init_result.returncode == 0, init_result.stderr
+    assert json.loads(init_result.stdout)["code"] == "initialized"
 
 
 def test_guide_contains_one_exact_change_and_the_stable_json_envelope():
