@@ -1,14 +1,19 @@
 from __future__ import annotations
 
 import argparse
+import io
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
+from types import SimpleNamespace
 
 import pytest
 
 from igess.cli import build_parser
+from igess.authoring import cli as authoring_cli
+from igess.authoring.response import CommandResponse
 
 
 RESOURCE_YAML = """\
@@ -30,6 +35,8 @@ RESOURCE_JSON = json.dumps(
         "fields": {"name": "Gems", "dimension": "currency"},
     }
 )
+
+MAX_CHANGE_BYTES = 1_048_576
 
 
 def run_cli(
@@ -291,6 +298,178 @@ def test_model_apply_help_limits_format_option_to_standard_input():
     assert actions(apply)["format_name"].help == (
         "Standard-input format; defaults to yaml. File input always uses its extension."
     )
+
+
+def test_model_apply_stdin_stops_at_budget_without_waiting_for_eof(tmp_path: Path):
+    root = tmp_path / "model"
+    assert run_cli("model", "init", "--out", str(root)).returncode == 0
+    process = subprocess.Popen(
+        [
+            sys.executable,
+            "-m",
+            "igess.cli",
+            "model",
+            "apply",
+            "--project",
+            str(root),
+            "--stdin",
+            "--json",
+        ],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    assert process.stdin is not None
+    try:
+        process.stdin.write(b" " * (MAX_CHANGE_BYTES + 1))
+        process.stdin.flush()
+        returncode = process.wait(timeout=15)
+        assert process.stdout is not None
+        assert process.stderr is not None
+        stdout = process.stdout.read().decode("utf-8")
+        stderr = process.stderr.read().decode("utf-8")
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait()
+        process.stdin.close()
+
+    payload = json.loads(stdout)
+    assert returncode == 1
+    assert stderr == ""
+    assert payload["code"] == "invalid_change"
+    assert payload["details"]["reason"] == "budget_exceeded"
+    assert payload["details"]["budget"] == "source_bytes"
+    assert "Traceback" not in stdout + stderr
+
+
+@pytest.mark.parametrize("source", ["stdin", "file"])
+def test_model_apply_accepts_a_change_at_the_exact_byte_budget(
+    tmp_path: Path,
+    source: str,
+):
+    root = tmp_path / source
+    assert run_cli("model", "init", "--out", str(root)).returncode == 0
+    document = RESOURCE_YAML + (" " * (MAX_CHANGE_BYTES - len(RESOURCE_YAML.encode("utf-8"))))
+    if source == "stdin":
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "igess.cli",
+                "model",
+                "apply",
+                "--project",
+                str(root),
+                "--stdin",
+                "--json",
+            ],
+            input=document.encode("utf-8"),
+            check=False,
+            capture_output=True,
+        )
+        payload = json.loads(result.stdout.decode("utf-8"))
+        diagnostic = result.stderr.decode("utf-8") + result.stdout.decode("utf-8")
+    else:
+        change = tmp_path / "boundary.yaml"
+        change.write_bytes(document.encode("utf-8"))
+        result = run_cli(
+            "model",
+            "apply",
+            "--project",
+            str(root),
+            "--change",
+            str(change),
+            "--json",
+        )
+        payload = json_result(result)
+        diagnostic = result.stderr + result.stdout
+
+    assert result.returncode == 0, diagnostic
+    assert payload["result"]["id"] == "gold"
+
+
+def test_model_apply_rejects_an_oversized_change_file_before_parsing(tmp_path: Path):
+    root = tmp_path / "model"
+    change = tmp_path / "oversized.yaml"
+    assert run_cli("model", "init", "--out", str(root)).returncode == 0
+    change.write_bytes(b" " * (MAX_CHANGE_BYTES + 1))
+
+    result = run_cli(
+        "model",
+        "apply",
+        "--project",
+        str(root),
+        "--change",
+        str(change),
+        "--json",
+    )
+    payload = json_result(result)
+
+    assert result.returncode == 1
+    assert result.stderr == ""
+    assert payload["code"] == "invalid_change"
+    assert payload["details"]["reason"] == "budget_exceeded"
+    assert payload["details"]["budget"] == "source_bytes"
+    assert "Traceback" not in result.stdout
+
+
+def test_change_file_reader_rejects_growth_during_bounded_read(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    change = tmp_path / "growing.yaml"
+    change.write_text(RESOURCE_YAML, encoding="utf-8")
+    real_read = os.read
+    appended = False
+
+    def grow_after_first_read(fd: int, size: int) -> bytes:
+        nonlocal appended
+        chunk = real_read(fd, size)
+        if not appended:
+            appended = True
+            with change.open("ab") as stream:
+                stream.write(b" ")
+        return chunk
+
+    monkeypatch.setattr(os, "read", grow_after_first_read)
+    response = authoring_cli._read_change_document(
+        SimpleNamespace(change=str(change), format_name=None)
+    )
+
+    assert isinstance(response, CommandResponse)
+    assert response.ok is False
+    assert response.code == "change_read_failed"
+    assert response.details["reason"] == "source_changed"
+
+
+def test_change_file_reader_rejects_symbolic_links_when_supported(tmp_path: Path):
+    target = tmp_path / "target.yaml"
+    link = tmp_path / "link.yaml"
+    target.write_text(RESOURCE_YAML, encoding="utf-8")
+    try:
+        link.symlink_to(target)
+    except OSError as error:
+        pytest.skip(f"symbolic links unavailable: {error}")
+
+    response = authoring_cli._read_change_document(
+        SimpleNamespace(change=str(link), format_name=None)
+    )
+
+    assert isinstance(response, CommandResponse)
+    assert response.ok is False
+    assert response.code == "change_read_failed"
+    assert response.details["reason"] == "unsafe_file"
+
+
+def test_bounded_stdin_reader_supports_replaced_text_stream(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(authoring_cli.sys, "stdin", io.StringIO(RESOURCE_YAML))
+
+    document = authoring_cli._read_change_document(
+        SimpleNamespace(change=None, format_name=None)
+    )
+
+    assert document == (RESOURCE_YAML, "yaml")
 
 
 @pytest.mark.parametrize(
