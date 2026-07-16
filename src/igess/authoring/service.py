@@ -129,8 +129,25 @@ class AuthoringService:
     ) -> CommandResponse:
         """Create a blank authoring project and return its canonical paths."""
 
+        recovery: tuple[Mapping[str, object], ...] = ()
+        phase = "init"
         try:
+            target = Path(out).expanduser()
+            if _looks_like_authoring_project(target):
+                existing = self._project_factory(target)
+                phase = "recovery"
+                with self._lock_factory(existing, True):
+                    recovery = _warning_sequence(self._recoverer(existing))
+                phase = "init"
             created = Path(self._initializer(out, model_id)).absolute()
+            created_project = self._project_factory(created)
+            phase = "recovery"
+            with self._lock_factory(created_project, True):
+                post_init_recovery = _warning_sequence(
+                    self._recoverer(created_project)
+                )
+            recovery = (*recovery, *post_init_recovery)
+            phase = "init"
             payload = yaml.safe_load((created / "economy.yaml").read_text(encoding="utf-8"))
             actual_model_id = payload["model"]["id"]
             result = {
@@ -147,10 +164,16 @@ class AuthoringService:
                 True,
                 "initialized",
                 f"Initialized model project at {created}",
+                details=_details_with_warnings({}, recovery),
                 result=result,
             )
         except Exception as exc:
-            return _error_response("model.init", _phase_error(exc, "init"))
+            error = _phase_error(exc, phase)
+            return _error_response(
+                "model.init",
+                error,
+                details=_details_with_warnings(error.details, recovery),
+            )
 
     def status(
         self,
@@ -165,17 +188,20 @@ class AuthoringService:
             return _status_error(error, _failed_status(error))
 
         recovery: Sequence[Mapping[str, object]] = ()
+        phase = "recovery"
         try:
             with self._shared_snapshot_factory(
                 project,
                 lambda: self._recoverer(project),
             ) as recovered:
                 recovery = _warning_sequence(recovered)
+                phase = "status"
                 registry = self._registry_factory(project)
                 status = self._status_deriver(project, registry.latest_smoke)
+                phase = "recovery"
                 status = _merge_status_warnings(status, recovery)
         except Exception as exc:
-            error = _phase_error(exc, "status")
+            error = _phase_error(exc, phase)
             return _status_error(error, _failed_status(error, warnings=recovery))
 
         if status.state == "failed":
@@ -213,6 +239,7 @@ class AuthoringService:
         except Exception as exc:
             return _error_response("model.apply", _phase_error(exc, "project"))
 
+        recovered: Sequence[Mapping[str, object]] = ()
         try:
             with self._lock_factory(project, True):
                 recovered = _warning_sequence(self._recoverer(project))
@@ -224,24 +251,33 @@ class AuthoringService:
                             format_name,
                         )
                     except Exception as exc:
+                        error = _phase_error(exc, "mapping")
                         return _error_response(
                             "model.apply",
-                            _phase_error(exc, "mapping"),
+                            error,
+                            details=_details_with_warnings(error.details, recovered),
                         )
                 elif isinstance(change, ModelChange):
                     parsed = change
                 else:
+                    error = AuthoringError(
+                        "invalid_change",
+                        "Apply requires one change document or validated ModelChange",
+                        {"value_type": type(change).__name__},
+                    )
                     return _error_response(
                         "model.apply",
-                        AuthoringError(
-                            "invalid_change",
-                            "Apply requires one change document or validated ModelChange",
-                            {"value_type": type(change).__name__},
-                        ),
+                        error,
+                        details=_details_with_warnings(error.details, recovered),
                     )
                 return self._apply_locked(project, parsed, recovered)
         except Exception as exc:
-            return _error_response("model.apply", _phase_error(exc, "recovery"))
+            error = _phase_error(exc, "recovery")
+            return _error_response(
+                "model.apply",
+                error,
+                details=_details_with_warnings(error.details, recovered),
+            )
 
     def simulate(
         self,
@@ -254,6 +290,7 @@ class AuthoringService:
             project = self._discover(project_root)
         except Exception as exc:
             return _error_response("model.simulate", _phase_error(exc, "project"))
+        warnings: Sequence[Mapping[str, object]] = ()
         try:
             with self._shared_snapshot_factory(
                 project,
@@ -262,7 +299,12 @@ class AuthoringService:
                 warnings = _warning_sequence(recovered)
                 return self._simulate_shared(project, scenario_id, warnings)
         except Exception as exc:
-            return _error_response("model.simulate", _phase_error(exc, "recovery"))
+            error = _phase_error(exc, "recovery")
+            return _error_response(
+                "model.simulate",
+                error,
+                details=_details_with_warnings(error.details, warnings),
+            )
 
     def _discover(
         self,
@@ -284,17 +326,24 @@ class AuthoringService:
         try:
             pre_digest = project.model_digest()
         except Exception as exc:
-            return _error_response("model.apply", _phase_error(exc, "source_digest"))
+            error = _phase_error(exc, "source_digest")
+            return _error_response(
+                "model.apply",
+                error,
+                details=_details_with_warnings(error.details, recovered),
+            )
 
         change_id = self._id_factory()
         if not isinstance(change_id, str) or _CHANGE_ID.fullmatch(change_id) is None:
+            error = AuthoringError(
+                "invalid_change_id",
+                "The change id factory returned an invalid id",
+                {"change_id": change_id},
+            )
             return _error_response(
                 "model.apply",
-                AuthoringError(
-                    "invalid_change_id",
-                    "The change id factory returned an invalid id",
-                    {"change_id": change_id},
-                ),
+                error,
+                details=_details_with_warnings(error.details, recovered),
             )
 
         transaction: Transaction | None = None
@@ -545,8 +594,16 @@ class AuthoringService:
                 "The failed change was rolled back but its audit could not be written",
                 details,
             )
-            return _error_response("model.apply", audit)
-        return _error_response("model.apply", error)
+            return _error_response(
+                "model.apply",
+                audit,
+                details=_details_with_warnings(audit.details, warnings),
+            )
+        return _error_response(
+            "model.apply",
+            error,
+            details=_details_with_warnings(error.details, warnings),
+        )
 
     def _simulate_shared(
         self,
@@ -630,7 +687,7 @@ class AuthoringService:
                 "model.simulate",
                 error,
                 result=_run_result(record) if record is not None else {},
-                details={"warnings": list(recovered)} if recovered else None,
+                details=_details_with_warnings(error.details, recovered),
             )
 
         assert record is not None
@@ -679,6 +736,38 @@ def _parse_change_against_current(
         if current is None:
             raise initial from None
         return parse_change_text(text, format_name, current=current)
+
+
+def _looks_like_authoring_project(path: Path) -> bool:
+    """Return whether direct source paths make pre-init recovery meaningful."""
+
+    return (
+        (path / "economy.yaml").exists()
+        and (path / "Datas").exists()
+        and (path / "luban_exports").exists()
+    )
+
+
+def _details_with_warnings(
+    details: Mapping[str, object],
+    warnings: Sequence[Mapping[str, object]],
+) -> dict[str, object]:
+    """Append recovery warnings without discarding structured error context."""
+
+    merged = dict(details)
+    combined: list[dict[str, object]] = []
+    existing = merged.pop("warnings", None)
+    if isinstance(existing, Sequence) and not isinstance(
+        existing,
+        (str, bytes, bytearray),
+    ):
+        combined.extend(dict(item) for item in existing if isinstance(item, Mapping))
+    elif existing is not None:
+        merged["original_warnings"] = existing
+    combined.extend(dict(item) for item in warnings)
+    if combined:
+        merged["warnings"] = combined
+    return merged
 
 
 def _run_paths(run_dir: Path) -> dict[str, Path]:

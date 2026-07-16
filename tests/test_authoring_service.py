@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from contextlib import contextmanager
 from dataclasses import replace
+from datetime import datetime, timezone
 import json
 from pathlib import Path
 from typing import Any
@@ -11,6 +12,7 @@ import pytest
 from igess.authoring.change import ModelChange
 from igess.authoring.change_records import ChangeRecordStore
 from igess.authoring.response import AuthoringError
+from igess.authoring.project import AuthoringProject
 from igess.authoring.service import AuthoringService
 from igess.authoring.probe import EligibilityFinding, TenTickProbeResult, run_ten_tick_probe
 from igess.authoring.status import derive_status
@@ -234,6 +236,7 @@ def test_manual_simulate_uses_ephemeral_exports_and_is_always_formal(tmp_path: P
     committed_before = {
         path.name: path.read_bytes() for path in (root / "luban_exports").glob("*.json")
     }
+    captured_digest = AuthoringProject.discover(root).model_digest()
 
     response = service.simulate()
 
@@ -254,6 +257,17 @@ def test_manual_simulate_uses_ephemeral_exports_and_is_always_formal(tmp_path: P
     assert {
         path.name: path.read_bytes() for path in (root / "luban_exports").glob("*.json")
     } == committed_before
+    run_dir = root / "runs" / response.result["run_id"]
+    run_status = json.loads((run_dir / "run_status.json").read_text(encoding="utf-8"))
+    manifest = json.loads(
+        (run_dir / "output" / "run_manifest.json").read_text(encoding="utf-8")
+    )
+    report = json.loads(
+        (run_dir / "report" / "report_data.json").read_text(encoding="utf-8")
+    )
+    assert run_status["model_digest"] == captured_digest
+    assert manifest["model_digest"] == captured_digest
+    assert report["scenario"]["model_digest"] == captured_digest
 
 
 def test_eligible_no_state_change_commits_probe_and_keeps_incomplete_status(tmp_path: Path) -> None:
@@ -696,3 +710,269 @@ def test_status_failure_is_full_typed_and_recovery_warnings_are_merged(tmp_path:
         "message": "Recovered interrupted change",
         "id": "old-change",
     }
+
+
+def test_lock_and_recovery_event_order_for_all_four_model_commands(tmp_path: Path) -> None:
+    events: list[str] = []
+
+    def discover(path: str | Path) -> AuthoringProject:
+        events.append("discover")
+        return AuthoringProject.discover(path)
+
+    @contextmanager
+    def exclusive(_project: object, is_exclusive: bool):
+        assert is_exclusive is True
+        events.append("exclusive_enter")
+        try:
+            yield
+        finally:
+            events.append("exclusive_exit")
+
+    def recover(_project: object) -> list[dict[str, str]]:
+        events.append("recover")
+        return []
+
+    @contextmanager
+    def recovered_snapshot(_project: object, callback: object):
+        events.append("exclusive_enter")
+        recovered = callback()  # type: ignore[operator]
+        events.append("exclusive_exit")
+        events.append("shared_enter")
+        try:
+            yield recovered
+        finally:
+            events.append("shared_exit")
+
+    root = tmp_path / "model"
+    init_response = AuthoringService(
+        project_factory=discover,
+        lock_factory=exclusive,
+        recoverer=recover,
+    ).init(root, "order_test")
+    assert init_response.ok is True
+    assert events == ["discover", "exclusive_enter", "recover", "exclusive_exit"]
+
+    events.clear()
+    status_response = AuthoringService(
+        root,
+        shared_snapshot_factory=recovered_snapshot,
+        recoverer=recover,
+    ).status()
+    assert status_response.ok is True
+    assert events == [
+        "exclusive_enter",
+        "recover",
+        "exclusive_exit",
+        "shared_enter",
+        "shared_exit",
+    ]
+
+    events.clear()
+    apply_response = AuthoringService(
+        root,
+        lock_factory=exclusive,
+        recoverer=recover,
+    ).apply(object())  # type: ignore[arg-type]
+    assert apply_response.code == "invalid_change"
+    assert events == ["exclusive_enter", "recover", "exclusive_exit"]
+
+    setup = _service(root, ids=["setup-1", "setup-2", "setup-3", "setup-4"])
+    _add_runnable_activity(setup)
+    events.clear()
+    simulate_response = AuthoringService(
+        root,
+        shared_snapshot_factory=recovered_snapshot,
+        recoverer=recover,
+    ).simulate()
+    assert simulate_response.ok is True
+    assert events == [
+        "exclusive_enter",
+        "recover",
+        "exclusive_exit",
+        "shared_enter",
+        "shared_exit",
+    ]
+
+
+def test_existing_init_recovers_before_initializer_refuses_nonempty_target(tmp_path: Path) -> None:
+    root = initialize_authoring_project(tmp_path / "model", "existing")
+    events: list[str] = []
+
+    @contextmanager
+    def exclusive(_project: object, _is_exclusive: bool):
+        events.append("exclusive_enter")
+        try:
+            yield
+        finally:
+            events.append("exclusive_exit")
+
+    def recover(_project: object) -> list[dict[str, str]]:
+        events.append("recover")
+        return []
+
+    def initializer(path: str | Path, model_id: str | None) -> Path:
+        events.append("initializer")
+        return initialize_authoring_project(path, model_id)
+
+    response = AuthoringService(
+        lock_factory=exclusive,
+        recoverer=recover,
+        initializer=initializer,
+    ).init(root)
+
+    assert response.ok is False
+    assert events == ["exclusive_enter", "recover", "exclusive_exit", "initializer"]
+
+
+def test_recovery_and_lock_errors_have_stable_codes_and_status_remains_typed(
+    tmp_path: Path,
+) -> None:
+    root = initialize_authoring_project(tmp_path / "model", "recovery_test")
+
+    @contextmanager
+    def broken_snapshot(_project: object, _callback: object):
+        raise RuntimeError("shared recovery failed")
+        yield  # pragma: no cover
+
+    status = AuthoringService(root, shared_snapshot_factory=broken_snapshot).status()
+    assert status.ok is False
+    assert status.code == "recovery_failed"
+    assert status.result["state"] == "failed"
+    assert set(status.to_payload()["result"]) == {
+        "model_digest",
+        "structural_valid",
+        "smoke_eligible",
+        "state",
+        "entity_counts",
+        "missing_requirements",
+        "warnings",
+        "available_scenarios",
+        "latest_smoke_run_id",
+    }
+    assert AuthoringService(root, shared_snapshot_factory=broken_snapshot).simulate().code == (
+        "recovery_failed"
+    )
+
+    @contextmanager
+    def broken_lock(_project: object, _exclusive: bool):
+        raise RuntimeError("lock failed")
+        yield  # pragma: no cover
+
+    assert AuthoringService(root, lock_factory=broken_lock).apply(_resource()).code == (
+        "recovery_failed"
+    )
+    init_root = tmp_path / "init-lock-failure"
+    init_failure = AuthoringService(lock_factory=broken_lock).init(
+        init_root,
+        "init_lock_failure",
+    )
+    assert init_failure.code == "recovery_failed"
+    assert (init_root / "economy.yaml").is_file()
+
+    def structured_recovery(_project: object) -> list[dict[str, str]]:
+        raise AuthoringError(
+            "recovery_required",
+            "Recovery must be completed",
+            {"path": "transaction"},
+        )
+
+    structured = AuthoringService(root, recoverer=structured_recovery).status()
+    assert structured.code == "recovery_required"
+    assert structured.details["path"] == "transaction"
+    assert structured.result["state"] == "failed"
+
+
+def test_unknown_scenario_and_simulation_failure_merge_recovery_warnings_with_details(
+    tmp_path: Path,
+) -> None:
+    root = initialize_authoring_project(tmp_path / "model", "details_test")
+    setup = _service(root, ids=["setup-1", "setup-2", "setup-3", "setup-4"])
+    _add_runnable_activity(setup)
+    warning = {"code": "recovered_transaction", "message": "Recovered old change"}
+
+    unknown = AuthoringService(root, recoverer=lambda _project: [warning]).simulate(
+        "missing"
+    )
+    unknown_details = unknown.to_payload()["details"]
+    assert unknown.code == "unknown_scenario"
+    assert unknown_details["available_scenarios"] == ["smoke"]
+    assert unknown_details["scenario_id"] == "missing"
+    assert unknown_details["warnings"] == [warning]
+
+    class BrokenSimulator:
+        def run_scenario(self, _scenario_id: str) -> None:
+            raise AuthoringError(
+                "simulation_failed",
+                "Engine failed",
+                {"engine": "broken", "phase": "execution"},
+            )
+
+    failed = AuthoringService(
+        root,
+        recoverer=lambda _project: [warning],
+        simulator_factory=lambda _model: BrokenSimulator(),
+    ).simulate()
+    failed_details = failed.to_payload()["details"]
+    assert failed.code == "simulation_failed"
+    assert failed_details["engine"] == "broken"
+    assert failed_details["phase"] == "execution"
+    assert failed_details["warnings"] == [warning]
+
+
+def test_apply_failure_merges_recovery_warnings_without_losing_error_details(
+    tmp_path: Path,
+) -> None:
+    root = initialize_authoring_project(tmp_path / "model", "details_test")
+    warning = {"code": "recovered_transaction", "message": "Recovered old change"}
+
+    def fail_mapping(*_args: object) -> None:
+        raise AuthoringError(
+            "invalid_change",
+            "Mapping failed",
+            {"entity": "resource", "field": "dimension", "phase": "mapping"},
+        )
+
+    response = _service(
+        root,
+        recoverer=lambda _project: [warning],
+        candidate_mapper=fail_mapping,
+    ).apply(_resource())
+    details = response.to_payload()["details"]
+
+    assert response.code == "invalid_change"
+    assert details["entity"] == "resource"
+    assert details["field"] == "dimension"
+    assert details["phase"] == "mapping"
+    assert details["warnings"] == [warning]
+
+
+def test_journal_committed_checkpoint_error_is_committed_success_with_cleanup_warning(
+    tmp_path: Path,
+) -> None:
+    root = initialize_authoring_project(tmp_path / "model", "commit_test")
+    before = _formal_bytes(root)
+    stores: list[_CountingStore] = []
+
+    def transaction_factory(project: object, change_id: str, digest: str) -> Transaction:
+        def fail(name: str) -> None:
+            if name == "journal_committed":
+                raise OSError(name)
+
+        return Transaction(project, change_id, digest, checkpoint=fail)  # type: ignore[arg-type]
+
+    response = _service(
+        root,
+        transaction_factory=transaction_factory,
+        record_store_factory=_counting_store_factory(root, stores),
+    ).apply(_resource())
+    payload = response.to_payload()
+
+    assert response.ok is True
+    assert response.code == "applied"
+    assert _formal_bytes(root) != before
+    assert stores[0].failure_calls == 0
+    assert len(list((root / "changes").glob("*.json"))) == 1
+    assert not (root / "changes" / "failed").exists()
+    assert payload["details"]["warnings"][-1]["code"] == (
+        "transaction_cleanup_pending"
+    )
