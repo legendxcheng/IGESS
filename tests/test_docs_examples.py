@@ -103,6 +103,8 @@ def test_guide_defines_progression_smoke_recovery_and_front_end_boundaries():
         "旧命令保持兼容",
     ):
         assert phrase in guide
+    assert "`model status`: `result.warnings`" in guide
+    assert "`model apply` / `model simulate`: `details.warnings`" in guide
 
 
 def test_sources_of_truth_and_external_data_policy_are_documented_and_configured():

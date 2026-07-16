@@ -132,8 +132,13 @@ IGESS 会与当前规则合并后再验证。
 源；Agent 应重新运行 status、读取当前规则，再生成新的单条 proposal。映射、
 导表、lint、build 或自动 smoke 在提交前失败时，事务回滚，正式源与导出保持
 原样，并尽力写入 `changes/failed`。进程在提交中断后，下一个 model 命令会在
-项目锁内先做崩溃恢复；应把响应 `details.warnings` 中的恢复信息展示给用户，
-而不是擅自删除 `.igess` 的 journal 或备份。
+项目锁内先做崩溃恢复。恢复警告的位置按命令区分：
+
+- `model status`: `result.warnings`；
+- `model apply` / `model simulate`: `details.warnings`。
+
+Agent 应把对应位置的恢复信息展示给用户，而不是擅自删除 `.igess` 的 journal
+或备份。
 
 ### Dashboard 的边界
 
