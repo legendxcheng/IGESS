@@ -832,6 +832,117 @@ def test_prune_never_rebaselines_a_child_added_between_snapshot_and_move(
     ] == ["formal-child"]
 
 
+def test_manifest_write_failure_after_move_cannot_lose_the_original_allowlist(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    registry = RunRegistry(tmp_path / "runs")
+    smoke = _write(
+        registry,
+        "20260715T010203000000Z-smoke-rule",
+        kind="smoke",
+        change_id="rule",
+    )
+    formal = _write(
+        registry,
+        "20260715T010204000000Z-day_1",
+        kind="formal",
+    )
+    formal_marker = formal.run_dir / "formal.marker"
+    formal_marker.write_text("formal-child", encoding="utf-8")
+    original_write = registry_module._write_tombstone_manifest
+    injected = False
+
+    def failing_write(
+        root: Path,
+        trash: Path,
+        trash_identity: os.stat_result,
+        tombstone: Path,
+        *args: object,
+        **kwargs: object,
+    ) -> tuple[Path, os.stat_result]:
+        nonlocal injected
+        if tombstone.exists():
+            injected = True
+            os.replace(formal_marker, tombstone / "foreign.marker")
+            raise OSError("injected manifest EIO after move")
+        return original_write(
+            root,
+            trash,
+            trash_identity,
+            tombstone,
+            *args,
+            **kwargs,
+        )
+
+    monkeypatch.setattr(
+        registry_module,
+        "_write_tombstone_manifest",
+        failing_write,
+    )
+
+    first = registry.prune_smoke(keep=0)
+    monkeypatch.setattr(
+        registry_module,
+        "_write_tombstone_manifest",
+        original_write,
+    )
+    second = registry.prune_smoke(keep=0)
+
+    assert first == [smoke.run_id]
+    assert second == []
+    assert not injected
+    assert formal_marker.read_text(encoding="utf-8") == "formal-child"
+
+
+def test_manifest_orphan_before_move_is_cleaned_only_for_the_same_live_run(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    registry = RunRegistry(tmp_path / "runs")
+    smoke = _write(
+        registry,
+        "20260715T010203000000Z-smoke-rule",
+        kind="smoke",
+        change_id="rule",
+    )
+    smoke_identity = smoke.run_dir.stat()
+    original_replace = os.replace
+    failed = False
+
+    def failing_move(
+        source: object,
+        destination: object,
+        *args: object,
+        **kwargs: object,
+    ) -> None:
+        nonlocal failed
+        if (
+            not failed
+            and Path(source) == smoke.run_dir
+            and Path(destination).parent.name == ".run-trash"
+        ):
+            failed = True
+            raise OSError("injected live-to-tomb move failure")
+        original_replace(source, destination, *args, **kwargs)
+
+    monkeypatch.setattr(os, "replace", failing_move)
+
+    assert registry.prune_smoke(keep=0) == []
+    assert failed
+    trash = registry.runs_root / ".run-trash"
+    manifests = list(trash.glob("tomb-????????????????????????????????.json"))
+    assert len(manifests) == 1
+    assert not list(trash.glob("tomb-????????????????????????????????"))
+    assert os.path.samestat(smoke_identity, smoke.run_dir.stat())
+
+    monkeypatch.setattr(os, "replace", original_replace)
+    assert registry.prune_smoke(keep=1) == []
+    assert smoke.run_dir.is_dir()
+    assert os.path.samestat(smoke_identity, smoke.run_dir.stat())
+    assert not manifests[0].exists()
+
+
 @pytest.mark.skipif(os.name == "nt", reason="POSIX dirfd race")
 def test_posix_bound_prune_rejects_child_replacement_across_retries(
     tmp_path: Path,

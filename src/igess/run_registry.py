@@ -376,6 +376,28 @@ class RunRegistry:
             if _path_exists_or_link(destination):
                 return False
 
+            manifest_path, manifest_identity = _write_tombstone_manifest(
+                self.runs_root,
+                trash,
+                trash_identity,
+                destination,
+                current.loaded,
+                manifest_entries,
+            )
+
+            if _path_exists_or_link(destination):
+                return False
+            installed_manifest = _required_regular_leaf(
+                manifest_path,
+                "tombstone manifest",
+            )
+            if (
+                not os.path.samestat(manifest_identity, installed_manifest)
+                or _stat_signature(manifest_identity)
+                != _stat_signature(installed_manifest)
+            ):
+                return False
+
             before_rename = _snapshot_owned_run_dir(self.runs_root, record.run_dir)
             if not os.path.samestat(current.loaded.directory_identity, before_rename):
                 return False
@@ -410,15 +432,6 @@ class RunRegistry:
             final_identity = _snapshot_owned_run_dir(trash, destination)
             if not os.path.samestat(quarantined_identity, final_identity):
                 raise ValueError("quarantined run changed before deletion")
-
-            manifest_path, manifest_identity = _write_tombstone_manifest(
-                self.runs_root,
-                trash,
-                trash_identity,
-                destination,
-                quarantined,
-                manifest_entries,
-            )
 
             if not _tombstone_tree_matches_exact(
                 destination,
@@ -862,9 +875,8 @@ def _write_tombstone_manifest(
 ) -> tuple[Path, os.stat_result]:
     if tombstone.parent != trash or _TOMBSTONE_RE.fullmatch(tombstone.name) is None:
         raise ValueError("tombstone manifest target is invalid")
-    current_tombstone = _snapshot_owned_run_dir(trash, tombstone)
-    if not os.path.samestat(loaded.directory_identity, current_tombstone):
-        raise ValueError("tombstone changed before its manifest was written")
+    if _path_exists_or_link(tombstone):
+        raise ValueError("tombstone must not exist before its manifest is written")
     run_id = _stored_run_id(loaded.payload)
     metadata = _parse_run_metadata(loaded.payload, expected_run_id=run_id)
     if metadata[2] != "smoke":
@@ -898,8 +910,8 @@ def _write_tombstone_manifest(
         "run_id": run_id,
         "kind": metadata[2],
         "directory_identity": {
-            "dev": current_tombstone.st_dev,
-            "ino": current_tombstone.st_ino,
+            "dev": loaded.directory_identity.st_dev,
+            "ino": loaded.directory_identity.st_ino,
         },
         "status_sha256": status_digest,
         "status": loaded.payload,
@@ -1212,6 +1224,47 @@ def _manifest_matches_directory(
         and identity.st_dev == manifest.directory_dev
         and identity.st_ino == manifest.directory_ino
     )
+
+
+def _manifest_matches_live_run(
+    root: Path,
+    manifest: _TombstoneManifest,
+) -> bool:
+    live = root / manifest.run_id
+    try:
+        loaded = _read_status_payload(root, live)
+        metadata = _parse_run_metadata(
+            loaded.payload,
+            expected_run_id=manifest.run_id,
+        )
+        if (
+            metadata[2] != manifest.kind
+            or not _manifest_matches_directory(manifest, loaded.directory_identity)
+            or _canonical_status_bytes(loaded.payload)
+            != _canonical_status_bytes(manifest.status_payload)
+        ):
+            return False
+        status_entry = next(
+            (
+                entry
+                for entry in manifest.entries
+                if entry.path == "run_status.json"
+            ),
+            None,
+        )
+        return status_entry is not None and _entry_matches_identity(
+            status_entry,
+            loaded.status_identity,
+        )
+    except (
+        OSError,
+        RuntimeError,
+        UnicodeError,
+        ValueError,
+        TypeError,
+        json.JSONDecodeError,
+    ):
+        return False
 
 
 def _delete_bound_manifest(
@@ -2044,6 +2097,12 @@ def _recover_one_manifest(
             return None, None
         tombstone = trash / manifest.tombstone
         if not _path_exists_or_link(tombstone):
+            live = root / manifest.run_id
+            if _path_exists_or_link(live) and not _manifest_matches_live_run(
+                root,
+                manifest,
+            ):
+                return None, None
             _delete_bound_manifest(
                 root,
                 trash,
