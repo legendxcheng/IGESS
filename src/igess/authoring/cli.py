@@ -202,35 +202,41 @@ def _read_change_document(
 
 
 def _read_stdin_change(format_name: str) -> tuple[str, str] | CommandResponse:
+    chunks: list[str] = []
+    source_bytes = 0
     try:
-        binary_stream = getattr(sys.stdin, "buffer", None)
-        if binary_stream is not None:
-            source = binary_stream.read(MAX_CHANGE_SOURCE_BYTES + 1)
-            if not isinstance(source, bytes):
+        while source_bytes <= MAX_CHANGE_SOURCE_BYTES:
+            remaining = MAX_CHANGE_SOURCE_BYTES + 1 - source_bytes
+            chunk = sys.stdin.read(min(65_536, max(1, remaining)))
+            if not isinstance(chunk, str):
                 return _change_read_error(
-                    "Standard input did not provide bytes",
+                    "Standard input did not provide text",
                     path="<stdin>",
                     reason="invalid_stream",
                 )
-            if len(source) > MAX_CHANGE_SOURCE_BYTES:
-                return _change_budget_error(len(source))
-            return _decode_change(source, format_name, "<stdin>")
-
-        text = sys.stdin.read(MAX_CHANGE_SOURCE_BYTES + 1)
-        if not isinstance(text, str):
-            return _change_read_error(
-                "Standard input did not provide text",
-                path="<stdin>",
-                reason="invalid_stream",
-            )
-        try:
-            source_bytes = len(text.encode("utf-8"))
-        except UnicodeError:
-            return _invalid_utf8_change(format_name, "<stdin>")
-        if source_bytes > MAX_CHANGE_SOURCE_BYTES:
-            return _change_budget_error(source_bytes)
-        return text, format_name
-    except (OSError, UnicodeError) as error:
+            if not chunk:
+                break
+            try:
+                chunk_bytes = len(chunk.encode("utf-8", errors="strict"))
+            except UnicodeEncodeError:
+                return _invalid_utf8_change(format_name, "<stdin>")
+            source_bytes += chunk_bytes
+            if source_bytes > MAX_CHANGE_SOURCE_BYTES:
+                return _change_budget_error(source_bytes)
+            chunks.append(chunk)
+        return "".join(chunks), format_name
+    except UnicodeDecodeError:
+        return _cli_error(
+            "invalid_change",
+            "Change document could not be decoded using standard-input encoding",
+            {
+                "reason": "invalid_syntax",
+                "format": format_name,
+                "encoding": getattr(sys.stdin, "encoding", None),
+                "path": "<stdin>",
+            },
+        )
+    except (OSError, ValueError) as error:
         return _change_read_error(
             "Could not read change document from standard input",
             path="<stdin>",

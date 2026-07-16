@@ -472,6 +472,75 @@ def test_bounded_stdin_reader_supports_replaced_text_stream(monkeypatch: pytest.
     assert document == (RESOURCE_YAML, "yaml")
 
 
+def test_model_apply_stdin_honors_pythonioencoding_for_chinese_yaml(tmp_path: Path):
+    root = tmp_path / "model"
+    assert run_cli("model", "init", "--out", str(root)).returncode == 0
+    document = RESOURCE_YAML.replace("name: Gold", "name: 金币")
+    environment = os.environ.copy()
+    environment["PYTHONIOENCODING"] = "cp936"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "igess.cli",
+            "model",
+            "apply",
+            "--project",
+            str(root),
+            "--stdin",
+            "--json",
+        ],
+        input=document.encode("cp936"),
+        check=False,
+        capture_output=True,
+        env=environment,
+    )
+    stdout = result.stdout.decode("cp936")
+    stderr = result.stderr.decode("cp936")
+    payload = json.loads(stdout)
+
+    assert result.returncode == 0, stderr + stdout
+    assert stderr == ""
+    assert payload["result"]["id"] == "gold"
+    assert "Traceback" not in stdout
+
+
+def test_model_apply_stdin_decode_failure_is_structured_without_traceback(
+    tmp_path: Path,
+):
+    root = tmp_path / "model"
+    assert run_cli("model", "init", "--out", str(root)).returncode == 0
+    environment = os.environ.copy()
+    environment["PYTHONIOENCODING"] = "cp936"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "igess.cli",
+            "model",
+            "apply",
+            "--project",
+            str(root),
+            "--stdin",
+            "--json",
+        ],
+        input=b"\x81",
+        check=False,
+        capture_output=True,
+        env=environment,
+    )
+    stdout = result.stdout.decode("cp936")
+    stderr = result.stderr.decode("cp936")
+    payload = json.loads(stdout)
+
+    assert result.returncode == 1
+    assert stderr == ""
+    assert payload["code"] in {"invalid_change", "change_read_failed"}
+    assert "Traceback" not in stdout
+
+
 @pytest.mark.parametrize(
     ("document", "format_args", "expected_id"),
     [
