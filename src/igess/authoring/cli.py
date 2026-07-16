@@ -118,7 +118,10 @@ def add_model_parser(subparsers: argparse._SubParsersAction) -> argparse.Argumen
         "--format",
         dest="format_name",
         choices=("yaml", "json"),
-        help="Input format override; standard input defaults to yaml.",
+        help=(
+            "Standard-input format; defaults to yaml. "
+            "File input always uses its extension."
+        ),
     )
     apply.add_argument(
         "--json",
@@ -185,7 +188,7 @@ def _read_change_document(
         return sys.stdin.read(), args.format_name or "yaml"
 
     path = Path(args.change)
-    format_name = args.format_name or _format_from_suffix(path)
+    format_name = _format_from_suffix(path)
     if format_name is None:
         return _cli_error(
             "invalid_change",

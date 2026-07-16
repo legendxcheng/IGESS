@@ -245,6 +245,54 @@ def test_model_apply_autodetects_change_file_extension(
     assert payload["result"]["smoke"]["status"] == "not_run"
 
 
+def test_model_apply_file_format_is_strictly_selected_by_extension(tmp_path: Path):
+    root = tmp_path / "model"
+    unknown = tmp_path / "rule.txt"
+    json_change = tmp_path / "rule.json"
+    assert run_cli("model", "init", "--out", str(root)).returncode == 0
+    unknown.write_text(RESOURCE_YAML, encoding="utf-8")
+    json_change.write_text(RESOURCE_JSON, encoding="utf-8")
+
+    rejected = run_cli(
+        "model",
+        "apply",
+        "--project",
+        str(root),
+        "--change",
+        str(unknown),
+        "--format",
+        "yaml",
+        "--json",
+    )
+    rejected_payload = json_result(rejected)
+    assert rejected.returncode == 1
+    assert rejected_payload["code"] == "invalid_change"
+    assert "Traceback" not in rejected.stderr + rejected.stdout
+
+    accepted = run_cli(
+        "model",
+        "apply",
+        "--project",
+        str(root),
+        "--change",
+        str(json_change),
+        "--format",
+        "yaml",
+        "--json",
+    )
+    accepted_payload = json_result(accepted)
+    assert accepted.returncode == 0, accepted.stderr + accepted.stdout
+    assert accepted_payload["result"]["id"] == "gems"
+
+
+def test_model_apply_help_limits_format_option_to_standard_input():
+    apply = model_commands()["apply"]
+
+    assert actions(apply)["format_name"].help == (
+        "Standard-input format; defaults to yaml. File input always uses its extension."
+    )
+
+
 @pytest.mark.parametrize(
     ("document", "format_args", "expected_id"),
     [
