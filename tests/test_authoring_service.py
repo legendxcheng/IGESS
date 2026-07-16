@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
+from queue import Queue
 import shutil
 import threading
 from typing import Any
@@ -15,6 +16,7 @@ import pytest
 
 from igess.authoring.change import ModelChange
 from igess.authoring.change_records import ChangeRecordStore
+from igess.authoring.locking import project_lock
 from igess.authoring.response import AuthoringError
 from igess.authoring.project import AuthoringProject
 from igess.authoring.service import AuthoringService
@@ -787,6 +789,7 @@ def test_lock_and_recovery_event_order_for_all_four_model_commands(tmp_path: Pat
     events.clear()
     status_response = AuthoringService(
         root,
+        project_factory=discover,
         lock_factory=exclusive,
         shared_snapshot_factory=recovered_snapshot,
         recoverer=recover,
@@ -797,6 +800,7 @@ def test_lock_and_recovery_event_order_for_all_four_model_commands(tmp_path: Pat
         "recover",
         "exclusive_exit",
         "shared_enter",
+        "discover",
         "shared_exit",
     ]
 
@@ -814,6 +818,7 @@ def test_lock_and_recovery_event_order_for_all_four_model_commands(tmp_path: Pat
     events.clear()
     simulate_response = AuthoringService(
         root,
+        project_factory=discover,
         lock_factory=exclusive,
         shared_snapshot_factory=recovered_snapshot,
         recoverer=recover,
@@ -824,8 +829,69 @@ def test_lock_and_recovery_event_order_for_all_four_model_commands(tmp_path: Pat
         "recover",
         "exclusive_exit",
         "shared_enter",
+        "discover",
         "shared_exit",
     ]
+
+
+@pytest.mark.parametrize("command", ["status", "simulate"])
+def test_read_command_discovers_sources_inside_shared_snapshot_after_writer_gap(
+    tmp_path: Path,
+    command: str,
+) -> None:
+    root = initialize_authoring_project(tmp_path / "model", f"writer_gap_{command}")
+    setup = _service(root, ids=["setup-1", "setup-2", "setup-3", "setup-4"])
+    _add_runnable_activity(setup)
+    writer_project = AuthoringProject.discover(root)
+    recovery_inside_lock = threading.Event()
+    writer_moved_exports = threading.Event()
+    discovery_finished = threading.Event()
+    reader_next_step: Queue[str] = Queue()
+    backup = root / ".igess" / "writer-exports-backup"
+
+    def writer() -> None:
+        assert recovery_inside_lock.wait(timeout=10)
+        with project_lock(writer_project, exclusive=True):
+            os.replace(writer_project.exports, backup)
+            writer_moved_exports.set()
+            step = reader_next_step.get(timeout=10)
+            if step == "discover":
+                assert discovery_finished.wait(timeout=10)
+            os.replace(backup, writer_project.exports)
+
+    def recover(_project: AuthoringProject) -> list[dict[str, str]]:
+        recovery_inside_lock.set()
+        return []
+
+    def strict_discover(path: str | Path) -> AuthoringProject:
+        assert writer_moved_exports.wait(timeout=10)
+        reader_next_step.put("discover")
+        try:
+            return AuthoringProject.discover(path)
+        finally:
+            discovery_finished.set()
+
+    @contextmanager
+    def coordinated_shared(project: AuthoringProject, recovered: object):
+        assert writer_moved_exports.wait(timeout=10)
+        reader_next_step.put("shared")
+        with project_lock(project, exclusive=False):
+            yield recovered
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        writer_future = executor.submit(writer)
+        service = AuthoringService(
+            root,
+            project_factory=strict_discover,
+            recoverer=recover,
+            shared_snapshot_factory=coordinated_shared,
+        )
+        response = service.status() if command == "status" else service.simulate()
+        writer_future.result(timeout=20)
+
+    assert response.ok is True, response.to_payload()
+    assert writer_project.exports.is_dir()
+    assert not backup.exists()
 
 
 def test_existing_init_recovers_before_initializer_refuses_nonempty_target(tmp_path: Path) -> None:

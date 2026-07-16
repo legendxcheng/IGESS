@@ -278,10 +278,10 @@ class AuthoringService:
                 recovery = _warning_sequence(
                     self._recoverer(recovery_context)
                 )
-            phase = "project"
-            project = self._project_factory(recovery_context.root)
             phase = "recovery"
-            with self._shared_snapshot_factory(project, recovery):
+            with self._shared_snapshot_factory(recovery_context, recovery):
+                phase = "project"
+                project = self._project_factory(recovery_context.root)
                 phase = "status"
                 registry = self._registry_factory(project)
                 status = self._status_deriver(project, registry.latest_smoke)
@@ -389,10 +389,10 @@ class AuthoringService:
                 warnings = _warning_sequence(
                     self._recoverer(recovery_context)
                 )
-            phase = "project"
-            project = self._project_factory(recovery_context.root)
             phase = "recovery"
-            with self._shared_snapshot_factory(project, warnings):
+            with self._shared_snapshot_factory(recovery_context, warnings):
+                phase = "project"
+                project = self._project_factory(recovery_context.root)
                 response = self._simulate_shared(project, scenario_id, warnings)
                 phase = "recovery"
                 return response
