@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
 from contextlib import AbstractContextManager, contextmanager
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 import json
 import os
@@ -48,6 +48,14 @@ from .yaml_source import read_yaml_entity
 
 _CHANGE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$")
 _RUN_ID_ATTEMPTS = 16
+
+
+@dataclass(frozen=True, slots=True)
+class SnapshotOperationResult:
+    """Result and recovery warnings from one source-consistent read operation."""
+
+    result: Any
+    warnings: tuple[Mapping[str, object], ...]
 
 
 class RecoveryProjectContext(AuthoringProject):
@@ -207,6 +215,13 @@ class AuthoringService:
         self._report_writer = report_writer
         self._record_store_factory = record_store_factory
 
+    def bind_run_registry(self, registry: RunRegistry) -> None:
+        """Bind one stable registry during front-end composition, before commands run."""
+
+        if not isinstance(registry, RunRegistry):
+            raise TypeError("registry must be a RunRegistry")
+        self._registry_factory = lambda _project: registry
+
     def init(
         self,
         out: str | os.PathLike[str],
@@ -311,6 +326,38 @@ class AuthoringService:
             messages[status.state],
             result=status.to_payload(),
         )
+
+    def run_snapshot_operation(
+        self,
+        callback: Callable[
+            [AuthoringProject, tuple[Mapping[str, object], ...]],
+            Any,
+        ],
+        project_root: str | os.PathLike[str] | None = None,
+    ) -> SnapshotOperationResult:
+        """Execute a callback after recovery while holding a shared project lock.
+
+        The callback receives a strictly discovered project and immutable
+        recovery-warning sequence.  Its complete source read must happen before
+        it returns; the shared lock is released immediately afterwards.
+        """
+
+        if not callable(callback):
+            raise TypeError("snapshot callback must be callable")
+        warnings: tuple[Mapping[str, object], ...] = ()
+        phase = "recovery"
+        try:
+            recovery_context = self._recovery_context(project_root)
+            with self._lock_factory(recovery_context, True):
+                warnings = _warning_sequence(self._recoverer(recovery_context))
+            with self._shared_snapshot_factory(recovery_context, warnings):
+                phase = "project"
+                project = self._project_factory(recovery_context.root)
+                phase = "snapshot_operation"
+                result = callback(project, warnings)
+            return SnapshotOperationResult(result, warnings)
+        except Exception as exc:
+            raise _phase_error(exc, phase) from None
 
     def apply(
         self,
@@ -1213,6 +1260,7 @@ def _phase_error(exc: Exception, phase: str) -> AuthoringError:
         "simulate": "simulation_failed",
         "simulation_artifact": "simulation_failed",
         "apply": "commit_failed",
+        "snapshot_operation": "snapshot_operation_failed",
     }
     code = codes.get(phase, "authoring_failed")
     return AuthoringError(

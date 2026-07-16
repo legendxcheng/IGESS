@@ -1,24 +1,26 @@
 from __future__ import annotations
 
 import html
+import ipaddress
 import json
 import mimetypes
-import os
-import stat
+import secrets
 from collections.abc import Mapping, Sequence
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path, PurePosixPath
+from threading import BoundedSemaphore
 from urllib.parse import parse_qs, unquote, urlparse
 
 from .authoring.project import AuthoringProject
 from .authoring.response import CommandResponse
-from .workflows import WorkflowService
+from .workflows import WorkflowService, _read_bounded_relative_file
 
 
 _SAMPLE_CONFIG = "examples/shelldiver_v0/economy.yaml"
 _SAMPLE_TABLES = "examples/shelldiver_v0/luban_exports"
 _MAX_FORM_BYTES = 64 * 1024
+_MAX_REPORT_BYTES = 32 * 1024 * 1024
 _MUTATION_PATHS = frozenset({"/smoke", "/formal", "/run", "/advise"})
 
 
@@ -58,14 +60,36 @@ def render_dashboard_home(
     service: WorkflowService,
     config: str | Path | None,
     tables: str | Path | None,
+    *,
+    csrf_token: str | None = None,
 ) -> str:
-    status_response = service.model_status() if service.is_authoring else None
-    runs = service.list_runs()
-    advice = service.latest_advice()
-    if status_response is not None:
-        main_content = _authoring_content(service, status_response, runs, advice)
-    else:
-        main_content = _legacy_content(service, config, tables, runs, advice)
+    token = csrf_token or secrets.token_urlsafe(32)
+    try:
+        status_response = service.model_status() if service.is_authoring else None
+        runs = service.list_runs()
+        advice = service.latest_advice()
+        if status_response is not None:
+            main_content = _authoring_content(
+                service,
+                status_response,
+                runs,
+                advice,
+                token,
+            )
+        else:
+            main_content = _legacy_content(
+                service,
+                config,
+                tables,
+                runs,
+                advice,
+                token,
+            )
+    except Exception:  # noqa: BLE001 - GET must remain a stable observability boundary.
+        main_content = (
+            '    <section><h2>Dashboard unavailable</h2><p class="failed">'
+            "Model observability data could not be loaded safely.</p></section>"
+        )
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -107,7 +131,8 @@ def _authoring_content(
     service: WorkflowService,
     response: CommandResponse,
     runs: Sequence[object],
-    advice: dict | None,
+    advice: object,
+    csrf_token: str,
 ) -> str:
     status = response.result
     state = _text(status.get("state"), "failed")
@@ -148,14 +173,17 @@ def _authoring_content(
       <p>Manual scenario actions are recorded as <strong>formal</strong> runs. Automatic smoke records are created by successful rule application.</p>
       <div class="actions">
         <form action="/smoke" method="post">
+          {_csrf_input(csrf_token)}
           <button type="submit">Run smoke scenario (formal)</button>
         </form>
         <form action="/formal" method="post">
+          {_csrf_input(csrf_token)}
           <label for="scenario">Formal scenario</label>
           <select id="scenario" name="scenario">{options}</select>
           <button type="submit">Run formal scenario</button>
         </form>
         <form action="/advise" method="post">
+          {_csrf_input(csrf_token)}
           <label for="advice-scenario">Advice scenario</label>
           <select id="advice-scenario" name="scenario">{options}</select>
           <button type="submit">Run advice (advice)</button>
@@ -174,7 +202,8 @@ def _legacy_content(
     config: str | Path | None,
     tables: str | Path | None,
     runs: Sequence[object],
-    advice: dict | None,
+    advice: object,
+    csrf_token: str,
 ) -> str:
     lint = service.lint(config or _SAMPLE_CONFIG, tables or _SAMPLE_TABLES)
     return f"""    <section>
@@ -186,6 +215,7 @@ def _legacy_content(
     <section>
       <h2>Run Scenario</h2>
       <form action="/formal" method="post">
+        {_csrf_input(csrf_token)}
         <label for="scenario">Scenario</label>
         <input id="scenario" name="scenario" value="day_1_progression">
         <button type="submit">Run formal scenario</button>
@@ -194,6 +224,7 @@ def _legacy_content(
     <section>
       <h2>Agent Analyst</h2>
       <form action="/advise" method="post">
+        {_csrf_input(csrf_token)}
         <label for="advice-scenario">Scenario</label>
         <input id="advice-scenario" name="scenario" value="day_1_progression">
         <button type="submit">Run advice (advice)</button>
@@ -265,13 +296,21 @@ def serve_dashboard(
     host: str,
     port: int,
 ) -> None:
+    if not _is_loopback_host(host):
+        raise ValueError("Dashboard host must be a loopback address")
     service, resolved_config, resolved_tables = create_dashboard_context(
         project,
         config,
         tables,
         runs_root,
     )
-    handler = _handler(service, resolved_config, resolved_tables)
+    handler = _handler(
+        service,
+        resolved_config,
+        resolved_tables,
+        csrf_token=secrets.token_urlsafe(32),
+        mutation_guard=BoundedSemaphore(1),
+    )
     server = ThreadingHTTPServer((host, port), handler)
     print(f"IGESS dashboard running at http://{host}:{port}/")
     try:
@@ -286,12 +325,25 @@ def _handler(
     service: WorkflowService,
     config: str | Path | None,
     tables: str | Path | None,
+    *,
+    csrf_token: str | None = None,
+    mutation_guard: BoundedSemaphore | None = None,
 ):
+    token = csrf_token or secrets.token_urlsafe(32)
+    guard = mutation_guard or BoundedSemaphore(1)
+
     class DashboardHandler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:  # noqa: N802 - stdlib handler API.
             parsed = urlparse(self.path)
             if parsed.path == "/":
-                self._send_html(render_dashboard_home(service, config, tables))
+                self._send_html(
+                    render_dashboard_home(
+                        service,
+                        config,
+                        tables,
+                        csrf_token=token,
+                    )
+                )
                 return
             if parsed.path == "/status":
                 self._send_status()
@@ -313,25 +365,43 @@ def _handler(
                 return
             try:
                 form = self._read_form()
-                scenario = form.get("scenario", ["day_1_progression"])[0]
-                if parsed.path == "/smoke":
-                    if service.is_authoring:
-                        service.run_authoring_scenario("smoke")
+            except (UnicodeError, ValueError):
+                self.send_error(HTTPStatus.BAD_REQUEST)
+                return
+            supplied_token = form.get("_csrf", [""])[0]
+            if (
+                not self._host_is_local()
+                or not self._origin_is_same()
+                or not secrets.compare_digest(supplied_token, token)
+            ):
+                self.send_error(HTTPStatus.FORBIDDEN)
+                return
+            if not guard.acquire(blocking=False):
+                self.send_error(HTTPStatus.TOO_MANY_REQUESTS)
+                return
+            try:
+                try:
+                    scenario = form.get("scenario", ["day_1_progression"])[0]
+                    if parsed.path == "/smoke":
+                        if service.is_authoring:
+                            service.run_authoring_scenario("smoke")
+                        else:
+                            service.run_scenario(config, tables, "smoke")
+                    elif parsed.path in {"/formal", "/run"}:
+                        if service.is_authoring:
+                            service.run_authoring_scenario(scenario)
+                        else:
+                            service.run_scenario(config, tables, scenario)
                     else:
-                        service.run_scenario(config, tables, "smoke")
-                elif parsed.path in {"/formal", "/run"}:
-                    if service.is_authoring:
-                        service.run_authoring_scenario(scenario)
-                    else:
-                        service.run_scenario(config, tables, scenario)
-                else:
-                    service.run_advice(
-                        None if service.is_authoring else config,
-                        None if service.is_authoring else tables,
-                        scenario,
-                    )
-            except Exception:  # noqa: BLE001 - operation services persist their own failures.
-                pass
+                        service.run_advice(
+                            None if service.is_authoring else config,
+                            None if service.is_authoring else tables,
+                            scenario,
+                        )
+                except Exception:  # noqa: BLE001 - operation services persist their failures.
+                    pass
+            finally:
+                guard.release()
             self.send_response(HTTPStatus.SEE_OTHER)
             self.send_header("Location", "/")
             self.end_headers()
@@ -348,6 +418,28 @@ def _handler(
                 raise ValueError("invalid form size")
             body = self.rfile.read(length).decode("utf-8")
             return parse_qs(body, keep_blank_values=True)
+
+        def _host_is_local(self) -> bool:
+            return _valid_local_authority(
+                self.headers.get("Host"),
+                self.server.server_port,
+            )
+
+        def _origin_is_same(self) -> bool:
+            origin = self.headers.get("Origin")
+            if origin is None:
+                return True
+            parsed = urlparse(origin)
+            return (
+                parsed.scheme == "http"
+                and not parsed.path.strip("/")
+                and not parsed.params
+                and not parsed.query
+                and not parsed.fragment
+                and _valid_local_authority(parsed.netloc, self.server.server_port)
+                and parsed.netloc.casefold()
+                == (self.headers.get("Host") or "").casefold()
+            )
 
         def _send_status(self) -> None:
             response = service.model_status() if service.is_authoring else None
@@ -388,6 +480,8 @@ def _handler(
 def send_report_file_response(
     service: WorkflowService,
     relative: str,
+    *,
+    _before_file_open=None,
 ) -> tuple[HTTPStatus, str, bytes]:
     decoded = unquote(relative)
     if "\\" in decoded or "\x00" in decoded:
@@ -400,38 +494,21 @@ def send_report_file_response(
     if run is None:
         return _not_found_response()
     report_root = Path(run.report_dir)
-    path = report_root.joinpath(*asset_parts)
     try:
-        if _is_indirection(report_root.lstat()):
-            return _not_found_response()
-        resolved_root = report_root.resolve(strict=True)
-        current = report_root
-        for component in asset_parts:
-            current = current / component
-            identity = current.lstat()
-            if _is_indirection(identity):
-                return _not_found_response()
-        resolved_path = path.resolve(strict=True)
-        if resolved_path != resolved_root and resolved_root not in resolved_path.parents:
-            return _not_found_response()
-        if not stat.S_ISREG(path.stat().st_mode):
-            return _not_found_response()
-        body = path.read_bytes()
+        body = _read_bounded_relative_file(
+            report_root,
+            tuple(asset_parts),
+            max_bytes=_MAX_REPORT_BYTES,
+            before_file_open=_before_file_open,
+        )
     except (OSError, RuntimeError, ValueError):
         return _not_found_response()
+    path = Path(asset_parts[-1])
     return (
         HTTPStatus.OK,
         mimetypes.guess_type(path.name)[0] or "application/octet-stream",
         body,
     )
-
-
-def _is_indirection(identity: os.stat_result) -> bool:
-    reparse = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
-    return stat.S_ISLNK(identity.st_mode) or bool(
-        getattr(identity, "st_file_attributes", 0) & reparse
-    )
-
 
 def _not_found_response() -> tuple[HTTPStatus, str, bytes]:
     return HTTPStatus.NOT_FOUND, "text/plain; charset=utf-8", b"Not found"
@@ -457,11 +534,28 @@ def _issue_list(value: object, empty: str) -> str:
     return f"<ol>{''.join(items)}</ol>" if items else f"<p>{_e(empty)}</p>"
 
 
-def _advice_panel(advice: dict | None) -> str:
+def _advice_panel(advice: object) -> str:
     if advice is None:
         return "<p>Latest advice: none yet.</p>"
+    if not isinstance(advice, Mapping):
+        return '<p class="failed">Latest advice is unavailable.</p>'
+    status = advice.get("status")
+    summary = advice.get("summary")
     findings = advice.get("findings", [])
     recommendations = advice.get("table_recommendations", [])
+    if (
+        not isinstance(status, str)
+        or not status
+        or not isinstance(summary, str)
+        or not summary
+        or not isinstance(findings, Sequence)
+        or isinstance(findings, (str, bytes, bytearray))
+        or not isinstance(recommendations, Sequence)
+        or isinstance(recommendations, (str, bytes, bytearray))
+        or any(not isinstance(item, Mapping) for item in findings)
+        or any(not isinstance(item, Mapping) for item in recommendations)
+    ):
+        return '<p class="failed">Latest advice is unavailable.</p>'
     finding_items = "".join(
         f"<li>{_e(item.get('category'))}: {_e(item.get('message'))}</li>"
         for item in findings[:5]
@@ -477,8 +571,8 @@ def _advice_panel(advice: dict | None) -> str:
     if not rec_items:
         rec_items = "<li>No table recommendations.</li>"
     return (
-        f"<p>Latest advice: <code>{_e(advice.get('status'))}</code></p>"
-        f"<p>{_e(advice.get('summary'))}</p>"
+        f"<p>Latest advice: <code>{_e(status)}</code></p>"
+        f"<p>{_e(summary)}</p>"
         f"<h3>Main findings</h3><ul>{finding_items}</ul>"
         f"<h3>Human table recommendations</h3><ul>{rec_items}</ul>"
     )
@@ -496,3 +590,33 @@ def _text(value: object, fallback: str) -> str:
 
 def _e(value: object) -> str:
     return html.escape("" if value is None else str(value), quote=True)
+
+
+def _csrf_input(token: str) -> str:
+    return f'<input type="hidden" name="_csrf" value="{_e(token)}">'
+
+
+def _is_loopback_host(host: str) -> bool:
+    if host.casefold() == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
+def _valid_local_authority(authority: str | None, port: int) -> bool:
+    if not isinstance(authority, str) or not authority:
+        return False
+    parsed = urlparse(f"//{authority}")
+    try:
+        parsed_port = parsed.port
+    except ValueError:
+        return False
+    return (
+        parsed.username is None
+        and parsed.password is None
+        and parsed_port == port
+        and parsed.hostname is not None
+        and _is_loopback_host(parsed.hostname)
+    )

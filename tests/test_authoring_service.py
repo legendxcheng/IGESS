@@ -19,7 +19,7 @@ from igess.authoring.change_records import ChangeRecordStore
 from igess.authoring.locking import project_lock
 from igess.authoring.response import AuthoringError
 from igess.authoring.project import AuthoringProject
-from igess.authoring.service import AuthoringService
+from igess.authoring.service import AuthoringService, SnapshotOperationResult
 from igess.authoring.probe import EligibilityFinding, TenTickProbeResult, run_ten_tick_probe
 from igess.authoring.status import derive_status
 from igess.authoring.templates import initialize_authoring_project
@@ -97,6 +97,46 @@ def _formal_bytes(root: Path) -> dict[str, bytes]:
     return {
         path.relative_to(root).as_posix(): path.read_bytes()
         for path in sorted(paths, key=lambda item: item.as_posix())
+    }
+
+
+def test_snapshot_operation_recovers_then_runs_inside_strict_shared_snapshot(
+    tmp_path: Path,
+) -> None:
+    root = initialize_authoring_project(tmp_path / "model")
+    warning = {"code": "recovered", "message": "Recovered pending journal"}
+    observed: dict[str, object] = {}
+
+    def callback(project, warnings):
+        observed["project"] = project
+        observed["warnings"] = warnings
+        return project.model_digest()
+
+    result = AuthoringService(root, recoverer=lambda _project: [warning]).run_snapshot_operation(
+        callback
+    )
+
+    assert isinstance(result, SnapshotOperationResult)
+    assert result.result == AuthoringProject.discover(root).model_digest()
+    assert result.warnings == (warning,)
+    assert isinstance(observed["project"], AuthoringProject)
+    assert observed["warnings"] == (warning,)
+
+
+def test_snapshot_operation_wraps_unexpected_callback_errors_stably(tmp_path: Path) -> None:
+    root = initialize_authoring_project(tmp_path / "model")
+
+    def broken(_project, _warnings):
+        raise RuntimeError("sensitive callback failure")
+
+    with pytest.raises(AuthoringError) as raised:
+        AuthoringService(root).run_snapshot_operation(broken)
+
+    assert raised.value.code == "snapshot_operation_failed"
+    assert raised.value.message == "Authoring operation failed during snapshot_operation"
+    assert raised.value.details == {
+        "error_type": "RuntimeError",
+        "phase": "snapshot_operation",
     }
 
 

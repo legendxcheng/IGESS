@@ -1,11 +1,12 @@
 import json
+import subprocess
+import sys
+from concurrent.futures import ThreadPoolExecutor
+from http import HTTPStatus
 from http.client import HTTPConnection
 from http.server import ThreadingHTTPServer
 from pathlib import Path
-import subprocess
-import sys
-from http import HTTPStatus
-from threading import Thread
+from threading import BoundedSemaphore, Event, Thread
 from types import SimpleNamespace
 from urllib.parse import urlencode
 
@@ -13,9 +14,11 @@ import pytest
 
 from igess import dashboard
 from igess.authoring import AuthoringProject
+from igess.authoring.change import ModelChange
 from igess.authoring.response import CommandResponse
 from igess.authoring.service import AuthoringService
 from igess.authoring.templates import initialize_authoring_project
+from igess.authoring.transactions import Transaction
 from igess.dashboard import create_dashboard_context, render_dashboard_home
 from igess.run_registry import RunRegistry
 from igess.workflows import WorkflowService
@@ -221,13 +224,18 @@ def test_authoring_dashboard_renders_read_only_observability_with_escaped_values
     assert 'action="/smoke" method="post"' in body
     assert 'action="/formal" method="post"' in body
     assert 'action="/advise" method="post"' in body
+    assert 'type="hidden" name="_csrf"' in body
     assert 'method="get"' not in body.lower()
     assert "Run smoke scenario (formal)" in body
 
 
 def test_dashboard_mutations_require_post_and_redirect_home(tmp_path):
     service = _DashboardService(tmp_path)
-    server = ThreadingHTTPServer(("127.0.0.1", 0), dashboard._handler(service, None, None))
+    token = "test-csrf-token"
+    server = ThreadingHTTPServer(
+        ("127.0.0.1", 0),
+        dashboard._handler(service, None, None, csrf_token=token),
+    )
     thread = Thread(target=server.serve_forever, daemon=True)
     thread.start()
     connection = HTTPConnection("127.0.0.1", server.server_port, timeout=5)
@@ -244,7 +252,7 @@ def test_dashboard_mutations_require_post_and_redirect_home(tmp_path):
             ("/formal", "day<1", ("formal", "day<1")),
             ("/advise", "day<1", ("advice", "day<1")),
         ):
-            encoded = urlencode({"scenario": scenario})
+            encoded = urlencode({"scenario": scenario, "_csrf": token})
             connection.request(
                 "POST",
                 path,
@@ -267,6 +275,99 @@ def test_dashboard_mutations_require_post_and_redirect_home(tmp_path):
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
+
+
+def test_dashboard_post_rejects_csrf_origin_host_and_concurrent_mutations(tmp_path):
+    service = _DashboardService(tmp_path)
+    token = "test-csrf-token"
+    guard = BoundedSemaphore(1)
+    server = ThreadingHTTPServer(
+        ("127.0.0.1", 0),
+        dashboard._handler(
+            service,
+            None,
+            None,
+            csrf_token=token,
+            mutation_guard=guard,
+        ),
+    )
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    def post(fields, headers=None, *, host=None):
+        connection = HTTPConnection("127.0.0.1", server.server_port, timeout=5)
+        encoded = urlencode(fields)
+        request_headers = {"Content-Type": "application/x-www-form-urlencoded"}
+        request_headers.update(headers or {})
+        if host is None:
+            connection.request("POST", "/formal", encoded, request_headers)
+        else:
+            connection.putrequest("POST", "/formal", skip_host=True)
+            connection.putheader("Host", host)
+            for key, value in request_headers.items():
+                connection.putheader(key, value)
+            connection.putheader("Content-Length", str(len(encoded.encode("ascii"))))
+            connection.endheaders(encoded.encode("ascii"))
+        response = connection.getresponse()
+        response.read()
+        status = response.status
+        connection.close()
+        return status
+
+    try:
+        assert post({"scenario": "smoke"}) == HTTPStatus.FORBIDDEN
+        assert post({"scenario": "smoke", "_csrf": "wrong"}) == HTTPStatus.FORBIDDEN
+        assert (
+            post(
+                {"scenario": "smoke", "_csrf": token},
+                {"Origin": "http://evil.example"},
+            )
+            == HTTPStatus.FORBIDDEN
+        )
+        assert (
+            post(
+                {"scenario": "smoke", "_csrf": token},
+                host=f"evil.example:{server.server_port}",
+            )
+            == HTTPStatus.FORBIDDEN
+        )
+        assert service.calls == []
+
+        assert guard.acquire(blocking=False)
+        try:
+            assert (
+                post({"scenario": "smoke", "_csrf": token})
+                == HTTPStatus.TOO_MANY_REQUESTS
+            )
+        finally:
+            guard.release()
+        assert service.calls == []
+
+        origin = f"http://127.0.0.1:{server.server_port}"
+        assert (
+            post(
+                {"scenario": "smoke", "_csrf": token},
+                {"Origin": origin},
+            )
+            == HTTPStatus.SEE_OTHER
+        )
+        assert service.calls == [("formal", "smoke")]
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def test_dashboard_server_refuses_non_loopback_binding():
+    with pytest.raises(ValueError, match="loopback"):
+        dashboard.serve_dashboard(
+            project=".",
+            config=CONFIG,
+            tables=TABLES,
+            runs_root=None,
+            host="0.0.0.0",
+            port=8765,
+        )
 
 
 def test_dashboard_context_auto_discovers_authoring_and_preserves_legacy_overrides(tmp_path):
@@ -421,8 +522,198 @@ def test_custom_authoring_service_registry_must_match_dashboard_registry(tmp_pat
     project = AuthoringProject.discover(root)
     shared = RunRegistry(custom_runs, read_roots=project.read_run_roots())
     matching = AuthoringService(root, registry_factory=lambda _project: shared)
-    service = WorkflowService(root, custom_runs, authoring_service=matching)
+    service = WorkflowService(
+        root,
+        custom_runs,
+        authoring_service=matching,
+        registry=shared,
+    )
     assert service.registry is shared
+
+
+def test_injected_authoring_service_registry_factory_is_pinned_once(tmp_path):
+    root = initialize_authoring_project(tmp_path / "model")
+    first = RunRegistry(tmp_path / "first-runs")
+    second = RunRegistry(tmp_path / "second-runs")
+    calls = []
+
+    def unstable(_project):
+        calls.append(len(calls))
+        return first if len(calls) == 1 else second
+
+    injected = AuthoringService(root, registry_factory=unstable)
+    service = WorkflowService(root, authoring_service=injected, registry=first)
+
+    assert service.model_status().command == "model.status"
+    response = service.run_authoring_scenario("smoke")
+    assert response.ok
+    assert first.runs_root.joinpath(response.result["run_id"]).is_dir()
+    assert not second.runs_root.exists()
+    assert calls == []
+
+
+def test_authoring_advice_waits_for_apply_replace_and_reads_one_locked_snapshot(tmp_path):
+    root = initialize_authoring_project(tmp_path / "model")
+    writer_ready = Event()
+    release_writer = Event()
+    advice_started = Event()
+    observed = {}
+
+    def advice_runner(config, tables, _scenario, out):
+        advice_started.set()
+        observed["config"] = Path(config).read_text(encoding="utf-8")
+        observed["resources"] = Path(tables, "resources.json").read_text(
+            encoding="utf-8"
+        )
+        payload = {
+            "status": "ok",
+            "summary": "Snapshot advice",
+            "findings": [],
+            "table_recommendations": [],
+        }
+        Path(out).mkdir(parents=True, exist_ok=True)
+        Path(out, "advice.json").write_text(json.dumps(payload), encoding="utf-8")
+        return payload
+
+    service = WorkflowService(root, advice_runner=advice_runner)
+
+    def transaction_factory(project, change_id, digest):
+        def checkpoint(name):
+            if name.startswith("target:0:"):
+                writer_ready.set()
+                assert release_writer.wait(timeout=10)
+
+        return Transaction(project, change_id, digest, checkpoint=checkpoint)
+
+    writer_service = AuthoringService(
+        root,
+        id_factory=lambda: "writer-change",
+        transaction_factory=transaction_factory,
+    )
+    change = ModelChange(
+        1,
+        "upsert",
+        "resource",
+        "gold",
+        {"name": "Gold", "dimension": "currency"},
+    )
+
+    def writer():
+        response = writer_service.apply(change)
+        assert response.ok, response.to_payload()
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        writer_future = executor.submit(writer)
+        assert writer_ready.wait(timeout=10)
+        advice_future = executor.submit(service.run_advice, None, None, "smoke")
+        assert not advice_started.wait(timeout=0.25)
+        release_writer.set()
+        writer_future.result(timeout=30)
+        record = advice_future.result(timeout=30)
+
+    assert advice_started.is_set()
+    assert "model:" in observed["config"]
+    assert "gold" in observed["resources"]
+    assert record.kind == "advice"
+    assert record.model_digest == AuthoringProject.discover(root).model_digest()
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        [],
+        {"status": "ok", "summary": "bad", "findings": None},
+        {"status": "ok", "summary": "bad", "findings": "not-a-list"},
+    ],
+)
+def test_latest_advice_rejects_malformed_or_wrong_schema_payloads(tmp_path, payload):
+    registry = RunRegistry(tmp_path / "runs")
+    run_dir = registry.runs_root / "20260716T010203000000Z-advice_day_1"
+    advice_dir = run_dir / "advice"
+    advice_dir.mkdir(parents=True)
+    (advice_dir / "advice.json").write_text(json.dumps(payload), encoding="utf-8")
+    registry.write_status(
+        run_dir,
+        status="success",
+        scenario_id="day_1",
+        message="Advice complete",
+        output_dir=advice_dir / "run",
+        report_dir=advice_dir / "report",
+        report_index=advice_dir / "report" / "index.html",
+        kind="advice",
+        model_digest="sha256:" + "a" * 64,
+    )
+    service = WorkflowService(".", registry=registry, authoring=False)
+
+    assert service.latest_advice() is None
+    assert "Latest advice: none yet." in render_dashboard_home(service, CONFIG, TABLES)
+    assert "Latest advice is unavailable." in dashboard._advice_panel(payload)
+
+
+def test_latest_advice_is_bounded_and_does_not_follow_links(tmp_path):
+    registry = RunRegistry(tmp_path / "runs")
+    run_dir = registry.runs_root / "20260716T010203000000Z-advice_day_1"
+    advice_dir = run_dir / "advice"
+    advice_dir.mkdir(parents=True)
+    path = advice_dir / "advice.json"
+    oversized = {
+        "status": "ok",
+        "summary": "x" * (1024 * 1024),
+        "findings": [],
+    }
+    path.write_text(json.dumps(oversized), encoding="utf-8")
+    registry.write_status(
+        run_dir,
+        status="success",
+        scenario_id="day_1",
+        message="Advice complete",
+        output_dir=advice_dir / "run",
+        report_dir=advice_dir / "report",
+        report_index=advice_dir / "report" / "index.html",
+        kind="advice",
+        model_digest="sha256:" + "a" * 64,
+    )
+    service = WorkflowService(".", registry=registry, authoring=False)
+    assert service.latest_advice() is None
+
+    path.unlink()
+    outside = tmp_path / "outside-advice.json"
+    outside.write_text(
+        json.dumps({"status": "ok", "summary": "secret", "findings": []}),
+        encoding="utf-8",
+    )
+    try:
+        path.symlink_to(outside)
+    except OSError:
+        return
+    assert service.latest_advice() is None
+
+
+def test_dashboard_get_returns_stable_error_card_when_observability_raises(tmp_path):
+    service = _DashboardService(tmp_path)
+
+    def broken():
+        raise RuntimeError("must not escape into the HTTP connection")
+
+    service.latest_advice = broken
+
+    body = render_dashboard_home(service, None, None)
+
+    assert "Dashboard unavailable" in body
+    assert "must not escape" not in body
+
+
+def test_legacy_dashboard_advice_has_kind_and_canonical_model_digest(tmp_path):
+    service = WorkflowService(".", runs_root=tmp_path / "runs", authoring=False)
+
+    record = service.run_advice(CONFIG, TABLES, "day_1_progression")
+
+    assert record.kind == "advice"
+    assert record.version == 1
+    assert record.run_id.endswith("-advice_day_1_progression")
+    assert record.model_digest.startswith("sha256:")
+    assert len(record.model_digest) == 71
+    assert "kind-advice" in render_dashboard_home(service, CONFIG, TABLES)
 
 
 def test_send_report_file_response_rejects_symlinked_assets(tmp_path):
@@ -443,3 +734,27 @@ def test_send_report_file_response_rejects_symlinked_assets(tmp_path):
 
     assert status == HTTPStatus.NOT_FOUND
     assert body == b"Not found"
+
+
+def test_report_reader_does_not_follow_file_swapped_after_validation(tmp_path):
+    service = WorkflowService(project_root=".", runs_root=tmp_path / "runs")
+    record = service.run_scenario(CONFIG, TABLES, "day_1_progression")
+    target = record.report_dir / "report_data.json"
+    outside = tmp_path / "outside-secret.json"
+    outside.write_text('{"secret":"must-not-leak"}', encoding="utf-8")
+
+    def replace_with_link():
+        target.unlink()
+        try:
+            target.symlink_to(outside)
+        except OSError:
+            pytest.skip("symlink creation is unavailable")
+
+    status, _, body = dashboard.send_report_file_response(
+        service,
+        f"{record.run_id}/report_data.json",
+        _before_file_open=replace_with_link,
+    )
+
+    assert status == HTTPStatus.NOT_FOUND
+    assert b"must-not-leak" not in body
