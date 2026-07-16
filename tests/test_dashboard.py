@@ -9,9 +9,12 @@ from threading import Thread
 from types import SimpleNamespace
 from urllib.parse import urlencode
 
+import pytest
+
 from igess import dashboard
 from igess.authoring import AuthoringProject
 from igess.authoring.response import CommandResponse
+from igess.authoring.service import AuthoringService
 from igess.authoring.templates import initialize_authoring_project
 from igess.dashboard import create_dashboard_context, render_dashboard_home
 from igess.run_registry import RunRegistry
@@ -350,6 +353,76 @@ def test_workflow_service_authoring_facade_uses_injected_collaborators(tmp_path)
     assert service.latest_change()["change"]["id"] == "gold"
     assert service.run_authoring_scenario("day_1").ok
     assert authoring.scenarios == ["day_1"]
+
+
+def test_custom_authoring_runs_root_is_shared_by_status_simulation_history_and_reports(
+    tmp_path,
+):
+    root = initialize_authoring_project(tmp_path / "model")
+    project = AuthoringProject.discover(root)
+    custom_runs = tmp_path / "dashboard-runs"
+    registry = RunRegistry(custom_runs)
+    legacy = RunRegistry(root / ".igess" / "runs")
+    legacy_dir = legacy.runs_root / "20260715T010203000000Z-legacy"
+    legacy.write_status(
+        legacy_dir,
+        status="success",
+        scenario_id="day_1",
+        message="Legacy formal run",
+        output_dir=legacy_dir / "output",
+        report_dir=legacy_dir / "report",
+        report_index=legacy_dir / "report" / "index.html",
+    )
+    smoke_dir = custom_runs / "20260716T010203000000Z-smoke-change-1"
+    registry.write_status(
+        smoke_dir,
+        status="success",
+        scenario_id="smoke",
+        message="Automatic smoke complete",
+        output_dir=smoke_dir / "output",
+        report_dir=smoke_dir / "report",
+        report_index=smoke_dir / "report" / "index.html",
+        kind="smoke",
+        change_id="change-1",
+        model_digest=project.model_digest(),
+    )
+
+    service = WorkflowService(root, custom_runs)
+
+    assert service.model_status().result["latest_smoke_run_id"] == smoke_dir.name
+    response = service.run_authoring_scenario("smoke")
+    assert response.ok
+    assert response.result["kind"] == "formal"
+    assert custom_runs.joinpath(response.result["run_id"]).is_dir()
+    assert {record.run_id for record in service.list_runs()} == {
+        legacy_dir.name,
+        smoke_dir.name,
+        response.result["run_id"],
+    }
+    report_status, content_type, body = dashboard.send_report_file_response(
+        service,
+        f"{response.result['run_id']}/index.html",
+    )
+    assert report_status == HTTPStatus.OK
+    assert content_type == "text/html"
+    assert body
+    project_runs = root / "runs"
+    assert not project_runs.exists() or list(project_runs.iterdir()) == []
+
+
+def test_custom_authoring_service_registry_must_match_dashboard_registry(tmp_path):
+    root = initialize_authoring_project(tmp_path / "model")
+    custom_runs = tmp_path / "dashboard-runs"
+    mismatched = AuthoringService(root)
+
+    with pytest.raises(ValueError, match="registry"):
+        WorkflowService(root, custom_runs, authoring_service=mismatched)
+
+    project = AuthoringProject.discover(root)
+    shared = RunRegistry(custom_runs, read_roots=project.read_run_roots())
+    matching = AuthoringService(root, registry_factory=lambda _project: shared)
+    service = WorkflowService(root, custom_runs, authoring_service=matching)
+    assert service.registry is shared
 
 
 def test_send_report_file_response_rejects_symlinked_assets(tmp_path):

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -43,23 +44,59 @@ class WorkflowService:
             authoring_project,
         )
         self.is_authoring = self.authoring_project is not None
-        self.authoring_service = (
-            authoring_service
+        if authoring_service is not None and self.authoring_project is None:
+            raise ValueError("an injected authoring_service requires an authoring project")
+        service_registry = (
+            _authoring_service_registry(authoring_service, self.authoring_project)
             if authoring_service is not None
-            else AuthoringService(self.authoring_project.root)
-            if self.authoring_project is not None
             else None
         )
 
         if registry is not None:
             self.registry = registry
-        elif self.authoring_project is not None and runs_root is None:
+            if runs_root is not None and not _same_registry_root(registry, runs_root):
+                raise ValueError("injected registry does not match runs_root")
+        elif self.authoring_project is not None and authoring_service is not None:
+            if service_registry is None:
+                raise ValueError(
+                    "an opaque authoring_service requires an explicit registry"
+                )
+            if runs_root is not None and not _same_registry_root(
+                service_registry,
+                runs_root,
+            ):
+                raise ValueError("authoring_service registry does not match runs_root")
+            self.registry = service_registry
+        elif self.authoring_project is not None:
+            write_root = (
+                Path(runs_root)
+                if runs_root is not None
+                else self.authoring_project.runs
+            )
             self.registry = RunRegistry(
-                self.authoring_project.runs,
+                write_root,
                 read_roots=self.authoring_project.read_run_roots(),
             )
         else:
             self.registry = RunRegistry(runs_root or self.project_root / ".igess" / "runs")
+
+        if authoring_service is not None:
+            if service_registry is not None and (
+                _registry_signature(service_registry)
+                != _registry_signature(self.registry)
+            ):
+                raise ValueError(
+                    "authoring_service registry does not match the dashboard registry"
+                )
+            self.authoring_service = authoring_service
+        elif self.authoring_project is not None:
+            shared_registry = self.registry
+            self.authoring_service = AuthoringService(
+                self.authoring_project.root,
+                registry_factory=lambda _project: shared_registry,
+            )
+        else:
+            self.authoring_service = None
         self.change_store = (
             change_store
             if change_store is not None
@@ -254,3 +291,34 @@ class WorkflowService:
             if authoring:
                 raise
             return None
+
+
+def _authoring_service_registry(
+    service: object,
+    project: AuthoringProject | None,
+) -> RunRegistry | None:
+    """Inspect the explicit Task-23 registry dependency when it is available."""
+
+    if project is None:
+        return None
+    factory = getattr(service, "_registry_factory", None)
+    if not callable(factory):
+        return None
+    registry = factory(project)
+    if not isinstance(registry, RunRegistry):
+        raise ValueError("authoring_service registry_factory must return RunRegistry")
+    return registry
+
+
+def _same_registry_root(registry: RunRegistry, root: str | Path) -> bool:
+    return _path_key(registry.runs_root) == _path_key(Path(root))
+
+
+def _registry_signature(registry: RunRegistry) -> tuple[str, tuple[str, ...]]:
+    return _path_key(registry.runs_root), tuple(
+        _path_key(root) for root in registry.read_roots
+    )
+
+
+def _path_key(path: Path) -> str:
+    return os.path.normcase(str(Path(path).absolute()))
