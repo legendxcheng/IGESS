@@ -5,11 +5,14 @@ from pathlib import Path
 import subprocess
 import sys
 
+import pytest
+
 from igess.numbers import SimNumber
 from igess.stone_role_level import build_role_level_curve, write_role_level_artifacts
 
 
 STONE_DATAS = Path(r"E:\stone-oasis\data-tables\Datas")
+pytestmark = pytest.mark.external_data
 
 
 def test_build_role_level_curve_uses_runtime_power_formula():

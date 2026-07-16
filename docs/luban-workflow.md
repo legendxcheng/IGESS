@@ -2,6 +2,23 @@
 
 The simulator reads Luban export output, not hand-edited Excel files at runtime.
 
+## Source-of-truth contract
+
+- Formal sources of truth: `economy.yaml` and the workbooks registered from
+  `Datas/__tables__.xlsx` (normally `Datas/*.xlsx`).
+- Generated output: `luban_exports/`. It is a deterministic runtime projection,
+  not an authoring surface; do not patch its JSON by hand.
+- `igess model apply` stages one YAML/JSON change against a candidate copy,
+  regenerates exports, lints and builds it, and replaces the formal sources plus
+  generated exports only after every check succeeds.
+- `igess model status` and `igess model simulate` use an ephemeral export from one
+  source-consistent snapshot, so stale committed JSON cannot silently become the
+  simulation input.
+
+This contract also applies to activity and activity-output workbooks: their Excel
+rows remain authoritative while `activities.json` and `activity_outputs.json` are
+generated artifacts.
+
 The sample authoring workbooks live in:
 
 ```text

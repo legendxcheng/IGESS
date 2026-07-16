@@ -9,6 +9,27 @@ The current implementation is v0.5 and includes Web reports, a local dashboard,
 run comparison, parameter scanning, regression gates, project ergonomics
 commands, and Agent Analyst advice artifacts.
 
+## Agent-first Incremental Authoring
+
+The primary authoring workflow is Agent-assisted and incremental: Agent 一次协助填写一条规则，
+IGESS validates and commits that single rule, reports what is still missing, and
+runs an automatic ten-tick smoke as soon as the model is executable. After the
+rules reach `ready`, the same attributable model moves into formal simulation and
+tuning. The intended primary user is comfortable with Python; the protocol uses
+small YAML/JSON changes and CLI responses instead of a non-technical form builder.
+
+```powershell
+igess model init --out projects/my-game --id my_game
+igess model status --project projects/my-game --json
+igess model apply --project projects/my-game --change changes/resource.yaml --json
+igess model simulate --project projects/my-game --scenario smoke --json
+```
+
+See the [Agent operator guide](docs/agent-operator-guide.md) for the exact
+one-change schema, response envelope, progressive model states, failure recovery,
+Dashboard boundary, and handoff to formal tuning. Existing flat commands remain
+compatible for established batch, reporting, and analysis workflows.
+
 ## Quick Start
 
 ```powershell

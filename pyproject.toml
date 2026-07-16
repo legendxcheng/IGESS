@@ -29,3 +29,7 @@ igess = ["reporting/assets/*"]
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+addopts = '-m "not external_data"'
+markers = [
+  "external_data: tests that require an explicitly provisioned external data snapshot",
+]

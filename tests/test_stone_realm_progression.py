@@ -4,6 +4,8 @@ from pathlib import Path
 import subprocess
 import sys
 
+import pytest
+
 from igess.numbers import SimNumber
 from igess.stone_role_level import (
     build_realm_progression_curve,
@@ -12,6 +14,7 @@ from igess.stone_role_level import (
 
 
 STONE_DATAS = Path(r"E:\stone-oasis\data-tables\Datas")
+pytestmark = pytest.mark.external_data
 
 
 def test_build_realm_progression_curve_keeps_realm_power_independent():

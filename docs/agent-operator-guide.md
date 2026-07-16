@@ -4,6 +4,172 @@
 IGESS 源码的 Agent。仓库根目录是 IGESS 工具本体；具体游戏项目应放在独立
 项目目录中，避免把工具代码、样例数据和真实项目输出混在一起。
 
+## 首要工作流：一条规则，一次反馈
+
+IGESS 的首要用户熟悉 Python，并由 Agent 协作完成模型。这里不设计面向
+非技术用户的大表单；Agent 一次协助填写一条规则，把这一条规则写成可审计的
+YAML 或 JSON change，调用 IGESS 验证并提交，再根据 `status` 与本次模拟证据
+决定下一条。完整节奏是：
+
+1. Agent 与用户确认当前只要补哪一条数值规则；
+2. Agent 生成一个只含一个实体的 change，并带上刚读取的模型摘要；
+3. `model apply` 在候选副本中映射、导表、lint、构建；模型一旦可运行，还会
+   自动执行 10 个 tick 的 smoke；
+4. Agent 展示状态、缺项、警告和本次 smoke 证据，再进入下一条规则；
+5. 全部规则完成并达到 `ready` 后，才把同一个可追溯模型交给正式场景模拟和
+   正式调参。
+
+### 可复制的 PowerShell / CLI
+
+以下命令与 `igess model <command> --help` 一致。`init` 只运行一次；后续循环
+通常是 `status -> apply -> status`，模型达到 smoke 条件时 `apply` 自带一次
+自动 smoke。显式 `simulate` 始终记为 formal run，即使场景名叫 `smoke`。
+
+```powershell
+igess model init --out projects/my-game --id my_game
+igess model status --project projects/my-game --json
+igess model apply --project projects/my-game --change changes/resource.yaml --json
+igess model simulate --project projects/my-game --scenario smoke --json
+```
+
+也可以通过标准输入提交一条 change：
+
+```powershell
+Get-Content -Raw changes/resource.yaml | igess model apply --project projects/my-game --stdin --format yaml --json
+```
+
+文件输入只接受 `.yaml`、`.yml`、`.json`；标准输入的 `--format` 只接受
+`yaml` 或 `json`。不加 `--json` 时输出简洁的人类可读结果。
+
+### 一条 change 的准确格式
+
+下面是一个完整的“只新增或更新 `resource:gold`”change。`fields` 里不能再放
+`id`，也不能把多个实体拼成列表。先从 `model status --json` 读取
+`result.model_digest`，原样填入 `if_model_digest`；下面的摘要只是格式示例。
+
+<!-- exact-one-change -->
+```yaml
+version: 1
+operation: upsert
+entity: resource
+id: gold
+fields:
+  name: Gold
+  dimension: currency
+if_model_digest: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+```
+
+`if_model_digest` 可以省略，但 Agent 协作时推荐保留，以免基于旧状态覆盖另一
+次修改。新实体必须给出该实体的全部必填字段；已有实体允许只写要改的字段，
+IGESS 会与当前规则合并后再验证。
+
+### 稳定的 JSON 响应包络
+
+所有 `--json` 响应都是一行 JSON，固定外层字段为
+`schema_version`、`command`、`ok`、`code`、`message`、`details`、`result`。
+下面是格式完整的 `model status` 示例；实际摘要、计数和 run id 以命令输出为准。
+
+<!-- exact-json-envelope -->
+```json
+{
+  "schema_version": 1,
+  "command": "model.status",
+  "ok": true,
+  "code": "status",
+  "message": "Model is runnable",
+  "details": {},
+  "result": {
+    "state": "runnable",
+    "model_digest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "structural_valid": true,
+    "smoke_eligible": true,
+    "entity_counts": {},
+    "available_scenarios": ["smoke"],
+    "missing_requirements": [],
+    "warnings": [],
+    "latest_smoke_run_id": "20260716T120000000000Z-smoke-change-1"
+  }
+}
+```
+
+程序判断成功与否应读取 `ok` 和进程退出码，分支应读取 `code`，不要解析
+`message` 文案。`details` 放错误、恢复警告等诊断，`result` 放成功产物或失败
+时仍可安全返回的结构化结果。
+
+### 状态如何逐步变化
+
+| 状态 | 含义 | Agent 下一步 |
+| --- | --- | --- |
+| `failed` | 当前源结构无效，不能作为候选模型 | 修复所列错误，不做数值结论 |
+| `incomplete` | 已有规则有效，但还缺可执行链或必要引用 | 每次补一条 `missing_requirements` 指向的规则 |
+| `runnable` | `smoke` 可执行，但尚无非 smoke 的正式场景 | 检查自动 smoke，再补正式场景或剩余规则 |
+| `ready` | smoke 与至少一个正式场景都可执行 | 冻结当前摘要，进入正式模拟与调参 |
+
+状态不要求机械地只向右移动：删除引用或写入无效内容会失败；增加正式场景可
+让 `runnable` 变为 `ready`。每次都以响应里的 `state`、
+`missing_requirements`、`warnings` 和 `model_digest` 为准。
+
+### 自动 smoke 与显式模拟
+
+只要应用后的候选模型 `smoke_eligible=true`，成功的 `model apply` 会在同一个
+事务中自动 smoke：固定运行 10 个 tick，验证至少有资源、购买、解锁或转生等
+可观察状态变化，并把关联 run id 写入 change record。尚不可运行时，apply 仍
+可成功提交单条有效规则，`result.smoke.status` 为 `not_run`，然后由 Agent 按
+缺项继续补规则。
+
+自动 smoke 是一条规则后的快速反馈，不是平衡性结论。手动执行
+`model simulate` 会从锁定的 source snapshot 临时导出并生成标准 output/report，
+统一登记为 `kind=formal`；它不改正式源表，也不会冒充 apply 的自动 smoke。
+
+### Source of truth、并发与失败恢复
+
+`economy.yaml` 与 `Datas/*.xlsx` 是正式 source of truth；`luban_exports/` 是从
+它们生成的运行时副本，不应手工编辑。一个 change 的成功记录位于
+`changes/*.json`，失败审计位于 `changes/failed/*.json`，run 与报告位于
+`runs/<run_id>/`。
+
+若 `if_model_digest` 与当前摘要不同，apply 返回 `code=stale_model`，不修改正式
+源；Agent 应重新运行 status、读取当前规则，再生成新的单条 proposal。映射、
+导表、lint、build 或自动 smoke 在提交前失败时，事务回滚，正式源与导出保持
+原样，并尽力写入 `changes/failed`。进程在提交中断后，下一个 model 命令会在
+项目锁内先做崩溃恢复；应把响应 `details.warnings` 中的恢复信息展示给用户，
+而不是擅自删除 `.igess` 的 journal 或备份。
+
+### Dashboard 的边界
+
+Dashboard 不填写或修改规则。它观察当前 model status、摘要、缺项、警告、
+最近 change、自动 smoke 和统一 run history，并提供受控的 smoke/formal/advice
+运行入口。规则的生成与提交仍由 Agent 使用 `model apply` 完成，避免浏览器表单
+绕过 one-change、摘要检查和审计协议。
+
+### 从建模切换到正式调参
+
+达到 `ready` 后，先记录 `model_digest`，用 `model simulate` 运行非 smoke 的
+正式场景，保留其 `run_status.json`、`output/run_manifest.json` 和报告；三者应
+归属于同一个 source digest。随后可把这些 formal runs 交给 `compare`、
+`scan`、`gate`、`advise` 等既有分析能力。任何参数修改仍回到“一条 change ->
+自动 smoke -> 新 formal run”的可归因循环，不直接改生成的 JSON。
+
+### 旧命令与外部数据测试
+
+旧命令保持兼容：`export-tables`、`lint`、`run`、`report`、`dashboard`、
+`compare`、`scan`、`gate`、`doctor`、`explain`、`advise`、`review-run`、
+`yaml-plan`、`yaml-apply`、`review-proposal`、`verify-edits` 继续可用。它们适合
+已有项目的批量/正式分析；新的 `igess model` 是 Agent 逐条建模的首要入口，
+不是对旧脚本的破坏性替换。
+
+默认测试不读取 `E:\stone-oasis`，因此可在任何干净环境运行。只有明确验证
+Stone 工作簿快照时才执行：
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -m external_data tests/test_stone_role_level.py tests/test_stone_realm_progression.py
+```
+
+## 既有批量与分析工作流
+
+下面各节保留旧命令的完整操作手册，供已经具备整套 YAML/Luban 数据的项目
+做正式模拟、报告、扫描和验证。
+
 ## 推荐工作区结构
 
 推荐在 IGESS 根目录下建立 `projects/`，每个游戏一个子目录：
