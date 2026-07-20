@@ -1,0 +1,8 @@
+version: 1
+operation: upsert
+entity: resource
+id: material
+fields:
+  name: 材料
+  dimension: material
+if_model_digest: sha256:b3d865937783f65573818fba46ed6284b2901e9a1c85e1956db83f2ca3636b7e

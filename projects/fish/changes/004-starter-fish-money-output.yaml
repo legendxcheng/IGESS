@@ -1,0 +1,9 @@
+version: 1
+operation: upsert
+entity: activity_output
+id: starter_fish_hall_money
+fields:
+  activity_id: starter_fish_hall
+  output_resource: money
+  amount_per_second: "2"
+if_model_digest: sha256:55b2deb734bcccceecb64cb21183221e66f933cb99e427d177efa39d9a790a8e

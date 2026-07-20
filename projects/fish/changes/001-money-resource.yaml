@@ -1,0 +1,8 @@
+version: 1
+operation: upsert
+entity: resource
+id: money
+fields:
+  name: 金钱
+  dimension: currency
+if_model_digest: sha256:80a15d45e8cdbf4a53c94343eb8b3eaa4591c07d9ad32038bb2f42bb8a19ac21

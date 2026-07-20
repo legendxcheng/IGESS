@@ -11,6 +11,8 @@ from .compare import compare_runs
 from .dashboard import serve_dashboard
 from .doctor import format_doctor_report, run_doctor
 from .explain import explain_event, format_event_explanation
+from .fish_rng import FishRngConfig, FishRngSimulator
+from .fish_rng_outputs import FishRngOutputWriter
 from .gates import evaluate_gates
 from .linter import ConfigError, ConfigLinter
 from .loader import ConfigLoader
@@ -170,6 +172,18 @@ def build_parser() -> argparse.ArgumentParser:
         "--scenario", required=True, help="RNG scenario identifier to simulate."
     )
     rng_run.add_argument("--out", required=True, help="Directory for RNG simulation outputs.")
+
+    fish_rng_run = add_command(
+        "fish-rng-run",
+        "Run a Fish dual-stream RNG scenario",
+        "igess fish-rng-run --config projects/fish-rng/gdd-example.json --out projects/fish-rng/runs/gdd-example",
+    )
+    fish_rng_run.add_argument(
+        "--config", required=True, help="Path to the Fish RNG JSON configuration."
+    )
+    fish_rng_run.add_argument(
+        "--out", required=True, help="Directory for Fish RNG simulation outputs."
+    )
 
     gate = add_command(
         "gate",
@@ -404,6 +418,13 @@ def main(argv: list[str] | None = None) -> int:
             result = RngSimulator(model).run_scenario(args.scenario)
             RngOutputWriter.write_all(result, args.out, model)
             print(f"Wrote RNG simulation outputs to {args.out}")
+            return 0
+        if args.command == "fish-rng-run":
+            require_file(args.config, "Fish RNG config file")
+            config = FishRngConfig.load(args.config)
+            result = FishRngSimulator(config).run()
+            FishRngOutputWriter.write_all(result, config, args.out)
+            print(f"Wrote Fish RNG simulation outputs to {args.out}")
             return 0
         if args.command == "gate":
             require_directory(args.base, "baseline run directory")

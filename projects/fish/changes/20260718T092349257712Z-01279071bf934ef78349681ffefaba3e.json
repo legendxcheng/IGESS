@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "outcome": "success",
+  "timestamp": "2026-07-18T09:23:49.257712Z",
+  "change": {
+    "version": 1,
+    "operation": "upsert",
+    "entity": "resource",
+    "id": "material",
+    "fields": {
+      "name": "材料",
+      "dimension": "material"
+    },
+    "if_model_digest": "sha256:b3d865937783f65573818fba46ed6284b2901e9a1c85e1956db83f2ca3636b7e"
+  },
+  "pre_digest": "sha256:b3d865937783f65573818fba46ed6284b2901e9a1c85e1956db83f2ca3636b7e",
+  "post_digest": "sha256:ceac15cb8f6671dd288b999390436548e87371e8e077a860315aa64e6b47f551",
+  "affected_files": [
+    "Datas/resources.xlsx",
+    "luban_exports"
+  ],
+  "status": {
+    "model_digest": "sha256:ceac15cb8f6671dd288b999390436548e87371e8e077a860315aa64e6b47f551",
+    "structural_valid": true,
+    "smoke_eligible": false,
+    "state": "incomplete",
+    "entity_counts": {
+      "resource": 2,
+      "generator": 0,
+      "activity": 0,
+      "activity_output": 0,
+      "upgrade": 0,
+      "constant": 0,
+      "milestone": 0,
+      "prestige_layer": 0,
+      "formula": 3,
+      "generator_type": 1,
+      "source_type": 5,
+      "modifier_type": 4,
+      "behavior_policy": 1,
+      "session_pattern": 1,
+      "player_profile": 1,
+      "scenario": 1,
+      "rng_table": 0,
+      "rng_scenario": 0,
+      "regression_gate": 0
+    },
+    "missing_requirements": [
+      {
+        "code": "no_executable_behavior",
+        "message": "No executable economy behavior is currently available for the smoke scenario."
+      },
+      {
+        "code": "no_production_path",
+        "message": "Add an always-available activity or generator production path."
+      }
+    ],
+    "warnings": [],
+    "available_scenarios": [
+      "smoke"
+    ],
+    "latest_smoke_run_id": null
+  },
+  "warnings": [],
+  "run_id": null
+}

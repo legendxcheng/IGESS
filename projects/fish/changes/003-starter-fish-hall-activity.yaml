@@ -1,0 +1,9 @@
+version: 1
+operation: upsert
+entity: activity
+id: starter_fish_hall
+fields:
+  name: 初始鱼摸鱼厅产出
+  source_type: active
+  unlock_condition: always
+if_model_digest: sha256:ceac15cb8f6671dd288b999390436548e87371e8e077a860315aa64e6b47f551

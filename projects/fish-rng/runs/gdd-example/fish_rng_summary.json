@@ -1,0 +1,137 @@
+{
+  "schema_version": 1,
+  "scenario_id": "gdd_example_baseline",
+  "random_seed": 20260626,
+  "throws": 1000000,
+  "cycle_seconds": 30,
+  "represented_play_seconds": 30000000,
+  "strength_luck_mapping": {
+    "input_strength": 100.0,
+    "clamped_strength": 100.0,
+    "pool_id": 2,
+    "pool_name": "池2",
+    "interval_min_strength": 50.0,
+    "interval_max_strength": 2000.0,
+    "log_progress": 0.18790182,
+    "smooth_progress": 0.09265275,
+    "base_fish_luck": 5.92652752,
+    "regular_luck_multiplier": 1.0,
+    "fish_luck": 5.92652752
+  },
+  "fish_luck": 5.92652752,
+  "trash_luck": 20.0,
+  "bonus": {
+    "first_layer_observed": {
+      "no_bonus": 0.735947,
+      "mutation": 0.163947,
+      "luck_double": 0.100106
+    },
+    "first_layer_theoretical": {
+      "no_bonus": 0.736,
+      "mutation": 0.164,
+      "luck_double": 0.1
+    },
+    "layer_reach_observed": {
+      "1": 1.0,
+      "2": 0.264053,
+      "3": 0.043186,
+      "4": 0.006008
+    },
+    "layer_reach_theoretical": {
+      "1": 1.0,
+      "2": 0.264,
+      "3": 0.0428,
+      "4": 0.00592
+    },
+    "any_mutation_observed": 0.182185,
+    "any_mutation_theoretical": 0.182204,
+    "any_luck_double_observed": 0.116652,
+    "any_luck_double_theoretical": 0.1164,
+    "expected_luck_multiplier_observed": 1.150646,
+    "expected_luck_multiplier_theoretical": 1.149728,
+    "luck_multiplier_distribution": {
+      "1": 0.883348,
+      "2": 0.103133,
+      "4": 0.012006,
+      "8": 0.0014,
+      "16": 0.000113
+    }
+  },
+  "mutations": {
+    "counts": {
+      "gold": 100006,
+      "diamond": 40012,
+      "plasma": 30387,
+      "molten": 7919,
+      "radioactive": 3072,
+      "shadow": 516,
+      "electrified": 204,
+      "rainbow": 51,
+      "astral": 18
+    },
+    "probabilities_per_throw": {
+      "gold": 0.100006,
+      "diamond": 0.040012,
+      "plasma": 0.030387,
+      "molten": 0.007919,
+      "radioactive": 0.003072,
+      "shadow": 0.000516,
+      "electrified": 0.000204,
+      "rainbow": 5.1e-05,
+      "astral": 1.8e-05
+    },
+    "conditional_probabilities": {
+      "gold": 0.54892554,
+      "diamond": 0.21962291,
+      "plasma": 0.166792,
+      "molten": 0.04346681,
+      "radioactive": 0.01686198,
+      "shadow": 0.00283229,
+      "electrified": 0.00111974,
+      "rainbow": 0.00027994,
+      "astral": 9.88e-05
+    }
+  },
+  "fish": {
+    "counts": {
+      "common_a": 359649,
+      "rare_b": 572144,
+      "epic_c": 61361,
+      "legendary_d": 6122,
+      "mythic_e": 446,
+      "mythic_f": 271,
+      "secret_g": 7
+    },
+    "probabilities": {
+      "common_a": 0.359649,
+      "rare_b": 0.572144,
+      "epic_c": 0.061361,
+      "legendary_d": 0.006122,
+      "mythic_e": 0.000446,
+      "mythic_f": 0.000271,
+      "secret_g": 7e-06
+    }
+  },
+  "trash": {
+    "counts": {
+      "common": 0,
+      "rare": 800540,
+      "epic": 179621,
+      "legendary": 17807,
+      "mythic": 2001,
+      "secret": 31
+    },
+    "probabilities": {
+      "common": 0.0,
+      "rare": 0.80054,
+      "epic": 0.179621,
+      "legendary": 0.017807,
+      "mythic": 0.002001,
+      "secret": 3.1e-05
+    }
+  },
+  "independence": {
+    "log_roll_power_pearson": 0.00084637,
+    "reward_rank_pearson": 0.00197749
+  }
+}

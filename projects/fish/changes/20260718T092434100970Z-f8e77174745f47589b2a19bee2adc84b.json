@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "outcome": "success",
+  "timestamp": "2026-07-18T09:24:34.100970Z",
+  "change": {
+    "version": 1,
+    "operation": "upsert",
+    "entity": "player_profile",
+    "id": "default",
+    "fields": {
+      "source_efficiency": {
+        "active": "1",
+        "generator": "1",
+        "offline": "1",
+        "milestone": "1",
+        "prestige": "1"
+      },
+      "behavior_policy": "cheap_unlock_first",
+      "session_pattern": "authoring_default",
+      "prestige_policy": "conservative",
+      "activity_weights": {
+        "starter_fish_hall": "1"
+      },
+      "luck": "1"
+    },
+    "if_model_digest": "sha256:f5f6e98c0246a7088aed08ee83417ccaa81e3c9b8dba4616583867fbf0e5cd7d"
+  },
+  "pre_digest": "sha256:f5f6e98c0246a7088aed08ee83417ccaa81e3c9b8dba4616583867fbf0e5cd7d",
+  "post_digest": "sha256:2795300e4e0b4007c068036098724ef12a77f6710cbcb2e90edf84b007929eb1",
+  "affected_files": [
+    "economy.yaml",
+    "luban_exports"
+  ],
+  "status": {
+    "model_digest": "sha256:2795300e4e0b4007c068036098724ef12a77f6710cbcb2e90edf84b007929eb1",
+    "structural_valid": true,
+    "smoke_eligible": true,
+    "state": "runnable",
+    "entity_counts": {
+      "resource": 2,
+      "generator": 0,
+      "activity": 1,
+      "activity_output": 1,
+      "upgrade": 0,
+      "constant": 0,
+      "milestone": 0,
+      "prestige_layer": 0,
+      "formula": 3,
+      "generator_type": 1,
+      "source_type": 5,
+      "modifier_type": 4,
+      "behavior_policy": 1,
+      "session_pattern": 1,
+      "player_profile": 1,
+      "scenario": 1,
+      "rng_table": 0,
+      "rng_scenario": 0,
+      "regression_gate": 0
+    },
+    "missing_requirements": [],
+    "warnings": [],
+    "available_scenarios": [
+      "smoke"
+    ],
+    "latest_smoke_run_id": "20260718T092433955095Z-smoke-f8e77174745f47589b2a19bee2adc84b"
+  },
+  "warnings": [],
+  "run_id": "20260718T092433955095Z-smoke-f8e77174745f47589b2a19bee2adc84b"
+}

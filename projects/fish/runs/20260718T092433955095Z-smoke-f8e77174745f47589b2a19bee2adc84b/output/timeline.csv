@@ -1,0 +1,12 @@
+scenario_id,profile_id,time_seconds,resources,generators_owned,upgrades_purchased,total_cps
+smoke,default,0,"{""material"": ""0"", ""money"": ""0""}",{},[],2
+smoke,default,1,"{""material"": ""0"", ""money"": ""2""}",{},[],2
+smoke,default,2,"{""material"": ""0"", ""money"": ""4""}",{},[],2
+smoke,default,3,"{""material"": ""0"", ""money"": ""6""}",{},[],2
+smoke,default,4,"{""material"": ""0"", ""money"": ""8""}",{},[],2
+smoke,default,5,"{""material"": ""0"", ""money"": ""10""}",{},[],2
+smoke,default,6,"{""material"": ""0"", ""money"": ""12""}",{},[],2
+smoke,default,7,"{""material"": ""0"", ""money"": ""14""}",{},[],2
+smoke,default,8,"{""material"": ""0"", ""money"": ""16""}",{},[],2
+smoke,default,9,"{""material"": ""0"", ""money"": ""18""}",{},[],2
+smoke,default,10,"{""material"": ""0"", ""money"": ""20""}",{},[],2

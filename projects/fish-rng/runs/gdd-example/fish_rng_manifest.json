@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "scenario_id": "gdd_example_baseline",
+  "random_seed": 20260626,
+  "throws": 1000000,
+  "cycle_seconds": 30,
+  "artifacts": [
+    "fish_rng_summary.json",
+    "fish_rng_samples.json",
+    "fish_rng_analysis.md"
+  ]
+}

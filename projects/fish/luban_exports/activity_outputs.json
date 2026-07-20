@@ -1,0 +1,13 @@
+[
+  {
+    "id": "starter_fish_hall_money",
+    "activity_id": "starter_fish_hall",
+    "output_resource": "money",
+    "amount_per_second": "2",
+    "_source": {
+      "table": "activity_outputs",
+      "workbook": "activity_outputs.xlsx",
+      "row": 4
+    }
+  }
+]

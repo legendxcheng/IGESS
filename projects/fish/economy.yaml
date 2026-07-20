@@ -1,0 +1,90 @@
+model:
+  id: fish
+  tick_seconds: 1
+  number_backend: bignum_log
+  random_seed: 20260626
+formulas:
+  exponential_cost:
+    args:
+    - base_cost
+    - growth
+    - owned
+    expr: base_cost * pow(growth, owned)
+  generator_output:
+    args:
+    - base_output
+    - owned
+    - multiplier
+    expr: base_output * owned * multiplier
+  prestige_gain:
+    args:
+    - progress
+    - divisor
+    - exponent
+    expr: floor(pow(progress / divisor, exponent))
+generator_types:
+  building:
+    cost_formula: exponential_cost
+    production_formula: generator_output
+source_types:
+  active:
+    description: Active player actions
+  generator:
+    description: Automatic generator output
+  offline:
+    description: Offline reward
+  milestone:
+    description: Milestone reward
+  prestige:
+    description: Prestige reward
+modifier_pipeline:
+  order:
+  - base
+  - flat
+  - add_pct
+  - mult
+  - exp
+modifier_types:
+  flat:
+    stage: flat
+  add_pct:
+    stage: add_pct
+  multiply:
+    stage: mult
+  exponent:
+    stage: exp
+behavior_policies:
+  cheap_unlock_first:
+    type: cheap_unlock_first
+session_patterns:
+  authoring_default:
+    offline_every_seconds: 60
+    offline_duration_seconds: 0
+player_profiles:
+  default:
+    source_efficiency:
+      active: '1'
+      generator: '1'
+      offline: '1'
+      milestone: '1'
+      prestige: '1'
+    behavior_policy: cheap_unlock_first
+    session_pattern: authoring_default
+    prestige_policy: conservative
+    activity_weights:
+      starter_fish_hall: '1'
+    luck: '1'
+scenarios:
+  smoke:
+    duration_hours: '0.002777777777777778'
+    time_mode: tick
+    profiles:
+    - default
+    start_state: new_player
+    record_interval_seconds: 1
+    outputs:
+    - resource_curve
+    - purchase_timeline
+    - unlock_timeline
+    - prestige_timeline
+    - bottleneck_report

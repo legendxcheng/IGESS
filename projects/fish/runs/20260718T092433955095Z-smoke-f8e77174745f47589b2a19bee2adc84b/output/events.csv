@@ -1,0 +1,2 @@
+scenario_id,profile_id,time_seconds,kind,item_id,details
+smoke,default,0,unlock_activity,starter_fish_hall,"{""source_row"": ""4"", ""source_table"": ""activities"", ""source_workbook"": ""activities.xlsx""}"

@@ -1,0 +1,81 @@
+{
+  "scenario_id": "gdd_example_baseline",
+  "random_seed": 20260626,
+  "throws": 1000000,
+  "cycle_seconds": 30,
+  "strength": "100",
+  "regular_luck_multiplier": "1",
+  "strength_luck_pools": [
+    {"id": 1, "name": "池1", "strength_requirement": "50", "start_luck": "1", "end_luck": "5"},
+    {"id": 2, "name": "池2", "strength_requirement": "2000", "start_luck": "5", "end_luck": "15"},
+    {"id": 3, "name": "池3", "strength_requirement": "30000", "start_luck": "15", "end_luck": "30"},
+    {"id": 4, "name": "池4", "strength_requirement": "220000", "start_luck": "30", "end_luck": "50"},
+    {"id": 5, "name": "池5", "strength_requirement": "1000000", "start_luck": "50", "end_luck": "100"},
+    {"id": 6, "name": "池6", "strength_requirement": "4000000", "start_luck": "100", "end_luck": "200"},
+    {"id": 7, "name": "池7", "strength_requirement": "10000000", "start_luck": "200", "end_luck": "300"},
+    {"id": 8, "name": "池8", "strength_requirement": "28000000", "start_luck": "300", "end_luck": "500"},
+    {"id": 9, "name": "池9", "strength_requirement": "70000000", "start_luck": "500", "end_luck": "650"},
+    {"id": 10, "name": "池10", "strength_requirement": "250000000", "start_luck": "650", "end_luck": "900"},
+    {"id": 11, "name": "池11", "strength_requirement": "2500000000", "start_luck": "900", "end_luck": "1000"},
+    {"id": 12, "name": "池12", "strength_requirement": "11000000000", "start_luck": "1000", "end_luck": "1200"},
+    {"id": 13, "name": "池13", "strength_requirement": "30000000000", "start_luck": "1200", "end_luck": "1500"}
+  ],
+  "trash_luck": "20",
+  "bonus_base_luck": "1",
+  "max_bonus_layers": 4,
+  "sample_throw_count": 20,
+  "bonus_results": [
+    {
+      "id": "no_bonus",
+      "name": "无 Bonus",
+      "result_type": "no_bonus",
+      "roll_power_requirement": "1",
+      "continue_chain": false,
+      "luck_multiplier": "1"
+    },
+    {
+      "id": "mutation",
+      "name": "进入变异",
+      "result_type": "mutation",
+      "roll_power_requirement": "3.787878787878788",
+      "continue_chain": true,
+      "luck_multiplier": "1"
+    },
+    {
+      "id": "luck_double",
+      "name": "Luck ×2",
+      "result_type": "luck_double",
+      "roll_power_requirement": "10",
+      "continue_chain": true,
+      "luck_multiplier": "2"
+    }
+  ],
+  "mutations": [
+    {"id": "gold", "name": "Gold", "weight": 54922, "income_multiplier": "1.5"},
+    {"id": "diamond", "name": "Diamond", "weight": 21969, "income_multiplier": "2"},
+    {"id": "plasma", "name": "Plasma", "weight": 16643, "income_multiplier": "4"},
+    {"id": "molten", "name": "Molten", "weight": 4394, "income_multiplier": "6"},
+    {"id": "radioactive", "name": "Radioactive", "weight": 1649, "income_multiplier": "8"},
+    {"id": "shadow", "name": "Shadow", "weight": 275, "income_multiplier": "12"},
+    {"id": "electrified", "name": "Electrified", "weight": 110, "income_multiplier": "16"},
+    {"id": "rainbow", "name": "Rainbow", "weight": 27, "income_multiplier": "40"},
+    {"id": "astral", "name": "Astral", "weight": 11, "income_multiplier": "50"}
+  ],
+  "fish_pool": [
+    {"id": "common_a", "name": "普通鱼 A", "denominator": "1"},
+    {"id": "rare_b", "name": "稀有鱼 B", "denominator": "10"},
+    {"id": "epic_c", "name": "史诗鱼 C", "denominator": "100"},
+    {"id": "legendary_d", "name": "传说鱼 D", "denominator": "1000"},
+    {"id": "mythic_e", "name": "神话鱼 E", "denominator": "10000"},
+    {"id": "mythic_f", "name": "神话鱼 F", "denominator": "25000"},
+    {"id": "secret_g", "name": "秘密鱼 G", "denominator": "1000000"}
+  ],
+  "trash_pool": [
+    {"id": "common", "name": "普通废料", "denominator": "1"},
+    {"id": "rare", "name": "稀有废料", "denominator": "10"},
+    {"id": "epic", "name": "史诗废料", "denominator": "100"},
+    {"id": "legendary", "name": "传说废料", "denominator": "1000"},
+    {"id": "mythic", "name": "神话废料", "denominator": "10000"},
+    {"id": "secret", "name": "秘密废料", "denominator": "1000000"}
+  ]
+}

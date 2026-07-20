@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "outcome": "success",
+  "timestamp": "2026-07-18T09:24:15.850281Z",
+  "change": {
+    "version": 1,
+    "operation": "upsert",
+    "entity": "activity",
+    "id": "starter_fish_hall",
+    "fields": {
+      "name": "初始鱼摸鱼厅产出",
+      "source_type": "active",
+      "unlock_condition": "always"
+    },
+    "if_model_digest": "sha256:ceac15cb8f6671dd288b999390436548e87371e8e077a860315aa64e6b47f551"
+  },
+  "pre_digest": "sha256:ceac15cb8f6671dd288b999390436548e87371e8e077a860315aa64e6b47f551",
+  "post_digest": "sha256:55b2deb734bcccceecb64cb21183221e66f933cb99e427d177efa39d9a790a8e",
+  "affected_files": [
+    "Datas/activities.xlsx",
+    "luban_exports"
+  ],
+  "status": {
+    "model_digest": "sha256:55b2deb734bcccceecb64cb21183221e66f933cb99e427d177efa39d9a790a8e",
+    "structural_valid": true,
+    "smoke_eligible": false,
+    "state": "incomplete",
+    "entity_counts": {
+      "resource": 2,
+      "generator": 0,
+      "activity": 1,
+      "activity_output": 0,
+      "upgrade": 0,
+      "constant": 0,
+      "milestone": 0,
+      "prestige_layer": 0,
+      "formula": 3,
+      "generator_type": 1,
+      "source_type": 5,
+      "modifier_type": 4,
+      "behavior_policy": 1,
+      "session_pattern": 1,
+      "player_profile": 1,
+      "scenario": 1,
+      "rng_table": 0,
+      "rng_scenario": 0,
+      "regression_gate": 0
+    },
+    "missing_requirements": [
+      {
+        "code": "activity_no_positive_output",
+        "message": "Activity 'starter_fish_hall' needs a positive linked resource output.",
+        "entity": "activity",
+        "id": "starter_fish_hall"
+      },
+      {
+        "code": "activity_weight_nonpositive",
+        "message": "Profile 'default' needs a positive weight for activity 'starter_fish_hall'.",
+        "entity": "player_profile",
+        "id": "default"
+      },
+      {
+        "code": "no_executable_behavior",
+        "message": "No executable economy behavior is currently available for the smoke scenario."
+      }
+    ],
+    "warnings": [],
+    "available_scenarios": [
+      "smoke"
+    ],
+    "latest_smoke_run_id": null
+  },
+  "warnings": [],
+  "run_id": null
+}

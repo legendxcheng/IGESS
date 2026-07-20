@@ -1,0 +1,22 @@
+[
+  {
+    "id": "money",
+    "name": "金钱",
+    "dimension": "currency",
+    "_source": {
+      "table": "resources",
+      "workbook": "resources.xlsx",
+      "row": 4
+    }
+  },
+  {
+    "id": "material",
+    "name": "材料",
+    "dimension": "material",
+    "_source": {
+      "table": "resources",
+      "workbook": "resources.xlsx",
+      "row": 5
+    }
+  }
+]

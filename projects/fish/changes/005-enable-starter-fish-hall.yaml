@@ -1,0 +1,8 @@
+version: 1
+operation: upsert
+entity: player_profile
+id: default
+fields:
+  activity_weights:
+    starter_fish_hall: "1"
+if_model_digest: sha256:f5f6e98c0246a7088aed08ee83417ccaa81e3c9b8dba4616583867fbf0e5cd7d
