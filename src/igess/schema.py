@@ -19,6 +19,7 @@ class ModelSettings:
     tick_seconds: int
     number_backend: str
     random_seed: int | None
+    engine_id: str = "generic"
 
 
 @dataclass(frozen=True)
@@ -50,6 +51,7 @@ class Rules:
     rng_tables: dict[str, "RngTable"]
     rng_scenarios: dict[str, "RngScenario"]
     regression_gates: dict[str, dict[str, Any]]
+    engine_settings: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -202,6 +204,7 @@ class RuntimeConfig:
     tick_seconds: int
     number_backend: str
     random_seed: int
+    engine_id: str = "generic"
 
 
 @dataclass
@@ -226,6 +229,7 @@ class EconomyModel:
     rng_scenarios: dict[str, RngScenario]
     activities: dict[str, ActivityRow] = field(default_factory=dict)
     activity_outputs: dict[str, ActivityOutputRow] = field(default_factory=dict)
+    engine_settings: dict[str, Any] = field(default_factory=dict)
 
     def generator_cost(self, generator_id: str, owned: int) -> SimNumber:
         generator = self.generators[generator_id]

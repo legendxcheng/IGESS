@@ -1,13 +1,24 @@
 from __future__ import annotations
 
-import hashlib
 import json
 import math
-import random
 from bisect import bisect_right
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+from .fish_throw import (
+    BonusResult,
+    Mutation,
+    StrengthLuckMapping,
+    StrengthLuckPool,
+    ThresholdItem,
+    ThrowInput,
+    ThrowRules,
+    map_strength_to_fish_luck,
+    resolve_throw,
+    select_bonus,
+)
 
 
 def _positive_float(value: Any, field: str) -> float:
@@ -34,70 +45,6 @@ def _positive_int(value: Any, field: str) -> int:
     if type(value) is not int or value <= 0:
         raise ValueError(f"{field} must be a positive integer")
     return value
-
-
-@dataclass(frozen=True)
-class ThresholdItem:
-    id: str
-    name: str
-    denominator: float
-
-
-@dataclass(frozen=True)
-class BonusResult:
-    id: str
-    name: str
-    result_type: str
-    roll_power_requirement: float
-    continue_chain: bool
-    luck_multiplier: float
-
-
-@dataclass(frozen=True)
-class Mutation:
-    id: str
-    name: str
-    weight: int
-    income_multiplier: float
-
-
-@dataclass(frozen=True)
-class StrengthLuckPool:
-    id: int
-    name: str
-    strength_requirement: float
-    start_luck: float
-    end_luck: float
-
-
-@dataclass(frozen=True)
-class StrengthLuckMapping:
-    input_strength: float
-    clamped_strength: float
-    pool_id: int
-    pool_name: str
-    interval_min_strength: float
-    interval_max_strength: float
-    log_progress: float
-    smooth_progress: float
-    base_fish_luck: float
-    regular_luck_multiplier: float
-    fish_luck: float
-
-    def to_ordered_dict(self) -> dict[str, Any]:
-        return {
-            "input_strength": _rounded(self.input_strength),
-            "clamped_strength": _rounded(self.clamped_strength),
-            "pool_id": self.pool_id,
-            "pool_name": self.pool_name,
-            "interval_min_strength": _rounded(self.interval_min_strength),
-            "interval_max_strength": _rounded(self.interval_max_strength),
-            "log_progress": _rounded(self.log_progress),
-            "smooth_progress": _rounded(self.smooth_progress),
-            "base_fish_luck": _rounded(self.base_fish_luck),
-            "regular_luck_multiplier": _rounded(self.regular_luck_multiplier),
-            "fish_luck": _rounded(self.fish_luck),
-        }
 
 
 @dataclass(frozen=True)
@@ -191,9 +138,9 @@ class FishRngConfig:
             StrengthLuckPool(
                 id=row["id"],
                 name=str(row["name"]),
-                strength_requirement=_positive_float(
-                    row["strength_requirement"],
-                    "strength_luck_pools.strength_requirement",
+                strength_upper_bound=_positive_float(
+                    row["strength_upper_bound"],
+                    "strength_luck_pools.strength_upper_bound",
                 ),
                 start_luck=_positive_float(
                     row["start_luck"], "strength_luck_pools.start_luck"
@@ -278,86 +225,19 @@ def _validate_strength_luck_pools(
     expected_ids = list(range(1, len(pools) + 1))
     if [pool.id for pool in pools] != expected_ids:
         raise ValueError("strength_luck_pools ids must be continuous from 1")
-    requirements = [pool.strength_requirement for pool in pools]
+    upper_bounds = [pool.strength_upper_bound for pool in pools]
     if any(
         current >= following
-        for current, following in zip(requirements, requirements[1:])
+        for current, following in zip(upper_bounds, upper_bounds[1:])
     ):
         raise ValueError(
-            "strength_luck_pools strength requirements must be strictly increasing"
+            "strength_luck_pools strength upper bounds must be strictly increasing"
         )
     for index, pool in enumerate(pools):
         if pool.start_luck > pool.end_luck:
             raise ValueError(
                 f"strength_luck_pools[{index}] start_luck must not exceed end_luck"
             )
-        if index and not math.isclose(
-            pools[index - 1].end_luck,
-            pool.start_luck,
-            rel_tol=0.0,
-            abs_tol=1e-12,
-        ):
-            raise ValueError(
-                "adjacent strength_luck_pools must have continuous Luck endpoints"
-            )
-
-
-def map_strength_to_fish_luck(
-    strength: float,
-    pools: tuple[StrengthLuckPool, ...],
-    regular_luck_multiplier: float = 1.0,
-) -> StrengthLuckMapping:
-    """Map strength directly to FishLuck using GDD log progress and smoothstep."""
-
-    if not pools:
-        raise ValueError("strength_luck_pools must not be empty")
-    input_strength = _finite_float(strength, "strength")
-    multiplier = _positive_float(
-        regular_luck_multiplier, "regular_luck_multiplier"
-    )
-    min_strength = 1.0
-    max_strength = pools[-1].strength_requirement
-    clamped = min(max(input_strength, min_strength), max_strength)
-    pool_index = next(
-        (
-            index
-            for index, pool in enumerate(pools)
-            if clamped <= pool.strength_requirement
-        ),
-        len(pools) - 1,
-    )
-    pool = pools[pool_index]
-    interval_min = (
-        min_strength
-        if pool_index == 0
-        else pools[pool_index - 1].strength_requirement
-    )
-    interval_max = pool.strength_requirement
-    log_progress = (
-        (math.log(clamped) - math.log(interval_min))
-        / (math.log(interval_max) - math.log(interval_min))
-    )
-    log_progress = min(max(log_progress, 0.0), 1.0)
-    smooth_progress = log_progress**2 * (3.0 - 2.0 * log_progress)
-    base_luck = pool.start_luck + (
-        pool.end_luck - pool.start_luck
-    ) * smooth_progress
-    fish_luck = max(1.0, base_luck * multiplier)
-    return StrengthLuckMapping(
-        input_strength=input_strength,
-        clamped_strength=clamped,
-        pool_id=pool.id,
-        pool_name=pool.name,
-        interval_min_strength=interval_min,
-        interval_max_strength=interval_max,
-        log_progress=log_progress,
-        smooth_progress=smooth_progress,
-        base_fish_luck=base_luck,
-        regular_luck_multiplier=multiplier,
-        fish_luck=fish_luck,
-    )
-
-
 class _ThresholdSelector:
     def __init__(self, rows: tuple[ThresholdItem, ...]):
         self.rows = rows
@@ -411,10 +291,15 @@ class FishRngSimulator:
 
     def run(self) -> FishRngSimulationResult:
         config = self.config
-        bonus_rng = random.Random(_stable_seed(config.random_seed, "bonus"))
-        mutation_rng = random.Random(_stable_seed(config.random_seed, "mutation"))
-        fish_rng = random.Random(_stable_seed(config.random_seed, "fish"))
-        trash_rng = random.Random(_stable_seed(config.random_seed, "trash"))
+        rules = ThrowRules(
+            strength_luck_pools=config.strength_luck_pools,
+            bonus_base_luck=config.bonus_base_luck,
+            max_bonus_layers=config.max_bonus_layers,
+            bonus_results=config.bonus_results,
+            mutations=config.mutations,
+            fish_pool=config.fish_pool,
+            trash_pool=config.trash_pool,
+        )
 
         first_layer_counts = {row.result_type: 0 for row in config.bonus_results}
         layer_reaches = [0] * config.max_bonus_layers
@@ -428,53 +313,51 @@ class FishRngSimulator:
         roll_power_correlation = _OnlineCorrelation()
         reward_rank_correlation = _OnlineCorrelation()
         samples: list[dict[str, Any]] = []
-
         for throw_index in range(1, config.throws + 1):
-            current_luck = config.fish_luck
-            mutation: Mutation | None = None
-            bonus_events: list[dict[str, Any]] = []
-            double_count = 0
-
-            for layer_index in range(1, config.max_bonus_layers + 1):
-                layer_reaches[layer_index - 1] += 1
-                bonus_power = config.bonus_base_luck / _open_closed_random(bonus_rng)
-                bonus = self._select_bonus(bonus_power, mutation is None)
-                if layer_index == 1:
-                    first_layer_counts[bonus.result_type] += 1
-
-                event: dict[str, Any] = {
-                    "layer": layer_index,
-                    "result": bonus.result_type,
-                    "roll_power": _rounded(bonus_power),
+            outcome = resolve_throw(
+                ThrowInput(
+                    root_random_seed=config.random_seed,
+                    throw_id=throw_index,
+                    strength=config.strength,
+                    regular_luck_multiplier=config.regular_luck_multiplier,
+                    trash_luck=config.trash_luck,
+                ),
+                rules,
+            )
+            bonus_events = []
+            for event in outcome.bonus_events:
+                layer_reaches[event.layer - 1] += 1
+                if event.layer == 1:
+                    first_layer_counts[event.result_type] += 1
+                event_payload: dict[str, Any] = {
+                    "layer": event.layer,
+                    "result": event.result_type,
+                    "roll_power": _rounded(event.roll_power),
                 }
-                if bonus.result_type == "no_bonus":
-                    bonus_events.append(event)
-                    break
-                if bonus.result_type == "mutation":
-                    mutation = _weighted_mutation(config.mutations, mutation_rng)
-                    mutation_counts[mutation.id] += 1
-                    event["mutation"] = mutation.id
-                elif bonus.result_type == "luck_double":
-                    current_luck *= bonus.luck_multiplier
-                    double_count += 1
-                    event["fish_luck_after"] = _rounded(current_luck)
-                bonus_events.append(event)
-                if not bonus.continue_chain:
-                    break
+                if event.mutation_id is not None:
+                    event_payload["mutation"] = event.mutation_id
+                if event.fish_luck_after is not None:
+                    event_payload["fish_luck_after"] = _rounded(
+                        event.fish_luck_after
+                    )
+                bonus_events.append(event_payload)
 
-            if mutation is not None:
+            if outcome.mutation is not None:
                 throws_with_mutation += 1
-            if double_count:
+                mutation_counts[outcome.mutation.id] += 1
+            if outcome.bonus_double_count:
                 throws_with_double += 1
-            multiplier = current_luck / config.fish_luck
+            multiplier = outcome.final_fish_luck / outcome.strength_luck.fish_luck
             total_multiplier += multiplier
             multiplier_key = _number_key(multiplier)
             multiplier_counts[multiplier_key] = multiplier_counts.get(multiplier_key, 0) + 1
 
-            fish_power = current_luck / _open_closed_random(fish_rng)
-            trash_power = config.trash_luck / _open_closed_random(trash_rng)
-            fish, fish_rank = self._fish_selector.select(fish_power)
-            trash, trash_rank = self._trash_selector.select(trash_power)
+            fish_power = outcome.fish_roll_power
+            trash_power = outcome.trash_roll_power
+            fish = outcome.fish_reward
+            trash = outcome.trash_reward
+            fish_rank = self._fish_selector.rows.index(fish)
+            trash_rank = self._trash_selector.rows.index(trash)
             fish_counts[fish.id] += 1
             trash_counts[trash.id] += 1
             roll_power_correlation.add(math.log10(fish_power), math.log10(trash_power))
@@ -485,8 +368,10 @@ class FishRngSimulator:
                     {
                         "throw_index": throw_index,
                         "bonus_events": bonus_events,
-                        "mutation": mutation.id if mutation else None,
-                        "final_fish_luck": _rounded(current_luck),
+                        "mutation": (
+                            outcome.mutation.id if outcome.mutation else None
+                        ),
+                        "final_fish_luck": _rounded(outcome.final_fish_luck),
                         "fish_roll_power": _rounded(fish_power),
                         "fish_reward": fish.id,
                         "trash_roll_power": _rounded(trash_power),
@@ -553,35 +438,11 @@ class FishRngSimulator:
     def _select_bonus(
         self, roll_power: float, can_select_mutation: bool
     ) -> BonusResult:
-        selected = self.config.bonus_results[0]
-        for row in self.config.bonus_results:
-            if row.result_type == "mutation" and not can_select_mutation:
-                continue
-            if row.roll_power_requirement <= roll_power:
-                selected = row
-        return selected
-
-
-def _weighted_mutation(
-    mutations: tuple[Mutation, ...], rng: random.Random
-) -> Mutation:
-    total = sum(item.weight for item in mutations)
-    target = rng.randrange(total)
-    cumulative = 0
-    for item in mutations:
-        cumulative += item.weight
-        if target < cumulative:
-            return item
-    return mutations[-1]
-
-
-def _open_closed_random(rng: random.Random) -> float:
-    return 1.0 - rng.random()
-
-
-def _stable_seed(*parts: object) -> int:
-    payload = "|".join(str(part) for part in parts).encode("utf-8")
-    return int.from_bytes(hashlib.sha256(payload).digest()[:8], "big")
+        return select_bonus(
+            self.config.bonus_results,
+            roll_power,
+            can_select_mutation,
+        )
 
 
 def _selection_probabilities(

@@ -16,12 +16,12 @@ from .authoring.project import AuthoringProject
 from .authoring.response import CommandResponse
 from .authoring.service import AuthoringService
 from .builder import ModelBuilder
+from .engines import EngineRegistry
 from .linter import ConfigLinter
 from .loader import ConfigLoader
 from .outputs import OutputWriter
 from .reporting.static import generate_static_report
 from .run_registry import RunRecord, RunRegistry
-from .simulator import Simulator
 
 
 _MAX_ADVICE_BYTES = 1024 * 1024
@@ -47,8 +47,10 @@ class WorkflowService:
         change_store: ChangeRecordStore | None = None,
         advice_runner: Callable[..., dict[str, Any]] = run_advise,
         ephemeral_exporter: Callable[[AuthoringProject], Any] = ephemeral_export,
+        engine_registry: EngineRegistry | None = None,
     ):
         self.project_root = Path(project_root)
+        self._engine_registry = engine_registry or EngineRegistry.standard()
         self.authoring_project = self._discover_authoring_project(
             authoring,
             authoring_project,
@@ -86,6 +88,7 @@ class WorkflowService:
             self.authoring_service = AuthoringService(
                 self.authoring_project.root,
                 registry_factory=lambda _project: shared_registry,
+                engine_registry=self._engine_registry,
             )
         else:
             self.authoring_service = None
@@ -113,12 +116,24 @@ class WorkflowService:
             return None
         return self.change_store.latest()
 
-    def run_authoring_scenario(self, scenario_id: str) -> CommandResponse:
+    def run_authoring_scenario(
+        self,
+        scenario_id: str,
+        *,
+        checkpoint_input: str | Path | None = None,
+        overrides: Sequence[str] = (),
+    ) -> CommandResponse:
         """Run a manual scenario through authoring's source-consistent snapshot."""
 
         if self.authoring_service is None:
             raise ValueError("authoring scenario requires an authoring project")
-        return self.authoring_service.simulate(scenario_id)
+        if checkpoint_input is None and not overrides:
+            return self.authoring_service.simulate(scenario_id)
+        return self.authoring_service.simulate(
+            scenario_id,
+            checkpoint_input=checkpoint_input,
+            overrides=overrides,
+        )
 
     def lint(self, config: str | Path, tables: str | Path) -> WorkflowResult:
         try:
@@ -128,7 +143,15 @@ class WorkflowService:
         except Exception as exc:  # noqa: BLE001 - service boundary returns messages.
             return WorkflowResult(False, str(exc))
 
-    def run_scenario(self, config: str | Path, tables: str | Path, scenario_id: str) -> RunRecord:
+    def run_scenario(
+        self,
+        config: str | Path,
+        tables: str | Path,
+        scenario_id: str,
+        *,
+        checkpoint_input: str | Path | None = None,
+        overrides: Sequence[str] = (),
+    ) -> RunRecord:
         run_dir = self.registry.new_run_dir(scenario_id)
         output_dir = run_dir / "output"
         report_dir = run_dir / "report"
@@ -142,12 +165,44 @@ class WorkflowService:
             report_dir=report_dir,
             report_index=report_index,
         )
+        prepared = None
         try:
-            raw = ConfigLoader.load(self._path(config), self._path(tables))
+            resolved_config = self._path(config)
+            resolved_tables = self._path(tables)
+            raw = ConfigLoader.load(resolved_config, resolved_tables)
             ConfigLinter.validate(raw)
             model = ModelBuilder.build(raw)
-            result = Simulator(model).run_scenario(scenario_id)
-            OutputWriter.write_all(result, output_dir, model)
+            adapter = self._engine_registry.resolve(model.config.engine_id)
+            prepared = adapter.prepare(
+                model,
+                source_digest=_legacy_model_digest(
+                    resolved_config,
+                    resolved_tables,
+                ),
+                base_dir=resolved_config.parent,
+                overrides=overrides,
+            )
+            execution = adapter.run_scenario(
+                prepared,
+                scenario_id,
+                checkpoint_input=checkpoint_input,
+            )
+            checkpoint_name = "final_checkpoint.json"
+            checkpoint_path = adapter.write_checkpoint(
+                execution,
+                output_dir / checkpoint_name,
+                model_digest=prepared.model_digest,
+            )
+            fish_run = prepared.engine_id != "generic"
+            OutputWriter.write_all(
+                execution.result,
+                output_dir,
+                model,
+                overrides=list(overrides),
+                model_digest=prepared.model_digest if fish_run else None,
+                manifest_metadata=prepared.manifest_metadata,
+                extra_artifacts=(checkpoint_name,) if checkpoint_path else (),
+            )
             generate_static_report(output_dir, report_dir)
             return self.registry.write_status(
                 run_dir,
@@ -157,8 +212,12 @@ class WorkflowService:
                 output_dir=output_dir,
                 report_dir=report_dir,
                 report_index=report_index,
+                kind="formal" if fish_run else None,
+                model_digest=prepared.model_digest if fish_run else None,
+                engine_id=prepared.engine_id if fish_run else None,
             )
         except Exception as exc:  # noqa: BLE001 - failure is persisted for dashboard history.
+            fish_run = prepared is not None and prepared.engine_id != "generic"
             return self.registry.write_status(
                 run_dir,
                 status="failed",
@@ -167,6 +226,9 @@ class WorkflowService:
                 output_dir=output_dir,
                 report_dir=report_dir,
                 report_index=report_index,
+                kind="formal" if fish_run else None,
+                model_digest=prepared.model_digest if fish_run else None,
+                engine_id=prepared.engine_id if fish_run else None,
             )
 
     def run_advice(

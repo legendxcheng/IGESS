@@ -142,6 +142,7 @@ class ConfigLoader:
                 tick_seconds=int(data["model"]["tick_seconds"]),
                 number_backend=str(data["model"]["number_backend"]),
                 random_seed=data["model"].get("random_seed"),
+                engine_id=str(data["model"].get("engine_id", "generic")),
             ),
             formulas=formulas,
             generator_types=dict(sorted(data.get("generator_types", {}).items())),
@@ -155,6 +156,7 @@ class ConfigLoader:
             rng_tables=rng_tables,
             rng_scenarios=rng_scenarios,
             regression_gates=dict(sorted(data.get("regression_gates", {}).items())),
+            engine_settings=dict(data.get("engine", {})),
         )
 
     @classmethod

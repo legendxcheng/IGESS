@@ -96,6 +96,8 @@ def test_model_help_owns_exact_nested_arguments_defaults_examples_and_exit_codes
         "help",
         "project",
         "scenario",
+        "checkpoint_in",
+        "override",
         "json",
     }
     assert actions(commands["status"])["project"].default == "."
@@ -104,6 +106,8 @@ def test_model_help_owns_exact_nested_arguments_defaults_examples_and_exit_codes
     assert actions(commands["apply"])["format_name"].choices == ("yaml", "json")
     assert actions(commands["simulate"])["project"].default == "."
     assert actions(commands["simulate"])["scenario"].default == "smoke"
+    assert actions(commands["simulate"])["checkpoint_in"].default is None
+    assert actions(commands["simulate"])["override"].default == []
 
     for name, parser in commands.items():
         rendered = parser.format_help()

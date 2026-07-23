@@ -144,6 +144,17 @@ def add_model_parser(subparsers: argparse._SubParsersAction) -> argparse.Argumen
         help="Scenario identifier to simulate.",
     )
     simulate.add_argument(
+        "--checkpoint-in",
+        help="Optional engine checkpoint to resume from.",
+    )
+    simulate.add_argument(
+        "--override",
+        action="append",
+        default=[],
+        metavar="TABLE.ROW.FIELD=VALUE",
+        help="Engine-owned fixture override; repeat for multiple fields.",
+    )
+    simulate.add_argument(
         "--json",
         action="store_true",
         help="Emit one machine-readable JSON response.",
@@ -170,7 +181,11 @@ def dispatch_model(args: argparse.Namespace) -> int:
                 format_name=format_name,
             )
     elif command == "simulate":
-        response = AuthoringService(args.project).simulate(args.scenario)
+        response = AuthoringService(args.project).simulate(
+            args.scenario,
+            checkpoint_input=args.checkpoint_in,
+            overrides=args.override,
+        )
     else:  # pragma: no cover - argparse owns the closed command set.
         _unreachable_model_command(command)
     return _render_response(response, args.json)

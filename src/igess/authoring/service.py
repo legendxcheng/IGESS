@@ -17,6 +17,7 @@ import uuid
 import yaml
 
 from ..builder import ModelBuilder
+from ..engines import EngineAdapterError, EngineRegistry
 from ..linter import ConfigLinter
 from ..loader import ConfigLoader
 from ..outputs import OutputWriter
@@ -185,6 +186,7 @@ class AuthoringService:
         builder: Callable[[object], object] = ModelBuilder.build,
         probe_runner: Callable[..., TenTickProbeResult] = run_ten_tick_probe,
         simulator_factory: Callable[[object], object] = Simulator,
+        engine_registry: EngineRegistry | None = None,
         output_writer: Callable[..., None] = OutputWriter.write_all,
         report_writer: Callable[..., Path] = generate_static_report,
         record_store_factory: Callable[
@@ -211,6 +213,9 @@ class AuthoringService:
         self._builder = builder
         self._probe_runner = probe_runner
         self._simulator_factory = simulator_factory
+        self._engine_registry = engine_registry or EngineRegistry.standard(
+            simulator_factory
+        )
         self._output_writer = output_writer
         self._report_writer = report_writer
         self._record_store_factory = record_store_factory
@@ -425,6 +430,9 @@ class AuthoringService:
         self,
         scenario_id: str = "smoke",
         project_root: str | os.PathLike[str] | None = None,
+        *,
+        checkpoint_input: str | os.PathLike[str] | None = None,
+        overrides: Sequence[str] = (),
     ) -> CommandResponse:
         """Run one manual/formal scenario from a source-consistent snapshot."""
 
@@ -440,7 +448,13 @@ class AuthoringService:
             with self._shared_snapshot_factory(recovery_context, warnings):
                 phase = "project"
                 project = self._project_factory(recovery_context.root)
-                response = self._simulate_shared(project, scenario_id, warnings)
+                response = self._simulate_shared(
+                    project,
+                    scenario_id,
+                    warnings,
+                    checkpoint_input=checkpoint_input,
+                    overrides=overrides,
+                )
                 phase = "recovery"
                 return response
         except Exception as exc:
@@ -836,6 +850,9 @@ class AuthoringService:
         project: AuthoringProject,
         scenario_id: str,
         recovered: Sequence[Mapping[str, object]],
+        *,
+        checkpoint_input: str | os.PathLike[str] | None = None,
+        overrides: Sequence[str] = (),
     ) -> CommandResponse:
         registry = self._registry_factory(project)
         record: RunRecord | None = None
@@ -849,7 +866,7 @@ class AuthoringService:
                     {"scenario_id": scenario_id},
                 )
             with self._ephemeral_exporter(project) as exported:
-                digest = exported.source_digest
+                source_digest = exported.source_digest
                 raw = self._loader(exported.candidate_config, exported.export_root)
                 self._linter(raw)
                 model = self._builder(raw)
@@ -863,6 +880,19 @@ class AuthoringService:
                             "scenario_id": scenario_id,
                         },
                     )
+                adapter = self._engine_registry.resolve(model.config.engine_id)
+                prepared = adapter.prepare(
+                    model,
+                    source_digest=source_digest,
+                    base_dir=project.root,
+                    overrides=overrides,
+                )
+                digest = prepared.model_digest
+                status_engine_id = (
+                    prepared.engine_id
+                    if prepared.engine_id != "generic"
+                    else None
+                )
                 phase = "reservation"
                 run_dir = _reserve_manual_run_dir(
                     registry,
@@ -879,16 +909,30 @@ class AuthoringService:
                     kind="formal",
                     change_id=None,
                     model_digest=digest,
+                    engine_id=status_engine_id,
                     **paths,
                 )
                 phase = "simulate"
-                result = self._simulator_factory(model).run_scenario(scenario_id)
+                execution = adapter.run_scenario(
+                    prepared,
+                    scenario_id,
+                    checkpoint_input=checkpoint_input,
+                )
                 phase = "simulation_artifact"
+                checkpoint_name = "final_checkpoint.json"
+                checkpoint_path = adapter.write_checkpoint(
+                    execution,
+                    paths["output_dir"] / checkpoint_name,
+                    model_digest=digest,
+                )
                 self._output_writer(
-                    result,
+                    execution.result,
                     paths["output_dir"],
                     model,
                     model_digest=digest,
+                    overrides=list(overrides),
+                    manifest_metadata=prepared.manifest_metadata,
+                    extra_artifacts=(checkpoint_name,) if checkpoint_path else (),
                 )
                 self._report_writer(paths["output_dir"], paths["report_dir"])
                 phase = "run_status"
@@ -900,6 +944,7 @@ class AuthoringService:
                     kind="formal",
                     change_id=None,
                     model_digest=digest,
+                    engine_id=status_engine_id,
                     **paths,
                 )
         except Exception as exc:
@@ -916,6 +961,7 @@ class AuthoringService:
                         kind="formal",
                         change_id=None,
                         model_digest=record.model_digest,
+                        engine_id=record.engine_id,
                         output_dir=record.output_dir,
                         report_dir=record.report_dir,
                         report_index=record.report_index,
@@ -1136,7 +1182,7 @@ def _run_paths(run_dir: Path) -> dict[str, Path]:
 
 
 def _run_result(record: RunRecord) -> dict[str, object]:
-    return {
+    result: dict[str, object] = {
         "run_id": record.run_id,
         "kind": record.kind,
         "scenario_id": record.scenario_id,
@@ -1145,6 +1191,10 @@ def _run_result(record: RunRecord) -> dict[str, object]:
         "report_index": str(record.report_index),
         "change_id": record.change_id,
     }
+    if record.engine_id is not None:
+        result["engine_id"] = record.engine_id
+        result["model_digest"] = record.model_digest
+    return result
 
 
 def _warning_sequence(value: object) -> tuple[Mapping[str, object], ...]:
@@ -1238,6 +1288,8 @@ def _ordered_files(values: Sequence[str]) -> list[str]:
 def _phase_error(exc: Exception, phase: str) -> AuthoringError:
     if isinstance(exc, AuthoringError):
         return exc
+    if isinstance(exc, EngineAdapterError):
+        return AuthoringError(exc.code, str(exc), exc.details)
     codes = {
         "init": "init_failed",
         "project": "project_invalid",

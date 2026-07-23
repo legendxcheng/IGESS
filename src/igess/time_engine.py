@@ -22,6 +22,23 @@ class TimeEngine:
             steps.append(duration_seconds)
         return steps
 
+    def recurring_event_times(
+        self,
+        start_seconds: int,
+        end_seconds: int,
+        interval_seconds: int,
+    ) -> range:
+        """Return absolute recurring boundaries in ``(start, end]``."""
+
+        if type(start_seconds) is not int or start_seconds < 0:
+            raise ValueError("event start_seconds must be a non-negative integer")
+        if type(end_seconds) is not int or end_seconds < start_seconds:
+            raise ValueError("event end_seconds must not precede start_seconds")
+        if type(interval_seconds) is not int or interval_seconds <= 0:
+            raise ValueError("event interval_seconds must be a positive integer")
+        first = ((start_seconds // interval_seconds) + 1) * interval_seconds
+        return range(first, end_seconds + 1, interval_seconds)
+
     def seconds_until_affordable(
         self, current: SimNumber, cost: SimNumber, cps: SimNumber
     ) -> int | None:

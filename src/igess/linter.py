@@ -24,6 +24,10 @@ class ConfigLinter:
     @classmethod
     def validate(cls, raw: RawConfig) -> None:
         rules = raw.rules
+        if not rules.model.engine_id or not rules.model.engine_id.replace("_", "").isalnum():
+            raise ConfigError(
+                "model.engine_id must contain only letters, digits, and underscores"
+            )
         if rules.model.number_backend not in cls.ALLOWED_BACKENDS:
             raise ConfigError(
                 f"number_backend '{rules.model.number_backend}' is not implemented; use bignum_log"

@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import csv
 import json
+from collections.abc import Mapping, Sequence
 from pathlib import Path
+from typing import Any
 
 from .analyzer import Analyzer
 from .schema import EconomyModel, SimulationResult
@@ -17,6 +19,8 @@ class OutputWriter:
         model: EconomyModel | None = None,
         overrides: list[str] | None = None,
         model_digest: str | None = None,
+        manifest_metadata: Mapping[str, Any] | None = None,
+        extra_artifacts: Sequence[str] = (),
     ) -> None:
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -35,6 +39,8 @@ class OutputWriter:
             output_dir / "run_manifest.json",
             overrides or [],
             model_digest=model_digest,
+            manifest_metadata=manifest_metadata,
+            extra_artifacts=extra_artifacts,
         )
 
     @classmethod
@@ -45,25 +51,39 @@ class OutputWriter:
         path: Path,
         overrides: list[str],
         model_digest: str | None = None,
+        manifest_metadata: Mapping[str, Any] | None = None,
+        extra_artifacts: Sequence[str] = (),
     ) -> None:
+        artifacts = [
+            "analysis.json",
+            "analysis.md",
+            "events.csv",
+            "events.json",
+            "payback.csv",
+            "timeline.csv",
+            "timeline.json",
+        ]
+        artifacts.extend(
+            artifact for artifact in extra_artifacts if artifact not in artifacts
+        )
         payload = {
             "schema_version": 1,
             "scenario_id": result.scenario_id,
             "model_id": model.config.model_id if model is not None else None,
             "profiles": sorted({row.profile_id for row in result.timeline}),
-            "artifacts": [
-                "analysis.json",
-                "analysis.md",
-                "events.csv",
-                "events.json",
-                "payback.csv",
-                "timeline.csv",
-                "timeline.json",
-            ],
+            "artifacts": artifacts,
             "overrides": list(overrides),
         }
         if model_digest is not None:
             payload["model_digest"] = model_digest
+        if manifest_metadata:
+            collisions = sorted(set(payload) & set(manifest_metadata))
+            if collisions:
+                raise ValueError(
+                    "manifest metadata cannot replace standard fields: "
+                    + ", ".join(collisions)
+                )
+            payload.update(manifest_metadata)
         path.write_text(
             json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",

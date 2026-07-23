@@ -44,6 +44,7 @@ class RunRecord:
     kind: RunKind = "formal"
     change_id: str | None = None
     model_digest: str | None = None
+    engine_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -164,6 +165,7 @@ class RunRegistry:
         kind: RunKind | None = None,
         change_id: str | None = None,
         model_digest: str | None = None,
+        engine_id: str | None = None,
     ) -> RunRecord:
         run_dir = Path(run_dir)
         if not isinstance(status, str) or not status:
@@ -172,6 +174,8 @@ class RunRegistry:
             raise TypeError("scenario_id must be a string")
         if not isinstance(message, str):
             raise TypeError("message must be a string")
+        if engine_id is not None:
+            _require_component(engine_id, "engine_id")
 
         authoring = kind is not None or change_id is not None or model_digest is not None
         if authoring:
@@ -217,6 +221,8 @@ class RunRegistry:
                     "model_digest": model_digest,
                 }
             )
+        if engine_id is not None:
+            payload["engine_id"] = engine_id
 
         status_path = run_dir / "run_status.json"
         _atomic_write_status(self.runs_root, run_dir, payload)
@@ -315,6 +321,7 @@ class RunRegistry:
             payload,
             expected_run_id=run_dir.name,
         )
+        engine_id = payload.get("engine_id")
         status = _required_text(payload, "status")
         scenario_id = _optional_text(payload, "scenario_id")
         message = _optional_text(payload, "message")
@@ -342,6 +349,7 @@ class RunRegistry:
             kind=kind,
             change_id=change_id,
             model_digest=model_digest,
+            engine_id=engine_id,
         )
 
     def _quarantine_and_delete_smoke(self, original: _BoundRunRecord) -> bool:
@@ -499,6 +507,9 @@ def _parse_run_metadata(
     run_id = _required_text(payload, "run_id")
     if run_id != expected_run_id or Path(run_id).name != run_id:
         raise ValueError("run_id must match its run directory")
+    engine_id = payload.get("engine_id")
+    if engine_id is not None:
+        _require_component(engine_id, "engine_id")
     if "version" not in payload:
         return run_id, None, "formal", None, None
 

@@ -1,0 +1,52 @@
+{
+  "base": {
+    "final_resources": {
+      "default": {
+        "material": "0",
+        "money": "0",
+        "strength": "0"
+      }
+    },
+    "payback_seconds": {},
+    "prestige_counts": {},
+    "profiles": [
+      "default"
+    ],
+    "purchase_counts": {},
+    "scenario_id": "smoke",
+    "schema_version": 1,
+    "unlock_times": {}
+  },
+  "candidate": {
+    "final_resources": {
+      "default": {
+        "material": "0",
+        "money": "0",
+        "strength": "0"
+      }
+    },
+    "payback_seconds": {},
+    "prestige_counts": {},
+    "profiles": [
+      "default"
+    ],
+    "purchase_counts": {},
+    "scenario_id": "smoke",
+    "schema_version": 1,
+    "unlock_times": {}
+  },
+  "deltas": {
+    "final_resource_delta": {
+      "default": {
+        "material": "0",
+        "money": "0",
+        "strength": "0"
+      }
+    },
+    "payback_delta_seconds": {},
+    "prestige_count_delta": {},
+    "purchase_count_delta": {},
+    "unlock_time_delta_seconds": {}
+  },
+  "schema_version": 1
+}

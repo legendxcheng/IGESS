@@ -55,6 +55,7 @@ class FishRngOutputWriter:
         mapping = summary["strength_luck_mapping"]
         independence = summary["independence"]
         duration_days = summary["represented_play_seconds"] / 86400
+        interval_open = "[" if mapping["pool_id"] == 1 else "("
         return "\n".join(
             [
                 "# Fish RNG Simulation",
@@ -65,8 +66,10 @@ class FishRngOutputWriter:
                 f"- Represented continuous play: {duration_days:.2f} days",
                 f"- Strength: {mapping['input_strength']}",
                 f"- Strength pool: {mapping['pool_id']} "
-                f"({mapping['interval_min_strength']}.."
-                f"{mapping['interval_max_strength']})",
+                f"{interval_open}{mapping['interval_min_strength']}.."
+                f"{mapping['interval_max_strength']}]",
+                f"- strengthUpperBound: "
+                f"{mapping['interval_max_strength']} (inclusive)",
                 f"- Log progress: {mapping['log_progress']}",
                 f"- Smooth progress: {mapping['smooth_progress']}",
                 f"- Base Fish Luck: {mapping['base_fish_luck']}",

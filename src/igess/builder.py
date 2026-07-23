@@ -20,6 +20,7 @@ class ModelBuilder:
                 tick_seconds=raw.rules.model.tick_seconds,
                 number_backend=raw.rules.model.number_backend,
                 random_seed=int(raw.rules.model.random_seed or 0),
+                engine_id=raw.rules.model.engine_id,
             ),
             resources={row.id: row for row in raw.resources},
             generators={row.id: row for row in raw.generators},
@@ -40,4 +41,5 @@ class ModelBuilder:
             scenarios=raw.rules.scenarios,
             rng_tables=raw.rules.rng_tables,
             rng_scenarios=raw.rules.rng_scenarios,
+            engine_settings=raw.rules.engine_settings,
         )
