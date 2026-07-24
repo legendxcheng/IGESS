@@ -1,6 +1,6 @@
 # Fish 模拟 RoadMap
 
-更新时间：2026-07-23  
+更新时间：2026-07-24
 项目范围：`projects/fish`、`projects/fish-rng` 与 Fish 领域模拟代码  
 当前总状态：**Fish 专用引擎已接入 IGESS；鱼厅金钱、垃圾佬材料和已装备杠铃力量已进入同一个原子在线结算。废料加工支持境界变速、批量队列、小数进度 checkpoint 和数量守恒，垃圾佬可在线追赶至历史最高境界。通用玩家行为接口已接通 Fish fixture，材料→摸鱼厅容量、材料→杠铃→力量以及力量重生→摸鱼厅永久总倍率已完成；新境界瓶颈、资助突破、鱼雷购买、垃圾佬转世、离线和长期策略模拟仍未完成**
 
@@ -514,6 +514,7 @@ Phase 0 已完成，后续顺序：
 
 | 日期 | 变更 |
 | --- | --- |
+| 2026-07-24 | 完成 Fish 超长模块职责拆分并保持公共 API 兼容：`fish_state` 拆为 model/parse/validation/serialization/codec，`fish_trash` 拆为 model/rules/settlement，`fish_commands` 拆为结果 DTO 与 throw/hall/rebirth/barbell 命令，原 2496 行综合测试按领域拆为 7 个测试模块和共享 fixture。Fish 范围已无超过 600 物理行的 Python 文件；原模块的 26/7/16 个公共符号均由兼容门面保留。Fish 测试为 `93 passed, 3 deselected`；仓库全部 53 个测试文件分批回归通过，四组非 Fish 结果为 `513 passed`、`446 passed, 3 skipped`、`163 passed`、`71 passed, 3 skipped, 7 deselected`。 |
 | 2026-07-23 | 完成 Phase 7 力量重生首片：确认生产 `tbstrengthrebirth` 是一基 `id=1..10`，`completedCount=0` 使用表外默认 `1×`，下一次门槛读取 `id=completedCount+1`，完成第 `n` 次后使用 `id=n` 的摸鱼厅永久总倍率。新增原子重生命令、总倍率收入/来源 trace 和无目标 `strength_rebirth` 行为；命令先按旧倍率结算统一在线生产，再只清空当前力量并保留其余数值状态。fixture 覆盖门槛不足、满档、行为中 checkpoint 和连续/分段恢复；生产权威表 10 档已验证。 |
 | 2026-07-23 | 完成 Phase 6 杠铃在线链：生产 `tbbarbell.price/strengthPerExercise/timeCost` 强类型适配，在线速度为每次力量除以锻炼秒数；仅已装备杠铃产出，库存数量不放大。合成命令先结算旧装备，再原子扣材料、增加库存/revision，并固定自动装备最高每秒力量；保留显式已拥有换装命令。新增 `synthesize_barbell + random_affordable` 行为，只选择未拥有且可支付目标；fixture 覆盖材料不足不变、旧新装备结算顺序和行为中 checkpoint。离线 50% 留在 Phase 8。 |
 | 2026-07-23 | 完成 Phase 6 摸鱼厅材料升级首片：人类确认当前等级行 `upgradePrice` 用于升级到下一行，最终零值行是满级哨兵。生产适配器校验可购买行正价、末行零值和容量严格递增；原子命令使用 BigNumber 扣材料、提升等级/revision，并按 `fixed_max_income` 模拟策略重排。新增无目标行为 `upgrade_fish_hall`，fixture 验证可用性过滤、鱼数量不影响行为概率，以及行为中 checkpoint 不提前扣款、恢复不重抽。生产 `default` 权重仍未配置。 |
