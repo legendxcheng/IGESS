@@ -152,6 +152,22 @@ class ConfigLinter:
             if policy.get("type") not in cls.ALLOWED_POLICY_TYPES:
                 raise ConfigError(f"policy '{policy_id}' unknown type '{policy.get('type')}'")
 
+        for pattern_id, pattern in rules.session_patterns.items():
+            if not isinstance(pattern, dict):
+                raise ConfigError(
+                    f"session_pattern '{pattern_id}' must be a mapping"
+                )
+            daily_online_seconds = pattern.get("daily_online_seconds")
+            if daily_online_seconds is not None and (
+                type(daily_online_seconds) is not int
+                or daily_online_seconds <= 0
+                or daily_online_seconds > 24 * 60 * 60
+            ):
+                raise ConfigError(
+                    f"session_pattern '{pattern_id}' daily_online_seconds "
+                    "must be an integer within [1, 86400]"
+                )
+
         for profile_id, profile in rules.player_profiles.items():
             if profile.behavior_policy not in rules.behavior_policies:
                 raise ConfigError(

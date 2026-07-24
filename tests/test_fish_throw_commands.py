@@ -10,6 +10,7 @@ from igess.fish_barbell import FishBarbellDataAdapter
 from igess.fish_commands import (
     FishCommandError,
     apply_strength_rebirth,
+    apply_trash_man_rebirth,
     apply_throw_resolution,
     upgrade_fish,
 )
@@ -355,7 +356,39 @@ def test_current_production_snapshot_resolves_one_throw() -> None:
     assert trash_adapter.cultivation_seconds_to_next_realm(first_realm.id) == int(
         first_realm.cultivationSecondsToNextRealm
     )
+    assert trash_adapter.max_trash_man_rebirth_count == 10
+    assert trash_adapter.material_output_multiplier(0) == SimNumber.one()
+    first_trash_man_rebirth = trash_adapter.next_trash_man_rebirth_rule(0)
+    assert first_trash_man_rebirth.completed_count == 1
+    assert first_trash_man_rebirth.realm_requirement == 0
+    assert (
+        first_trash_man_rebirth.material_output_multiplier
+        == SimNumber.parse("2")
+    )
     assert trash_adapter.material_output_multiplier(1) == SimNumber.parse("2")
+    final_trash_man_rebirth = trash_adapter.trash_man_rebirth_rule(10)
+    assert final_trash_man_rebirth.realm_requirement == 36
+    assert (
+        final_trash_man_rebirth.material_output_multiplier
+        == SimNumber.parse("11")
+    )
+    production_trash_man_rebirth_state = PlayerState.new(
+        initial_torpedo_id=adapter.initial_torpedo_id,
+        initial_trash_man_realm_id=trash_adapter.initial_realm_id,
+    )
+    production_trash_man_rebirth = apply_trash_man_rebirth(
+        production_trash_man_rebirth_state,
+        trash_adapter=trash_adapter,
+    )
+    assert production_trash_man_rebirth.to_completed_count == 1
+    assert (
+        production_trash_man_rebirth.state.rebirth.trash_man_completed_count
+        == 1
+    )
+    assert (
+        production_trash_man_rebirth.material_multiplier_after
+        == SimNumber.parse(2)
+    )
 
     barbell_adapter = FishBarbellDataAdapter(snapshot)
     assert len(barbell_adapter.rules) == 15
@@ -431,7 +464,7 @@ def test_current_production_snapshot_resolves_one_throw() -> None:
     ]
     state.fish.next_instance_id = 2
     price = hall_adapter.upgrade_price(state.fish.items[0])
-    state.wallet.money = state.wallet.money.from_value(price * 2)
+    state.wallet.material = state.wallet.material.from_value(price * 2)
 
     application = upgrade_fish(state, 1, hall_adapter=hall_adapter)
 

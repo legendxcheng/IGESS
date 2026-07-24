@@ -157,12 +157,12 @@ def _snapshot(
         ),
         "tbtrashmanrebirth": (
             SimpleNamespace(
-                id=0,
+                id=1,
                 realmRequirement=0,
                 trashToTreasureOutputMultiplier=2,
             ),
             SimpleNamespace(
-                id=1,
+                id=2,
                 realmRequirement=4,
                 trashToTreasureOutputMultiplier=3,
             ),

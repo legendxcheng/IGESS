@@ -82,6 +82,33 @@ def test_legacy_profiles_default_to_empty_behavior_configuration() -> None:
         assert profile.behavior_target_policies == {}
 
 
+def test_linter_accepts_daily_online_session_budget() -> None:
+    raw = ConfigLoader.load_rules_only(SAMPLE_CONFIG)
+    raw.rules.session_patterns["daily"] = {
+        "daily_online_seconds": 7200
+    }
+    raw.rules.player_profiles["casual"].session_pattern = "daily"
+
+    ConfigLinter.validate(raw)
+
+
+@pytest.mark.parametrize("value", [0, 86401, -1, True, "7200"])
+def test_linter_rejects_invalid_daily_online_session_budget(
+    value: object,
+) -> None:
+    raw = ConfigLoader.load_rules_only(SAMPLE_CONFIG)
+    raw.rules.session_patterns["daily"] = {
+        "daily_online_seconds": value
+    }
+    raw.rules.player_profiles["casual"].session_pattern = "daily"
+
+    with pytest.raises(
+        ConfigError,
+        match="daily_online_seconds",
+    ):
+        ConfigLinter.validate(raw)
+
+
 def test_linter_rejects_negative_behavior_weight() -> None:
     raw = ConfigLoader.load_rules_only(SAMPLE_CONFIG)
     raw.rules.player_profiles["casual"].behavior_weights["upgrade_fish"] = SimNumber.parse("-1")

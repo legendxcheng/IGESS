@@ -17,6 +17,7 @@ from .fish_barbell import FishBarbellDataAdapter
 from .fish_commands import (
     apply_fish_hall_upgrade,
     apply_strength_rebirth,
+    apply_trash_man_rebirth,
     apply_throw_resolution,
     lock_throw_request,
     synthesize_barbell,
@@ -38,15 +39,28 @@ MANUAL_THROW_BEHAVIOR_ID = "manual_throw"
 UPGRADE_FISH_BEHAVIOR_ID = "upgrade_fish"
 UPGRADE_FISH_HALL_BEHAVIOR_ID = "upgrade_fish_hall"
 SYNTHESIZE_BARBELL_BEHAVIOR_ID = "synthesize_barbell"
+EXERCISE_BARBELL_BEHAVIOR_ID = "exercise_barbell"
 STRENGTH_REBIRTH_BEHAVIOR_ID = "strength_rebirth"
+TRASH_MAN_REBIRTH_BEHAVIOR_ID = "trash_man_rebirth"
+REBIRTH_BEHAVIOR_IDS = frozenset(
+    {
+        STRENGTH_REBIRTH_BEHAVIOR_ID,
+        TRASH_MAN_REBIRTH_BEHAVIOR_ID,
+    }
+)
 RANDOM_AFFORDABLE_POLICY_ID = "random_affordable"
+CHEAPEST_BELOW_MATERIAL_TENTH_POLICY_ID = (
+    "cheapest_below_material_tenth"
+)
 FISH_BEHAVIOR_IDS = frozenset(
     {
         MANUAL_THROW_BEHAVIOR_ID,
         UPGRADE_FISH_BEHAVIOR_ID,
         UPGRADE_FISH_HALL_BEHAVIOR_ID,
         SYNTHESIZE_BARBELL_BEHAVIOR_ID,
+        EXERCISE_BARBELL_BEHAVIOR_ID,
         STRENGTH_REBIRTH_BEHAVIOR_ID,
+        TRASH_MAN_REBIRTH_BEHAVIOR_ID,
         IDLE_BEHAVIOR_ID,
     }
 )
@@ -120,7 +134,10 @@ class FishBehaviorAdapter:
                 raise FishBehaviorConfigError(
                     "upgrade_fish requires an explicit target policy"
                 )
-            if policy != RANDOM_AFFORDABLE_POLICY_ID:
+            if policy not in {
+                RANDOM_AFFORDABLE_POLICY_ID,
+                CHEAPEST_BELOW_MATERIAL_TENTH_POLICY_ID,
+            }:
                 raise FishBehaviorConfigError(
                     f"unknown Fish upgrade target policy: {policy}"
                 )
@@ -164,7 +181,7 @@ class FishBehaviorAdapter:
         state: PlayerState,
         profile: PlayerProfile,
     ) -> tuple[BehaviorCandidate, ...]:
-        """Return current foreground actions; Fish hall income stays passive."""
+        """Return mutually exclusive foreground Fish actions."""
 
         state.validate(self.hall_adapter.validation_context())
         candidates: list[BehaviorCandidate] = []
@@ -222,6 +239,20 @@ class FishBehaviorAdapter:
                         targets=targets,
                     )
                 )
+            elif behavior_id == EXERCISE_BARBELL_BEHAVIOR_ID:
+                barbell = self.barbell_adapter.production_snapshot(state)
+                candidates.append(
+                    BehaviorCandidate(
+                        behavior_id=behavior_id,
+                        duration=duration,
+                        available=(
+                            barbell.equipped_id > 0
+                            and barbell.equipped_count > 0
+                            and barbell.strength_per_second
+                            > SimNumber.zero()
+                        ),
+                    )
+                )
             elif behavior_id == STRENGTH_REBIRTH_BEHAVIOR_ID:
                 candidates.append(
                     BehaviorCandidate(
@@ -232,9 +263,30 @@ class FishBehaviorAdapter:
                         ),
                     )
                 )
+            elif behavior_id == TRASH_MAN_REBIRTH_BEHAVIOR_ID:
+                candidates.append(
+                    BehaviorCandidate(
+                        behavior_id=behavior_id,
+                        duration=duration,
+                        available=(
+                            self.trash_adapter.can_trash_man_rebirth(
+                                state
+                            )
+                        ),
+                    )
+                )
             elif behavior_id == IDLE_BEHAVIOR_ID:
                 candidates.append(BehaviorCandidate.idle(duration))
-        return tuple(candidates)
+        result = tuple(candidates)
+        available_rebirths = tuple(
+            candidate
+            for candidate in result
+            if (
+                candidate.behavior_id in REBIRTH_BEHAVIOR_IDS
+                and candidate.available
+            )
+        )
+        return available_rebirths or result
 
     def complete(
         self,
@@ -254,6 +306,11 @@ class FishBehaviorAdapter:
             trash_adapter=self.trash_adapter,
             barbell_adapter=self.barbell_adapter,
             runtime=production_runtime,
+            online=True,
+            barbell_training_active=(
+                decision.behavior_id
+                == EXERCISE_BARBELL_BEHAVIOR_ID
+            ),
         )
         committed = settlement.state
         details = self._decision_details(decision)
@@ -348,6 +405,16 @@ class FishBehaviorAdapter:
                 details=details,
             )
 
+        if decision.behavior_id == EXERCISE_BARBELL_BEHAVIOR_ID:
+            return FishBehaviorCompletion(
+                state=committed,
+                production_runtime=settlement.runtime,
+                next_throw_id=next_throw_id,
+                event_kind="barbell_exercise_completed",
+                item_id=f"barbell:{settlement.barbell.equipped_id}",
+                details=details,
+            )
+
         if decision.behavior_id == STRENGTH_REBIRTH_BEHAVIOR_ID:
             application = apply_strength_rebirth(
                 committed,
@@ -361,6 +428,24 @@ class FishBehaviorAdapter:
                 event_kind="strength_reborn",
                 item_id=(
                     "strength_rebirth:"
+                    f"{application.to_completed_count}"
+                ),
+                details=details,
+            )
+
+        if decision.behavior_id == TRASH_MAN_REBIRTH_BEHAVIOR_ID:
+            application = apply_trash_man_rebirth(
+                committed,
+                trash_adapter=self.trash_adapter,
+            )
+            details.update(application.event_details())
+            return FishBehaviorCompletion(
+                state=application.state,
+                production_runtime=settlement.runtime,
+                next_throw_id=next_throw_id,
+                event_kind="trash_man_reborn",
+                item_id=(
+                    "trash_man_rebirth:"
                     f"{application.to_completed_count}"
                 ),
                 details=details,
@@ -386,19 +471,37 @@ class FishBehaviorAdapter:
         policy = profile.behavior_target_policies.get(
             UPGRADE_FISH_BEHAVIOR_ID
         )
-        if policy != RANDOM_AFFORDABLE_POLICY_ID:
+        if policy not in {
+            RANDOM_AFFORDABLE_POLICY_ID,
+            CHEAPEST_BELOW_MATERIAL_TENTH_POLICY_ID,
+        }:
             return ()
-        money = state.wallet.money.to_sim_number()
-        targets = []
+        material = state.wallet.material.to_sim_number()
+        priced_items = []
         for item in sorted(
             state.fish.items,
             key=lambda value: value.instance_id,
         ):
             if item.level >= FISH_MAX_LEVEL:
                 continue
-            if self.hall_adapter.upgrade_price(item) <= money:
-                targets.append(BehaviorTarget(str(item.instance_id)))
-        return tuple(targets)
+            priced_items.append(
+                (item, self.hall_adapter.upgrade_price(item))
+            )
+        if policy == CHEAPEST_BELOW_MATERIAL_TENTH_POLICY_ID:
+            if not priced_items:
+                return ()
+            item, price = min(
+                priced_items,
+                key=lambda value: (value[1], value[0].instance_id),
+            )
+            if price * SimNumber.parse(10) >= material:
+                return ()
+            return (BehaviorTarget(str(item.instance_id)),)
+        return tuple(
+            BehaviorTarget(str(item.instance_id))
+            for item, price in priced_items
+            if price <= material
+        )
 
     def _barbell_synthesis_targets(
         self,

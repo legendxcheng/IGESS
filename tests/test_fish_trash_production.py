@@ -159,9 +159,10 @@ def test_online_cultivation_splits_trash_work_at_realm_boundary(
     assert json.loads(details["trash_processing_realm_segments"]) == [
         {
             "decompose_speed_multiplier": "1.25",
-            "elapsed_seconds": 1,
-            "material_added": "2.5",
-            "realm_id": 2,
+                "elapsed_seconds": 1,
+                "material_added": "2.5",
+                "processing_efficiency": "1",
+                "realm_id": 2,
             "unused_work": "0",
             "work_consumed": "1.25",
         }
@@ -296,6 +297,15 @@ def test_active_throw_loop_processes_trash_and_replays_checkpoint(
         "projects/fish/luban_exports",
     )
     model = ModelBuilder.build(raw)
+    profile = model.player_profiles["default"]
+    profile.behavior_weights = {"manual_throw": SimNumber.one()}
+    profile.behavior_durations = {
+        "manual_throw": {
+            "type": "fixed",
+            "seconds": 1,
+        }
+    }
+    profile.behavior_target_policies = {}
     simulator = FishEconomySimulator(
         model,
         _snapshot(tmp_path, trash_duration=3),
@@ -308,6 +318,7 @@ def test_active_throw_loop_processes_trash_and_replays_checkpoint(
     final_processing = continuous.checkpoint.engine_state["trashMan"]["processing"]
 
     assert continuous.checkpoint.event_counters["trash_processed"] == 3
+    assert continuous.checkpoint.event_counters["manual_throw_completed"] == 10
     assert sum(stock["count"] for stock in final_processing["stocks"]) == 7
     assert continuous.checkpoint.engine_state["wallet"]["material"]["sign"] == 1
     assert resumed.checkpoint.engine_state == continuous.checkpoint.engine_state

@@ -243,6 +243,8 @@ def test_authoring_workflow_dispatches_fish_engine(tmp_path: Path) -> None:
         Path("projects/fish/economy.yaml").read_text(encoding="utf-8")
     )
     payload["engine"].pop("active_throw", None)
+    payload["player_profiles"]["default"].pop("behavior_weights", None)
+    payload["player_profiles"]["default"].pop("behavior_durations", None)
     payload["engine"].update(
         {
             "data_root": str(data_root),

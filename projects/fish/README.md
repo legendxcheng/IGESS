@@ -19,7 +19,7 @@ Fish 正式数值的唯一权威生产快照是 `E:\fish-oasis\igess_export`。�
 `next_throw_id`，分段恢复不会重放已经结算的事件。每次投掷前先结算旧阵容
 截至当前秒的金钱，新鱼入库后按
 `baseMoneyPerSecond × 1.25^(level-1) × incomeMultiplier` 降序自动填满
-鱼厅容量；同收益按 `instanceId` 升序决胜。鱼可用金钱升至最高 100 级，
+鱼厅容量；同收益按 `instanceId` 升序决胜。鱼可消耗材料升至最高 100 级，
 从等级 `n` 升到 `n+1` 的价格为 `baseMoneyPerSecond × 1.5^(n-1)`，价格
 不乘变异倍率；升级会按新收益重排阵容。timeline 输出当前金钱和鱼厅 CPS，
 事件保存逐鱼公式 trace。
@@ -31,13 +31,12 @@ Fish 正式数值的唯一权威生产快照是 `E:\fish-oasis\igess_export`。�
 并按 IGESS 的固定 `max_income` 模拟策略补齐/重排阵容。
 
 杠铃使用生产 `tbbarbell`：`price` 严格消耗材料，
-`strengthPerExercise / timeCost` 是装备后的在线每秒力量。当前生产 15 档
-`timeCost` 均为 1 秒。只有正在装备的杠铃产出力量；库存 `count` 只表示持有
-数量，不放大产出。合成会在结算旧装备截至当前秒的力量后，原子扣材料、增加
-库存和 `meta.revision`，再按固定 `highest_strength_per_second` 策略自动装备
-当前每秒力量最高的已拥有杠铃；领域层也保留显式换装命令。力量与鱼厅金钱、
-垃圾佬材料使用同一生产结算锚点并进入 checkpoint。离线 50% 力量结算仍属于
-Phase 8，当前实现仅覆盖在线时间。
+`strengthPerExercise / timeCost` 是主动锻炼时的在线每秒力量。当前生产 15 档
+`timeCost` 均为 1 秒。只有当前前台行为为 `exercise_barbell` 时，正在装备的
+杠铃才产出力量；库存 `count` 只表示持有数量，不放大产出。合成原子扣材料、
+增加库存和 `meta.revision`，再按固定 `highest_strength_per_second` 策略自动
+装备当前每秒力量最高的已拥有杠铃；合成、炸鱼等其他前台行为不同时产出力量，
+领域层也保留显式换装命令。离线期间杠铃力量固定为零。
 
 力量重生使用生产 `tbstrengthrebirth` 的一基 ID：`completedCount=0` 时摸鱼厅
 使用表外默认 `1×`，下一次重生读取 `id=completedCount+1` 的力量门槛，完成
@@ -60,16 +59,36 @@ Phase 8，当前实现仅覆盖在线时间。
 IGESS 另提供可选的玩家行为循环。玩家画像可以分别配置
 `behavior_weights`、`behavior_durations` 和 `behavior_target_policies`；
 Fish 当前前台行为为 `manual_throw`、`upgrade_fish`、
-`upgrade_fish_hall`、`synthesize_barbell`、`strength_rebirth`、`idle`，
-三类持续产出始终作为后台系统并行结算。
+`upgrade_fish_hall`、`synthesize_barbell`、`exercise_barbell`、
+`strength_rebirth`、`trash_man_rebirth`、`idle`。每次只允许一个前台行为；
+摸鱼厅金钱和垃圾佬加工属于后台系统，杠铃锻炼不是后台系统。
 `upgrade_fish_hall` 是无目标行为，只在未满级且当前材料可支付时进入候选。
+生产 `upgrade_fish` 使用 `cheapest_below_material_tenth` 目标策略：从全部未满级
+鱼中选择升级价格最低的一条，同价按 `instanceId` 升序决胜；只有该最低价格
+严格低于当前材料的 `1/10` 时才进入候选。鱼升级价格从材料余额扣除。
 `synthesize_barbell` 必须显式使用 `random_affordable` 目标策略，并只从当前
 未拥有且材料可支付的杠铃中选择，避免行为模拟反复合成不提高产出的副本。
+`exercise_barbell` 仅在拥有有效已装备杠铃时进入候选，执行期间按装备速度
+持续增加力量，并与炸鱼、升级、合成和重生互斥。
 `strength_rebirth` 也是无目标行为，只在当前力量达到下一张一基表行门槛时
 进入候选。
+`trash_man_rebirth` 同样无目标；`0` 次使用表外 `1×`，第 `n` 次对应
+`tbtrashmanrebirth.id=n`，只在当前境界达到下一行 `realmRequirement`
+且没有进行中的突破时进入候选。完成后当前境界和本境界修炼进度回到初始值，
+历史最高境界保留，新的材料总倍率立即生效。
 行为选择、随机时长和目标选择使用独立稳定随机域，checkpoint 可保存进行中的
-行为并在恢复时原样继续。生产画像的具体行为权重、持续时长和升级目标策略
-尚未配置；机制测试使用显式 fixture，不能据此得出正式经济节奏结论。
+行为并在恢复时原样继续。默认画像的 `session_pattern.daily_online_seconds`
+为 `7200`，即每天从模拟日开始连续在线 2 小时、随后离线 22 小时，到下一模拟日重新
+上线。离线期间不调度前台行为，摸鱼厅金钱和废料加工按在线的 `50%` 结算，
+杠铃力量为 `0%`，垃圾佬修炼不推进。默认 `manual_throw` 与
+`exercise_barbell` 使用基准权重 `1`，低优先级 `upgrade_fish` 使用权重
+`0.1`；`synthesize_barbell` 与 `upgrade_fish_hall` 使用高优先级权重
+`100`。两类重生也配置为固定 `1` 秒行为；只要任一种达到下一档要求，候选池
+就只保留当前可执行的重生，绝对优先于所有普通前台行为。若两种同时满足，则
+稳定选择一种并在下一轮立即执行另一种。杠铃合成使用 `random_affordable`，鱼升级使用
+`cheapest_below_material_tenth`；没有可执行目标时相应行为自动过滤。未拥有杠铃
+时训练行为也会自动过滤。正式 24h/长期场景和重生回本分析仍待运行，因此暂不能
+据此得出完整经济节奏结论。
 
 IGESS 只模拟会影响数值体验的资源、概率、时间、产出、消耗、成长和策略。
 图鉴等非数值子系统不进入模拟逻辑；为兼容正式存档而存在的对应字段只透传，

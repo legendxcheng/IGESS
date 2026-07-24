@@ -22,6 +22,7 @@ def settle_trash(
     elapsed_seconds: int,
     *,
     runtime: TrashProcessingRuntime | None = None,
+    processing_efficiency: SimNumber = SimNumber.one(),
 ) -> TrashProcessingSettlement:
     if not isinstance(state, PlayerState):
         raise TypeError("state must be a PlayerState")
@@ -30,6 +31,9 @@ def settle_trash(
     runtime = runtime or TrashProcessingRuntime()
     if not isinstance(runtime, TrashProcessingRuntime):
         raise TypeError("runtime must be a TrashProcessingRuntime")
+    processing_efficiency = SimNumber.parse(processing_efficiency)
+    if processing_efficiency < SimNumber.zero():
+        raise ValueError("processing_efficiency must be non-negative")
 
     processing = state.trash_man.processing
     stocks = {stock.trash_id: stock.count for stock in processing.stocks}
@@ -48,7 +52,11 @@ def settle_trash(
     output_multiplier = adapter.material_output_multiplier(
         state.rebirth.trash_man_completed_count
     )
-    available_work = SimNumber.parse(elapsed_seconds) * speed
+    available_work = (
+        SimNumber.parse(elapsed_seconds)
+        * speed
+        * processing_efficiency
+    )
     work_consumed = SimNumber.zero()
     material_added = SimNumber.zero()
     completed: dict[int, int] = {}
@@ -141,6 +149,7 @@ def settle_trash(
         elapsed_seconds=elapsed_seconds,
         realm_id=realm_id,
         decompose_speed_multiplier=speed,
+        processing_efficiency=processing_efficiency,
         material_output_multiplier=output_multiplier,
         work_consumed=work_consumed,
         unused_work=available_work,
@@ -262,6 +271,8 @@ def settle_trash_online(
         processing=segments[-1].processing,
         runtime=current_runtime,
         elapsed_seconds=elapsed_seconds,
+        cultivation_elapsed_seconds=elapsed_seconds,
+        settlement_mode="online",
         realm_id_before=realm_before,
         realm_id_after=current_realm,
         highest_realm_id=highest_realm,
@@ -270,4 +281,48 @@ def settle_trash_online(
         paused_by_breakthrough=paused,
         segments=tuple(segments),
         transitions=tuple(transitions),
+    )
+
+
+def settle_trash_offline(
+    adapter: "FishTrashDataAdapter",
+    state: PlayerState,
+    elapsed_seconds: int,
+    *,
+    runtime: TrashProcessingRuntime | None = None,
+    processing_efficiency: SimNumber = SimNumber.parse("0.5"),
+) -> TrashOnlineSettlement:
+    """Process stocked trash offline without advancing cultivation."""
+
+    if not isinstance(state, PlayerState):
+        raise TypeError("state must be a PlayerState")
+    if type(elapsed_seconds) is not int or elapsed_seconds < 0:
+        raise ValueError("elapsed_seconds must be non-negative")
+    runtime = runtime or TrashProcessingRuntime()
+    if not isinstance(runtime, TrashProcessingRuntime):
+        raise TypeError("runtime must be a TrashProcessingRuntime")
+    segment = adapter.settle(
+        state,
+        elapsed_seconds,
+        runtime=runtime,
+        processing_efficiency=processing_efficiency,
+    )
+    return TrashOnlineSettlement(
+        processing=segment.processing,
+        runtime=segment.runtime,
+        elapsed_seconds=elapsed_seconds,
+        cultivation_elapsed_seconds=0,
+        settlement_mode="offline",
+        realm_id_before=state.trash_man.realm_id,
+        realm_id_after=state.trash_man.realm_id,
+        highest_realm_id=state.trash_man.highest_realm_id,
+        training_progress_seconds_before=(
+            state.trash_man.training_progress_seconds
+        ),
+        training_progress_seconds_after=(
+            state.trash_man.training_progress_seconds
+        ),
+        paused_by_breakthrough=state.trash_man.breakthrough.active,
+        segments=(segment,),
+        transitions=(),
     )

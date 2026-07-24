@@ -59,8 +59,8 @@ class AppliedFishUpgrade:
     from_level: int
     to_level: int
     price: SimNumber
-    money_before: SimNumber
-    money_after: SimNumber
+    material_before: SimNumber
+    material_after: SimNumber
     income_before: FishIncomeTrace
     income_after: FishIncomeTrace
     fish_hall_before: FishHallIncomeSnapshot
@@ -76,6 +76,7 @@ class AppliedFishUpgrade:
             "fish_upgrade_price_formula": (
                 "base_money_per_second*1.5^(current_level-1)"
             ),
+            "fish_upgrade_price_resource": "material",
             "fish_upgrade_price_uses_mutation": "false",
             "fish_income_formula": (
                 "base_money_per_second*1.25^(level-1)"
@@ -87,10 +88,12 @@ class AppliedFishUpgrade:
             "fish_income_per_second_after": (
                 self.income_after.income_per_second.to_decimal_string()
             ),
-            "money_before_fish_upgrade": (
-                self.money_before.to_decimal_string()
+            "material_before_fish_upgrade": (
+                self.material_before.to_decimal_string()
             ),
-            "money_after_fish_upgrade": self.money_after.to_decimal_string(),
+            "material_after_fish_upgrade": (
+                self.material_after.to_decimal_string()
+            ),
             "player_state_revision": str(self.state.meta.revision),
         }
         details.update(
@@ -209,6 +212,73 @@ class AppliedStrengthRebirth:
             )
         )
         return details
+
+
+@dataclass(frozen=True)
+class AppliedTrashManRebirth:
+    state: PlayerState
+    from_completed_count: int
+    to_completed_count: int
+    realm_requirement: int
+    realm_before: int
+    realm_after: int
+    highest_realm_id: int
+    training_progress_seconds_before: int
+    training_progress_seconds_after: int
+    material_multiplier_before: SimNumber
+    material_multiplier_after: SimNumber
+
+    def event_details(self) -> dict[str, str]:
+        return {
+            "trash_man_rebirth_completed_count_before": str(
+                self.from_completed_count
+            ),
+            "trash_man_rebirth_completed_count_after": str(
+                self.to_completed_count
+            ),
+            "trash_man_rebirth_table_id": str(self.to_completed_count),
+            "trash_man_rebirth_realm_requirement": str(
+                self.realm_requirement
+            ),
+            "trash_man_rebirth_realm_requirement_source": (
+                "tbtrashmanrebirth"
+                f"[id={self.to_completed_count}].realmRequirement"
+            ),
+            "trash_man_rebirth_realm_requirement_check": (
+                "current_realm_id>=realmRequirement"
+            ),
+            "trash_man_rebirth_realm_before": str(self.realm_before),
+            "trash_man_rebirth_realm_after": str(self.realm_after),
+            "trash_man_rebirth_highest_realm_preserved": str(
+                self.highest_realm_id
+            ),
+            "trash_man_training_progress_seconds_before_rebirth": str(
+                self.training_progress_seconds_before
+            ),
+            "trash_man_training_progress_seconds_after_rebirth": str(
+                self.training_progress_seconds_after
+            ),
+            "trash_man_rebirth_reset_fields": (
+                "trashMan.realmId,trashMan.trainingProgressSeconds"
+            ),
+            "trash_man_rebirth_preserved_fields": (
+                "fish,trash,money,material,strength,torpedo,barbell,"
+                "fish_hall,trash_man.highest_realm_id,"
+                "trash_man.upgrades,trash_man.processing,collection,"
+                "automation,statistics,strength_rebirth"
+            ),
+            "trash_man_rebirth_material_multiplier_before": (
+                self.material_multiplier_before.to_decimal_string()
+            ),
+            "trash_man_rebirth_material_multiplier_after": (
+                self.material_multiplier_after.to_decimal_string()
+            ),
+            "trash_man_rebirth_multiplier_source": (
+                "completed_count_0_is_default_1x_not_in_table;"
+                "completed_count_n_uses_tbtrashmanrebirth_id_n"
+            ),
+            "player_state_revision": str(self.state.meta.revision),
+        }
 
 
 @dataclass(frozen=True)

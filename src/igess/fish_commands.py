@@ -8,6 +8,7 @@ from .fish_command_results import (
     AppliedFishHallUpgrade,
     AppliedFishUpgrade,
     AppliedStrengthRebirth,
+    AppliedTrashManRebirth,
     AppliedThrowResolution,
     FishCommandError,
 )
@@ -16,7 +17,10 @@ from .fish_hall_commands import (
     settle_fish_hall_income,
     upgrade_fish,
 )
-from .fish_rebirth_commands import apply_strength_rebirth
+from .fish_rebirth_commands import (
+    apply_strength_rebirth,
+    apply_trash_man_rebirth,
+)
 from .fish_throw_commands import apply_throw_resolution, lock_throw_request
 
 __all__ = [
@@ -26,10 +30,12 @@ __all__ = [
     "AppliedFishHallUpgrade",
     "AppliedFishUpgrade",
     "AppliedStrengthRebirth",
+    "AppliedTrashManRebirth",
     "AppliedThrowResolution",
     "FishCommandError",
     "apply_fish_hall_upgrade",
     "apply_strength_rebirth",
+    "apply_trash_man_rebirth",
     "apply_throw_resolution",
     "equip_barbell",
     "lock_throw_request",

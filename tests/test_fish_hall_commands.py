@@ -107,6 +107,7 @@ def test_fish_upgrade_atomically_pays_levels_and_reorders_hall(
     hall_adapter = FishHallDataAdapter(_snapshot(tmp_path))
     state = PlayerState.new(initial_torpedo_id=1)
     state.wallet.money = state.wallet.money.from_value("100")
+    state.wallet.material = state.wallet.material.from_value("100")
     state.fish.items = [
         FishInstance(1, 1, 7, 1, 100, 2),
         FishInstance(2, 2, 2, 1, 100, 1),
@@ -120,11 +121,12 @@ def test_fish_upgrade_atomically_pays_levels_and_reorders_hall(
     assert application.from_level == 1
     assert application.to_level == 2
     assert application.price.to_decimal_string() == "10"
-    assert application.money_before.to_decimal_string() == "100"
-    assert application.money_after.to_decimal_string() == "90"
+    assert application.material_before.to_decimal_string() == "100"
+    assert application.material_after.to_decimal_string() == "90"
     assert application.income_before.income_per_second.to_decimal_string() == "10"
     assert application.income_after.income_per_second.to_decimal_string() == "12.5"
-    assert application.state.wallet.money.to_sim_number() == SimNumber.parse("90")
+    assert application.state.wallet.money.to_sim_number() == SimNumber.parse("100")
+    assert application.state.wallet.material.to_sim_number() == SimNumber.parse("90")
     assert application.state.fish.items[0].level == 2
     assert application.state.fish.items[0].hall_slot == 1
     assert application.state.fish.items[1].hall_slot == 2
@@ -133,24 +135,28 @@ def test_fish_upgrade_atomically_pays_levels_and_reorders_hall(
     assert details["fish_upgrade_price_formula"] == (
         "base_money_per_second*1.5^(current_level-1)"
     )
+    assert details["fish_upgrade_price_resource"] == "material"
     assert details["fish_upgrade_price_uses_mutation"] == "false"
+    assert details["material_before_fish_upgrade"] == "100"
+    assert details["material_after_fish_upgrade"] == "90"
     assert details["fish_income_formula"] == (
         "base_money_per_second*1.25^(level-1)*mutation_income_multiplier"
     )
     assert details["fish_hall_deployed_instance_ids_after_upgrade"] == "[1,2]"
 
 
-def test_fish_upgrade_rejects_insufficient_money_without_mutation(
+def test_fish_upgrade_rejects_insufficient_material_without_mutation(
     tmp_path: Path,
 ) -> None:
     hall_adapter = FishHallDataAdapter(_snapshot(tmp_path))
     state = PlayerState.new(initial_torpedo_id=1)
-    state.wallet.money = state.wallet.money.from_value("9")
+    state.wallet.money = state.wallet.money.from_value("100")
+    state.wallet.material = state.wallet.material.from_value("9")
     state.fish.items = [FishInstance(1, 1, 7, 1, 100, 1)]
     state.fish.next_instance_id = 2
     original = state.to_dict(context=hall_adapter.validation_context())
 
-    with pytest.raises(FishCommandError, match="insufficient money"):
+    with pytest.raises(FishCommandError, match="insufficient material"):
         upgrade_fish(state, 1, hall_adapter=hall_adapter)
 
     assert state.to_dict(context=hall_adapter.validation_context()) == original

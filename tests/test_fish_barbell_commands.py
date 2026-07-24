@@ -147,7 +147,7 @@ def test_explicit_barbell_equip_changes_only_the_equipped_item(
     )
 
 
-def test_barbell_online_strength_is_part_of_unified_production_settlement(
+def test_barbell_strength_requires_explicit_online_training(
     tmp_path: Path,
 ) -> None:
     snapshot = _snapshot(tmp_path)
@@ -161,7 +161,7 @@ def test_barbell_online_strength_is_part_of_unified_production_settlement(
     state.barbell.owned = [OwnedBarbell(1, 3)]
     state.barbell.equipped_id = 1
 
-    settlement = settle_fish_production(
+    passive = settle_fish_production(
         state,
         5,
         hall_adapter=hall_adapter,
@@ -169,16 +169,32 @@ def test_barbell_online_strength_is_part_of_unified_production_settlement(
         barbell_adapter=barbell_adapter,
     )
 
-    assert settlement.strength_added == SimNumber.parse(10)
-    assert settlement.state.wallet.strength.to_sim_number() == (
+    assert passive.strength_added == SimNumber.zero()
+    assert passive.state.wallet.strength.to_sim_number() == (
+        SimNumber.parse(10)
+    )
+    assert passive.event_details()["barbell_training_active"] == "false"
+
+    training = settle_fish_production(
+        state,
+        5,
+        hall_adapter=hall_adapter,
+        trash_adapter=FishTrashDataAdapter(snapshot),
+        barbell_adapter=barbell_adapter,
+        barbell_training_active=True,
+    )
+
+    assert training.strength_added == SimNumber.parse(10)
+    assert training.state.wallet.strength.to_sim_number() == (
         SimNumber.parse(20)
     )
-    assert settlement.state.meta.revision == 1
-    assert settlement.barbell.equipped_count == 3
-    assert settlement.barbell.strength_per_second == SimNumber.parse(2)
-    assert settlement.event_details()["barbell_strength_added"] == "10"
+    assert training.state.meta.revision == 1
+    assert training.barbell.equipped_count == 3
+    assert training.barbell.strength_per_second == SimNumber.parse(2)
+    assert training.event_details()["barbell_strength_added"] == "10"
+    assert training.event_details()["barbell_training_active"] == "true"
     assert (
-        settlement.event_details()[
+        training.event_details()[
             "barbell_owned_count_affects_output_before_command"
         ]
         == "false"

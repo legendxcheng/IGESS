@@ -85,6 +85,7 @@ session_patterns:
   authoring_default:
     offline_every_seconds: 60
     offline_duration_seconds: 0
+    daily_online_seconds: 7200
 player_profiles:
   default:
     source_efficiency:
@@ -98,6 +99,39 @@ player_profiles:
     prestige_policy: conservative
     activity_weights:
       starter_fish_hall: '1'
+    behavior_weights:
+      manual_throw: '1'
+      upgrade_fish: '0.1'
+      upgrade_fish_hall: '100'
+      synthesize_barbell: '100'
+      exercise_barbell: '1'
+      strength_rebirth: '1'
+      trash_man_rebirth: '1'
+    behavior_durations:
+      manual_throw:
+        type: fixed
+        seconds: 1
+      upgrade_fish:
+        type: fixed
+        seconds: 1
+      upgrade_fish_hall:
+        type: fixed
+        seconds: 1
+      synthesize_barbell:
+        type: fixed
+        seconds: 1
+      exercise_barbell:
+        type: fixed
+        seconds: 1
+      strength_rebirth:
+        type: fixed
+        seconds: 1
+      trash_man_rebirth:
+        type: fixed
+        seconds: 1
+    behavior_target_policies:
+      upgrade_fish: cheapest_below_material_tenth
+      synthesize_barbell: random_affordable
     luck: '1'
 scenarios:
   smoke:

@@ -217,8 +217,13 @@ _SCHEMAS = (
         "session_pattern",
         "yaml",
         "session_patterns",
-        _field("offline_every_seconds", "positive_int"),
-        _field("offline_duration_seconds", "nonnegative_int"),
+        _field("offline_every_seconds", "positive_int", required=False),
+        _field(
+            "offline_duration_seconds",
+            "nonnegative_int",
+            required=False,
+        ),
+        _field("daily_online_seconds", "positive_int", required=False),
     ),
     _schema(
         "player_profile",

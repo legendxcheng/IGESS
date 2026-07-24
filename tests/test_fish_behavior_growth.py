@@ -13,6 +13,7 @@ from igess.behavior import (
 from igess.builder import ModelBuilder
 from igess.fish_barbell import FishBarbellDataAdapter
 from igess.fish_behavior import (
+    EXERCISE_BARBELL_BEHAVIOR_ID,
     STRENGTH_REBIRTH_BEHAVIOR_ID,
     SYNTHESIZE_BARBELL_BEHAVIOR_ID,
     FishBehaviorAdapter,
@@ -252,6 +253,7 @@ def test_barbell_synthesis_behavior_uses_explicit_affordable_unowned_targets(
             "seconds": 1,
         }
     }
+    profile.behavior_target_policies = {}
     state = PlayerState.new(
         initial_torpedo_id=1,
         initial_trash_man_realm_id=1,
@@ -275,7 +277,7 @@ def test_barbell_synthesis_behavior_uses_explicit_affordable_unowned_targets(
     assert [target.target_id for target in candidate.targets] == ["2"]
 
 
-def test_barbell_synthesis_settles_old_equipment_before_auto_equip(
+def test_barbell_synthesis_does_not_train_with_old_equipment(
     tmp_path: Path,
 ) -> None:
     snapshot = _snapshot(tmp_path)
@@ -323,11 +325,8 @@ def test_barbell_synthesis_settles_old_equipment_before_auto_equip(
         next_throw_id=0,
     )
 
-    assert completion.details["barbell_strength_added"] == "8"
-    assert (
-        completion.state.wallet.strength.to_sim_number()
-        == SimNumber.parse(8)
-    )
+    assert completion.details["barbell_strength_added"] == "0"
+    assert completion.state.wallet.strength.to_sim_number().is_zero()
     assert completion.state.wallet.material.to_sim_number().is_zero()
     assert completion.state.barbell.equipped_id == 2
     assert completion.details[
@@ -443,4 +442,73 @@ def test_barbell_synthesis_checkpoint_does_not_pay_or_produce_mid_behavior(
             continuous.checkpoint.engine_runtime_state
         ),
     )
-    assert post_synthesis.strength_added == SimNumber.parse(4)
+    assert post_synthesis.strength_added == SimNumber.zero()
+
+    training = settle_fish_production(
+        final_state,
+        6,
+        hall_adapter=FishHallDataAdapter(snapshot),
+        trash_adapter=FishTrashDataAdapter(snapshot),
+        barbell_adapter=FishBarbellDataAdapter(snapshot),
+        runtime=FishProductionRuntime.from_dict(
+            continuous.checkpoint.engine_runtime_state
+        ),
+        barbell_training_active=True,
+    )
+    assert training.strength_added == SimNumber.parse(4)
+
+
+def test_exercise_barbell_is_the_only_strength_producing_behavior(
+    tmp_path: Path,
+) -> None:
+    snapshot = _snapshot(tmp_path)
+    adapter = FishBehaviorAdapter(
+        throw_adapter=FishThrowDataAdapter(
+            snapshot,
+            bonus_base_luck=1,
+            max_bonus_layers=4,
+        ),
+        hall_adapter=FishHallDataAdapter(snapshot),
+        trash_adapter=FishTrashDataAdapter(snapshot),
+        barbell_adapter=FishBarbellDataAdapter(snapshot),
+        throw_config=ProductionThrowConfig.from_mapping(
+            {
+                "initial_strength": "50",
+                "interval_seconds": 1,
+                "regular_luck_multiplier": "1",
+                "bonus_base_luck": "1",
+                "max_bonus_layers": 4,
+            }
+        ),
+    )
+    state = PlayerState.new(
+        initial_torpedo_id=1,
+        initial_strength=0,
+        initial_trash_man_realm_id=1,
+    )
+    state.barbell.owned = [OwnedBarbell(1, 3)]
+    state.barbell.equipped_id = 1
+    decision = BehaviorDecision(
+        sequence_id=0,
+        profile_id="default",
+        behavior_id=EXERCISE_BARBELL_BEHAVIOR_ID,
+        target_id=None,
+        duration_seconds=4,
+        started_at_seconds=0,
+        completes_at_seconds=4,
+    )
+
+    completion = adapter.complete(
+        state,
+        decision,
+        root_random_seed=7,
+        next_throw_id=0,
+    )
+
+    assert completion.event_kind == "barbell_exercise_completed"
+    assert completion.item_id == "barbell:1"
+    assert completion.state.wallet.strength.to_sim_number() == (
+        SimNumber.parse(8)
+    )
+    assert completion.details["barbell_training_active"] == "true"
+    assert completion.details["barbell_strength_added"] == "8"

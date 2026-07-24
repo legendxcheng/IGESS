@@ -3,21 +3,28 @@ from __future__ import annotations
 from decimal import Decimal
 
 from .behavior import (
+    IDLE_BEHAVIOR_ID,
+    BehaviorCandidate,
     BehaviorDecision,
     BehaviorRuntimeState,
     BehaviorScheduler,
+    FixedDuration,
+    UniformIntDuration,
 )
 from .checkpoint import SimulationCheckpoint
 from .fish_barbell import FishBarbellDataAdapter
 from .fish_behavior import (
+    EXERCISE_BARBELL_BEHAVIOR_ID,
     FISH_BEHAVIOR_IDS,
     FishBehaviorAdapter,
     MANUAL_THROW_BEHAVIOR_ID,
     STRENGTH_REBIRTH_BEHAVIOR_ID,
     SYNTHESIZE_BARBELL_BEHAVIOR_ID,
+    TRASH_MAN_REBIRTH_BEHAVIOR_ID,
     UPGRADE_FISH_BEHAVIOR_ID,
     UPGRADE_FISH_HALL_BEHAVIOR_ID,
 )
+from .fish_session import FishDailySessionSchedule
 from .fish_data import FishDataSnapshot
 from .fish_hall import FishHallDataAdapter
 from .fish_production import (
@@ -83,6 +90,9 @@ class FishBehaviorSimulator:
         profile_id = scenario.profiles[0]
         profile = self.model.player_profiles[profile_id]
         behavior_profile = self.adapter.behavior_profile(profile)
+        session_schedule = FishDailySessionSchedule.from_mapping(
+            self.model.session_patterns[profile.session_pattern]
+        )
         duration_seconds = int(scenario.duration_hours * 3600)
 
         if checkpoint is None:
@@ -163,6 +173,12 @@ class FishBehaviorSimulator:
                     state,
                     start_time,
                     production_runtime,
+                    online=session_schedule.is_online(start_time),
+                    active_behavior_id=(
+                        None
+                        if runtime.active is None
+                        else runtime.active.behavior_id
+                    ),
                 ),
             )
         ]
@@ -177,6 +193,13 @@ class FishBehaviorSimulator:
                     "engine_id": "fish",
                     "model_digest": self.model_digest,
                     "behavior_scheduler": "weighted_duration_v1",
+                    "daily_online_seconds": str(
+                        session_schedule.daily_online_seconds
+                    ),
+                    "barbell_strength_source": (
+                        EXERCISE_BARBELL_BEHAVIOR_ID
+                    ),
+                    "offline_barbell_strength": "0",
                     "production_data": str(
                         self.data.production_data
                     ).lower(),
@@ -198,13 +221,133 @@ class FishBehaviorSimulator:
         current_time = start_time
 
         while current_time < target_time:
-            if runtime.active is None:
-                decision = scheduler.decide(
-                    self.adapter.candidates(state, profile),
-                    behavior_profile,
-                    sequence_id=runtime.next_sequence_id,
-                    started_at_seconds=current_time,
+            online = session_schedule.is_online(current_time)
+            next_session_transition = (
+                session_schedule.next_transition_after(current_time)
+            )
+            next_record = (
+                record_times[record_index]
+                if record_index < len(record_times)
+                else target_time
+            )
+
+            if not online:
+                if runtime.active is not None:
+                    raise ValueError(
+                        "offline checkpoint cannot contain an active behavior"
+                    )
+                boundary = min(
+                    target_time,
+                    next_record,
+                    (
+                        next_session_transition
+                        if next_session_transition is not None
+                        else target_time
+                    ),
                 )
+                reached_session_transition = (
+                    next_session_transition is not None
+                    and boundary == next_session_transition
+                )
+                if reached_session_transition:
+                    settlement = settle_fish_production(
+                        state,
+                        boundary,
+                        hall_adapter=self.hall_adapter,
+                        trash_adapter=self.trash_adapter,
+                        barbell_adapter=self.barbell_adapter,
+                        runtime=production_runtime,
+                        online=False,
+                    )
+                    state = settlement.state
+                    production_runtime = settlement.runtime
+                    self._record_production_counters(
+                        event_counters,
+                        settlement.elapsed_seconds,
+                        settlement.trash_processing.completed_count,
+                    )
+                    self._increment(
+                        event_counters,
+                        "fish_offline_settled",
+                    )
+                    events.append(
+                        Event(
+                            scenario_id=scenario_id,
+                            profile_id=profile_id,
+                            time_seconds=boundary,
+                            kind="fish_offline_settled",
+                            item_id="session:offline",
+                            details=settlement.event_details(),
+                        )
+                    )
+                    events.append(
+                        Event(
+                            scenario_id=scenario_id,
+                            profile_id=profile_id,
+                            time_seconds=boundary,
+                            kind="fish_session_online_started",
+                            item_id="session:online",
+                            details={
+                                "daily_online_seconds": str(
+                                    session_schedule.daily_online_seconds
+                                )
+                            },
+                        )
+                    )
+
+                current_time = boundary
+                if (
+                    record_index < len(record_times)
+                    and record_times[record_index] == boundary
+                ):
+                    timeline.append(
+                        self._timeline_row(
+                            scenario_id,
+                            profile_id,
+                            boundary,
+                            self._display_state(
+                                state,
+                                boundary,
+                                production_runtime,
+                                online=False,
+                            ),
+                        )
+                    )
+                    record_index += 1
+                continue
+
+            if runtime.active is None:
+                remaining_online_seconds = (
+                    session_schedule.online_seconds_remaining(current_time)
+                )
+                raw_candidates = self.adapter.candidates(state, profile)
+                candidates = (
+                    raw_candidates
+                    if next_session_transition is None
+                    else self._fit_candidates_to_online_window(
+                        raw_candidates,
+                        remaining_online_seconds,
+                    )
+                )
+                if candidates:
+                    decision = scheduler.decide(
+                        candidates,
+                        behavior_profile,
+                        sequence_id=runtime.next_sequence_id,
+                        started_at_seconds=current_time,
+                    )
+                else:
+                    decision = BehaviorDecision(
+                        sequence_id=runtime.next_sequence_id,
+                        profile_id=profile_id,
+                        behavior_id=IDLE_BEHAVIOR_ID,
+                        target_id=None,
+                        duration_seconds=remaining_online_seconds,
+                        started_at_seconds=current_time,
+                        completes_at_seconds=(
+                            current_time + remaining_online_seconds
+                        ),
+                    )
                 runtime = BehaviorRuntimeState(
                     next_sequence_id=runtime.next_sequence_id + 1,
                     active=decision,
@@ -227,17 +370,25 @@ class FishBehaviorSimulator:
             active = runtime.active
             if active is None:
                 raise AssertionError("behavior scheduler did not create an action")
-            next_record = (
-                record_times[record_index]
-                if record_index < len(record_times)
-                else target_time
-            )
             boundary = min(
                 active.completes_at_seconds,
                 next_record,
                 target_time,
+                (
+                    next_session_transition
+                    if next_session_transition is not None
+                    else target_time
+                ),
             )
             completed = active.completes_at_seconds == boundary
+            reached_session_transition = (
+                next_session_transition is not None
+                and boundary == next_session_transition
+            )
+            if reached_session_transition and not completed:
+                raise ValueError(
+                    "active behavior crosses the daily offline boundary"
+                )
             if completed:
                 completion = self.adapter.complete(
                     state,
@@ -257,26 +408,15 @@ class FishBehaviorSimulator:
                     event_counters,
                     f"{active.behavior_id}_completed",
                 )
-                if (
+                self._record_production_counters(
+                    event_counters,
                     int(
                         completion.details[
                             "fish_hall_settlement_elapsed_seconds"
                         ]
-                    )
-                    > 0
-                ):
-                    self._increment(
-                        event_counters,
-                        "fish_hall_settled",
-                    )
-                    completed_trash = int(
-                        completion.details["trash_completed_count"]
-                    )
-                    if completed_trash:
-                        event_counters["trash_processed"] = (
-                            event_counters.get("trash_processed", 0)
-                            + completed_trash
-                        )
+                    ),
+                    int(completion.details["trash_completed_count"]),
+                )
                 events.append(
                     Event(
                         scenario_id=scenario_id,
@@ -287,6 +427,22 @@ class FishBehaviorSimulator:
                         details=completion.details,
                     )
                 )
+                if reached_session_transition:
+                    events.append(
+                        Event(
+                            scenario_id=scenario_id,
+                            profile_id=profile_id,
+                            time_seconds=boundary,
+                            kind="fish_session_offline_started",
+                            item_id="session:offline",
+                            details={
+                                "daily_online_seconds": str(
+                                    session_schedule.daily_online_seconds
+                                ),
+                                "barbell_strength_offline_efficiency": "0",
+                            },
+                        )
+                    )
 
             current_time = boundary
             if (
@@ -302,6 +458,12 @@ class FishBehaviorSimulator:
                             state,
                             boundary,
                             production_runtime,
+                            online=session_schedule.is_online(boundary),
+                            active_behavior_id=(
+                                None
+                                if runtime.active is None
+                                else runtime.active.behavior_id
+                            ),
                         ),
                     )
                 )
@@ -320,26 +482,45 @@ class FishBehaviorSimulator:
                 trash_adapter=self.trash_adapter,
                 barbell_adapter=self.barbell_adapter,
                 runtime=production_runtime,
+                online=session_schedule.is_online(target_time),
+                barbell_training_active=(
+                    session_schedule.is_online(target_time)
+                    and runtime.active is not None
+                    and runtime.active.behavior_id
+                    == EXERCISE_BARBELL_BEHAVIOR_ID
+                ),
             )
             state = final_settlement.state
             production_runtime = final_settlement.runtime
             if final_settlement.elapsed_seconds > 0:
-                self._increment(event_counters, "fish_hall_settled")
                 completed_trash = (
                     final_settlement.trash_processing.completed_count
                 )
-                if completed_trash:
-                    event_counters["trash_processed"] = (
-                        event_counters.get("trash_processed", 0)
-                        + completed_trash
+                self._record_production_counters(
+                    event_counters,
+                    final_settlement.elapsed_seconds,
+                    completed_trash,
+                )
+                if not final_settlement.online:
+                    self._increment(
+                        event_counters,
+                        "fish_offline_settled",
                     )
                 events.append(
                     Event(
                         scenario_id=scenario_id,
                         profile_id=profile_id,
                         time_seconds=target_time,
-                        kind="fish_hall_settled",
-                        item_id="fish_hall:scenario_end",
+                        kind=(
+                            "fish_hall_settled"
+                            if final_settlement.online
+                            else "fish_offline_settled"
+                        ),
+                        item_id=(
+                            "fish_hall:scenario_end"
+                            if final_settlement.online
+                            else "session:scenario_end"
+                        ),
                         details=final_settlement.event_details(),
                     )
                 )
@@ -369,6 +550,9 @@ class FishBehaviorSimulator:
         state: PlayerState,
         time_seconds: int,
         production_runtime: FishProductionRuntime,
+        *,
+        online: bool,
+        active_behavior_id: str | None = None,
     ) -> PlayerState:
         if state.production.last_settled_at >= time_seconds:
             return state
@@ -379,7 +563,66 @@ class FishBehaviorSimulator:
             trash_adapter=self.trash_adapter,
             barbell_adapter=self.barbell_adapter,
             runtime=production_runtime,
+            online=online,
+            barbell_training_active=(
+                online
+                and active_behavior_id == EXERCISE_BARBELL_BEHAVIOR_ID
+            ),
         ).state
+
+    @staticmethod
+    def _fit_candidates_to_online_window(
+        candidates: tuple[BehaviorCandidate, ...],
+        remaining_seconds: int,
+    ) -> tuple[BehaviorCandidate, ...]:
+        """Keep actions that can finish before the strict logout boundary."""
+
+        if type(remaining_seconds) is not int or remaining_seconds <= 0:
+            return ()
+        fitted: list[BehaviorCandidate] = []
+        for candidate in candidates:
+            if not candidate.available:
+                continue
+            duration = candidate.duration
+            if isinstance(duration, FixedDuration):
+                if duration.seconds > remaining_seconds:
+                    continue
+                fitted_duration = duration
+            elif isinstance(duration, UniformIntDuration):
+                if duration.min_seconds > remaining_seconds:
+                    continue
+                fitted_duration = UniformIntDuration(
+                    duration.min_seconds,
+                    min(duration.max_seconds, remaining_seconds),
+                )
+            else:
+                raise TypeError("unsupported behavior duration")
+            fitted.append(
+                BehaviorCandidate(
+                    behavior_id=candidate.behavior_id,
+                    duration=fitted_duration,
+                    available=candidate.available,
+                    targets=candidate.targets,
+                )
+            )
+        return tuple(fitted)
+
+    @staticmethod
+    def _record_production_counters(
+        event_counters: dict[str, int],
+        elapsed_seconds: int,
+        completed_trash: int,
+    ) -> None:
+        if elapsed_seconds <= 0:
+            return
+        event_counters["fish_hall_settled"] = (
+            event_counters.get("fish_hall_settled", 0) + 1
+        )
+        if completed_trash > 0:
+            event_counters["trash_processed"] = (
+                event_counters.get("trash_processed", 0)
+                + completed_trash
+            )
 
     def _timeline_row(
         self,
@@ -434,8 +677,16 @@ class FishBehaviorSimulator:
             f"{SYNTHESIZE_BARBELL_BEHAVIOR_ID}_completed",
             0,
         )
+        barbell_exercises = event_counters.get(
+            f"{EXERCISE_BARBELL_BEHAVIOR_ID}_completed",
+            0,
+        )
         strength_rebirths = event_counters.get(
             f"{STRENGTH_REBIRTH_BEHAVIOR_ID}_completed",
+            0,
+        )
+        trash_man_rebirths = event_counters.get(
+            f"{TRASH_MAN_REBIRTH_BEHAVIOR_ID}_completed",
             0,
         )
         idle = event_counters.get("idle_completed", 0)
@@ -446,7 +697,9 @@ class FishBehaviorSimulator:
             upgrades,
             hall_upgrades,
             barbell_syntheses,
+            barbell_exercises,
             strength_rebirths,
+            trash_man_rebirths,
             idle,
         )
         if any(type(value) is not int or value < 0 for value in counters):
@@ -471,7 +724,9 @@ class FishBehaviorSimulator:
                 + upgrades
                 + hall_upgrades
                 + barbell_syntheses
+                + barbell_exercises
                 + strength_rebirths
+                + trash_man_rebirths
                 + idle
             )
             or started != completed + int(active is not None)
@@ -482,9 +737,11 @@ class FishBehaviorSimulator:
             or len(state.fish.items) != manual_throws
             or trash_count + trash_processed != manual_throws
             or state.fish_hall.upgrade_level != hall_upgrades
-            or owned_barbell_count != barbell_syntheses
+            or owned_barbell_count < barbell_syntheses
             or state.rebirth.strength_completed_count
             != strength_rebirths
+            or state.rebirth.trash_man_completed_count
+            != trash_man_rebirths
             or state.barbell.equipped_id
             != self.barbell_adapter.best_owned_id(state)
             or state.production.last_settled_at > simulated_time_seconds

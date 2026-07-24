@@ -27,6 +27,13 @@ class TrashManRealmRule:
 
 
 @dataclass(frozen=True)
+class TrashManRebirthRule:
+    completed_count: int
+    realm_requirement: int
+    material_output_multiplier: SimNumber
+
+
+@dataclass(frozen=True)
 class TrashManRealmTransition:
     from_realm_id: int
     to_realm_id: int
@@ -84,6 +91,7 @@ class TrashProcessingSettlement:
     elapsed_seconds: int
     realm_id: int
     decompose_speed_multiplier: SimNumber
+    processing_efficiency: SimNumber
     material_output_multiplier: SimNumber
     work_consumed: SimNumber
     unused_work: SimNumber
@@ -102,7 +110,8 @@ class TrashProcessingSettlement:
         }
         return {
             "trash_processing_formula": (
-                "work=elapsed_seconds*decompose_speed_multiplier;"
+                "work=elapsed_seconds*decompose_speed_multiplier"
+                "*processing_efficiency;"
                 "material=base_material_per_second*work_consumed"
                 "*trash_to_treasure_output_multiplier"
             ),
@@ -111,6 +120,9 @@ class TrashProcessingSettlement:
             "trash_processing_realm_id": str(self.realm_id),
             "trash_decompose_speed_multiplier": (
                 self.decompose_speed_multiplier.to_decimal_string()
+            ),
+            "trash_processing_efficiency": (
+                self.processing_efficiency.to_decimal_string()
             ),
             "trash_material_output_multiplier": (
                 self.material_output_multiplier.to_decimal_string()
@@ -141,6 +153,8 @@ class TrashOnlineSettlement:
     processing: TrashProcessingState
     runtime: TrashProcessingRuntime
     elapsed_seconds: int
+    cultivation_elapsed_seconds: int
+    settlement_mode: str
     realm_id_before: int
     realm_id_after: int
     highest_realm_id: int
@@ -203,6 +217,9 @@ class TrashOnlineSettlement:
                 "decompose_speed_multiplier": (
                     segment.decompose_speed_multiplier.to_decimal_string()
                 ),
+                "processing_efficiency": (
+                    segment.processing_efficiency.to_decimal_string()
+                ),
                 "work_consumed": segment.work_consumed.to_decimal_string(),
                 "unused_work": segment.unused_work.to_decimal_string(),
                 "material_added": segment.material_added.to_decimal_string(),
@@ -211,15 +228,20 @@ class TrashOnlineSettlement:
         ]
         return {
             "trash_processing_formula": (
-                "work=elapsed_seconds*decompose_speed_multiplier;"
+                "work=elapsed_seconds*decompose_speed_multiplier"
+                "*processing_efficiency;"
                 "material=base_material_per_second*work_consumed"
                 "*trash_to_treasure_output_multiplier"
             ),
+            "trash_processing_mode": self.settlement_mode,
             "trash_processing_queue_policy": "trash_id_ascending",
             "trash_processing_elapsed_seconds": str(self.elapsed_seconds),
             "trash_processing_realm_id": str(first_segment.realm_id),
             "trash_decompose_speed_multiplier": (
                 first_segment.decompose_speed_multiplier.to_decimal_string()
+            ),
+            "trash_processing_efficiency": (
+                first_segment.processing_efficiency.to_decimal_string()
             ),
             "trash_material_output_multiplier": (
                 first_segment.material_output_multiplier.to_decimal_string()
@@ -254,7 +276,9 @@ class TrashOnlineSettlement:
             ),
             "trash_man_cultivation_online_only": "true",
             "trash_man_cultivation_ceiling": "historical_highest_realm",
-            "trash_man_cultivation_elapsed_seconds": str(self.elapsed_seconds),
+            "trash_man_cultivation_elapsed_seconds": str(
+                self.cultivation_elapsed_seconds
+            ),
             "trash_man_realm_id_before": str(self.realm_id_before),
             "trash_man_realm_id_after": str(self.realm_id_after),
             "trash_man_highest_realm_id": str(self.highest_realm_id),

@@ -6,6 +6,7 @@ from typing import Any, Mapping
 from .fish_data import FishDataError, FishDataSnapshot
 from .fish_state import PlayerState
 from .fish_trash_model import (
+    TrashManRebirthRule,
     TrashOnlineSettlement,
     TrashProcessingRuntime,
     TrashProcessingSettlement,
@@ -30,7 +31,7 @@ class FishTrashDataAdapter:
             realm_id: index for index, realm_id in enumerate(self._realm_order)
         }
         self.initial_realm_id = self._realm_order[0]
-        self._rebirth_output = self._rebirth_rows()
+        self._rebirth_rules = self._rebirth_rows()
 
     def trash_rule(self, trash_id: int) -> TrashRule:
         try:
@@ -81,20 +82,68 @@ class FishTrashDataAdapter:
         self,
         completed_rebirth_count: int,
     ) -> SimNumber:
-        if type(completed_rebirth_count) is not int or completed_rebirth_count < 0:
-            raise FishDataError(
-                "trash-man completed rebirth count must be non-negative"
-            )
+        """Map 0 to implicit 1x and n>=1 to tbtrashmanrebirth id n."""
+
+        self._validate_rebirth_count(completed_rebirth_count)
         if completed_rebirth_count == 0:
             return SimNumber.one()
-        row_id = completed_rebirth_count - 1
-        try:
-            return self._rebirth_output[row_id]
-        except KeyError as exc:
+        return self.trash_man_rebirth_rule(
+            completed_rebirth_count
+        ).material_output_multiplier
+
+    @property
+    def max_trash_man_rebirth_count(self) -> int:
+        return len(self._rebirth_rules)
+
+    def trash_man_rebirth_rule(
+        self,
+        completed_count: int,
+    ) -> TrashManRebirthRule:
+        """Return the row earned after exactly ``completed_count`` rebirths."""
+
+        self._validate_rebirth_count(completed_count)
+        if completed_count == 0:
             raise FishDataError(
-                "trash-man completed rebirth count exceeds production data: "
-                f"{completed_rebirth_count}"
-            ) from exc
+                "trash-man rebirth count 0 has the default 1x multiplier "
+                "and no table row"
+            )
+        return self._rebirth_rules[completed_count - 1]
+
+    def next_trash_man_rebirth_rule(
+        self,
+        completed_count: int,
+    ) -> TrashManRebirthRule:
+        """Return the realm requirement and reward for the next rebirth."""
+
+        self._validate_rebirth_count(completed_count)
+        if completed_count >= self.max_trash_man_rebirth_count:
+            raise FishDataError(
+                "trash-man rebirth is already at max completed count: "
+                f"{completed_count}"
+            )
+        return self.trash_man_rebirth_rule(completed_count + 1)
+
+    def can_trash_man_rebirth(self, state: PlayerState) -> bool:
+        if not isinstance(state, PlayerState):
+            raise FishDataError("state must be a PlayerState")
+        completed_count = state.rebirth.trash_man_completed_count
+        self._validate_rebirth_count(completed_count)
+        if state.trash_man.realm_id not in self._realms:
+            raise FishDataError(
+                "unknown production trash-man realm id: "
+                f"{state.trash_man.realm_id}"
+            )
+        if (
+            completed_count >= self.max_trash_man_rebirth_count
+            or state.trash_man.breakthrough.active
+        ):
+            return False
+        return (
+            state.trash_man.realm_id
+            >= self.next_trash_man_rebirth_rule(
+                completed_count
+            ).realm_requirement
+        )
 
     def settle(
         self,
@@ -102,6 +151,7 @@ class FishTrashDataAdapter:
         elapsed_seconds: int,
         *,
         runtime: TrashProcessingRuntime | None = None,
+        processing_efficiency: SimNumber = SimNumber.one(),
     ) -> TrashProcessingSettlement:
         from .fish_trash_settlement import settle_trash
 
@@ -110,6 +160,7 @@ class FishTrashDataAdapter:
             state,
             elapsed_seconds,
             runtime=runtime,
+            processing_efficiency=processing_efficiency,
         )
 
     def settle_online(
@@ -126,6 +177,24 @@ class FishTrashDataAdapter:
             state,
             elapsed_seconds,
             runtime=runtime,
+        )
+
+    def settle_offline(
+        self,
+        state: PlayerState,
+        elapsed_seconds: int,
+        *,
+        runtime: TrashProcessingRuntime | None = None,
+        processing_efficiency: SimNumber = SimNumber.parse("0.5"),
+    ) -> TrashOnlineSettlement:
+        from .fish_trash_settlement import settle_trash_offline
+
+        return settle_trash_offline(
+            self,
+            state,
+            elapsed_seconds,
+            runtime=runtime,
+            processing_efficiency=processing_efficiency,
         )
 
     def _trash_rows(self) -> dict[int, TrashRule]:
@@ -183,10 +252,10 @@ class FishTrashDataAdapter:
             raise FishDataError("tbtrashmanrealm must not be empty")
         return result, tuple(sorted(result))
 
-    def _rebirth_rows(self) -> dict[int, SimNumber]:
-        result: dict[int, SimNumber] = {}
+    def _rebirth_rows(self) -> tuple[TrashManRebirthRule, ...]:
+        result: dict[int, TrashManRebirthRule] = {}
         for row in self.data.table("tbtrashmanrebirth"):
-            row_id = _nonnegative_int(
+            row_id = _positive_int(
                 _field(row, "id", "tbtrashmanrebirth"),
                 "tbtrashmanrebirth.id",
             )
@@ -194,15 +263,49 @@ class FishTrashDataAdapter:
                 raise FishDataError(
                     f"tbtrashmanrebirth contains duplicate id: {row_id}"
                 )
-            result[row_id] = _positive_sim_number(
-                _field(
-                    row,
-                    "trashToTreasureOutputMultiplier",
-                    "tbtrashmanrebirth",
+            result[row_id] = TrashManRebirthRule(
+                completed_count=row_id,
+                realm_requirement=_nonnegative_int(
+                    _field(
+                        row,
+                        "realmRequirement",
+                        "tbtrashmanrebirth",
+                    ),
+                    f"tbtrashmanrebirth.{row_id}.realmRequirement",
                 ),
-                ("tbtrashmanrebirth." f"{row_id}.trashToTreasureOutputMultiplier"),
+                material_output_multiplier=_positive_sim_number(
+                    _field(
+                        row,
+                        "trashToTreasureOutputMultiplier",
+                        "tbtrashmanrebirth",
+                    ),
+                    (
+                        "tbtrashmanrebirth."
+                        f"{row_id}.trashToTreasureOutputMultiplier"
+                    ),
+                ),
             )
-        return result
+        if not result:
+            raise FishDataError(
+                "tbtrashmanrebirth must contain at least one row"
+            )
+        expected_ids = set(range(1, len(result) + 1))
+        if set(result) != expected_ids:
+            raise FishDataError(
+                "tbtrashmanrebirth ids must be contiguous and start at 1"
+            )
+        return tuple(result[row_id] for row_id in sorted(result))
+
+    def _validate_rebirth_count(self, completed_count: int) -> None:
+        if type(completed_count) is not int or completed_count < 0:
+            raise FishDataError(
+                "trash-man rebirth completed count must be non-negative"
+            )
+        if completed_count > self.max_trash_man_rebirth_count:
+            raise FishDataError(
+                "trash-man rebirth completed count is out of range: "
+                f"{completed_count}"
+            )
 
 
 def _field(row: Any, name: str, table_name: str) -> Any:

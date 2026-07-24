@@ -18,6 +18,7 @@ from .numbers import SimNumber
 
 
 _RUNTIME_VERSION = 1
+FISH_OFFLINE_EFFICIENCY = SimNumber.parse("0.5")
 
 
 @dataclass(frozen=True)
@@ -56,6 +57,9 @@ class AppliedFishProductionSettlement:
     from_time_seconds: int
     to_time_seconds: int
     elapsed_seconds: int
+    online: bool
+    passive_efficiency: SimNumber
+    barbell_training_active: bool
     money_added: SimNumber
     material_added: SimNumber
     strength_added: SimNumber
@@ -68,11 +72,21 @@ class AppliedFishProductionSettlement:
             "fish_production_settlement_from_seconds": str(self.from_time_seconds),
             "fish_production_settlement_to_seconds": str(self.to_time_seconds),
             "fish_production_settlement_elapsed_seconds": str(self.elapsed_seconds),
+            "fish_production_mode": (
+                "online" if self.online else "offline"
+            ),
+            "fish_passive_production_efficiency": (
+                self.passive_efficiency.to_decimal_string()
+            ),
             "fish_hall_money_added": self.money_added.to_decimal_string(),
             "fish_hall_settlement_from_seconds": str(self.from_time_seconds),
             "fish_hall_settlement_to_seconds": str(self.to_time_seconds),
             "fish_hall_settlement_elapsed_seconds": str(self.elapsed_seconds),
             "barbell_strength_added": self.strength_added.to_decimal_string(),
+            "barbell_training_active": str(
+                self.barbell_training_active
+            ).lower(),
+            "barbell_strength_online_only": "true",
             "barbell_settlement_from_seconds": str(self.from_time_seconds),
             "barbell_settlement_to_seconds": str(self.to_time_seconds),
             "barbell_settlement_elapsed_seconds": str(self.elapsed_seconds),
@@ -91,13 +105,25 @@ def settle_fish_production(
     trash_adapter: FishTrashDataAdapter,
     barbell_adapter: FishBarbellDataAdapter | None = None,
     runtime: FishProductionRuntime | None = None,
+    online: bool = True,
+    barbell_training_active: bool = False,
 ) -> AppliedFishProductionSettlement:
-    """Atomically settle hall money, trash material, and barbell strength."""
+    """Atomically settle one uninterrupted Fish production interval.
+
+    Hall and trash processing are passive. Equipped barbells produce strength
+    only while the foreground ``exercise_barbell`` behavior is active online.
+    """
 
     if not isinstance(state, PlayerState):
         raise TypeError("state must be a PlayerState")
     if type(to_time_seconds) is not int or to_time_seconds < 0:
         raise ValueError("to_time_seconds must be non-negative")
+    if type(online) is not bool:
+        raise TypeError("online must be a bool")
+    if type(barbell_training_active) is not bool:
+        raise TypeError("barbell_training_active must be a bool")
+    if barbell_training_active and not online:
+        raise ValueError("barbell training cannot produce while offline")
     runtime = runtime or FishProductionRuntime()
     if not isinstance(runtime, FishProductionRuntime):
         raise TypeError("runtime must be a FishProductionRuntime")
@@ -106,8 +132,15 @@ def settle_fish_production(
     if to_time_seconds < from_time_seconds:
         raise ValueError("Fish production settlement time cannot move backwards")
     elapsed_seconds = to_time_seconds - from_time_seconds
+    passive_efficiency = (
+        SimNumber.one() if online else FISH_OFFLINE_EFFICIENCY
+    )
     hall = hall_adapter.snapshot(state)
-    money_added = hall.total_income_per_second * SimNumber.parse(elapsed_seconds)
+    money_added = (
+        hall.total_income_per_second
+        * SimNumber.parse(elapsed_seconds)
+        * passive_efficiency
+    )
     barbell = (
         BarbellProductionSnapshot(
             equipped_id=0,
@@ -121,11 +154,22 @@ def settle_fish_production(
     )
     strength_added = (
         barbell.strength_per_second * SimNumber.parse(elapsed_seconds)
+        if barbell_training_active
+        else SimNumber.zero()
     )
-    trash = trash_adapter.settle_online(
-        state,
-        elapsed_seconds,
-        runtime=runtime.trash_processing,
+    trash = (
+        trash_adapter.settle_online(
+            state,
+            elapsed_seconds,
+            runtime=runtime.trash_processing,
+        )
+        if online
+        else trash_adapter.settle_offline(
+            state,
+            elapsed_seconds,
+            runtime=runtime.trash_processing,
+            processing_efficiency=passive_efficiency,
+        )
     )
 
     committed = state.copy()
@@ -156,6 +200,9 @@ def settle_fish_production(
         from_time_seconds=from_time_seconds,
         to_time_seconds=to_time_seconds,
         elapsed_seconds=elapsed_seconds,
+        online=online,
+        passive_efficiency=passive_efficiency,
+        barbell_training_active=barbell_training_active,
         money_added=money_added,
         material_added=trash.material_added,
         strength_added=strength_added,

@@ -137,6 +137,11 @@ def test_table_schema_storage_and_field_order_match_luban_contract() -> None:
 def test_yaml_schema_storage_names_and_optional_fields() -> None:
     expected_optional = {
         "behavior_policy": ("lookahead_depth", "include_unlock_chain_value"),
+        "session_pattern": (
+            "offline_every_seconds",
+            "offline_duration_seconds",
+            "daily_online_seconds",
+        ),
         "player_profile": ("activity_weights", "luck"),
         "rng_scenario": ("event_threshold",),
         "regression_gate": (

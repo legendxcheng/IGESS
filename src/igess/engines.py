@@ -223,6 +223,14 @@ class FishEngineAdapter:
                 "target_policies": dict(
                     sorted(profile.behavior_target_policies.items())
                 ),
+                "session_pattern": profile.session_pattern,
+                "session": dict(
+                    sorted(
+                        model.session_patterns[
+                            profile.session_pattern
+                        ].items()
+                    )
+                ),
             }
             for profile_id, profile in sorted(
                 model.player_profiles.items()
@@ -232,6 +240,9 @@ class FishEngineAdapter:
         if behavior_profiles:
             strategy_parameters["behavior_scheduler"] = {
                 "schema": "weighted_duration_v1",
+                "foreground_strength_behavior": "exercise_barbell",
+                "offline_barbell_strength_efficiency": "0",
+                "offline_passive_efficiency": "0.5",
                 "profiles": behavior_profiles,
             }
         metadata = {
