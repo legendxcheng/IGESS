@@ -149,6 +149,9 @@ class PlayerProfile:
     prestige_policy: str
     luck: SimNumber = field(default_factory=SimNumber.one)
     activity_weights: dict[str, SimNumber] = field(default_factory=dict)
+    behavior_weights: dict[str, SimNumber] = field(default_factory=dict)
+    behavior_durations: dict[str, dict[str, Any]] = field(default_factory=dict)
+    behavior_target_policies: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass

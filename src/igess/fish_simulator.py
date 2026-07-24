@@ -4,9 +4,20 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from .checkpoint import SimulationCheckpoint
-from .fish_commands import apply_throw_resolution, lock_throw_request
+from .fish_barbell import FishBarbellDataAdapter
+from .fish_commands import (
+    apply_throw_resolution,
+    lock_throw_request,
+)
+from .fish_behavior_simulator import FishBehaviorSimulator
 from .fish_data import FishDataSnapshot
+from .fish_hall import FishHallDataAdapter
+from .fish_production import (
+    FishProductionRuntime,
+    settle_fish_production,
+)
 from .fish_state import FishCheckpointCodec, PlayerState
+from .fish_trash import FishTrashDataAdapter
 from .fish_throw_data import (
     FishThrowDataAdapter,
     ProductionThrowConfig,
@@ -53,6 +64,21 @@ class FishEconomySimulator:
                 max_bonus_layers=self.active_throw_config.max_bonus_layers,
             )
         )
+        self.fish_hall_adapter = (
+            None
+            if self.active_throw_config is None
+            else FishHallDataAdapter(self.data)
+        )
+        self.trash_adapter = (
+            None
+            if self.active_throw_config is None
+            else FishTrashDataAdapter(self.data)
+        )
+        self.barbell_adapter = (
+            None
+            if self.active_throw_config is None
+            else FishBarbellDataAdapter(self.data)
+        )
         self.time_engine = TimeEngine(self.model.config.tick_seconds)
 
     def run_scenario(
@@ -71,6 +97,21 @@ class FishEconomySimulator:
         if len(scenario.profiles) != 1:
             raise ValueError("Phase-0 Fish scenarios require exactly one profile")
         profile_id = scenario.profiles[0]
+        profile = self.model.player_profiles[profile_id]
+        if profile.behavior_weights:
+            result, behavior_checkpoint = FishBehaviorSimulator(
+                self.model,
+                self.data,
+                model_digest=self.model_digest,
+            ).run_scenario(
+                scenario_id,
+                checkpoint,
+                until_seconds=until_seconds,
+            )
+            return FishSimulationRun(
+                result=result,
+                checkpoint=behavior_checkpoint,
+            )
         duration_seconds = int(scenario.duration_hours * 3600)
 
         if checkpoint is None:
@@ -87,16 +128,24 @@ class FishEconomySimulator:
                     if self.active_throw_config is None
                     else Decimal(str(self.active_throw_config.initial_strength))
                 ),
+                initial_trash_man_realm_id=(
+                    0
+                    if self.trash_adapter is None
+                    else self.trash_adapter.initial_realm_id
+                ),
             )
             start_time = 0
             root_random_seed = self.model.config.random_seed
             next_throw_id = 0
             event_counters: dict[str, int] = {}
+            production_runtime = FishProductionRuntime()
         else:
             state = FishCheckpointCodec.decode_state(
                 checkpoint,
                 expected_model_digest=self.model_digest,
             )
+            if self.trash_adapter is not None:
+                state = self.trash_adapter.initialize_realm(state)
             if checkpoint.scenario_id != scenario_id:
                 raise ValueError("checkpoint scenario does not match the requested scenario")
             if checkpoint.profile_id != profile_id:
@@ -105,6 +154,9 @@ class FishEconomySimulator:
             root_random_seed = checkpoint.root_random_seed
             next_throw_id = checkpoint.next_throw_id
             event_counters = dict(checkpoint.event_counters)
+            production_runtime = FishProductionRuntime.from_dict(
+                checkpoint.engine_runtime_state
+            )
             if self.active_throw_config is not None:
                 self._validate_active_throw_checkpoint(
                     state,
@@ -113,6 +165,17 @@ class FishEconomySimulator:
                     event_counters,
                     self.active_throw_config.interval_seconds,
                 )
+                if (
+                    self.fish_hall_adapter is None
+                    or self.trash_adapter is None
+                    or self.barbell_adapter is None
+                ):
+                    raise AssertionError(
+                        "active throw requires Fish production data"
+                    )
+                state.validate(self.fish_hall_adapter.validation_context())
+                self.fish_hall_adapter.snapshot(state)
+                self.barbell_adapter.production_snapshot(state)
         if start_time > duration_seconds:
             raise ValueError("checkpoint time exceeds the scenario duration")
 
@@ -169,8 +232,44 @@ class FishEconomySimulator:
             record_times.add(target_time)
 
         for event_time in sorted(throw_times | record_times):
+            settlement = None
+            if (
+                self.fish_hall_adapter is not None
+                and self.trash_adapter is not None
+                and (
+                    event_time in throw_times
+                    or event_time == target_time
+                )
+            ):
+                settlement = settle_fish_production(
+                    state,
+                    event_time,
+                    hall_adapter=self.fish_hall_adapter,
+                    trash_adapter=self.trash_adapter,
+                    barbell_adapter=self.barbell_adapter,
+                    runtime=production_runtime,
+                )
+                state = settlement.state
+                production_runtime = settlement.runtime
+                if settlement.elapsed_seconds > 0:
+                    event_counters["fish_hall_settled"] = (
+                        event_counters.get("fish_hall_settled", 0) + 1
+                    )
+                    completed = settlement.trash_processing.completed_count
+                    if completed:
+                        event_counters["trash_processed"] = (
+                            event_counters.get("trash_processed", 0)
+                            + completed
+                        )
+
             if event_time in throw_times:
-                if self.active_throw_config is None or self.throw_adapter is None:
+                if (
+                    self.active_throw_config is None
+                    or self.throw_adapter is None
+                    or self.fish_hall_adapter is None
+                    or self.trash_adapter is None
+                    or self.barbell_adapter is None
+                ):
                     raise AssertionError("active throw schedule requires its adapter")
                 config = self.active_throw_config
                 request = lock_throw_request(
@@ -185,9 +284,12 @@ class FishEconomySimulator:
                     state,
                     resolution,
                     adapter=self.throw_adapter,
+                    hall_adapter=self.fish_hall_adapter,
                 )
                 state = application.state
                 event_details = resolution.event_details()
+                if settlement is not None:
+                    event_details.update(settlement.event_details())
                 event_details.update(application.event_details())
                 event_details["strength_source"] = "player_state_snapshot"
                 events.append(
@@ -206,12 +308,26 @@ class FishEconomySimulator:
                 )
 
             if event_time in record_times:
+                timeline_state = state
+                if (
+                    self.fish_hall_adapter is not None
+                    and self.trash_adapter is not None
+                    and state.production.last_settled_at < event_time
+                ):
+                    timeline_state = settle_fish_production(
+                        state,
+                        event_time,
+                        hall_adapter=self.fish_hall_adapter,
+                        trash_adapter=self.trash_adapter,
+                        barbell_adapter=self.barbell_adapter,
+                        runtime=production_runtime,
+                    ).state
                 timeline.append(
                     self._timeline_row(
                         scenario_id,
                         profile_id,
                         event_time,
-                        state,
+                        timeline_state,
                     )
                 )
         result = SimulationResult(
@@ -228,6 +344,7 @@ class FishEconomySimulator:
             simulated_time_seconds=target_time,
             next_throw_id=next_throw_id,
             event_counters=event_counters,
+            engine_runtime_state=production_runtime.to_dict(),
         )
         return FishSimulationRun(result=result, checkpoint=final_checkpoint)
 
@@ -247,18 +364,35 @@ class FishEconomySimulator:
         if type(interval_seconds) is not int or interval_seconds <= 0:
             raise ValueError("active throw interval must be positive")
         expected_count = simulated_time_seconds // interval_seconds
+        expected_settlement_count = expected_count + (
+            1
+            if simulated_time_seconds > expected_count * interval_seconds
+            else 0
+        )
+        settled_count = event_counters.get("fish_hall_settled", 0)
+        if type(settled_count) is not int or settled_count < 0:
+            raise ValueError(
+                "checkpoint fish_hall_settled counter must be non-negative"
+            )
         trash_count = sum(
             stock.count for stock in state.trash_man.processing.stocks
         )
+        processed_count = event_counters.get("trash_processed", 0)
+        if type(processed_count) is not int or processed_count < 0:
+            raise ValueError(
+                "checkpoint trash_processed counter must be non-negative"
+            )
         if (
             simulated_time_seconds < 0
             or resolved_count != expected_count
+            or settled_count != expected_settlement_count
             or next_throw_id != resolved_count
             or state.statistics.total_throws != resolved_count
             or state.statistics.total_fish_caught != resolved_count
-            or state.meta.revision != resolved_count
+            or state.meta.revision != resolved_count + settled_count
+            or state.production.last_settled_at != simulated_time_seconds
             or len(state.fish.items) != resolved_count
-            or trash_count != resolved_count
+            or trash_count + processed_count != resolved_count
         ):
             raise ValueError(
                 "checkpoint active-throw progress does not match committed rewards"
@@ -271,6 +405,13 @@ class FishEconomySimulator:
         time_seconds: int,
         state: PlayerState,
     ) -> TimelineRow:
+        total_cps = (
+            "0"
+            if self.fish_hall_adapter is None
+            else self.fish_hall_adapter.snapshot(
+                state
+            ).total_income_per_second.to_decimal_string()
+        )
         return TimelineRow(
             scenario_id=scenario_id,
             profile_id=profile_id,
@@ -284,5 +425,5 @@ class FishEconomySimulator:
                 generator_id: 0 for generator_id in self.model.generators
             },
             upgrades_purchased=[],
-            total_cps="0",
+            total_cps=total_cps,
         )

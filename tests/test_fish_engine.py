@@ -333,7 +333,8 @@ def test_active_throw_checkpoint_progress_must_be_consistent() -> None:
     ]
     committed.statistics.total_throws = 1
     committed.statistics.total_fish_caught = 1
-    committed.meta.revision = 1
+    committed.production.last_settled_at = 1
+    committed.meta.revision = 2
     committed.validate()
 
     with pytest.raises(ValueError, match="progress"):
@@ -349,7 +350,7 @@ def test_active_throw_checkpoint_progress_must_be_consistent() -> None:
         committed,
         1,
         1,
-        {"active_throw_resolved": 1},
+        {"active_throw_resolved": 1, "fish_hall_settled": 1},
         1,
     )
 
@@ -397,8 +398,21 @@ def test_production_workflow_records_one_resolved_throw(tmp_path: Path) -> None:
     assert details["reward_application"] == "applied_to_player_state"
     assert details["fish_instance_id"] == "1"
     assert details["trash_stock_count"] == "1"
-    assert details["player_state_revision"] == "1"
+    assert details["player_state_revision"] == "2"
     assert details["strength_source"] == "player_state_snapshot"
+    assert details["fish_hall_capacity_after_throw"] == "10"
+    assert details["fish_hall_policy_after_throw"] == "fixed_max_income"
+    assert details["fish_hall_tie_breaker_after_throw"] == (
+        "instance_id_ascending"
+    )
+    assert details["fish_hall_deployed_instance_ids_after_throw"] == "[1]"
+    assert details["fish_hall_income_per_second_before_throw"] == "0"
+    assert details["fish_hall_money_added"] == "0"
+    assert details["trash_processing_queue_policy"] == "trash_id_ascending"
+    assert details["trash_material_added"] == "0"
+    assert "base_money_per_second*1.25^(level-1)" in details[
+        "fish_hall_formula_trace_after_throw"
+    ]
     assert "collection_key" not in details
 
     checkpoint = json.loads(
@@ -408,6 +422,7 @@ def test_production_workflow_records_one_resolved_throw(tmp_path: Path) -> None:
     )
     assert checkpoint["next_throw_id"] == 10
     assert checkpoint["event_counters"]["active_throw_resolved"] == 10
+    assert checkpoint["event_counters"]["fish_hall_settled"] == 10
     assert checkpoint["engine_state"]["torpedo"] == {
         "ownedIds": [1],
         "selectedId": 1,
@@ -415,6 +430,15 @@ def test_production_workflow_records_one_resolved_throw(tmp_path: Path) -> None:
     fish_state = checkpoint["engine_state"]["fish"]
     assert fish_state["nextInstanceId"] == 11
     assert len(fish_state["items"]) == 10
+    deployed_ids = json.loads(
+        throw_events[-1]["details"][
+            "fish_hall_deployed_instance_ids_after_throw"
+        ]
+    )
+    deployed_slots = {
+        instance_id: slot
+        for slot, instance_id in enumerate(deployed_ids, start=1)
+    }
     for index, (item, event) in enumerate(
         zip(fish_state["items"], throw_events, strict=True),
         start=1,
@@ -426,22 +450,51 @@ def test_production_workflow_records_one_resolved_throw(tmp_path: Path) -> None:
             "mutationId": int(event_details["fish_mutation_id"]),
             "level": 1,
             "weightGram": int(event_details["fish_weight_gram"]),
-            "hallSlot": 0,
+            "hallSlot": deployed_slots.get(index, 0),
         }
     trash_stocks = checkpoint["engine_state"]["trashMan"]["processing"][
         "stocks"
     ]
     assert sum(stock["count"] for stock in trash_stocks) == 10
+    processing = checkpoint["engine_state"]["trashMan"]["processing"]
+    assert processing["activeTrashId"] == int(
+        throw_events[0]["details"]["trash_id"]
+    )
+    assert processing["activeProgressSeconds"] == 9
+    assert checkpoint["engine_state"]["trashMan"]["realmId"] == 1
+    assert checkpoint["engine_state"]["trashMan"]["highestRealmId"] == 1
+    assert checkpoint["engine_state"]["wallet"]["material"]["sign"] == 1
+    assert checkpoint["engine_runtime_state"] == {
+        "version": 1,
+        "trash_processing": {
+            "version": 1,
+            "progress_remainder": "0",
+        },
+    }
     assert checkpoint["engine_state"]["statistics"]["totalThrows"] == 10
     assert checkpoint["engine_state"]["statistics"][
         "totalFishCaught"
     ] == 10
-    assert checkpoint["engine_state"]["meta"]["revision"] == 10
+    assert checkpoint["engine_state"]["meta"]["revision"] == 20
+    assert checkpoint["engine_state"]["production"]["lastSettledAt"] == 10
+    assert checkpoint["engine_state"]["wallet"]["money"] == {
+        "sign": 1,
+        "coeff": 9800,
+        "exp": -2,
+    }
     assert checkpoint["engine_state"]["wallet"]["strength"] == {
         "sign": 1,
         "coeff": 5000,
         "exp": -2,
     }
+
+    timeline = json.loads(
+        (record.output_dir / "timeline.json").read_text(encoding="utf-8")
+    )
+    assert timeline[0]["total_cps"] == "0"
+    assert timeline[-1]["total_cps"] == "21"
+    assert timeline[-1]["resources"]["money"] == "9800E-2"
+    assert timeline[-1]["resources"]["material"] != "0"
 
     manifest = json.loads(
         (record.output_dir / "run_manifest.json").read_text(encoding="utf-8")
@@ -454,6 +507,15 @@ def test_production_workflow_records_one_resolved_throw(tmp_path: Path) -> None:
         "interval_seconds": 1,
         "max_bonus_layers": 4,
         "regular_luck_multiplier": "1",
+    }
+    assert manifest["strategy"]["parameters"]["trash_processing"] == {
+        "formula": "fixed_base_work_continuous_yield_v1",
+        "queue_policy": "trash_id_ascending",
+        "fractional_progress": "engine_runtime_state",
+        "rebirth_mapping": (
+            "completed_count_0_is_1x;"
+            "completed_count_n_uses_table_id_n_minus_1"
+        ),
     }
 
     resumed = service.run_authoring_scenario(

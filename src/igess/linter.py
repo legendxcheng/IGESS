@@ -179,6 +179,28 @@ class ConfigLinter:
                     raise ConfigError(
                         f"profile '{profile_id}' activity_weight '{activity_id}' must be non-negative"
                     )
+            for behavior_id, weight in profile.behavior_weights.items():
+                if not behavior_id:
+                    raise ConfigError(
+                        f"profile '{profile_id}' behavior_weight id must be non-empty"
+                    )
+                if weight < SimNumber.zero():
+                    raise ConfigError(
+                        f"profile '{profile_id}' behavior_weight '{behavior_id}' "
+                        "must be non-negative"
+                    )
+            for behavior_id, duration in profile.behavior_durations.items():
+                cls._validate_behavior_duration(profile_id, behavior_id, duration)
+            for behavior_id, policy in profile.behavior_target_policies.items():
+                if not behavior_id:
+                    raise ConfigError(
+                        f"profile '{profile_id}' behavior_target_policy id must be non-empty"
+                    )
+                if not isinstance(policy, str) or not policy.strip():
+                    raise ConfigError(
+                        f"profile '{profile_id}' behavior_target_policy '{behavior_id}' "
+                        "must be non-empty"
+                    )
             if profile.luck <= SimNumber.zero():
                 raise ConfigError(f"profile '{profile_id}' luck must be positive")
 
@@ -303,3 +325,45 @@ class ConfigLinter:
         if not actual_args <= allowed_args:
             extras = ", ".join(sorted(actual_args - allowed_args))
             raise ConfigError(f"{context} dimension mismatch: unsupported args {extras}")
+
+    @classmethod
+    def _validate_behavior_duration(
+        cls, profile_id: str, behavior_id: str, duration: object
+    ) -> None:
+        context = f"profile '{profile_id}' behavior_duration '{behavior_id}'"
+        if not behavior_id:
+            raise ConfigError(f"profile '{profile_id}' behavior_duration id must be non-empty")
+        if not isinstance(duration, dict):
+            raise ConfigError(f"{context} must be a mapping")
+
+        duration_type = duration.get("type")
+        if duration_type == "fixed":
+            expected_keys = {"type", "seconds"}
+            if set(duration) != expected_keys:
+                raise ConfigError(
+                    f"{context} fixed duration must contain only type and seconds"
+                )
+            cls._validate_positive_duration_integer(duration["seconds"], context, "seconds")
+            return
+
+        if duration_type == "uniform":
+            expected_keys = {"type", "min_seconds", "max_seconds"}
+            if set(duration) != expected_keys:
+                raise ConfigError(
+                    f"{context} uniform duration must contain only type, "
+                    "min_seconds, and max_seconds"
+                )
+            min_seconds = duration["min_seconds"]
+            max_seconds = duration["max_seconds"]
+            cls._validate_positive_duration_integer(min_seconds, context, "min_seconds")
+            cls._validate_positive_duration_integer(max_seconds, context, "max_seconds")
+            if min_seconds > max_seconds:
+                raise ConfigError(f"{context} min_seconds must not exceed max_seconds")
+            return
+
+        raise ConfigError(f"{context} type must be 'fixed' or 'uniform'")
+
+    @staticmethod
+    def _validate_positive_duration_integer(value: object, context: str, field: str) -> None:
+        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+            raise ConfigError(f"{context} {field} must be a positive integer")

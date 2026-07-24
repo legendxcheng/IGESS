@@ -287,6 +287,23 @@ trashMan.processing
 仍由当前境界、升级和配置推导；进度结算必须在改变产出源前先推进到当前
 时间。
 
+Phase 5 v1 采用固定基础工作量模型：
+
+```text
+单份废料基础工作量 = baseDecomposeSeconds
+真实秒工作速度 = decomposeSpeedMultiplier
+已产材料 =
+  baseMaterialPerSecond
+  × 实际消费的基础工作量
+  × trashToTreasureOutputMultiplier
+```
+
+因此境界加速只缩短处理同一份废料所需的真实时间，不会减少它的基础总材料。
+活动目标仍计入聚合库存，完成时才扣除；没有显式目标时按 `trashId` 升序选择。
+结算按废料种类批量跨越完整份数，不逐秒或逐份循环。PlayerState v1 的
+`activeProgressSeconds` 保存完整基础工作秒，小数余量放在 checkpoint 的
+`engine_runtime_state`，保证境界速度为小数时仍可精确恢复。
+
 ### 4.6 垃圾佬状态
 
 ```text
@@ -440,25 +457,17 @@ BuffExpired
 
 ## 8. PlayerPolicy
 
-策略不是存档的一部分。Fish 策略由领域实现，但通过 IGESS 的 profile/scenario 配置选择，策略 ID 和参数必须进入 manifest。首版接口至少能决定：
+策略不是存档的一部分。Fish 策略由领域实现，但通过 IGESS 的 profile/scenario 配置选择，策略 ID 和参数必须进入 manifest。鱼厅编队不再作为策略分支：模拟始终按当前单鱼每秒收益降序取容量内前 `N` 条上阵，同收益按 `instanceId` 升序决胜。首版策略接口只需决定：
 
-1. 新鱼领取后出售、保留还是上阵。
-2. 鱼厅满时替换哪条鱼。
-3. 金钱优先购买鱼雷还是资助垃圾佬突破。
-4. 材料优先升级鱼厅还是合成杠铃。
-5. 使用哪种鱼雷和杠铃。
-6. 何时力量重生。
-7. 何时垃圾佬转世。
+1. 金钱优先购买鱼雷还是资助垃圾佬突破。
+2. 材料优先升级鱼厅还是合成杠铃。
+3. 使用哪种鱼雷和杠铃。
+4. 何时力量重生。
+5. 何时垃圾佬转世。
 
 首批基准策略：
 
 ```text
-collector
-    新鱼优先保留，重复鱼按收入处理
-
-max_income
-    鱼厅始终保留当前每秒收入最高的鱼
-
 progression
     优先购买能解锁下一阶段的升级
 
@@ -545,7 +554,16 @@ rebirth_conservative
 3. 定义同一时间点多个事件的稳定处理顺序。
 4. 支持主动炸鱼和慢速自动炸鱼。
 5. 支持仅存在于一次运行时事件内的投掷结果、原子领取结算和策略决策，不把 pending result 写入存档。
-6. 支持在事件边界输出 checkpoint。
+6. 通过 IGESS 通用 `BehaviorScheduler` 调度带权重、持续时长和目标的离散
+   玩家行为；每个玩家画像独立配置，行为选择、时长和目标使用独立稳定随机域。
+7. checkpoint 保存行为 sequence 游标及进行中的完整行为；恢复时继续原行为，
+   不重新选择。无行为的旧 checkpoint 保持原 JSON 形状。
+
+当前 Fish 加权模式已以 opt-in 方式接入 `manual_throw`、`upgrade_fish`、
+`upgrade_fish_hall` 和 `idle`。鱼厅收入是与前台行为并行的后台生产，
+不进入行为权重；鱼厅升级是无目标前台行为。生产 `default` 画像尚未配置
+正式权重和持续时长，机制测试使用 fixture；没有 `behavior_weights` 的画像
+仍走旧主动投掷循环。
 
 验收：
 
@@ -563,17 +581,25 @@ rebirth_conservative
 ```text
 炸鱼
 → 鱼实例
-→ 领取、出售或上阵
+→ 固定最高收益自动上阵
 → 摸鱼厅随时间产出金钱
 → 金钱消费
 ```
 
 工作：
 
-1. 实现鱼背包、出售和鱼厅栏位。
+1. 实现鱼背包和鱼厅栏位；出售等待正式价格口径。
 2. 接入 `baseMoneyPerSecond` 和变异 `incomeMultiplier`。
 3. 实现鱼厅容量和收入计算。
-4. 实现 `collector` 和 `max_income` 策略。
+4. 实现固定 `max_income` 自动编队，不保留手动/`collector` 分支。
+
+当前进度：上述基础上阵、容量、收入和 trace 已完成。鱼等级从 `1` 开始、
+最高 `100`；等级 `n` 的产出为
+`B × 1.25^(n-1) × mutationIncomeMultiplier`，从 `n` 升到 `n+1` 的价格
+为 `B × 1.5^(n-1)` 且不乘变异倍率，统一使用 BigNumber。升级原子扣款、
+加级和固定最高收益阵容重排已完成。加权行为适配器提供显式 opt-in 的
+`random_affordable` 策略，只从当前余额可支付且未满 100 级的鱼中选择；
+生产玩家权重、行为时长和该目标策略尚未配置，出售仍等待正式口径。
 
 验收：
 
@@ -628,6 +654,11 @@ rebirth_conservative
 2. 鱼厅升级。
 3. 杠铃合成、选用和力量挂机产出。
 4. 购买与合成策略。
+
+当前鱼厅升级首片已完成：`upgradeLevel` 当前行的 `upgradePrice` 用于进入
+下一行，最终零值行是不可购买的满级哨兵。命令先结算后台生产，再使用
+BigNumber 原子扣除材料、扩容并按 IGESS 的 `fixed_max_income` 模拟策略重排；
+`upgrade_fish_hall` 行为支持中途 checkpoint 恢复且不会提前扣款。
 5. 关键升级等待时间和回本时间报告。
 
 验收：

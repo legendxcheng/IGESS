@@ -253,6 +253,13 @@ def test_copy_is_deep_and_does_not_share_nested_state() -> None:
             "fish.items[1].hallSlot",
         ),
         (
+            lambda state: state.fish.items.append(
+                FishInstance(1, 17, 1, 101, 100, 0)
+            ),
+            "archive_schema_invalid_value",
+            "fish.items[1].level",
+        ),
+        (
             lambda state: (
                 state.fish.items.append(
                     FishInstance(1, 17, 1, 1, 100, 0)

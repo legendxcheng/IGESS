@@ -47,6 +47,8 @@ class SimulationCheckpoint:
     next_throw_id: int
     engine_state: dict[str, Any]
     event_counters: dict[str, int] = field(default_factory=dict)
+    behavior_state: dict[str, Any] = field(default_factory=dict)
+    engine_runtime_state: dict[str, Any] = field(default_factory=dict)
     schema_version: int = CHECKPOINT_SCHEMA_VERSION
 
     def validate(
@@ -109,10 +111,19 @@ class SimulationCheckpoint:
         if type(self.engine_state) is not dict:
             _fail("checkpoint_invalid_type", "$.engine_state")
         _validate_plain_json(self.engine_state, "$.engine_state")
+        if type(self.behavior_state) is not dict:
+            _fail("checkpoint_invalid_type", "$.behavior_state")
+        _validate_plain_json(self.behavior_state, "$.behavior_state")
+        if type(self.engine_runtime_state) is not dict:
+            _fail("checkpoint_invalid_type", "$.engine_runtime_state")
+        _validate_plain_json(
+            self.engine_runtime_state,
+            "$.engine_runtime_state",
+        )
 
     def to_dict(self) -> dict[str, Any]:
         self.validate()
-        return {
+        payload = {
             "schema_version": self.schema_version,
             "engine_id": self.engine_id,
             "model_digest": self.model_digest,
@@ -124,6 +135,14 @@ class SimulationCheckpoint:
             "event_counters": dict(sorted(self.event_counters.items())),
             "engine_state": _copy_plain_json(self.engine_state),
         }
+        # Preserve the canonical v1 shape for engines without a behavior loop.
+        if self.behavior_state:
+            payload["behavior_state"] = _copy_plain_json(self.behavior_state)
+        if self.engine_runtime_state:
+            payload["engine_runtime_state"] = _copy_plain_json(
+                self.engine_runtime_state
+            )
+        return payload
 
     @classmethod
     def from_dict(
@@ -134,7 +153,7 @@ class SimulationCheckpoint:
         expected_model_digest: str | None = None,
     ) -> "SimulationCheckpoint":
         document = _expect_object(payload, "$")
-        expected_keys = {
+        required_keys = {
             "schema_version",
             "engine_id",
             "model_digest",
@@ -146,12 +165,29 @@ class SimulationCheckpoint:
             "event_counters",
             "engine_state",
         }
-        _expect_keys(document, expected_keys, "$")
+        optional_keys = {"behavior_state", "engine_runtime_state"}
+        actual_keys = set(document)
+        missing = sorted(required_keys - actual_keys)
+        extra = sorted(actual_keys - required_keys - optional_keys)
+        if missing or extra:
+            _fail(
+                "checkpoint_schema_keys_invalid",
+                "$",
+                {"missing": missing, "extra": extra},
+            )
         event_counters = _expect_object(
             document["event_counters"],
             "$.event_counters",
         )
         engine_state = _expect_object(document["engine_state"], "$.engine_state")
+        behavior_state = _expect_object(
+            document.get("behavior_state", {}),
+            "$.behavior_state",
+        )
+        engine_runtime_state = _expect_object(
+            document.get("engine_runtime_state", {}),
+            "$.engine_runtime_state",
+        )
         checkpoint = cls(
             schema_version=document["schema_version"],
             engine_id=document["engine_id"],
@@ -163,6 +199,8 @@ class SimulationCheckpoint:
             next_throw_id=document["next_throw_id"],
             event_counters=dict(event_counters),
             engine_state=_copy_plain_json(engine_state),
+            behavior_state=_copy_plain_json(behavior_state),
+            engine_runtime_state=_copy_plain_json(engine_runtime_state),
         )
         checkpoint.validate(
             expected_engine_id=expected_engine_id,

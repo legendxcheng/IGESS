@@ -197,6 +197,43 @@ class FishEngineAdapter:
                     settings["active_throw"]
                 ).manifest_parameters()
             )
+            strategy_parameters["trash_processing"] = {
+                "formula": "fixed_base_work_continuous_yield_v1",
+                "queue_policy": "trash_id_ascending",
+                "fractional_progress": "engine_runtime_state",
+                "rebirth_mapping": (
+                    "completed_count_0_is_1x;"
+                    "completed_count_n_uses_table_id_n_minus_1"
+                ),
+            }
+        behavior_profiles = {
+            profile_id: {
+                "weights": {
+                    behavior_id: weight.to_decimal_string()
+                    for behavior_id, weight in sorted(
+                        profile.behavior_weights.items()
+                    )
+                },
+                "durations": {
+                    behavior_id: dict(duration)
+                    for behavior_id, duration in sorted(
+                        profile.behavior_durations.items()
+                    )
+                },
+                "target_policies": dict(
+                    sorted(profile.behavior_target_policies.items())
+                ),
+            }
+            for profile_id, profile in sorted(
+                model.player_profiles.items()
+            )
+            if profile.behavior_weights
+        }
+        if behavior_profiles:
+            strategy_parameters["behavior_scheduler"] = {
+                "schema": "weighted_duration_v1",
+                "profiles": behavior_profiles,
+            }
         metadata = {
             "engine_id": self.engine_id,
             "strategy": {

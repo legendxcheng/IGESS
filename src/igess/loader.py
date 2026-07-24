@@ -88,6 +88,20 @@ class ConfigLoader:
                     key: SimNumber.parse(value)
                     for key, value in sorted(profile_data.get("activity_weights", {}).items())
                 },
+                behavior_weights={
+                    key: SimNumber.parse(value)
+                    for key, value in sorted(profile_data.get("behavior_weights", {}).items())
+                },
+                behavior_durations={
+                    key: dict(value) if isinstance(value, dict) else value
+                    for key, value in sorted(profile_data.get("behavior_durations", {}).items())
+                },
+                behavior_target_policies={
+                    key: value
+                    for key, value in sorted(
+                        profile_data.get("behavior_target_policies", {}).items()
+                    )
+                },
                 behavior_policy=str(profile_data["behavior_policy"]),
                 session_pattern=str(profile_data["session_pattern"]),
                 prestige_policy=str(profile_data["prestige_policy"]),

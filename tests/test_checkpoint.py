@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from igess.behavior import BehaviorDecision, BehaviorRuntimeState
 from igess.checkpoint import (
     CheckpointCodec,
     CheckpointValidationError,
@@ -138,3 +139,43 @@ def test_checkpoint_copy_has_independent_engine_state() -> None:
 
     assert original.engine_state["items"] == [1, 2]
     assert original.event_counters == {"trash_job": 1}
+
+
+def test_checkpoint_optionally_round_trips_behavior_runtime_state() -> None:
+    runtime = BehaviorRuntimeState(
+        next_sequence_id=4,
+        active=BehaviorDecision(
+            sequence_id=3,
+            profile_id="progression",
+            behavior_id="upgrade_fish",
+            target_id="27",
+            duration_seconds=8,
+            started_at_seconds=55,
+            completes_at_seconds=63,
+        ),
+    )
+    checkpoint = _checkpoint(behavior_state=runtime.to_dict())
+
+    encoded = CheckpointCodec.dumps(checkpoint)
+    loaded = CheckpointCodec.loads(encoded)
+
+    assert BehaviorRuntimeState.from_dict(loaded.behavior_state) == runtime
+    assert json.loads(encoded)["behavior_state"] == runtime.to_dict()
+
+
+def test_checkpoint_optionally_round_trips_engine_runtime_state() -> None:
+    runtime = {
+        "version": 1,
+        "trash_processing": {
+            "version": 1,
+            "progress_remainder": "0.25",
+        },
+    }
+    checkpoint = _checkpoint(engine_runtime_state=runtime)
+
+    encoded = CheckpointCodec.dumps(checkpoint)
+    loaded = CheckpointCodec.loads(encoded)
+
+    assert loaded.engine_runtime_state == runtime
+    assert json.loads(encoded)["engine_runtime_state"] == runtime
+    assert "engine_runtime_state" not in _checkpoint().to_dict()

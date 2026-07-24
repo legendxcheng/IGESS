@@ -14,6 +14,7 @@ from .numbers import SimNumber
 
 FISH_ENGINE_ID = "fish"
 FISH_ARCHIVE_VERSION = 1
+FISH_MAX_LEVEL = 100
 MAX_BIG_NUMBER_EXPONENT = 1_000_000
 DEFAULT_MAX_FUTURE_SECONDS = 300
 _COLLECTION_KEY_RE = re.compile(r"^\d+:\d+$")
@@ -324,11 +325,17 @@ class PlayerState:
         *,
         initial_torpedo_id: int = 0,
         initial_strength: BigNumberDTO | SimNumber | Decimal | int | str = 0,
+        initial_trash_man_realm_id: int = 0,
     ) -> "PlayerState":
         if type(server_unix_seconds) is not int:
             _fail("archive_schema_invalid_value", "meta.createdAt")
         if type(initial_torpedo_id) is not int or initial_torpedo_id < 0:
             _fail("archive_schema_invalid_value", "torpedo.selectedId")
+        if (
+            type(initial_trash_man_realm_id) is not int
+            or initial_trash_man_realm_id < 0
+        ):
+            _fail("archive_schema_invalid_value", "trashMan.realmId")
         now = max(server_unix_seconds, 0)
         state = cls(
             meta=ArchiveMeta(created_at=now),
@@ -344,6 +351,10 @@ class PlayerState:
                 owned_ids=(
                     [] if initial_torpedo_id == 0 else [initial_torpedo_id]
                 ),
+            ),
+            trash_man=TrashManState(
+                realm_id=initial_trash_man_realm_id,
+                highest_realm_id=initial_trash_man_realm_id,
             ),
         )
         state.validate(FishStateValidationContext(now=now))
@@ -826,6 +837,8 @@ class PlayerState:
                 context,
             )
             _expect_positive_int(item.level, f"{path}.level")
+            if item.level > FISH_MAX_LEVEL:
+                _fail("archive_schema_invalid_value", f"{path}.level")
             _expect_positive_int(item.weight_gram, f"{path}.weightGram")
             _expect_nonnegative_int(item.hall_slot, f"{path}.hallSlot")
             if item.hall_slot > 0:
@@ -1211,6 +1224,8 @@ class FishCheckpointCodec:
         simulated_time_seconds: int = 0,
         next_throw_id: int | None = None,
         event_counters: Mapping[str, int] | None = None,
+        behavior_state: Mapping[str, Any] | None = None,
+        engine_runtime_state: Mapping[str, Any] | None = None,
         context: FishStateValidationContext | None = None,
     ) -> SimulationCheckpoint:
         return SimulationCheckpoint(
@@ -1226,6 +1241,8 @@ class FishCheckpointCodec:
                 else next_throw_id
             ),
             event_counters=dict(event_counters or {}),
+            behavior_state=dict(behavior_state or {}),
+            engine_runtime_state=dict(engine_runtime_state or {}),
             engine_state=state.to_dict(context=context),
         )
 
