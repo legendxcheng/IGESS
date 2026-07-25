@@ -1,7 +1,7 @@
 # Fish 模拟 RoadMap
 
 更新时间：2026-07-25
-项目范围：`projects/fish`、`projects/fish-rng` 与 Fish 领域模拟代码  
+项目范围：`projects/fish` 与 Fish 领域模拟代码
 当前总状态：**Fish 专用引擎已接入 IGESS；鱼厅金钱和垃圾佬材料使用统一在线/离线原子结算，已装备杠铃仅在互斥前台行为 `exercise_barbell` 在线执行时产出力量，离线力量为零。默认画像已配置每天在线 2 小时、离线 22 小时；鱼雷购买、杠铃合成与鱼厅升级为权重 `100` 的高优先级行为，鱼升级为权重 `0.1` 的低优先级行为且仅在最低升级价严格低于当前材料 `1/10` 时执行。鱼雷购买不使用力量门槛，时点完全由价格控制；2～11 号已完成第一轮双 Luck 平衡。两类重生达到要求后立即硬优先执行。核心强度与永久养成已成为正式 JSON/CSV/HTML 报表，并统一使用累计在线时间；24h 离线上限、新境界突破、临时效果、长期鱼雷价格验证和长期策略模拟仍未完成**
 
 ## 1. 本文档是唯一进度源
@@ -18,13 +18,10 @@ IGESS 只关注会改变数值体验的资源、概率、时间、产出、消�
 维护规则：
 
 1. 只有本文档维护阶段状态、任务勾选和“下一步”。
-2. `projects/fish-rng/FISH_ECONOMY_SIMULATOR_PLAN.md` 保留详细架构与验收背景，不再维护进度标记。
-3. `projects/fish-rng/HANDOFF.md` 是 2026-07-20 的历史交接快照，不再作为当前状态依据。
-4. `projects/fish-rng/PLAYER_STATE_MODEL.md` 只描述玩家存档模型，不维护项目总进度。
-5. 每次完成任务时同时填写证据；没有测试、运行产物或可检查代码的任务不能标记完成。
-6. 模拟中的具体数值必须与游戏实际数值完全一致，`E:\fish-oasis\igess_export` 是唯一权威生产快照；正式运行读取其中的 `json\*.json` 和同次生成的 `python\schema.py`，不得用 RoadMap、文字 GDD、旧 `gdd/data`、示例、fixture 或代码默认值覆盖。
-7. 具体玩法语义和计算规则到 `E:\fish-oasis\gdd` 查找；文字 GDD 或旧数据副本与 `igess_export/json/*.json` 冲突时，数值无条件以权威导出 JSON 为准，缺失字段、公式歧义和无法由数据表决定的行为再与人类确认。
-8. 每次模拟必须记录实际加载的数据目录、文件清单、内容摘要和 `model_digest`，确保结果能追踪到与游戏相同的一版数值。
+2. 每次完成任务时同时填写证据；没有测试、运行产物或可检查代码的任务不能标记完成。
+3. 模拟中的具体数值必须与游戏实际数值完全一致，`E:\fish-oasis\igess_export` 是唯一权威生产快照；正式运行读取其中的 `json\*.json` 和同次生成的 `python\schema.py`，不得用 RoadMap、文字 GDD、旧 `gdd/data`、示例、fixture 或代码默认值覆盖。
+4. 具体玩法语义和计算规则到 `E:\fish-oasis\gdd` 查找；文字 GDD 或旧数据副本与 `igess_export/json/*.json` 冲突时，数值无条件以权威导出 JSON 为准，缺失字段、公式歧义和无法由数据表决定的行为再与人类确认。
+5. 每次模拟必须记录实际加载的数据目录、文件清单、内容摘要和 `model_digest`，确保结果能追踪到与游戏相同的一版数值。
 
 状态标记：
 
@@ -38,7 +35,7 @@ IGESS 只关注会改变数值体验的资源、概率、时间、产出、消�
 | 工作线 | 状态 | 当前结论 | 证据 |
 | --- | --- | --- | --- |
 | 通用经济规则原型 | `[~]` | `projects/fish` 已达到 `runnable`，但只有主动活动每秒产生 2 金钱的最小 smoke，不代表正式 Fish 经济 | `economy.yaml`、`changes/`、自动 smoke run |
-| RNG 一期基线 | `[x]` | BonusChain、变异、鱼与废料独立随机流已有验证基线；Probe 已复用权威 `resolve_throw()`，FishLuck 直接按力量和 `tbfishrandompool` 插值 | `src/igess/fish_throw.py`、`src/igess/fish_rng.py`、相关测试 |
+| RNG 一期基线 | `[x]` | BonusChain、变异、鱼与废料独立随机流已有验证基线；Probe 已复用权威 `resolve_throw()`，FishLuck 直接按力量和 `tbfishrandompool` 插值 | `src/igess/fish_throw.py`、`src/igess/fish_throw_data.py`、`tests/test_fish_throw_commands.py` |
 | PlayerState v1 | `[x]` | 正式存档字段、大数 DTO、严格业务校验、新档和规范 JSON 已实现 | `src/igess/fish_state.py`、`tests/test_fish_state.py` |
 | 通用 checkpoint v1 | `[x]` | checkpoint 外壳、digest/engine 校验、原子读写及可选行为运行态已实现；无行为的旧 JSON 形状不变 | `src/igess/checkpoint.py`、`tests/test_checkpoint.py` |
 | Fish checkpoint codec | `[x]` | `PlayerState` 可作为 Fish `engine_state` 保存和恢复 | `FishCheckpointCodec` 及定向测试 |
@@ -429,7 +426,7 @@ Phase 2 的纯结算到此完成。`ThrowOutcome` 已通过独立领域命令原
 - `[x]` 小数基础工作进度保存在 checkpoint 的 `engine_runtime_state`，不修改生产 PlayerState v1 的整数 `activeProgressSeconds` 字段。
 - `[x]` 主动投掷和加权行为循环均在前台命令前原子结算鱼厅金钱与垃圾佬材料；timeline 可临时推导但不拆分事务。
 
-验证证据：`tests/test_fish_throw_data.py`、`tests/test_fish_engine.py`、`tests/test_fish_state.py`、`tests/test_fish_rng.py`、`tests/test_checkpoint.py`、`tests/test_behavior.py` 和 `tests/test_behavior_config.py` 定向回归 `118 passed, 3 deselected`；生产快照字段契约定向测试 `1 passed`。覆盖境界边界前后材料速度、首境界 `0s` 需求、历史最高境界封顶、行为中途 checkpoint 不提前提交，以及连续/分段恢复等价。
+验证证据：`tests/test_fish_throw_commands.py`、`tests/test_fish_engine.py`、`tests/test_fish_state.py`、`tests/test_checkpoint.py`、`tests/test_behavior.py` 和 `tests/test_behavior_config.py` 定向回归通过；生产快照字段契约测试单独以 `external_data` 标记。覆盖境界边界前后材料速度、首境界 `0s` 需求、历史最高境界封顶、行为中途 checkpoint 不提前提交，以及连续/分段恢复等价。
 
 ### Phase 6：升级和交叉养成
 

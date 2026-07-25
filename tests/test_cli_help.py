@@ -14,7 +14,6 @@ EXPECTED_COMMANDS = {
     "doctor",
     "explain",
     "export-tables",
-    "fish-rng-run",
     "gate",
     "init",
     "lint",
