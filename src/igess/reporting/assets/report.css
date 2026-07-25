@@ -25,12 +25,22 @@ h2 {
   margin: 0 0 12px;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 .band {
   background: #fff;
   border: 1px solid #d8dee6;
   border-radius: 6px;
   margin: 14px 0;
   padding: 18px;
+}
+
+.section-note {
+  color: #5d6875;
+  font-size: 13px;
+  margin: 0 0 12px;
 }
 
 .grid {
@@ -139,6 +149,34 @@ h2 {
 .chart {
   min-height: 320px;
   width: 100%;
+}
+
+.table-wrap {
+  margin-top: 16px;
+  max-height: 520px;
+  overflow: auto;
+}
+
+.data-table {
+  border-collapse: collapse;
+  font-size: 12px;
+  width: 100%;
+}
+
+.data-table th,
+.data-table td {
+  border-bottom: 1px solid #e1e6ec;
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.data-table th {
+  background: #f6f8fa;
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 
 .controls {

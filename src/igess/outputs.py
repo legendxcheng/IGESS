@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import Any
 
 from .analyzer import Analyzer
+from .fish_data import FishDataSnapshot
+from .fish_progression_reports import write_fish_progression_artifacts
 from .schema import EconomyModel, SimulationResult
 
 
@@ -21,6 +23,7 @@ class OutputWriter:
         model_digest: str | None = None,
         manifest_metadata: Mapping[str, Any] | None = None,
         extra_artifacts: Sequence[str] = (),
+        domain_model: Any = None,
     ) -> None:
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -33,6 +36,19 @@ class OutputWriter:
         (output_dir / "analysis.md").write_text(
             Analyzer.markdown(result, model), encoding="utf-8", newline="\n"
         )
+        domain_artifacts: tuple[str, ...] = ()
+        if (
+            model is not None
+            and model.config.engine_id == "fish"
+            and isinstance(domain_model, FishDataSnapshot)
+            and "active_throw" in model.engine_settings
+        ):
+            domain_artifacts = write_fish_progression_artifacts(
+                result,
+                model,
+                domain_model,
+                output_dir,
+            )
         cls.write_manifest(
             result,
             model,
@@ -40,7 +56,7 @@ class OutputWriter:
             overrides or [],
             model_digest=model_digest,
             manifest_metadata=manifest_metadata,
-            extra_artifacts=extra_artifacts,
+            extra_artifacts=(*extra_artifacts, *domain_artifacts),
         )
 
     @classmethod
@@ -124,12 +140,26 @@ class OutputWriter:
 
     @classmethod
     def write_events_json(cls, result: SimulationResult, path: Path) -> None:
-        payload = [event.to_ordered_dict() for event in result.events]
-        path.write_text(
-            json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=False) + "\n",
-            encoding="utf-8",
-            newline="\n",
-        )
+        with path.open("w", encoding="utf-8", newline="\n") as handle:
+            if not result.events:
+                handle.write("[]\n")
+                return
+            handle.write("[\n")
+            for index, event in enumerate(result.events):
+                if index:
+                    handle.write(",\n")
+                encoded = json.dumps(
+                    event.to_ordered_dict(),
+                    ensure_ascii=False,
+                    indent=2,
+                    sort_keys=False,
+                )
+                for line_index, line in enumerate(encoded.splitlines()):
+                    if line_index:
+                        handle.write("\n")
+                    handle.write("  ")
+                    handle.write(line)
+            handle.write("\n]\n")
 
     @classmethod
     def write_events_csv(cls, result: SimulationResult, path: Path) -> None:

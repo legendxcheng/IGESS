@@ -169,6 +169,7 @@ class FishTrashDataAdapter:
         elapsed_seconds: int,
         *,
         runtime: TrashProcessingRuntime | None = None,
+        _mutate: bool = False,
     ) -> TrashOnlineSettlement:
         from .fish_trash_settlement import settle_trash_online
 
@@ -177,6 +178,7 @@ class FishTrashDataAdapter:
             state,
             elapsed_seconds,
             runtime=runtime,
+            _mutate=_mutate,
         )
 
     def settle_offline(

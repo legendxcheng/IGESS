@@ -59,8 +59,9 @@ Fish 正式数值的唯一权威生产快照是 `E:\fish-oasis\igess_export`。�
 IGESS 另提供可选的玩家行为循环。玩家画像可以分别配置
 `behavior_weights`、`behavior_durations` 和 `behavior_target_policies`；
 Fish 当前前台行为为 `manual_throw`、`upgrade_fish`、
-`upgrade_fish_hall`、`synthesize_barbell`、`exercise_barbell`、
-`strength_rebirth`、`trash_man_rebirth`、`idle`。每次只允许一个前台行为；
+`upgrade_fish_hall`、`purchase_torpedo`、`synthesize_barbell`、
+`exercise_barbell`、`strength_rebirth`、`trash_man_rebirth`、`idle`。
+每次只允许一个前台行为；
 摸鱼厅金钱和垃圾佬加工属于后台系统，杠铃锻炼不是后台系统。
 `upgrade_fish_hall` 是无目标行为，只在未满级且当前材料可支付时进入候选。
 生产 `upgrade_fish` 使用 `cheapest_below_material_tenth` 目标策略：从全部未满级
@@ -68,6 +69,9 @@ Fish 当前前台行为为 `manual_throw`、`upgrade_fish`、
 严格低于当前材料的 `1/10` 时才进入候选。鱼升级价格从材料余额扣除。
 `synthesize_barbell` 必须显式使用 `random_affordable` 目标策略，并只从当前
 未拥有且材料可支付的杠铃中选择，避免行为模拟反复合成不提高产出的副本。
+`purchase_torpedo` 必须使用 `highest_affordable`：只从未拥有、比当前装备
+更强且金钱可支付的鱼雷中选择最高档，购买后自动装备。该行为不读取当前力量
+或历史最高力量，成长时点完全由 `tbtorpedo.price` 控制。
 `exercise_barbell` 仅在拥有有效已装备杠铃时进入候选，执行期间按装备速度
 持续增加力量，并与炸鱼、升级、合成和重生互斥。
 `strength_rebirth` 也是无目标行为，只在当前力量达到下一张一基表行门槛时
@@ -83,12 +87,28 @@ Fish 当前前台行为为 `manual_throw`、`upgrade_fish`、
 杠铃力量为 `0%`，垃圾佬修炼不推进。默认 `manual_throw` 与
 `exercise_barbell` 使用基准权重 `1`，低优先级 `upgrade_fish` 使用权重
 `0.1`；`synthesize_barbell` 与 `upgrade_fish_hall` 使用高优先级权重
-`100`。两类重生也配置为固定 `1` 秒行为；只要任一种达到下一档要求，候选池
+`100`；`purchase_torpedo` 同样使用权重 `100` 和固定 `1` 秒。两类重生也
+配置为固定 `1` 秒行为；只要任一种达到下一档要求，候选池
 就只保留当前可执行的重生，绝对优先于所有普通前台行为。若两种同时满足，则
 稳定选择一种并在下一轮立即执行另一种。杠铃合成使用 `random_affordable`，鱼升级使用
 `cheapest_below_material_tenth`；没有可执行目标时相应行为自动过滤。未拥有杠铃
-时训练行为也会自动过滤。正式 24h/长期场景和重生回本分析仍待运行，因此暂不能
-据此得出完整经济节奏结论。
+时训练行为也会自动过滤。生产 `day_1_growth` 与 `week_1_growth` 已完成正式
+24h/7d 基线；周场景保留全部行为事件以及重生/鱼雷购买的完整 trace，但对
+其他普通行为使用 `compact_event_details` 去除重复的大公式明细。重生直接
+产出与重置进度恢复结论见
+[`reports/rebirth-long-term-baseline.md`](reports/rebirth-long-term-baseline.md)。
+正式 Fish run 还会生成 `luck_progression.json/csv` 和
+`behavior_progression.json/csv`：前者按累计在线时间采样 Strength、
+FishLuck、TrashLuck 的当前值、历史峰值、变化速度、重生标记和停滞时间；
+后者只统计跨鱼保留或抬高长期能力上限的永久进展，并明确排除单鱼升级和临时
+效果。捕获只有在事件记录的最佳鱼厅 CPS 确实提高时才计入。静态 HTML 会显示
+双 Luck/Strength 曲线、永久进展触发密度、归一化变化幅度和事件明细。最新
+24h/7d 报表基线与结论见
+[`reports/torpedo-price-balance.md`](reports/torpedo-price-balance.md)；
+调价前报表基线保留在
+[`reports/progression-report-baseline.md`](reports/progression-report-baseline.md)。
+包含 FishLuck 机会成本的完整反事实经济回本仍需 Phase 9 的同 RNG 禁用重生分叉，
+不能直接用永久产出立即生效替代。
 
 IGESS 只模拟会影响数值体验的资源、概率、时间、产出、消耗、成长和策略。
 图鉴等非数值子系统不进入模拟逻辑；为兼容正式存档而存在的对应字段只透传，
@@ -105,6 +125,8 @@ igess model init --out projects/my-game
 igess model status --project .
 igess model apply --project . --change changes/next-rule.yaml
 igess model simulate --project . --scenario smoke
+igess model simulate --project projects/fish --scenario day_1_growth
+igess model simulate --project projects/fish --scenario week_1_growth
 ```
 
 ## Artifacts
@@ -115,3 +137,5 @@ igess model simulate --project . --scenario smoke
 - `changes/`: attributable incremental change records and proposed changes.
 - `runs/`: simulation run records and outputs.
 - `reports/`: generated analysis reports.
+- `runs/*/output/luck_progression.{json,csv}`: 核心强度与双 Luck 机器可读报表。
+- `runs/*/output/behavior_progression.{json,csv}`: 永久养成事件与间隔报表。

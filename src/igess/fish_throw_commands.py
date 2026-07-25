@@ -55,6 +55,7 @@ def apply_throw_resolution(
     *,
     adapter: FishThrowDataAdapter,
     hall_adapter: FishHallDataAdapter,
+    _mutate: bool = False,
 ) -> AppliedThrowResolution:
     """Atomically add one resolved fish and trash reward to PlayerState.
 
@@ -72,7 +73,10 @@ def apply_throw_resolution(
         raise FishCommandError("adapter must be a FishThrowDataAdapter")
     if not isinstance(hall_adapter, FishHallDataAdapter):
         raise FishCommandError("hall_adapter must be a FishHallDataAdapter")
-    state.validate(hall_adapter.validation_context())
+    if type(_mutate) is not bool:
+        raise FishCommandError("_mutate must be a bool")
+    if not _mutate:
+        state.validate(hall_adapter.validation_context())
     try:
         adapter.verify_resolution(resolution)
     except FishDataError as exc:
@@ -107,7 +111,8 @@ def apply_throw_resolution(
     ):
         raise FishCommandError("fish_mutation_id must be a positive integer")
 
-    committed = state.copy()
+    fish_hall_before = hall_adapter.snapshot(state, use_cache=_mutate)
+    committed = state if _mutate else state.copy()
     instance_id = committed.fish.next_instance_id
     committed.fish.items.append(
         FishInstance(
@@ -134,16 +139,20 @@ def apply_throw_resolution(
 
     committed.statistics.total_throws += 1
     committed.statistics.total_fish_caught += 1
-    layout = hall_adapter.expected_layout(committed)
-    for item in committed.fish.items:
-        item.hall_slot = layout.get(item.instance_id, 0)
     committed.meta.revision += 1
-    committed.validate(hall_adapter.validation_context())
-    fish_hall = hall_adapter.snapshot(committed)
+    if _mutate:
+        fish_hall = hall_adapter.apply_cached_layout(committed)
+    else:
+        layout = hall_adapter.expected_layout(committed)
+        for item in committed.fish.items:
+            item.hall_slot = layout.get(item.instance_id, 0)
+        committed.validate(hall_adapter.validation_context())
+        fish_hall = hall_adapter.snapshot(committed)
     return AppliedThrowResolution(
         state=committed,
         fish_instance_id=instance_id,
         trash_stock_count=trash_stock_count,
+        fish_hall_before=fish_hall_before,
         fish_hall=fish_hall,
     )
 

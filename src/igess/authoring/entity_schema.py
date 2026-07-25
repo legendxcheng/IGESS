@@ -37,6 +37,7 @@ _SCENARIO_OUTPUTS = (
     "unlock_timeline",
     "prestige_timeline",
     "bottleneck_report",
+    "compact_event_details",
 )
 
 
@@ -234,6 +235,9 @@ _SCHEMAS = (
         _field("session_pattern", "id"),
         _field("prestige_policy", "enum", allowed=_PRESTIGE_POLICIES),
         _field("activity_weights", "map_id_nonnegative_decimal", required=False),
+        _field("behavior_weights", "map_id_nonnegative_decimal", required=False),
+        _field("behavior_durations", "behavior_duration_map", required=False),
+        _field("behavior_target_policies", "map_id_id", required=False),
         _field("luck", "positive_decimal", required=False),
     ),
     _schema(
@@ -468,6 +472,18 @@ def _validate_value(
             if kind.startswith("map_id")
             else "native map[non-empty text, exact decimal >= 0]",
         )
+    elif kind == "map_id_id":
+        normalized = _validate_id_map(value)
+        if normalized is not None:
+            return normalized
+        allowed = ("native map[id, id]",)
+    elif kind == "behavior_duration_map":
+        normalized = _validate_behavior_duration_map(value)
+        if normalized is not None:
+            return normalized
+        allowed = (
+            "native map[id, fixed/uniform positive integer duration]",
+        )
     elif kind == "rng_rarities":
         normalized = _validate_rng_rarities(value)
         if normalized is not None:
@@ -537,6 +553,53 @@ def _validate_decimal_map(value: Any, *, id_keys: bool) -> dict[str, str] | None
         if not valid_key or parsed is None or parsed < SimNumber.zero():
             return None
         normalized[key] = str(item) if type(item) is int else item
+    return normalized
+
+
+def _validate_id_map(value: Any) -> dict[str, str] | None:
+    if type(value) is not dict:
+        return None
+    if not all(_is_id(key) and _is_id(item) for key, item in value.items()):
+        return None
+    return dict(value)
+
+
+def _validate_behavior_duration_map(
+    value: Any,
+) -> dict[str, dict[str, Any]] | None:
+    if type(value) is not dict:
+        return None
+    normalized: dict[str, dict[str, Any]] = {}
+    for behavior_id, duration in value.items():
+        if not _is_id(behavior_id) or type(duration) is not dict:
+            return None
+        duration_type = duration.get("type")
+        if duration_type == "fixed":
+            if (
+                set(duration) != {"type", "seconds"}
+                or type(duration["seconds"]) is not int
+                or duration["seconds"] <= 0
+            ):
+                return None
+        elif duration_type == "uniform":
+            if set(duration) != {
+                "type",
+                "min_seconds",
+                "max_seconds",
+            }:
+                return None
+            minimum = duration["min_seconds"]
+            maximum = duration["max_seconds"]
+            if (
+                type(minimum) is not int
+                or type(maximum) is not int
+                or minimum <= 0
+                or maximum < minimum
+            ):
+                return None
+        else:
+            return None
+        normalized[behavior_id] = dict(duration)
     return normalized
 
 

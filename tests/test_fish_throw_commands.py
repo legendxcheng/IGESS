@@ -124,6 +124,21 @@ def test_throw_application_atomically_persists_rewards(tmp_path: Path) -> None:
     assert application_details["fish_instance_id"] == "1"
     assert application_details["trash_stock_count"] == "1"
     assert application_details["player_state_revision"] == "1"
+    assert application_details["fish_hall_cps_before"] == "0"
+    assert application_details["fish_hall_cps_after"] in {
+        "8",
+        "10",
+        "12",
+        "15",
+    }
+    assert application_details["fish_hall_cps_delta"] in {
+        "8",
+        "10",
+        "12",
+        "15",
+    }
+    assert application_details["changed_best_hall_layout"] == "true"
+    assert application_details["is_persistent_progression"] == "true"
     assert application_details["fish_hall_capacity_after_throw"] == "2"
     assert application_details["fish_hall_policy_after_throw"] == ("fixed_max_income")
     assert application_details["fish_hall_tie_breaker_after_throw"] == (

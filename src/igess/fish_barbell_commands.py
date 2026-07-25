@@ -17,6 +17,7 @@ def synthesize_barbell(
     *,
     hall_adapter: FishHallDataAdapter,
     barbell_adapter: FishBarbellDataAdapter,
+    _mutate: bool = False,
 ) -> AppliedBarbellSynthesis:
     """Atomically pay material, add one barbell, and equip the best owned.
 
@@ -34,7 +35,10 @@ def synthesize_barbell(
         )
     if type(barbell_id) is not int or barbell_id <= 0:
         raise FishCommandError("barbell_id must be a positive integer")
-    state.validate(hall_adapter.validation_context())
+    if type(_mutate) is not bool:
+        raise FishCommandError("_mutate must be a bool")
+    if not _mutate:
+        state.validate(hall_adapter.validation_context())
     production_before = barbell_adapter.production_snapshot(state)
     try:
         price = barbell_adapter.synthesis_price(barbell_id)
@@ -57,7 +61,7 @@ def synthesize_barbell(
         None,
     )
     count_before = 0 if source_owned is None else source_owned.count
-    committed = state.copy()
+    committed = state if _mutate else state.copy()
     committed_owned = next(
         (
             entry
@@ -77,7 +81,8 @@ def synthesize_barbell(
         allow_negative=False,
     )
     committed.meta.revision += 1
-    committed.validate(hall_adapter.validation_context())
+    if not _mutate:
+        committed.validate(hall_adapter.validation_context())
     production_after = barbell_adapter.production_snapshot(committed)
     return AppliedBarbellSynthesis(
         state=committed,

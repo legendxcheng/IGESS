@@ -16,6 +16,7 @@ def apply_strength_rebirth(
     state: PlayerState,
     *,
     hall_adapter: FishHallDataAdapter,
+    _mutate: bool = False,
 ) -> AppliedStrengthRebirth:
     """Atomically reset strength and earn the next permanent hall multiplier.
 
@@ -27,7 +28,10 @@ def apply_strength_rebirth(
         raise FishCommandError("state must be a PlayerState")
     if not isinstance(hall_adapter, FishHallDataAdapter):
         raise FishCommandError("hall_adapter must be a FishHallDataAdapter")
-    state.validate(hall_adapter.validation_context())
+    if type(_mutate) is not bool:
+        raise FishCommandError("_mutate must be a bool")
+    if not _mutate:
+        state.validate(hall_adapter.validation_context())
 
     from_completed_count = state.rebirth.strength_completed_count
     try:
@@ -44,16 +48,20 @@ def apply_strength_rebirth(
             f"have {strength_before.to_decimal_string()}"
         )
 
-    fish_hall_before = hall_adapter.snapshot(state)
-    committed = state.copy()
+    fish_hall_before = hall_adapter.snapshot(state, use_cache=_mutate)
+    committed = state if _mutate else state.copy()
     committed.wallet.strength = BigNumberDTO.from_value(
         SimNumber.zero(),
         allow_negative=False,
     )
     committed.rebirth.strength_completed_count = rule.completed_count
     committed.meta.revision += 1
-    committed.validate(hall_adapter.validation_context())
-    fish_hall_after = hall_adapter.snapshot(committed)
+    if not _mutate:
+        committed.validate(hall_adapter.validation_context())
+    fish_hall_after = hall_adapter.snapshot(
+        committed,
+        use_cache=_mutate,
+    )
     return AppliedStrengthRebirth(
         state=committed,
         from_completed_count=from_completed_count,
@@ -70,6 +78,7 @@ def apply_trash_man_rebirth(
     state: PlayerState,
     *,
     trash_adapter: FishTrashDataAdapter,
+    _mutate: bool = False,
 ) -> AppliedTrashManRebirth:
     """Reset current realm and earn the next permanent material multiplier.
 
@@ -83,7 +92,10 @@ def apply_trash_man_rebirth(
         raise FishCommandError(
             "trash_adapter must be a FishTrashDataAdapter"
         )
-    state.validate()
+    if type(_mutate) is not bool:
+        raise FishCommandError("_mutate must be a bool")
+    if not _mutate:
+        state.validate()
 
     from_completed_count = state.rebirth.trash_man_completed_count
     realm_before = state.trash_man.realm_id
@@ -107,12 +119,16 @@ def apply_trash_man_rebirth(
     multiplier_before = trash_adapter.material_output_multiplier(
         from_completed_count
     )
-    committed = state.copy()
+    training_progress_seconds_before = (
+        state.trash_man.training_progress_seconds
+    )
+    committed = state if _mutate else state.copy()
     committed.trash_man.realm_id = trash_adapter.initial_realm_id
     committed.trash_man.training_progress_seconds = 0
     committed.rebirth.trash_man_completed_count = rule.completed_count
     committed.meta.revision += 1
-    committed.validate()
+    if not _mutate:
+        committed.validate()
     multiplier_after = trash_adapter.material_output_multiplier(
         rule.completed_count
     )
@@ -124,9 +140,7 @@ def apply_trash_man_rebirth(
         realm_before=realm_before,
         realm_after=committed.trash_man.realm_id,
         highest_realm_id=committed.trash_man.highest_realm_id,
-        training_progress_seconds_before=(
-            state.trash_man.training_progress_seconds
-        ),
+        training_progress_seconds_before=training_progress_seconds_before,
         training_progress_seconds_after=(
             committed.trash_man.training_progress_seconds
         ),

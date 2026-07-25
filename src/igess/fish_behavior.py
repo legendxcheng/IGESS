@@ -8,7 +8,6 @@ from .behavior import (
     BehaviorCandidate,
     BehaviorDecision,
     BehaviorProfile,
-    BehaviorTarget,
     DurationSpec,
     FixedDuration,
     UniformIntDuration,
@@ -20,24 +19,35 @@ from .fish_commands import (
     apply_trash_man_rebirth,
     apply_throw_resolution,
     lock_throw_request,
+    purchase_torpedo,
     synthesize_barbell,
     upgrade_fish,
+)
+from .fish_behavior_targets import (
+    CHEAPEST_BELOW_MATERIAL_TENTH_POLICY_ID,
+    HIGHEST_AFFORDABLE_POLICY_ID,
+    RANDOM_AFFORDABLE_POLICY_ID,
+    barbell_synthesis_targets,
+    fish_upgrade_targets,
+    torpedo_purchase_targets,
 )
 from .fish_hall import FishHallDataAdapter
 from .fish_production import (
     FishProductionRuntime,
     settle_fish_production,
 )
-from .fish_state import FISH_MAX_LEVEL, PlayerState
+from .fish_state import PlayerState
+from .fish_torpedo import FishTorpedoDataAdapter
 from .fish_trash import FishTrashDataAdapter
 from .fish_throw_data import FishThrowDataAdapter, ProductionThrowConfig
+from .fish_upgrade_ranking import FishUpgradeRankingCache
 from .numbers import SimNumber
 from .schema import PlayerProfile
-
 
 MANUAL_THROW_BEHAVIOR_ID = "manual_throw"
 UPGRADE_FISH_BEHAVIOR_ID = "upgrade_fish"
 UPGRADE_FISH_HALL_BEHAVIOR_ID = "upgrade_fish_hall"
+PURCHASE_TORPEDO_BEHAVIOR_ID = "purchase_torpedo"
 SYNTHESIZE_BARBELL_BEHAVIOR_ID = "synthesize_barbell"
 EXERCISE_BARBELL_BEHAVIOR_ID = "exercise_barbell"
 STRENGTH_REBIRTH_BEHAVIOR_ID = "strength_rebirth"
@@ -48,15 +58,12 @@ REBIRTH_BEHAVIOR_IDS = frozenset(
         TRASH_MAN_REBIRTH_BEHAVIOR_ID,
     }
 )
-RANDOM_AFFORDABLE_POLICY_ID = "random_affordable"
-CHEAPEST_BELOW_MATERIAL_TENTH_POLICY_ID = (
-    "cheapest_below_material_tenth"
-)
 FISH_BEHAVIOR_IDS = frozenset(
     {
         MANUAL_THROW_BEHAVIOR_ID,
         UPGRADE_FISH_BEHAVIOR_ID,
         UPGRADE_FISH_HALL_BEHAVIOR_ID,
+        PURCHASE_TORPEDO_BEHAVIOR_ID,
         SYNTHESIZE_BARBELL_BEHAVIOR_ID,
         EXERCISE_BARBELL_BEHAVIOR_ID,
         STRENGTH_REBIRTH_BEHAVIOR_ID,
@@ -91,12 +98,24 @@ class FishBehaviorAdapter:
         trash_adapter: FishTrashDataAdapter,
         barbell_adapter: FishBarbellDataAdapter,
         throw_config: ProductionThrowConfig,
+        _validate_state: bool = True,
     ) -> None:
+        if type(_validate_state) is not bool:
+            raise TypeError("_validate_state must be a bool")
         self.throw_adapter = throw_adapter
         self.hall_adapter = hall_adapter
         self.trash_adapter = trash_adapter
         self.barbell_adapter = barbell_adapter
         self.throw_config = throw_config
+        self.torpedo_adapter = FishTorpedoDataAdapter(
+            throw_adapter.snapshot,
+            trash_luck_pools=throw_adapter.trash_luck_pools,
+            regular_luck_multiplier=throw_config.regular_luck_multiplier,
+        )
+        self._validate_state = _validate_state
+        self._upgrade_ranking = FishUpgradeRankingCache(
+            self.hall_adapter.upgrade_price
+        )
 
     def behavior_profile(self, profile: PlayerProfile) -> BehaviorProfile:
         unknown = set(profile.behavior_weights) - FISH_BEHAVIOR_IDS
@@ -159,11 +178,30 @@ class FishBehaviorAdapter:
                 raise FishBehaviorConfigError(
                     f"unknown Barbell synthesis target policy: {policy}"
                 )
+        purchase_weight = profile.behavior_weights.get(
+            PURCHASE_TORPEDO_BEHAVIOR_ID
+        )
+        if (
+            purchase_weight is not None
+            and purchase_weight > SimNumber.zero()
+        ):
+            policy = profile.behavior_target_policies.get(
+                PURCHASE_TORPEDO_BEHAVIOR_ID
+            )
+            if policy is None:
+                raise FishBehaviorConfigError(
+                    "purchase_torpedo requires an explicit target policy"
+                )
+            if policy != HIGHEST_AFFORDABLE_POLICY_ID:
+                raise FishBehaviorConfigError(
+                    f"unknown Torpedo purchase target policy: {policy}"
+                )
         extra_policies = (
             set(profile.behavior_target_policies)
             - {
                 UPGRADE_FISH_BEHAVIOR_ID,
                 SYNTHESIZE_BARBELL_BEHAVIOR_ID,
+                PURCHASE_TORPEDO_BEHAVIOR_ID,
             }
         )
         if extra_policies:
@@ -183,7 +221,8 @@ class FishBehaviorAdapter:
     ) -> tuple[BehaviorCandidate, ...]:
         """Return mutually exclusive foreground Fish actions."""
 
-        state.validate(self.hall_adapter.validation_context())
+        if self._validate_state:
+            state.validate(self.hall_adapter.validation_context())
         candidates: list[BehaviorCandidate] = []
         for behavior_id, weight in sorted(profile.behavior_weights.items()):
             if weight <= SimNumber.zero():
@@ -204,7 +243,13 @@ class FishBehaviorAdapter:
                     )
                 )
             elif behavior_id == UPGRADE_FISH_BEHAVIOR_ID:
-                targets = self._upgrade_targets(state, profile)
+                targets = fish_upgrade_targets(
+                    state,
+                    profile.behavior_target_policies.get(behavior_id),
+                    upgrade_price=self.hall_adapter.upgrade_price,
+                    upgrade_ranking=self._upgrade_ranking,
+                    validate_state=self._validate_state,
+                )
                 candidates.append(
                     BehaviorCandidate(
                         behavior_id=behavior_id,
@@ -229,8 +274,26 @@ class FishBehaviorAdapter:
                         ),
                     )
                 )
+            elif behavior_id == PURCHASE_TORPEDO_BEHAVIOR_ID:
+                targets = torpedo_purchase_targets(
+                    state,
+                    profile.behavior_target_policies.get(behavior_id),
+                    torpedo_adapter=self.torpedo_adapter,
+                )
+                candidates.append(
+                    BehaviorCandidate(
+                        behavior_id=behavior_id,
+                        duration=duration,
+                        available=bool(targets),
+                        targets=targets,
+                    )
+                )
             elif behavior_id == SYNTHESIZE_BARBELL_BEHAVIOR_ID:
-                targets = self._barbell_synthesis_targets(state, profile)
+                targets = barbell_synthesis_targets(
+                    state,
+                    profile.behavior_target_policies.get(behavior_id),
+                    barbell_adapter=self.barbell_adapter,
+                )
                 candidates.append(
                     BehaviorCandidate(
                         behavior_id=behavior_id,
@@ -296,7 +359,10 @@ class FishBehaviorAdapter:
         root_random_seed: int,
         next_throw_id: int,
         production_runtime: FishProductionRuntime | None = None,
+        _mutate: bool = False,
     ) -> FishBehaviorCompletion:
+        if type(_mutate) is not bool:
+            raise TypeError("_mutate must be a bool")
         if decision.completes_at_seconds < state.production.last_settled_at:
             raise ValueError("behavior completion precedes Fish hall settlement")
         settlement = settle_fish_production(
@@ -311,6 +377,7 @@ class FishBehaviorAdapter:
                 decision.behavior_id
                 == EXERCISE_BARBELL_BEHAVIOR_ID
             ),
+            _mutate=_mutate,
         )
         committed = settlement.state
         details = self._decision_details(decision)
@@ -332,6 +399,7 @@ class FishBehaviorAdapter:
                 resolution,
                 adapter=self.throw_adapter,
                 hall_adapter=self.hall_adapter,
+                _mutate=_mutate,
             )
             details.update(resolution.event_details())
             details.update(application.event_details())
@@ -356,6 +424,7 @@ class FishBehaviorAdapter:
                 committed,
                 instance_id,
                 hall_adapter=self.hall_adapter,
+                _mutate=_mutate,
             )
             details.update(application.event_details())
             return FishBehaviorCompletion(
@@ -371,6 +440,7 @@ class FishBehaviorAdapter:
             application = apply_fish_hall_upgrade(
                 committed,
                 hall_adapter=self.hall_adapter,
+                _mutate=_mutate,
             )
             details.update(application.event_details())
             return FishBehaviorCompletion(
@@ -379,6 +449,30 @@ class FishBehaviorAdapter:
                 next_throw_id=next_throw_id,
                 event_kind="fish_hall_upgraded",
                 item_id=f"fish_hall:{application.to_level}",
+                details=details,
+            )
+
+        if decision.behavior_id == PURCHASE_TORPEDO_BEHAVIOR_ID:
+            try:
+                torpedo_id = int(decision.target_id or "")
+            except ValueError as exc:
+                raise ValueError(
+                    "purchase_torpedo behavior has an invalid target id"
+                ) from exc
+            application = purchase_torpedo(
+                committed,
+                torpedo_id,
+                hall_adapter=self.hall_adapter,
+                torpedo_adapter=self.torpedo_adapter,
+                _mutate=_mutate,
+            )
+            details.update(application.event_details())
+            return FishBehaviorCompletion(
+                state=application.state,
+                production_runtime=settlement.runtime,
+                next_throw_id=next_throw_id,
+                event_kind="torpedo_purchased",
+                item_id=f"torpedo:{torpedo_id}",
                 details=details,
             )
 
@@ -394,6 +488,7 @@ class FishBehaviorAdapter:
                 barbell_id,
                 hall_adapter=self.hall_adapter,
                 barbell_adapter=self.barbell_adapter,
+                _mutate=_mutate,
             )
             details.update(application.event_details())
             return FishBehaviorCompletion(
@@ -419,6 +514,7 @@ class FishBehaviorAdapter:
             application = apply_strength_rebirth(
                 committed,
                 hall_adapter=self.hall_adapter,
+                _mutate=_mutate,
             )
             details.update(application.event_details())
             return FishBehaviorCompletion(
@@ -437,6 +533,7 @@ class FishBehaviorAdapter:
             application = apply_trash_man_rebirth(
                 committed,
                 trash_adapter=self.trash_adapter,
+                _mutate=_mutate,
             )
             details.update(application.event_details())
             return FishBehaviorCompletion(
@@ -462,69 +559,6 @@ class FishBehaviorAdapter:
             )
 
         raise ValueError(f"unsupported Fish behavior: {decision.behavior_id}")
-
-    def _upgrade_targets(
-        self,
-        state: PlayerState,
-        profile: PlayerProfile,
-    ) -> tuple[BehaviorTarget, ...]:
-        policy = profile.behavior_target_policies.get(
-            UPGRADE_FISH_BEHAVIOR_ID
-        )
-        if policy not in {
-            RANDOM_AFFORDABLE_POLICY_ID,
-            CHEAPEST_BELOW_MATERIAL_TENTH_POLICY_ID,
-        }:
-            return ()
-        material = state.wallet.material.to_sim_number()
-        priced_items = []
-        for item in sorted(
-            state.fish.items,
-            key=lambda value: value.instance_id,
-        ):
-            if item.level >= FISH_MAX_LEVEL:
-                continue
-            priced_items.append(
-                (item, self.hall_adapter.upgrade_price(item))
-            )
-        if policy == CHEAPEST_BELOW_MATERIAL_TENTH_POLICY_ID:
-            if not priced_items:
-                return ()
-            item, price = min(
-                priced_items,
-                key=lambda value: (value[1], value[0].instance_id),
-            )
-            if price * SimNumber.parse(10) >= material:
-                return ()
-            return (BehaviorTarget(str(item.instance_id)),)
-        return tuple(
-            BehaviorTarget(str(item.instance_id))
-            for item, price in priced_items
-            if price <= material
-        )
-
-    def _barbell_synthesis_targets(
-        self,
-        state: PlayerState,
-        profile: PlayerProfile,
-    ) -> tuple[BehaviorTarget, ...]:
-        policy = profile.behavior_target_policies.get(
-            SYNTHESIZE_BARBELL_BEHAVIOR_ID
-        )
-        if policy != RANDOM_AFFORDABLE_POLICY_ID:
-            return ()
-        material = state.wallet.material.to_sim_number()
-        owned_ids = {
-            item.barbell_id
-            for item in state.barbell.owned
-            if item.count > 0
-        }
-        return tuple(
-            BehaviorTarget(str(rule.barbell_id))
-            for rule in self.barbell_adapter.rules
-            if rule.barbell_id not in owned_ids
-            and rule.price <= material
-        )
 
     @staticmethod
     def _duration(

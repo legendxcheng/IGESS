@@ -103,6 +103,7 @@ player_profiles:
       manual_throw: '1'
       upgrade_fish: '0.1'
       upgrade_fish_hall: '100'
+      purchase_torpedo: '100'
       synthesize_barbell: '100'
       exercise_barbell: '1'
       strength_rebirth: '1'
@@ -115,6 +116,9 @@ player_profiles:
         type: fixed
         seconds: 1
       upgrade_fish_hall:
+        type: fixed
+        seconds: 1
+      purchase_torpedo:
         type: fixed
         seconds: 1
       synthesize_barbell:
@@ -131,6 +135,7 @@ player_profiles:
         seconds: 1
     behavior_target_policies:
       upgrade_fish: cheapest_below_material_tenth
+      purchase_torpedo: highest_affordable
       synthesize_barbell: random_affordable
     luck: '1'
 scenarios:
@@ -147,3 +152,30 @@ scenarios:
     - unlock_timeline
     - prestige_timeline
     - bottleneck_report
+  day_1_growth:
+    duration_hours: '24'
+    time_mode: tick
+    profiles:
+    - default
+    start_state: new_player
+    record_interval_seconds: 3600
+    outputs:
+    - resource_curve
+    - purchase_timeline
+    - unlock_timeline
+    - prestige_timeline
+    - bottleneck_report
+  week_1_growth:
+    duration_hours: '168'
+    time_mode: tick
+    profiles:
+    - default
+    start_state: new_player
+    record_interval_seconds: 86400
+    outputs:
+    - resource_curve
+    - purchase_timeline
+    - unlock_timeline
+    - prestige_timeline
+    - bottleneck_report
+    - compact_event_details

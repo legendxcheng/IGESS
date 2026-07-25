@@ -58,6 +58,7 @@ def upgrade_fish(
     instance_id: int,
     *,
     hall_adapter: FishHallDataAdapter,
+    _mutate: bool = False,
 ) -> AppliedFishUpgrade:
     """Atomically pay for one level and recompute the fixed hall layout.
 
@@ -71,7 +72,10 @@ def upgrade_fish(
         raise FishCommandError("hall_adapter must be a FishHallDataAdapter")
     if type(instance_id) is not int or instance_id <= 0:
         raise FishCommandError("instance_id must be a positive integer")
-    state.validate(hall_adapter.validation_context())
+    if type(_mutate) is not bool:
+        raise FishCommandError("_mutate must be a bool")
+    if not _mutate:
+        state.validate(hall_adapter.validation_context())
     try:
         source_item = next(
             item for item in state.fish.items if item.instance_id == instance_id
@@ -93,9 +97,10 @@ def upgrade_fish(
             f"have {material_before.to_decimal_string()}"
         )
 
-    fish_hall_before = hall_adapter.snapshot(state)
+    fish_hall_before = hall_adapter.snapshot(state, use_cache=_mutate)
     income_before = hall_adapter.income_trace(source_item)
-    committed = state.copy()
+    from_level = source_item.level
+    committed = state if _mutate else state.copy()
     committed_item = next(
         item
         for item in committed.fish.items
@@ -108,17 +113,23 @@ def upgrade_fish(
         allow_negative=False,
     )
     material_after = committed.wallet.material.to_sim_number()
-    layout = hall_adapter.expected_layout(committed)
-    for item in committed.fish.items:
-        item.hall_slot = layout.get(item.instance_id, 0)
     committed.meta.revision += 1
-    committed.validate(hall_adapter.validation_context())
     income_after = hall_adapter.income_trace(committed_item)
-    fish_hall_after = hall_adapter.snapshot(committed)
+    if _mutate:
+        fish_hall_after = hall_adapter.apply_cached_layout(
+            committed,
+            changed_item=committed_item,
+        )
+    else:
+        layout = hall_adapter.expected_layout(committed)
+        for item in committed.fish.items:
+            item.hall_slot = layout.get(item.instance_id, 0)
+        committed.validate(hall_adapter.validation_context())
+        fish_hall_after = hall_adapter.snapshot(committed)
     return AppliedFishUpgrade(
         state=committed,
         instance_id=instance_id,
-        from_level=source_item.level,
+        from_level=from_level,
         to_level=committed_item.level,
         price=price,
         material_before=material_before,
@@ -134,6 +145,7 @@ def apply_fish_hall_upgrade(
     state: PlayerState,
     *,
     hall_adapter: FishHallDataAdapter,
+    _mutate: bool = False,
 ) -> AppliedFishHallUpgrade:
     """Atomically pay material for one hall level and apply its new capacity.
 
@@ -145,7 +157,10 @@ def apply_fish_hall_upgrade(
         raise FishCommandError("state must be a PlayerState")
     if not isinstance(hall_adapter, FishHallDataAdapter):
         raise FishCommandError("hall_adapter must be a FishHallDataAdapter")
-    state.validate(hall_adapter.validation_context())
+    if type(_mutate) is not bool:
+        raise FishCommandError("_mutate must be a bool")
+    if not _mutate:
+        state.validate(hall_adapter.validation_context())
 
     from_level = state.fish_hall.upgrade_level
     try:
@@ -160,8 +175,8 @@ def apply_fish_hall_upgrade(
             f"have {material_before.to_decimal_string()}"
         )
 
-    fish_hall_before = hall_adapter.snapshot(state)
-    committed = state.copy()
+    fish_hall_before = hall_adapter.snapshot(state, use_cache=_mutate)
+    committed = state if _mutate else state.copy()
     committed.fish_hall.upgrade_level = from_level + 1
     calculated_material_after = material_before - price
     committed.wallet.material = BigNumberDTO.from_value(
@@ -169,12 +184,15 @@ def apply_fish_hall_upgrade(
         allow_negative=False,
     )
     material_after = committed.wallet.material.to_sim_number()
-    layout = hall_adapter.expected_layout(committed)
-    for item in committed.fish.items:
-        item.hall_slot = layout.get(item.instance_id, 0)
     committed.meta.revision += 1
-    committed.validate(hall_adapter.validation_context())
-    fish_hall_after = hall_adapter.snapshot(committed)
+    if _mutate:
+        fish_hall_after = hall_adapter.apply_cached_layout(committed)
+    else:
+        layout = hall_adapter.expected_layout(committed)
+        for item in committed.fish.items:
+            item.hall_slot = layout.get(item.instance_id, 0)
+        committed.validate(hall_adapter.validation_context())
+        fish_hall_after = hall_adapter.snapshot(committed)
     return AppliedFishHallUpgrade(
         state=committed,
         from_level=from_level,

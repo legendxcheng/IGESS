@@ -933,6 +933,7 @@ class AuthoringService:
                     overrides=list(overrides),
                     manifest_metadata=prepared.manifest_metadata,
                     extra_artifacts=(checkpoint_name,) if checkpoint_path else (),
+                    domain_model=prepared.domain_model,
                 )
                 self._report_writer(paths["output_dir"], paths["report_dir"])
                 phase = "run_status"

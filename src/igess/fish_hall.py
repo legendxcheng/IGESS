@@ -1,11 +1,15 @@
 from __future__ import annotations
 
-import json
-from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from typing import Any, Sequence
 
 from .fish_data import FishDataError, FishDataSnapshot
+from .fish_hall_model import (
+    FishHallIncomeSnapshot,
+    FishIncomeTrace,
+    StrengthRebirthRule,
+)
+from .fish_hall_ranking import FishHallRankingCache
 from .fish_state import (
     FISH_MAX_LEVEL,
     FishInstance,
@@ -13,108 +17,6 @@ from .fish_state import (
     PlayerState,
 )
 from .numbers import SimNumber
-
-
-@dataclass(frozen=True)
-class FishIncomeTrace:
-    instance_id: int
-    fish_id: int
-    mutation_id: int
-    level: int
-    base_money_per_second: SimNumber
-    level_income_multiplier: SimNumber
-    level_money_per_second: SimNumber
-    mutation_income_multiplier: SimNumber
-    income_per_second: SimNumber
-
-    def event_entry(self) -> dict[str, int | str]:
-        return {
-            "instance_id": self.instance_id,
-            "fish_id": self.fish_id,
-            "mutation_id": self.mutation_id,
-            "level": self.level,
-            "base_money_per_second": (
-                self.base_money_per_second.to_decimal_string()
-            ),
-            "level_income_multiplier": (
-                self.level_income_multiplier.to_decimal_string()
-            ),
-            "level_money_per_second": (
-                self.level_money_per_second.to_decimal_string()
-            ),
-            "mutation_income_multiplier": (
-                self.mutation_income_multiplier.to_decimal_string()
-            ),
-            "formula": (
-                "base_money_per_second*1.25^(level-1)"
-                "*mutation_income_multiplier"
-            ),
-            "income_per_second": self.income_per_second.to_decimal_string(),
-        }
-
-
-@dataclass(frozen=True)
-class StrengthRebirthRule:
-    completed_count: int
-    strength_requirement: SimNumber
-    fish_hall_output_multiplier: SimNumber
-
-
-@dataclass(frozen=True)
-class FishHallIncomeSnapshot:
-    capacity: int
-    deployed_instance_ids: tuple[int, ...]
-    base_total_income_per_second: SimNumber
-    strength_rebirth_completed_count: int
-    strength_rebirth_multiplier: SimNumber
-    total_income_per_second: SimNumber
-    traces: tuple[FishIncomeTrace, ...]
-
-    def event_details(self, *, suffix: str = "") -> dict[str, str]:
-        label = f"_{suffix}" if suffix else ""
-        multiplier_source = (
-            "default_1x_not_in_table"
-            if self.strength_rebirth_completed_count == 0
-            else (
-                "tbstrengthrebirth"
-                f"[id={self.strength_rebirth_completed_count}]"
-                ".fishHallOutputMultiplier"
-            )
-        )
-        return {
-            f"fish_hall_policy{label}": "fixed_max_income",
-            f"fish_hall_tie_breaker{label}": "instance_id_ascending",
-            f"fish_hall_capacity{label}": str(self.capacity),
-            f"fish_hall_deployed_instance_ids{label}": json.dumps(
-                self.deployed_instance_ids,
-                separators=(",", ":"),
-            ),
-            f"fish_hall_income_per_second{label}": (
-                self.total_income_per_second.to_decimal_string()
-            ),
-            f"fish_hall_base_income_per_second{label}": (
-                self.base_total_income_per_second.to_decimal_string()
-            ),
-            f"strength_rebirth_completed_count{label}": str(
-                self.strength_rebirth_completed_count
-            ),
-            f"strength_rebirth_fish_hall_multiplier{label}": (
-                self.strength_rebirth_multiplier.to_decimal_string()
-            ),
-            f"strength_rebirth_fish_hall_multiplier_source{label}": (
-                multiplier_source
-            ),
-            f"fish_hall_income_formula{label}": (
-                "sum(deployed_fish_income_per_second)"
-                "*strength_rebirth_fish_hall_multiplier"
-            ),
-            f"fish_hall_formula_trace{label}": json.dumps(
-                [trace.event_entry() for trace in self.traces],
-                ensure_ascii=False,
-                sort_keys=True,
-                separators=(",", ":"),
-            ),
-        }
 
 
 class FishHallDataAdapter:
@@ -128,6 +30,23 @@ class FishHallDataAdapter:
         self._capacities = self._hall_capacities(hall_rows)
         self._hall_upgrade_prices = self._hall_prices(hall_rows)
         self._strength_rebirth_rules = self._strength_rebirth_rows()
+        self._income_value_cache: dict[
+            tuple[int, int, int],
+            tuple[
+                SimNumber,
+                SimNumber,
+                SimNumber,
+                SimNumber,
+                SimNumber,
+            ],
+        ] = {}
+        self._upgrade_price_cache: dict[tuple[int, int], SimNumber] = {}
+        self._cached_items: list[FishInstance] | None = None
+        self._cached_item_count = -1
+        self._cached_upgrade_level = -1
+        self._cached_strength_rebirth_count = -1
+        self._cached_snapshot: FishHallIncomeSnapshot | None = None
+        self._ranking = FishHallRankingCache(self._income_trace)
 
     def capacity(self, upgrade_level: int) -> int:
         if type(upgrade_level) is not int or upgrade_level < 0:
@@ -219,12 +138,21 @@ class FishHallDataAdapter:
     def validation_context(self) -> FishStateValidationContext:
         return FishStateValidationContext(fish_hall_capacity=self.capacity)
 
-    def expected_layout(self, state: PlayerState) -> dict[int, int]:
-        ranked = self._ranked_traces(state.fish.items)
-        selected = ranked[: self.capacity(state.fish_hall.upgrade_level)]
+    def expected_layout(
+        self,
+        state: PlayerState,
+        *,
+        use_cache: bool = False,
+    ) -> dict[int, int]:
+        capacity = self.capacity(state.fish_hall.upgrade_level)
+        ranked = self._ranking.ranked(
+            state.fish.items,
+            capacity,
+            use_cache=use_cache,
+        )
         return {
             trace.instance_id: slot
-            for slot, trace in enumerate(selected, start=1)
+            for slot, trace in enumerate(ranked, start=1)
         }
 
     def income_trace(self, item: FishInstance) -> FishIncomeTrace:
@@ -236,10 +164,40 @@ class FishHallDataAdapter:
             raise FishDataError(
                 f"fish instance is already at max level: {item.instance_id}"
             )
-        base = self._fish_base(item.fish_id)
-        return base * (SimNumber.parse("1.5") ** (item.level - 1))
+        key = (item.fish_id, item.level)
+        cached = self._upgrade_price_cache.get(key)
+        if cached is None:
+            base = self._fish_base(item.fish_id)
+            cached = base * (
+                SimNumber.parse("1.5") ** (item.level - 1)
+            )
+            self._upgrade_price_cache[key] = cached
+        return cached
 
-    def snapshot(self, state: PlayerState) -> FishHallIncomeSnapshot:
+    def snapshot(
+        self,
+        state: PlayerState,
+        *,
+        use_cache: bool = False,
+    ) -> FishHallIncomeSnapshot:
+        if (
+            use_cache
+            and self._cached_items is state.fish.items
+            and self._cached_item_count == len(state.fish.items)
+            and self._cached_upgrade_level == state.fish_hall.upgrade_level
+            and self._cached_snapshot is not None
+        ):
+            if (
+                self._cached_strength_rebirth_count
+                == state.rebirth.strength_completed_count
+            ):
+                return self._cached_snapshot
+            result = self._snapshot_from_traces(
+                state,
+                self._cached_snapshot.traces,
+            )
+            self._remember_snapshot(state, result)
+            return result
         expected = self.expected_layout(state)
         actual = {item.instance_id: item.hall_slot for item in state.fish.items}
         expected_all = {
@@ -250,18 +208,61 @@ class FishHallDataAdapter:
             raise FishDataError(
                 "PlayerState fish hall does not match fixed max_income layout"
             )
-        traces_by_id = {
-            trace.instance_id: trace
-            for trace in self._ranked_traces(state.fish.items)
-        }
-        deployed_ids = tuple(
-            instance_id
-            for instance_id, _slot in sorted(
-                expected.items(),
-                key=lambda item: item[1],
-            )
-        )
-        traces = tuple(traces_by_id[instance_id] for instance_id in deployed_ids)
+        traces = self._traces_for_layout(expected)
+        result = self._snapshot_from_traces(state, traces)
+        self._remember_snapshot(state, result)
+        return result
+
+    def apply_cached_layout(
+        self,
+        state: PlayerState,
+        *,
+        changed_item: FishInstance | None = None,
+    ) -> FishHallIncomeSnapshot:
+        """Apply the exact max-income layout to simulator-owned state.
+
+        The weighted Fish simulator owns its mutable state exclusively. Its
+        transitions only append fish, increase one fish level, increase hall
+        capacity, or change the strength-rebirth multiplier. That lets the
+        adapter maintain an exact lazy ranking heap and touch only the old and
+        new deployed items instead of rescanning every stored fish several
+        times per foreground action.
+
+        Public command paths continue to use ``expected_layout`` plus full
+        state validation; this method is reserved for the trusted internal
+        mutation path.
+        """
+
+        if not isinstance(state, PlayerState):
+            raise FishDataError("state must be a PlayerState")
+        self._ranking.sync(state.fish.items)
+        if changed_item is not None:
+            try:
+                self._ranking.note_updated(changed_item)
+            except ValueError as exc:
+                raise FishDataError(str(exc)) from exc
+        expected = self.expected_layout(state, use_cache=True)
+        previous_ids: tuple[int, ...] = ()
+        if (
+            self._cached_items is state.fish.items
+            and self._cached_snapshot is not None
+        ):
+            previous_ids = self._cached_snapshot.deployed_instance_ids
+        touched_ids = set(previous_ids)
+        touched_ids.update(expected)
+        for instance_id in touched_ids:
+            item = self._ranking.item(instance_id)
+            item.hall_slot = expected.get(instance_id, 0)
+        traces = self._traces_for_layout(expected)
+        result = self._snapshot_from_traces(state, traces)
+        self._remember_snapshot(state, result)
+        return result
+
+    def _snapshot_from_traces(
+        self,
+        state: PlayerState,
+        traces: tuple[FishIncomeTrace, ...],
+    ) -> FishHallIncomeSnapshot:
         base_total = sum(
             (trace.income_per_second for trace in traces),
             SimNumber.zero(),
@@ -271,7 +272,9 @@ class FishHallDataAdapter:
         )
         return FishHallIncomeSnapshot(
             capacity=self.capacity(state.fish_hall.upgrade_level),
-            deployed_instance_ids=deployed_ids,
+            deployed_instance_ids=tuple(
+                trace.instance_id for trace in traces
+            ),
             base_total_income_per_second=base_total,
             strength_rebirth_completed_count=(
                 state.rebirth.strength_completed_count
@@ -281,6 +284,29 @@ class FishHallDataAdapter:
                 base_total * strength_rebirth_multiplier
             ),
             traces=traces,
+        )
+
+    def _remember_snapshot(
+        self,
+        state: PlayerState,
+        result: FishHallIncomeSnapshot,
+    ) -> None:
+        self._cached_items = state.fish.items
+        self._cached_item_count = len(state.fish.items)
+        self._cached_upgrade_level = state.fish_hall.upgrade_level
+        self._cached_strength_rebirth_count = (
+            state.rebirth.strength_completed_count
+        )
+        self._cached_snapshot = result
+
+    def _traces_for_layout(
+        self,
+        layout: dict[int, int],
+    ) -> tuple[FishIncomeTrace, ...]:
+        by_slot = sorted(layout.items(), key=lambda item: item[1])
+        return tuple(
+            self._income_trace(self._ranking.item(instance_id))
+            for instance_id, _slot in by_slot
         )
 
     def _ranked_traces(
@@ -297,17 +323,38 @@ class FishHallDataAdapter:
 
     def _income_trace(self, item: FishInstance) -> FishIncomeTrace:
         self._validate_fish_level(item.level)
-        base = self._fish_base(item.fish_id)
-        try:
-            mutation_multiplier = self._mutation_income_multiplier[
-                item.mutation_id
-            ]
-        except KeyError as exc:
-            raise FishDataError(
-                f"unknown production mutation id: {item.mutation_id}"
-            ) from exc
-        level_multiplier = SimNumber.parse("1.25") ** (item.level - 1)
-        level_money_per_second = base * level_multiplier
+        key = (item.fish_id, item.mutation_id, item.level)
+        cached = self._income_value_cache.get(key)
+        if cached is None:
+            base = self._fish_base(item.fish_id)
+            try:
+                mutation_multiplier = self._mutation_income_multiplier[
+                    item.mutation_id
+                ]
+            except KeyError as exc:
+                raise FishDataError(
+                    "unknown production mutation id: "
+                    f"{item.mutation_id}"
+                ) from exc
+            level_multiplier = (
+                SimNumber.parse("1.25") ** (item.level - 1)
+            )
+            level_money_per_second = base * level_multiplier
+            cached = (
+                base,
+                level_multiplier,
+                level_money_per_second,
+                mutation_multiplier,
+                level_money_per_second * mutation_multiplier,
+            )
+            self._income_value_cache[key] = cached
+        (
+            base,
+            level_multiplier,
+            level_money_per_second,
+            mutation_multiplier,
+            income_per_second,
+        ) = cached
         return FishIncomeTrace(
             instance_id=item.instance_id,
             fish_id=item.fish_id,
@@ -317,9 +364,7 @@ class FishHallDataAdapter:
             level_income_multiplier=level_multiplier,
             level_money_per_second=level_money_per_second,
             mutation_income_multiplier=mutation_multiplier,
-            income_per_second=(
-                level_money_per_second * mutation_multiplier
-            ),
+            income_per_second=income_per_second,
         )
 
     def _fish_base(self, fish_id: int) -> SimNumber:

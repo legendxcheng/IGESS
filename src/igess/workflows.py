@@ -202,6 +202,7 @@ class WorkflowService:
                 model_digest=prepared.model_digest if fish_run else None,
                 manifest_metadata=prepared.manifest_metadata,
                 extra_artifacts=(checkpoint_name,) if checkpoint_path else (),
+                domain_model=prepared.domain_model,
             )
             generate_static_report(output_dir, report_dir)
             return self.registry.write_status(

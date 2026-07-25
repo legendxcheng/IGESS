@@ -166,6 +166,7 @@ def settle_trash_online(
     elapsed_seconds: int,
     *,
     runtime: TrashProcessingRuntime | None = None,
+    _mutate: bool = False,
 ) -> TrashOnlineSettlement:
     """Settle trash processing while replaying confirmed online catch-up.
 
@@ -177,6 +178,8 @@ def settle_trash_online(
         raise TypeError("state must be a PlayerState")
     if type(elapsed_seconds) is not int or elapsed_seconds < 0:
         raise ValueError("elapsed_seconds must be non-negative")
+    if type(_mutate) is not bool:
+        raise TypeError("_mutate must be a bool")
     runtime = runtime or TrashProcessingRuntime()
     if not isinstance(runtime, TrashProcessingRuntime):
         raise TypeError("runtime must be a TrashProcessingRuntime")
@@ -196,7 +199,7 @@ def settle_trash_online(
             "trash-man current realm exceeds historical highest realm"
         )
 
-    working = state.copy()
+    working = state if _mutate else state.copy()
     current_realm = realm_before
     progress = progress_before
     remaining_elapsed = elapsed_seconds

@@ -19,7 +19,7 @@ def build_report_view_model(data: ReportData) -> dict[str, Any]:
         }
     )
     return {
-        "schema_version": 2,
+        "schema_version": 3,
         "scenario": {
             "id": data.scenario_id,
             "model_id": data.manifest.get("model_id"),
@@ -33,6 +33,7 @@ def build_report_view_model(data: ReportData) -> dict[str, Any]:
             "events": _event_series(data.events),
         },
         "diagnostics": _diagnostics(data),
+        "fish_progression": _fish_progression(data),
         "evidence": _evidence(data),
         "artifacts": {
             "timeline": (data.run_dir / "timeline.json").as_posix(),
@@ -40,6 +41,12 @@ def build_report_view_model(data: ReportData) -> dict[str, Any]:
             "analysis": (data.run_dir / "analysis.json").as_posix(),
             "payback": (data.run_dir / "payback.csv").as_posix(),
             "manifest": (data.run_dir / "run_manifest.json").as_posix(),
+            "luck_progression": (
+                data.run_dir / "luck_progression.json"
+            ).as_posix(),
+            "behavior_progression": (
+                data.run_dir / "behavior_progression.json"
+            ).as_posix(),
         },
     }
 
@@ -163,6 +170,145 @@ def _event_series(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
         }
         for event in events
     ]
+
+
+def _fish_progression(data: ReportData) -> dict[str, Any]:
+    core_profiles = _progression_profiles(
+        data.luck_progression,
+        numeric_fields=(
+            "strength_current",
+            "strength_peak",
+            "strength_delta",
+            "fish_luck_current",
+            "fish_luck_peak",
+            "fish_luck_delta",
+            "trash_luck_current",
+            "trash_luck_peak",
+            "trash_luck_delta",
+            "fish_luck_delta_per_active_hour",
+            "trash_luck_delta_per_active_hour",
+            "time_since_fish_luck_growth_seconds",
+            "time_since_trash_luck_growth_seconds",
+            "strength_rebirth_count",
+            "trash_man_rebirth_count",
+        ),
+    )
+    behavior_profiles = _behavior_progression_profiles(
+        data.behavior_progression
+    )
+    return {
+        "available": bool(core_profiles or behavior_profiles),
+        "core": {
+            "time_basis": data.luck_progression.get("time_basis"),
+            "sample_interval_active_seconds": chart_point(
+                data.luck_progression.get(
+                    "sample_interval_active_seconds",
+                    0,
+                )
+            ),
+            "profiles": core_profiles,
+        },
+        "persistent": {
+            "time_basis": data.behavior_progression.get("time_basis"),
+            "excluded_event_kinds": list(
+                data.behavior_progression.get(
+                    "excluded_event_kinds",
+                    [],
+                )
+            ),
+            "profiles": behavior_profiles,
+        },
+    }
+
+
+def _progression_profiles(
+    payload: dict[str, Any],
+    *,
+    numeric_fields: tuple[str, ...],
+) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    raw_profiles = payload.get("profiles", {})
+    if not isinstance(raw_profiles, dict):
+        return result
+    for profile_id, raw_profile in raw_profiles.items():
+        if not isinstance(raw_profile, dict):
+            continue
+        rows = []
+        for raw_row in raw_profile.get("rows", []):
+            if not isinstance(raw_row, dict):
+                continue
+            row = dict(raw_row)
+            row["active_time"] = chart_point(
+                raw_row.get("active_time_seconds", 0)
+            )
+            row["wall_time"] = chart_point(
+                raw_row.get("wall_time_seconds", 0)
+            )
+            for field in numeric_fields:
+                row[field] = chart_point(raw_row.get(field, 0))
+            rows.append(row)
+        summary = _numeric_summary(
+            raw_profile.get("summary", {}),
+        )
+        result[str(profile_id)] = {
+            "summary": summary,
+            "rows": rows,
+        }
+    return result
+
+
+def _behavior_progression_profiles(
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    result = _progression_profiles(
+        payload,
+        numeric_fields=(
+            "metric_before",
+            "metric_after",
+            "metric_delta",
+            "relative_delta",
+            "gap_from_previous_progression_seconds",
+        ),
+    )
+    raw_profiles = payload.get("profiles", {})
+    if not isinstance(raw_profiles, dict):
+        return result
+    for profile_id, profile in result.items():
+        raw_profile = raw_profiles.get(profile_id, {})
+        density = []
+        if isinstance(raw_profile, dict):
+            for raw_row in raw_profile.get(
+                "density_by_active_hour",
+                [],
+            ):
+                if not isinstance(raw_row, dict):
+                    continue
+                row = dict(raw_row)
+                for field in (
+                    "active_hour_index",
+                    "active_time_start_seconds",
+                    "active_time_end_seconds",
+                    "event_count",
+                    "average_relative_delta",
+                ):
+                    row[field] = chart_point(raw_row.get(field, 0))
+                density.append(row)
+        profile["density_by_active_hour"] = density
+    return result
+
+
+def _numeric_summary(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    result: dict[str, Any] = {}
+    for key, item in value.items():
+        if isinstance(item, dict):
+            result[key] = dict(item)
+        elif isinstance(item, (str, int, float, Decimal)):
+            result[key] = chart_point(item)
+        else:
+            result[key] = item
+    return result
 
 
 def _diagnostics(data: ReportData) -> dict[str, Any]:

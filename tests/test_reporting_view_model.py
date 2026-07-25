@@ -93,7 +93,7 @@ def test_build_report_view_model_contains_chart_ready_sections(tmp_path):
 
     payload = build_report_view_model(data)
 
-    assert payload["schema_version"] == 2
+    assert payload["schema_version"] == 3
     assert payload["scenario"]["id"] == "day_1_progression"
     assert payload["scenario"]["profiles"] == ["casual", "explorer", "optimizer"]
     assert payload["series"]["resources"]

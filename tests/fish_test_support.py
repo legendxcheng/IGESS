@@ -173,6 +173,21 @@ def _snapshot(
                 name="初始鱼雷",
                 rarityId=1,
                 power=_big(50),
+                price=_big(0),
+            ),
+            SimpleNamespace(
+                id=initial_torpedo_id + 1,
+                name="鱼雷2",
+                rarityId=2,
+                power=_big(1000),
+                price=_big(100),
+            ),
+            SimpleNamespace(
+                id=initial_torpedo_id + 2,
+                name="鱼雷3",
+                rarityId=3,
+                power=_big(2000),
+                price=_big(1000),
             ),
         ),
         "tbbarbell": (

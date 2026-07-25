@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +20,8 @@ class ReportData:
     analysis: dict[str, Any]
     payback_rows: list[dict[str, str]]
     missing_artifacts: list[str]
+    luck_progression: dict[str, Any] = field(default_factory=dict)
+    behavior_progression: dict[str, Any] = field(default_factory=dict)
 
     @property
     def scenario_id(self) -> str:
@@ -42,6 +44,12 @@ def load_report_data(run_dir: str | Path) -> ReportData:
     events = _read_required_json_list(run_dir / "events.json")
     analysis = _read_required_json_dict(run_dir / "analysis.json")
     payback_rows = _read_optional_csv(run_dir / "payback.csv", missing)
+    luck_progression = _read_optional_json_dict(
+        run_dir / "luck_progression.json"
+    )
+    behavior_progression = _read_optional_json_dict(
+        run_dir / "behavior_progression.json"
+    )
     return ReportData(
         run_dir=run_dir,
         manifest=manifest,
@@ -50,6 +58,8 @@ def load_report_data(run_dir: str | Path) -> ReportData:
         analysis=analysis,
         payback_rows=payback_rows,
         missing_artifacts=missing,
+        luck_progression=luck_progression,
+        behavior_progression=behavior_progression,
     )
 
 
@@ -71,6 +81,15 @@ def _read_optional_json(path: Path, missing: list[str], default):
     if not path.exists():
         missing.append(path.name)
         return default
+    data = _read_json(path)
+    if not isinstance(data, dict):
+        raise ReportLoadError(f"{path.name} must contain a JSON object")
+    return data
+
+
+def _read_optional_json_dict(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
     data = _read_json(path)
     if not isinstance(data, dict):
         raise ReportLoadError(f"{path.name} must contain a JSON object")

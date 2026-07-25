@@ -58,6 +58,18 @@ def test_simulator_runs_all_profiles_deterministically(tmp_path):
     assert legacy_analysis["payback_report"] == []
     assert (first_output / "timeline.csv").exists()
     events = json.loads((first_output / "events.json").read_text(encoding="utf-8"))
+    expected_events_text = (
+        json.dumps(
+            [event.to_ordered_dict() for event in first.events],
+            ensure_ascii=False,
+            indent=2,
+            sort_keys=False,
+        )
+        + "\n"
+    )
+    assert (
+        first_output / "events.json"
+    ).read_text(encoding="utf-8") == expected_events_text
     event_kinds = {event["kind"] for event in events}
     assert {"buy_generator", "unlock_generator", "prestige_reset"}.issubset(event_kinds)
     buy_fisherman = next(

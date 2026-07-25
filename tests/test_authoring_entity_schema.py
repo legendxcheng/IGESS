@@ -142,7 +142,13 @@ def test_yaml_schema_storage_names_and_optional_fields() -> None:
             "offline_duration_seconds",
             "daily_online_seconds",
         ),
-        "player_profile": ("activity_weights", "luck"),
+        "player_profile": (
+            "activity_weights",
+            "behavior_weights",
+            "behavior_durations",
+            "behavior_target_policies",
+            "luck",
+        ),
         "rng_scenario": ("event_threshold",),
         "regression_gate": (
             "max_unlock_delay_pct",
@@ -376,6 +382,7 @@ def test_output_list_is_native_and_restricted_but_may_be_empty() -> None:
         "unlock_timeline",
         "prestige_timeline",
         "bottleneck_report",
+        "compact_event_details",
     ]
     assert validate_entity_fields("scenario", "s", {"outputs": allowed}, require_complete=False) == {"outputs": allowed}
     assert validate_entity_fields("scenario", "s", {"outputs": []}, require_complete=False) == {"outputs": []}
@@ -404,6 +411,67 @@ def test_decimal_maps_are_native_validate_key_kind_and_never_accept_float() -> N
         _assert_invalid(
             "player_profile", "p", {"source_efficiency": value}, field="source_efficiency", require_complete=False
         )
+
+
+def test_player_behavior_maps_use_exact_authoring_shapes() -> None:
+    fields = {
+        "behavior_weights": {
+            "manual_throw": "1",
+            "upgrade_fish": "0.1",
+        },
+        "behavior_durations": {
+            "manual_throw": {"type": "fixed", "seconds": 1},
+            "upgrade_fish": {
+                "type": "uniform",
+                "min_seconds": 2,
+                "max_seconds": 4,
+            },
+        },
+        "behavior_target_policies": {
+            "upgrade_fish": "cheapest_below_material_tenth",
+        },
+    }
+
+    assert validate_entity_fields(
+        "player_profile",
+        "default",
+        fields,
+        require_complete=False,
+    ) == fields
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("behavior_weights", {"bad/id": "1"}),
+        (
+            "behavior_durations",
+            {"manual_throw": {"type": "fixed", "seconds": 0}},
+        ),
+        (
+            "behavior_durations",
+            {
+                "manual_throw": {
+                    "type": "uniform",
+                    "min_seconds": 4,
+                    "max_seconds": 2,
+                }
+            },
+        ),
+        ("behavior_target_policies", {"upgrade_fish": "bad policy"}),
+    ],
+)
+def test_player_behavior_maps_reject_invalid_authoring_shapes(
+    field: str,
+    value: object,
+) -> None:
+    _assert_invalid(
+        "player_profile",
+        "default",
+        {field: value},
+        field=field,
+        require_complete=False,
+    )
 
 
 def test_regression_text_key_map_accepts_nonempty_unicode_text_keys() -> None:

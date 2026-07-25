@@ -66,6 +66,28 @@ def test_checkpoint_canonical_round_trip_and_atomic_file_write(
     assert not list(destination.parent.glob("*.tmp"))
 
 
+def test_checkpoint_supports_week_scale_fish_inventory() -> None:
+    fish_items = [
+        {
+            "fishId": 1,
+            "hallSlot": 0,
+            "instanceId": instance_id,
+            "level": 1,
+            "mutationId": 1,
+            "weightGram": 1,
+        }
+        for instance_id in range(1, 24_001)
+    ]
+    checkpoint = _checkpoint(
+        engine_state={"fish": {"items": fish_items}},
+    )
+
+    encoded = CheckpointCodec.dumps(checkpoint)
+    loaded = CheckpointCodec.loads(encoded)
+
+    assert len(loaded.engine_state["fish"]["items"]) == 24_000
+
+
 @pytest.mark.parametrize(
     ("overrides", "code", "path"),
     [

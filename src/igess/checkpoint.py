@@ -13,7 +13,11 @@ CHECKPOINT_SCHEMA_VERSION = 1
 _DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 _MAX_CHECKPOINT_BYTES = 16 * 1024 * 1024
 _MAX_JSON_DEPTH = 64
-_MAX_JSON_WORK_UNITS = 32_768
+# A week-long Fish checkpoint legitimately contains tens of thousands of
+# individual fish. The byte and depth limits remain the primary untrusted-input
+# bounds; this node budget allows that production archive shape while still
+# bounding recursive traversal work.
+_MAX_JSON_WORK_UNITS = 262_144
 
 
 class CheckpointValidationError(ValueError):

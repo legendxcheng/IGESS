@@ -498,7 +498,7 @@ def test_generate_static_report_embeds_parseable_json_payload(tmp_path):
     inline_payload = json.loads(html[start:end])
     file_payload = json.loads((report_dir / "report_data.json").read_text(encoding="utf-8"))
     assert inline_payload == file_payload
-    assert inline_payload["schema_version"] == 2
+    assert inline_payload["schema_version"] == 3
     assert inline_payload["series"]["resources"]
     assert set(inline_payload["overview"]["duration_seconds"]) == {
         "exact_value",

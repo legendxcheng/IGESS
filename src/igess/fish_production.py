@@ -63,6 +63,8 @@ class AppliedFishProductionSettlement:
     money_added: SimNumber
     material_added: SimNumber
     strength_added: SimNumber
+    strength_before: SimNumber
+    strength_after: SimNumber
     fish_hall: FishHallIncomeSnapshot
     barbell: BarbellProductionSnapshot
     trash_processing: TrashOnlineSettlement
@@ -83,6 +85,12 @@ class AppliedFishProductionSettlement:
             "fish_hall_settlement_to_seconds": str(self.to_time_seconds),
             "fish_hall_settlement_elapsed_seconds": str(self.elapsed_seconds),
             "barbell_strength_added": self.strength_added.to_decimal_string(),
+            "strength_before_settlement": (
+                self.strength_before.to_decimal_string()
+            ),
+            "strength_after_settlement": (
+                self.strength_after.to_decimal_string()
+            ),
             "barbell_training_active": str(
                 self.barbell_training_active
             ).lower(),
@@ -107,6 +115,7 @@ def settle_fish_production(
     runtime: FishProductionRuntime | None = None,
     online: bool = True,
     barbell_training_active: bool = False,
+    _mutate: bool = False,
 ) -> AppliedFishProductionSettlement:
     """Atomically settle one uninterrupted Fish production interval.
 
@@ -122,12 +131,15 @@ def settle_fish_production(
         raise TypeError("online must be a bool")
     if type(barbell_training_active) is not bool:
         raise TypeError("barbell_training_active must be a bool")
+    if type(_mutate) is not bool:
+        raise TypeError("_mutate must be a bool")
     if barbell_training_active and not online:
         raise ValueError("barbell training cannot produce while offline")
     runtime = runtime or FishProductionRuntime()
     if not isinstance(runtime, FishProductionRuntime):
         raise TypeError("runtime must be a FishProductionRuntime")
-    state.validate(hall_adapter.validation_context())
+    if not _mutate:
+        state.validate(hall_adapter.validation_context())
     from_time_seconds = state.production.last_settled_at
     if to_time_seconds < from_time_seconds:
         raise ValueError("Fish production settlement time cannot move backwards")
@@ -135,7 +147,7 @@ def settle_fish_production(
     passive_efficiency = (
         SimNumber.one() if online else FISH_OFFLINE_EFFICIENCY
     )
-    hall = hall_adapter.snapshot(state)
+    hall = hall_adapter.snapshot(state, use_cache=_mutate)
     money_added = (
         hall.total_income_per_second
         * SimNumber.parse(elapsed_seconds)
@@ -162,6 +174,7 @@ def settle_fish_production(
             state,
             elapsed_seconds,
             runtime=runtime.trash_processing,
+            _mutate=_mutate,
         )
         if online
         else trash_adapter.settle_offline(
@@ -172,7 +185,8 @@ def settle_fish_production(
         )
     )
 
-    committed = state.copy()
+    strength_before = state.wallet.strength.to_sim_number()
+    committed = state if _mutate else state.copy()
     if elapsed_seconds > 0:
         committed.wallet.money = BigNumberDTO.from_value(
             state.wallet.money.to_sim_number() + money_added,
@@ -193,7 +207,8 @@ def settle_fish_production(
         )
         committed.production.last_settled_at = to_time_seconds
         committed.meta.revision += 1
-    committed.validate(hall_adapter.validation_context())
+    if not _mutate:
+        committed.validate(hall_adapter.validation_context())
     return AppliedFishProductionSettlement(
         state=committed,
         runtime=FishProductionRuntime(trash.runtime),
@@ -206,6 +221,8 @@ def settle_fish_production(
         money_added=money_added,
         material_added=trash.material_added,
         strength_added=strength_added,
+        strength_before=strength_before,
+        strength_after=committed.wallet.strength.to_sim_number(),
         fish_hall=hall,
         barbell=barbell,
         trash_processing=trash,

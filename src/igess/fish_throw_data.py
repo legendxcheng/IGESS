@@ -220,6 +220,16 @@ class FishThrowDataAdapter:
             raise FishDataError("tbtorpedo contains duplicate ids")
         self.initial_torpedo_id = torpedoes[0].id
 
+    def torpedo(self, torpedo_id: int) -> _Torpedo:
+        if type(torpedo_id) is not int or torpedo_id <= 0:
+            raise FishDataError("torpedo id must be a positive integer")
+        try:
+            return self._torpedoes_by_id[torpedo_id]
+        except KeyError as exc:
+            raise FishDataError(
+                f"unknown production torpedo id: {torpedo_id}"
+            ) from exc
+
     def resolve(self, request: ProductionThrowRequest) -> ProductionThrowResolution:
         if not isinstance(request, ProductionThrowRequest):
             raise FishDataError(
@@ -231,12 +241,7 @@ class FishThrowDataAdapter:
             raise FishDataError("throw_id must be a non-negative integer")
         if type(request.torpedo_id) is not int or request.torpedo_id <= 0:
             raise FishDataError("torpedo_id must be a positive integer")
-        try:
-            torpedo = self._torpedoes_by_id[request.torpedo_id]
-        except KeyError as exc:
-            raise FishDataError(
-                f"unknown production torpedo id: {request.torpedo_id}"
-            ) from exc
+        torpedo = self.torpedo(request.torpedo_id)
         multiplier = _positive_number(
             request.regular_luck_multiplier, "regular_luck_multiplier"
         )

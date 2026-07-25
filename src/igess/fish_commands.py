@@ -8,6 +8,7 @@ from .fish_command_results import (
     AppliedFishHallUpgrade,
     AppliedFishUpgrade,
     AppliedStrengthRebirth,
+    AppliedTorpedoPurchase,
     AppliedTrashManRebirth,
     AppliedThrowResolution,
     FishCommandError,
@@ -22,6 +23,7 @@ from .fish_rebirth_commands import (
     apply_trash_man_rebirth,
 )
 from .fish_throw_commands import apply_throw_resolution, lock_throw_request
+from .fish_torpedo_commands import purchase_torpedo
 
 __all__ = [
     "AppliedBarbellEquip",
@@ -30,6 +32,7 @@ __all__ = [
     "AppliedFishHallUpgrade",
     "AppliedFishUpgrade",
     "AppliedStrengthRebirth",
+    "AppliedTorpedoPurchase",
     "AppliedTrashManRebirth",
     "AppliedThrowResolution",
     "FishCommandError",
@@ -39,6 +42,7 @@ __all__ = [
     "apply_throw_resolution",
     "equip_barbell",
     "lock_throw_request",
+    "purchase_torpedo",
     "settle_fish_hall_income",
     "synthesize_barbell",
     "upgrade_fish",

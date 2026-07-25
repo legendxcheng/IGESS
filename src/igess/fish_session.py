@@ -80,6 +80,33 @@ class FishDailySessionSchedule:
             return SECONDS_PER_DAY
         return transition - time_seconds
 
+    def active_seconds_at(self, time_seconds: int) -> int:
+        """Convert wall-clock simulation time to cumulative online time."""
+
+        self._validate_time(time_seconds)
+        if self.always_online:
+            return time_seconds
+        full_days, day_seconds = divmod(time_seconds, SECONDS_PER_DAY)
+        return (
+            full_days * self.daily_online_seconds
+            + min(day_seconds, self.daily_online_seconds)
+        )
+
+    def wall_time_for_active_seconds(self, active_time_seconds: int) -> int:
+        """Return the earliest wall time with this cumulative online time."""
+
+        self._validate_time(active_time_seconds)
+        if self.always_online or active_time_seconds == 0:
+            return active_time_seconds
+        completed_days = (
+            active_time_seconds - 1
+        ) // self.daily_online_seconds
+        current_day_active = (
+            active_time_seconds
+            - completed_days * self.daily_online_seconds
+        )
+        return completed_days * SECONDS_PER_DAY + current_day_active
+
     @staticmethod
     def _validate_time(time_seconds: int) -> None:
         if type(time_seconds) is not int or time_seconds < 0:

@@ -9,6 +9,8 @@ from igess.fish_barbell import FishBarbellDataAdapter
 from igess.fish_behavior import (
     CHEAPEST_BELOW_MATERIAL_TENTH_POLICY_ID,
     EXERCISE_BARBELL_BEHAVIOR_ID,
+    HIGHEST_AFFORDABLE_POLICY_ID,
+    PURCHASE_TORPEDO_BEHAVIOR_ID,
     STRENGTH_REBIRTH_BEHAVIOR_ID,
     SYNTHESIZE_BARBELL_BEHAVIOR_ID,
     TRASH_MAN_REBIRTH_BEHAVIOR_ID,
@@ -54,6 +56,10 @@ def test_default_profile_prioritizes_growth_in_two_hour_session() -> None:
         == SimNumber.parse(100)
     )
     assert (
+        profile.behavior_weights[PURCHASE_TORPEDO_BEHAVIOR_ID]
+        == SimNumber.parse(100)
+    )
+    assert (
         profile.behavior_weights[UPGRADE_FISH_BEHAVIOR_ID]
         == SimNumber.parse("0.1")
     )
@@ -70,6 +76,10 @@ def test_default_profile_prioritizes_growth_in_two_hour_session() -> None:
         "seconds": 1,
     }
     assert profile.behavior_durations[UPGRADE_FISH_HALL_BEHAVIOR_ID] == {
+        "type": "fixed",
+        "seconds": 1,
+    }
+    assert profile.behavior_durations[PURCHASE_TORPEDO_BEHAVIOR_ID] == {
         "type": "fixed",
         "seconds": 1,
     }
@@ -92,6 +102,9 @@ def test_default_profile_prioritizes_growth_in_two_hour_session() -> None:
     assert profile.behavior_target_policies[
         SYNTHESIZE_BARBELL_BEHAVIOR_ID
     ] == "random_affordable"
+    assert profile.behavior_target_policies[
+        PURCHASE_TORPEDO_BEHAVIOR_ID
+    ] == HIGHEST_AFFORDABLE_POLICY_ID
 
 
 def test_offline_settlement_halves_passive_work_and_never_adds_strength(

@@ -19,15 +19,33 @@ class AppliedThrowResolution:
     state: PlayerState
     fish_instance_id: int
     trash_stock_count: int
+    fish_hall_before: FishHallIncomeSnapshot
     fish_hall: FishHallIncomeSnapshot
 
     def event_details(self) -> dict[str, str]:
+        cps_before = self.fish_hall_before.total_income_per_second
+        cps_after = self.fish_hall.total_income_per_second
+        cps_delta = cps_after - cps_before
+        changed_layout = (
+            self.fish_hall_before.deployed_instance_ids
+            != self.fish_hall.deployed_instance_ids
+        )
         details = {
             "reward_application": "applied_to_player_state",
             "fish_instance_id": str(self.fish_instance_id),
             "trash_stock_count": str(self.trash_stock_count),
             "player_state_revision": str(self.state.meta.revision),
+            "fish_hall_cps_before": cps_before.to_decimal_string(),
+            "fish_hall_cps_after": cps_after.to_decimal_string(),
+            "fish_hall_cps_delta": cps_delta.to_decimal_string(),
+            "changed_best_hall_layout": str(changed_layout).lower(),
+            "is_persistent_progression": str(
+                cps_delta > SimNumber.zero()
+            ).lower(),
         }
+        details.update(
+            self.fish_hall_before.event_details(suffix="before_throw")
+        )
         details.update(self.fish_hall.event_details(suffix="after_throw"))
         return details
 
@@ -343,3 +361,45 @@ class AppliedBarbellEquip:
             self.production_after.event_details(suffix="after_equip")
         )
         return details
+
+
+@dataclass(frozen=True)
+class AppliedTorpedoPurchase:
+    state: PlayerState
+    from_torpedo_id: int
+    to_torpedo_id: int
+    price: SimNumber
+    money_before: SimNumber
+    money_after: SimNumber
+    power_before: SimNumber
+    power_after: SimNumber
+    trash_luck_before: float
+    trash_luck_after: float
+
+    def event_details(self) -> dict[str, str]:
+        before_luck = format(self.trash_luck_before, ".17g")
+        after_luck = format(self.trash_luck_after, ".17g")
+        return {
+            "torpedo_id_before": str(self.from_torpedo_id),
+            "torpedo_id_after": str(self.to_torpedo_id),
+            "torpedo_purchase_price": self.price.to_decimal_string(),
+            "torpedo_purchase_price_resource": "money",
+            "torpedo_purchase_price_source": "tbtorpedo.price",
+            "torpedo_power_before": self.power_before.to_decimal_string(),
+            "torpedo_power_after": self.power_after.to_decimal_string(),
+            "trash_luck_before": before_luck,
+            "trash_luck_after": after_luck,
+            "trash_luck": after_luck,
+            "trash_luck_delta": format(
+                self.trash_luck_after - self.trash_luck_before,
+                ".17g",
+            ),
+            "money_before_torpedo_purchase": (
+                self.money_before.to_decimal_string()
+            ),
+            "money_after_torpedo_purchase": (
+                self.money_after.to_decimal_string()
+            ),
+            "torpedo_auto_select_policy": "purchased_torpedo",
+            "player_state_revision": str(self.state.meta.revision),
+        }
