@@ -115,6 +115,7 @@ class FishBehaviorSimulator:
                     self.trash_adapter.initial_realm_id
                 ),
             )
+            state.validate(self.hall_adapter.validation_context())
             start_time = 0
             root_random_seed = self.model.config.random_seed
             next_throw_id = 0

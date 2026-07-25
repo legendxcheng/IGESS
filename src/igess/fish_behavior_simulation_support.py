@@ -306,6 +306,7 @@ def validate_checkpoint(
         or state.statistics.total_throws != manual_throws
         or state.statistics.total_fish_caught != manual_throws
         or len(state.fish.items) != manual_throws
+        or state.fish.next_instance_id != manual_throws + 1
         or trash_count + trash_processed != manual_throws
         or state.fish_hall.upgrade_level != hall_upgrades
         or owned_barbell_count < barbell_syntheses

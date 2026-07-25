@@ -3,9 +3,12 @@ from __future__ import annotations
 from pathlib import Path
 
 from fish_test_support import _snapshot
+from igess import fish_state_validation
 from igess.builder import ModelBuilder
+from igess.fish_behavior import MANUAL_THROW_BEHAVIOR_ID
 from igess.fish_behavior_simulator import FishBehaviorSimulator
 from igess.loader import ConfigLoader
+from igess.numbers import SimNumber
 
 
 def test_production_growth_scenarios_cover_one_day_and_one_week() -> None:
@@ -53,6 +56,51 @@ def test_owned_state_mutation_matches_copy_on_commit(
 
     assert owned_result == copied_result
     assert owned_checkpoint == copied_checkpoint
+
+
+def test_owned_state_full_validation_stays_at_scenario_boundaries(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    raw = ConfigLoader.load(
+        "projects/fish/economy.yaml",
+        "projects/fish/luban_exports",
+    )
+    model = ModelBuilder.build(raw)
+    model.scenarios["smoke"].duration_hours = 8 / 3600
+    profile = model.player_profiles["default"]
+    profile.behavior_weights = {MANUAL_THROW_BEHAVIOR_ID: SimNumber.one()}
+    profile.behavior_durations = {
+        MANUAL_THROW_BEHAVIOR_ID: {"type": "fixed", "seconds": 1}
+    }
+    validated_fish_counts: list[int] = []
+    original = fish_state_validation.validate_player_state
+
+    def track_validation(state, *, context=None) -> None:
+        validated_fish_counts.append(len(state.fish.items))
+        original(state, context=context)
+
+    monkeypatch.setattr(
+        fish_state_validation,
+        "validate_player_state",
+        track_validation,
+    )
+    simulator = FishBehaviorSimulator(
+        model,
+        _snapshot(tmp_path),
+        model_digest="sha256:" + ("7" * 64),
+    )
+    _first_result, first_checkpoint = simulator.run_scenario(
+        "smoke",
+        until_seconds=4,
+    )
+    _result, checkpoint = simulator.run_scenario(
+        "smoke",
+        first_checkpoint,
+    )
+
+    assert checkpoint.next_throw_id == 8
+    assert validated_fish_counts == [0, 0, 4, 4, 8]
 
 
 def test_week_scenario_compacts_ordinary_events_but_keeps_rebirth_trace(

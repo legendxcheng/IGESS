@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from decimal import Decimal, ROUND_CEILING, ROUND_FLOOR, getcontext
-from functools import total_ordering
+from functools import lru_cache, total_ordering
 from typing import Any
 
 getcontext().prec = 80
@@ -217,6 +217,7 @@ def _can_keep_exact(value: Decimal) -> bool:
     return -_EXACT_MAX_ADJUSTED <= adjusted <= _EXACT_MAX_ADJUSTED
 
 
+@lru_cache(maxsize=4096)
 def _decimal_log10_abs(value: Decimal) -> Decimal:
     absolute = value.copy_abs()
     digits = "".join(str(digit) for digit in absolute.as_tuple().digits)

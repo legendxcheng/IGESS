@@ -14,10 +14,15 @@ from igess.fish_behavior import (
     FishBehaviorAdapter,
     FishBehaviorConfigError,
 )
-from igess.fish_commands import apply_throw_resolution, lock_throw_request
+from igess.fish_commands import (
+    FishCommandError,
+    apply_throw_resolution,
+    lock_throw_request,
+)
 from igess.fish_hall import FishHallDataAdapter
 from igess.fish_simulator import FishEconomySimulator
 from igess.fish_state import BigNumberDTO, FishInstance, PlayerState
+from igess.fish_throw_commands import trusted_lock_throw_request
 from igess.fish_throw_data import (
     FishThrowDataAdapter,
     ProductionThrowConfig,
@@ -72,6 +77,42 @@ def test_throw_request_locks_strength_and_torpedo_from_player_state(
     assert request.strength == 75
     assert request.torpedo_id == 1
     assert request.throw_id == 0
+
+
+def test_trusted_throw_lock_skips_full_scan_but_checks_counters(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter = FishThrowDataAdapter(
+        _snapshot(tmp_path),
+        bonus_base_luck=1,
+        max_bonus_layers=4,
+    )
+    state = PlayerState.new(
+        initial_torpedo_id=1,
+        initial_strength="75",
+    )
+
+    def fail_full_validation(*_args, **_kwargs) -> None:
+        raise AssertionError("trusted lock performed a full state scan")
+
+    monkeypatch.setattr(PlayerState, "validate", fail_full_validation)
+    request = trusted_lock_throw_request(
+        state,
+        adapter=adapter,
+        root_random_seed=123,
+        throw_id=0,
+    )
+
+    assert request.strength == 75
+    state.statistics.total_fish_caught = 1
+    with pytest.raises(FishCommandError, match="trusted throw counters"):
+        trusted_lock_throw_request(
+            state,
+            adapter=adapter,
+            root_random_seed=123,
+            throw_id=0,
+        )
 
 
 def test_active_throw_loop_matches_checkpoint_segmented_resume(

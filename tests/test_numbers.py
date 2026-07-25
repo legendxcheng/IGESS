@@ -1,4 +1,6 @@
-from igess.numbers import SimNumber
+from decimal import Decimal
+
+from igess.numbers import SimNumber, _decimal_log10_abs
 
 
 def test_sim_number_preserves_large_subtraction_precision():
@@ -68,3 +70,15 @@ def test_bignum_log_decimal_property_handles_large_decimal_values():
 
 def test_sim_number_to_float_keeps_finite_float_range():
     assert SimNumber.parse("1.1e308").to_float() == float("1.1e308")
+
+
+def test_decimal_log10_cache_is_bounded_and_reuses_equal_values():
+    _decimal_log10_abs.cache_clear()
+
+    first = SimNumber.from_decimal(Decimal("123.4500"))
+    second = SimNumber.from_decimal(Decimal("123.45"))
+
+    assert first.log10_abs == second.log10_abs
+    assert _decimal_log10_abs.cache_parameters()["maxsize"] == 4096
+    assert _decimal_log10_abs.cache_info().hits == 1
+    assert _decimal_log10_abs.cache_info().misses == 1

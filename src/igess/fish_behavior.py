@@ -23,6 +23,7 @@ from .fish_commands import (
     synthesize_barbell,
     upgrade_fish,
 )
+from .fish_throw_commands import trusted_lock_throw_request
 from .fish_behavior_targets import (
     CHEAPEST_BELOW_MATERIAL_TENTH_POLICY_ID,
     HIGHEST_AFFORDABLE_POLICY_ID,
@@ -384,7 +385,12 @@ class FishBehaviorAdapter:
         details.update(settlement.event_details())
 
         if decision.behavior_id == MANUAL_THROW_BEHAVIOR_ID:
-            request = lock_throw_request(
+            lock_request = (
+                trusted_lock_throw_request
+                if _mutate
+                else lock_throw_request
+            )
+            request = lock_request(
                 committed,
                 adapter=self.throw_adapter,
                 root_random_seed=root_random_seed,

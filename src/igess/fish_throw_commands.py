@@ -20,19 +20,97 @@ def lock_throw_request(
     throw_id: int,
     regular_luck_multiplier: float = 1.0,
 ) -> ProductionThrowRequest:
-    """Lock strength and selected torpedo from PlayerState for one throw."""
+    """Lock one throw after fully validating the public PlayerState input."""
 
+    _validate_lock_inputs(state, adapter)
+    state.validate()
+    return _build_throw_request(
+        state,
+        adapter=adapter,
+        root_random_seed=root_random_seed,
+        throw_id=throw_id,
+        regular_luck_multiplier=regular_luck_multiplier,
+    )
+
+
+def trusted_lock_throw_request(
+    state: PlayerState,
+    *,
+    adapter: FishThrowDataAdapter,
+    root_random_seed: int,
+    throw_id: int,
+    regular_luck_multiplier: float = 1.0,
+) -> ProductionThrowRequest:
+    """Lock a throw from simulator-owned state using only O(1) invariants.
+
+    This is intentionally not exported by ``igess.fish_commands``. The Fish
+    behavior simulator fully validates state at its input/output boundaries
+    and owns every mutation between them.
+    """
+
+    _validate_lock_inputs(state, adapter)
+    _validate_trusted_throw_counters(state)
+    return _build_throw_request(
+        state,
+        adapter=adapter,
+        root_random_seed=root_random_seed,
+        throw_id=throw_id,
+        regular_luck_multiplier=regular_luck_multiplier,
+    )
+
+
+def _validate_lock_inputs(
+    state: PlayerState,
+    adapter: FishThrowDataAdapter,
+) -> None:
     if not isinstance(state, PlayerState):
         raise FishCommandError("state must be a PlayerState")
     if not isinstance(adapter, FishThrowDataAdapter):
         raise FishCommandError("adapter must be a FishThrowDataAdapter")
-    state.validate()
+
+
+def _validate_trusted_throw_counters(state: PlayerState) -> None:
+    total_throws = state.statistics.total_throws
+    total_fish_caught = state.statistics.total_fish_caught
+    next_instance_id = state.fish.next_instance_id
+    items = state.fish.items
+    if (
+        type(total_throws) is not int
+        or total_throws < 0
+        or type(total_fish_caught) is not int
+        or total_fish_caught < 0
+        or type(next_instance_id) is not int
+        or next_instance_id <= 0
+        or type(items) is not list
+        or total_fish_caught != total_throws
+        or len(items) != total_fish_caught
+        or next_instance_id != total_fish_caught + 1
+    ):
+        raise FishCommandError(
+            "trusted throw counters do not match simulator-owned state"
+        )
+
+
+def _build_throw_request(
+    state: PlayerState,
+    *,
+    adapter: FishThrowDataAdapter,
+    root_random_seed: int,
+    throw_id: int,
+    regular_luck_multiplier: float,
+) -> ProductionThrowRequest:
     if throw_id != state.statistics.total_throws:
         raise FishCommandError(
             "throw_id does not match PlayerState.statistics.totalThrows"
         )
     if state.torpedo.selected_id <= 0:
         raise FishCommandError("PlayerState has no selected torpedo")
+    try:
+        adapter.torpedo(state.torpedo.selected_id)
+    except FishDataError as exc:
+        raise FishCommandError(
+            "PlayerState has an invalid selected torpedo"
+        ) from exc
 
     stored_strength = state.wallet.strength.to_sim_number()
     if stored_strength <= SimNumber.zero():
