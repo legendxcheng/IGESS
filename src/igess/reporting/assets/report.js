@@ -169,7 +169,7 @@ function renderFishAcquisitionRateChart(profiles) {
   Object.entries(profiles).forEach(([profileId, profile]) => {
     const rows = profile.rate_rows || [];
     [
-      ['垃圾/秒', 'trash_per_second', '#d97706'],
+      ['资源/秒', 'resource_per_second', '#16a34a'],
       ['金钱/秒', 'money_per_second', '#2563eb'],
     ].forEach(([label, field, color]) => {
       series.push({
@@ -184,7 +184,7 @@ function renderFishAcquisitionRateChart(profiles) {
     });
   });
   replaceChart('fish-acquisition-rate-chart', fishBalanceLineOption(
-    '每秒获得的垃圾量与金钱量（5 分钟窗口）',
+    '每秒获得的资源量与金钱量（5分钟窗口）',
     series,
     '每秒获得量 · 对数同轴',
     { logarithmic: true }
@@ -432,6 +432,7 @@ function renderDailyProgressionCharts(profiles) {
       name: progressionCategoryLabel(category),
       type: 'scatter',
       symbolSize: 12,
+      itemStyle: { color: progressionCategoryColor(category) },
       data: rows
         .filter(row => (row.progression_category || 'other') === category)
         .map(row => ({
@@ -500,6 +501,21 @@ function progressionCategoryRank(category) {
   ];
   const index = order.indexOf(category);
   return index === -1 ? order.length : index;
+}
+
+function progressionCategoryColor(category) {
+  const colors = {
+    best_hall_fish: '#5470c6',
+    barbell: '#91cc75',
+    fish_hall: '#fac858',
+    strength_rebirth: '#ee6666',
+    torpedo: '#73c0de',
+    trash_man_realm: '#3ba272',
+    trash_man_rebirth: '#fc8452',
+    permanent_unlock: '#9a60b4',
+    other: '#6b7280',
+  };
+  return colors[category] || colors.other;
 }
 
 function renderProgressionDensityChart(profiles) {

@@ -107,12 +107,85 @@ def test_generate_static_report_writes_chart_rendering_asset(tmp_path):
     assert "renderOverview" in script
     assert "renderFishAcquisitionRateChart" in script
     assert "renderFishCumulativeOutputChart" in script
+    assert "每秒获得的资源量与金钱量（5分钟窗口）" in script
+    assert "resource_per_second" in script
+    assert "trash_per_second" not in script
     assert "renderDailyProgressionCharts" in script
+    assert "progressionCategoryColor" in script
     assert "report.overview" in script
     assert "display_value" in script
     assert "exact_value" in script
     assert "exact-value" in script
     assert "escapeHtml" in script
+
+
+@pytest.mark.skipif(NODE is None, reason="Node.js is required to execute the report renderer")
+def test_daily_progression_categories_keep_the_same_color_across_days():
+    script_path = Path("src/igess/reporting/assets/report.js").resolve()
+    harness = r"""
+const fs = require('fs');
+const vm = require('vm');
+const source = fs.readFileSync(process.argv[1], 'utf8');
+const context = { console };
+vm.createContext(context);
+vm.runInContext(source, context);
+
+const target = { innerHTML: '' };
+const options = {};
+context.document = {
+  querySelector(selector) {
+    return selector === '[data-daily-progression-charts]' ? target : null;
+  },
+  getElementById(id) { return { id, innerHTML: '' }; },
+};
+context.echarts = {
+  init(element) {
+    return {
+      setOption(option) { options[element.id] = option; },
+      dispose() {},
+      resize() {},
+    };
+  },
+};
+
+const row = (category, time) => ({
+  progression_category: category,
+  day_active_time_seconds: time,
+  active_time_seconds: time,
+});
+context.renderDailyProgressionCharts({
+  default: {
+    days: [
+      { day_index: 1, duration_seconds: { chart_value: 7200 }, rows: [
+        row('best_hall_fish', 60),
+        row('torpedo', 120),
+      ] },
+      { day_index: 2, duration_seconds: { chart_value: 7200 }, rows: [
+        row('torpedo', 180),
+      ] },
+    ],
+  },
+});
+
+const firstDayTorpedo = options['daily-progression-chart-0'].series
+  .find(series => series.name === '鱼雷 / TrashLuck');
+const secondDayTorpedo = options['daily-progression-chart-1'].series
+  .find(series => series.name === '鱼雷 / TrashLuck');
+process.stdout.write(JSON.stringify({
+  first: firstDayTorpedo.itemStyle.color,
+  second: secondDayTorpedo.itemStyle.color,
+}));
+"""
+
+    result = subprocess.run(
+        [NODE, "-e", harness, str(script_path)],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    colors = json.loads(result.stdout)
+    assert colors == {"first": "#73c0de", "second": "#73c0de"}
 
 
 @pytest.mark.skipif(NODE is None, reason="Node.js is required to execute the report renderer")

@@ -386,7 +386,6 @@ def _fish_economy_rows(
     bucket_count = math.ceil(active_duration_seconds / interval_seconds)
     bucket_money = [Decimal(0) for _ in range(bucket_count)]
     bucket_material = [Decimal(0) for _ in range(bucket_count)]
-    bucket_trash = [0 for _ in range(bucket_count)]
     for event in events:
         if str(event.get("profile_id", "")) != profile_id:
             continue
@@ -415,11 +414,6 @@ def _fish_economy_rows(
         bucket_material[bucket_index] += _positive_decimal(
             details.get("trash_material_added")
         )
-        if (
-            event.get("kind") == "fish_throw_resolved"
-            and details.get("trash_id") not in (None, "")
-        ):
-            bucket_trash[bucket_index] += 1
 
     rate_rows: list[dict[str, Any]] = []
     cumulative_rows: list[dict[str, Any]] = []
@@ -439,13 +433,13 @@ def _fish_economy_rows(
         rate_rows.append(
             {
                 **common,
-                "trash_per_second": chart_point(
-                    Decimal(bucket_trash[index]) / Decimal(elapsed)
+                "resource_per_second": chart_point(
+                    bucket_material[index] / Decimal(elapsed)
                 ),
                 "money_per_second": chart_point(
                     bucket_money[index] / Decimal(elapsed)
                 ),
-                "trash_acquired": chart_point(bucket_trash[index]),
+                "resource_acquired": chart_point(bucket_material[index]),
                 "money_acquired": chart_point(bucket_money[index]),
             }
         )

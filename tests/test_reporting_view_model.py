@@ -305,10 +305,12 @@ def test_fish_balance_curves_use_online_gross_output_and_daily_growth(
         300,
         600,
     ]
-    assert abs(
-        balance["rate_rows"][0]["trash_per_second"]["chart_value"]
-        - 1 / 300
-    ) < 1e-12
+    assert balance["rate_rows"][0]["resource_per_second"][
+        "exact_value"
+    ] == "0.1"
+    assert balance["rate_rows"][0]["resource_acquired"][
+        "exact_value"
+    ] == "30"
     assert balance["rate_rows"][0]["money_per_second"]["exact_value"] == "2"
     assert balance["cumulative_rows"][-1]["money_acquired_cumulative"][
         "exact_value"

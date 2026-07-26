@@ -159,6 +159,15 @@ igess model simulate --project projects/fish --scenario month_1_growth
 .\projects\fish\watch-report.ps1 -Scenario smoke
 ```
 
+30 天里程碑验证可使用专用入口：
+
+```powershell
+.\projects\fish\watch-report-month.ps1
+```
+
+它固定运行 `month_1_growth`。只有完整的 30 天正式产物和 Web 报表通过校验后，
+浏览器中的报表才会更新；大产物写入失败时会保留上一份成功报表并显示错误。
+
 ## Artifacts
 
 - `economy.yaml`: formal YAML rules and engine defaults.
