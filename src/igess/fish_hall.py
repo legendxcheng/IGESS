@@ -40,7 +40,9 @@ class FishHallDataAdapter:
                 SimNumber,
             ],
         ] = {}
-        self._upgrade_price_cache: dict[tuple[int, int], SimNumber] = {}
+        self._upgrade_price_cache: dict[
+            tuple[int, int, int], SimNumber
+        ] = {}
         self._cached_items: list[FishInstance] | None = None
         self._cached_item_count = -1
         self._cached_upgrade_level = -1
@@ -164,12 +166,14 @@ class FishHallDataAdapter:
             raise FishDataError(
                 f"fish instance is already at max level: {item.instance_id}"
             )
-        key = (item.fish_id, item.level)
+        key = (item.fish_id, item.mutation_id, item.level)
         cached = self._upgrade_price_cache.get(key)
         if cached is None:
             base = self._fish_base(item.fish_id)
-            cached = base * (
-                SimNumber.parse("1.5") ** (item.level - 1)
+            cached = (
+                base
+                * self._mutation_multiplier(item.mutation_id)
+                * (SimNumber.parse("1.5") ** (item.level - 1))
             )
             self._upgrade_price_cache[key] = cached
         return cached
@@ -327,15 +331,9 @@ class FishHallDataAdapter:
         cached = self._income_value_cache.get(key)
         if cached is None:
             base = self._fish_base(item.fish_id)
-            try:
-                mutation_multiplier = self._mutation_income_multiplier[
-                    item.mutation_id
-                ]
-            except KeyError as exc:
-                raise FishDataError(
-                    "unknown production mutation id: "
-                    f"{item.mutation_id}"
-                ) from exc
+            mutation_multiplier = self._mutation_multiplier(
+                item.mutation_id
+            )
             level_multiplier = (
                 SimNumber.parse("1.25") ** (item.level - 1)
             )
@@ -373,6 +371,15 @@ class FishHallDataAdapter:
         except KeyError as exc:
             raise FishDataError(
                 f"unknown production fish id: {fish_id}"
+            ) from exc
+
+    def _mutation_multiplier(self, mutation_id: int) -> SimNumber:
+        try:
+            return self._mutation_income_multiplier[mutation_id]
+        except KeyError as exc:
+            raise FishDataError(
+                "unknown production mutation id: "
+                f"{mutation_id}"
             ) from exc
 
     @staticmethod

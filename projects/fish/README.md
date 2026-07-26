@@ -138,6 +138,27 @@ igess model simulate --project projects/fish --scenario week_1_growth
 igess model simulate --project projects/fish --scenario month_1_growth
 ```
 
+### 无 Agent 快速报表循环
+
+在 `E:\IGESS` 启动一次监听器：
+
+```powershell
+.\projects\fish\watch-report.ps1
+```
+
+监听器会立即运行默认的 `week_1_growth`，在默认浏览器打开一个固定的实时报表页，
+并监听本项目配置/工作簿以及 `E:\fish-oasis\igess_export` 的生产 JSON 与
+`python\schema.py`。设计师修改并导出生产表后，输入稳定 1 秒即自动通过正式
+`WorkflowService` 重跑；同一个浏览器页会切换到最新验证成功的报表。失败不会
+覆盖上一份成功报表，错误会显示在页顶。按 `Ctrl+C` 停止。
+
+可按需改用更短场景：
+
+```powershell
+.\projects\fish\watch-report.ps1 -Scenario day_1_growth
+.\projects\fish\watch-report.ps1 -Scenario smoke
+```
+
 ## Artifacts
 
 - `economy.yaml`: formal YAML rules and engine defaults.

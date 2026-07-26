@@ -92,10 +92,11 @@ class AppliedFishUpgrade:
             "fish_max_level": str(FISH_MAX_LEVEL),
             "fish_upgrade_price": self.price.to_decimal_string(),
             "fish_upgrade_price_formula": (
-                "base_money_per_second*1.5^(current_level-1)"
+                "base_money_per_second*mutation_income_multiplier"
+                "*1.5^(current_level-1)"
             ),
             "fish_upgrade_price_resource": "material",
-            "fish_upgrade_price_uses_mutation": "false",
+            "fish_upgrade_price_uses_mutation": "true",
             "fish_income_formula": (
                 "base_money_per_second*1.25^(level-1)"
                 "*mutation_income_multiplier"

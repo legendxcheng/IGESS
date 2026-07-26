@@ -10,6 +10,7 @@ import sys
 from typing import NoReturn
 
 from .change import MAX_CHANGE_SOURCE_BYTES
+from .live_report import run_live_report
 from .response import CommandResponse
 from .service import AuthoringService
 
@@ -159,6 +160,41 @@ def add_model_parser(subparsers: argparse._SubParsersAction) -> argparse.Argumen
         action="store_true",
         help="Emit one machine-readable JSON response.",
     )
+
+    watch = add_command(
+        "watch",
+        "Watch numeric inputs and live-refresh a formal report",
+        "igess model watch --project projects/my-game --scenario smoke",
+    )
+    _add_project_argument(watch)
+    watch.add_argument(
+        "--scenario",
+        default="smoke",
+        help="Scenario identifier to rerun after input changes.",
+    )
+    watch.add_argument(
+        "--poll-seconds",
+        type=_positive_float,
+        default=0.5,
+        help="Seconds between input fingerprint checks.",
+    )
+    watch.add_argument(
+        "--debounce-seconds",
+        type=_positive_float,
+        default=1.0,
+        help="Stable-input delay before starting a simulation.",
+    )
+    watch.add_argument(
+        "--port",
+        type=_port_number,
+        default=0,
+        help="Loopback HTTP port; zero chooses a free port.",
+    )
+    watch.add_argument(
+        "--no-browser",
+        action="store_true",
+        help="Do not open the live report in the default browser.",
+    )
     return model
 
 
@@ -186,6 +222,15 @@ def dispatch_model(args: argparse.Namespace) -> int:
             checkpoint_input=args.checkpoint_in,
             overrides=args.override,
         )
+    elif command == "watch":
+        return run_live_report(
+            args.project,
+            args.scenario,
+            poll_seconds=args.poll_seconds,
+            debounce_seconds=args.debounce_seconds,
+            port=args.port,
+            open_browser=not args.no_browser,
+        )
     else:  # pragma: no cover - argparse owns the closed command set.
         _unreachable_model_command(command)
     return _render_response(response, args.json)
@@ -197,6 +242,26 @@ def _add_project_argument(parser: argparse.ArgumentParser) -> None:
         default=".",
         help="Authoring project root directory.",
     )
+
+
+def _positive_float(value: str) -> float:
+    try:
+        parsed = float(value)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError("must be a number") from error
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("must be greater than zero")
+    return parsed
+
+
+def _port_number(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError("must be an integer") from error
+    if not 0 <= parsed <= 65535:
+        raise argparse.ArgumentTypeError("must be between 0 and 65535")
+    return parsed
 
 
 def _read_change_document(

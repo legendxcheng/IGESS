@@ -10,6 +10,10 @@ from .kpis import build_overview
 from .loader import ReportData
 
 
+_SECONDS_PER_DAY = 24 * 60 * 60
+_DEFAULT_FISH_RATE_SAMPLE_SECONDS = 5 * 60
+
+
 def build_report_view_model(data: ReportData) -> dict[str, Any]:
     resource_ids = sorted(
         {
@@ -19,7 +23,7 @@ def build_report_view_model(data: ReportData) -> dict[str, Any]:
         }
     )
     return {
-        "schema_version": 3,
+        "schema_version": 4,
         "scenario": {
             "id": data.scenario_id,
             "model_id": data.manifest.get("model_id"),
@@ -196,8 +200,22 @@ def _fish_progression(data: ReportData) -> dict[str, Any]:
     behavior_profiles = _behavior_progression_profiles(
         data.behavior_progression
     )
+    balance_profiles = _fish_balance_profiles(
+        data,
+        behavior_profiles=behavior_profiles,
+    )
     return {
         "available": bool(core_profiles or behavior_profiles),
+        "balance": {
+            "time_basis": "cumulative_active_seconds",
+            "rate_definition": (
+                "online_gross_acquisition_per_active_sample_window"
+            ),
+            "rate_sample_interval_active_seconds": chart_point(
+                _fish_rate_sample_seconds(data)
+            ),
+            "profiles": balance_profiles,
+        },
         "core": {
             "time_basis": data.luck_progression.get("time_basis"),
             "sample_interval_active_seconds": chart_point(
@@ -255,6 +273,302 @@ def _progression_profiles(
             "rows": rows,
         }
     return result
+
+
+def _fish_balance_profiles(
+    data: ReportData,
+    *,
+    behavior_profiles: dict[str, Any],
+) -> dict[str, Any]:
+    raw_core_profiles = data.luck_progression.get("profiles", {})
+    if not isinstance(raw_core_profiles, dict):
+        raw_core_profiles = {}
+    profile_ids = list(
+        dict.fromkeys(
+            [
+                *data.profiles,
+                *[str(value) for value in raw_core_profiles],
+                *behavior_profiles,
+            ]
+        )
+    )
+    interval_seconds = _fish_rate_sample_seconds(data)
+    result: dict[str, Any] = {}
+    for profile_id in profile_ids:
+        raw_core = raw_core_profiles.get(profile_id, {})
+        if not isinstance(raw_core, dict):
+            raw_core = {}
+        active_duration = _active_duration_seconds(raw_core)
+        daily_online_seconds = _daily_online_seconds(data, profile_id)
+        rate_rows, cumulative_rows = _fish_economy_rows(
+            data.events,
+            profile_id=profile_id,
+            active_duration_seconds=active_duration,
+            daily_online_seconds=daily_online_seconds,
+            interval_seconds=interval_seconds,
+        )
+        result[profile_id] = {
+            "active_duration_seconds": chart_point(active_duration),
+            "daily_online_seconds": chart_point(daily_online_seconds),
+            "rate_rows": rate_rows,
+            "cumulative_rows": cumulative_rows,
+        }
+        behavior_profile = behavior_profiles.get(profile_id)
+        if isinstance(behavior_profile, dict):
+            behavior_profile["daily_online_seconds"] = chart_point(
+                daily_online_seconds
+            )
+            behavior_profile["days"] = _daily_progression_days(
+                behavior_profile.get("rows", []),
+                active_duration_seconds=active_duration,
+                daily_online_seconds=daily_online_seconds,
+            )
+    return result
+
+
+def _fish_rate_sample_seconds(data: ReportData) -> int:
+    value = data.luck_progression.get(
+        "sample_interval_active_seconds",
+        _DEFAULT_FISH_RATE_SAMPLE_SECONDS,
+    )
+    try:
+        result = int(value)
+    except (TypeError, ValueError):
+        return _DEFAULT_FISH_RATE_SAMPLE_SECONDS
+    return result if result > 0 else _DEFAULT_FISH_RATE_SAMPLE_SECONDS
+
+
+def _active_duration_seconds(raw_core_profile: dict[str, Any]) -> int:
+    summary = raw_core_profile.get("summary", {})
+    if isinstance(summary, dict):
+        value = summary.get("active_duration_seconds")
+        try:
+            return max(0, int(value))
+        except (TypeError, ValueError):
+            pass
+    rows = raw_core_profile.get("rows", [])
+    if not isinstance(rows, list):
+        return 0
+    values = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        try:
+            values.append(int(row.get("active_time_seconds", 0)))
+        except (TypeError, ValueError):
+            continue
+    return max(values, default=0)
+
+
+def _daily_online_seconds(data: ReportData, profile_id: str) -> int:
+    try:
+        value = data.manifest["strategy"]["parameters"][
+            "behavior_scheduler"
+        ]["profiles"][profile_id]["session"]["daily_online_seconds"]
+        result = int(value)
+    except (KeyError, TypeError, ValueError):
+        return _SECONDS_PER_DAY
+    if result <= 0 or result > _SECONDS_PER_DAY:
+        return _SECONDS_PER_DAY
+    return result
+
+
+def _fish_economy_rows(
+    events: list[dict[str, Any]],
+    *,
+    profile_id: str,
+    active_duration_seconds: int,
+    daily_online_seconds: int,
+    interval_seconds: int,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    if active_duration_seconds <= 0:
+        return [], []
+    bucket_count = math.ceil(active_duration_seconds / interval_seconds)
+    bucket_money = [Decimal(0) for _ in range(bucket_count)]
+    bucket_material = [Decimal(0) for _ in range(bucket_count)]
+    bucket_trash = [0 for _ in range(bucket_count)]
+    for event in events:
+        if str(event.get("profile_id", "")) != profile_id:
+            continue
+        if event.get("kind") == "fish_offline_settled":
+            continue
+        details = event.get("details", {})
+        if not isinstance(details, dict):
+            continue
+        try:
+            wall_time = max(0, int(event.get("time_seconds", 0)))
+        except (TypeError, ValueError):
+            continue
+        active_time = _active_seconds_at(
+            wall_time,
+            daily_online_seconds=daily_online_seconds,
+        )
+        if active_time > active_duration_seconds:
+            continue
+        bucket_index = min(
+            max(0, (max(1, active_time) - 1) // interval_seconds),
+            bucket_count - 1,
+        )
+        bucket_money[bucket_index] += _positive_decimal(
+            details.get("fish_hall_money_added")
+        )
+        bucket_material[bucket_index] += _positive_decimal(
+            details.get("trash_material_added")
+        )
+        if (
+            event.get("kind") == "fish_throw_resolved"
+            and details.get("trash_id") not in (None, "")
+        ):
+            bucket_trash[bucket_index] += 1
+
+    rate_rows: list[dict[str, Any]] = []
+    cumulative_rows: list[dict[str, Any]] = []
+    cumulative_money = Decimal(0)
+    cumulative_material = Decimal(0)
+    for index in range(bucket_count):
+        start = index * interval_seconds
+        end = min((index + 1) * interval_seconds, active_duration_seconds)
+        elapsed = max(1, end - start)
+        cumulative_money += bucket_money[index]
+        cumulative_material += bucket_material[index]
+        common = {
+            "active_time_seconds": end,
+            "active_time": chart_point(end),
+            "profile_id": profile_id,
+        }
+        rate_rows.append(
+            {
+                **common,
+                "trash_per_second": chart_point(
+                    Decimal(bucket_trash[index]) / Decimal(elapsed)
+                ),
+                "money_per_second": chart_point(
+                    bucket_money[index] / Decimal(elapsed)
+                ),
+                "trash_acquired": chart_point(bucket_trash[index]),
+                "money_acquired": chart_point(bucket_money[index]),
+            }
+        )
+        cumulative_rows.append(
+            {
+                **common,
+                "money_acquired_cumulative": chart_point(
+                    cumulative_money
+                ),
+                "resource_acquired_cumulative": chart_point(
+                    cumulative_material
+                ),
+            }
+        )
+    return rate_rows, cumulative_rows
+
+
+def _active_seconds_at(
+    wall_time_seconds: int,
+    *,
+    daily_online_seconds: int,
+) -> int:
+    full_days, day_seconds = divmod(wall_time_seconds, _SECONDS_PER_DAY)
+    return (
+        full_days * daily_online_seconds
+        + min(day_seconds, daily_online_seconds)
+    )
+
+
+def _positive_decimal(value: Any) -> Decimal:
+    if value in (None, ""):
+        return Decimal(0)
+    try:
+        result = Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError):
+        return Decimal(0)
+    if not result.is_finite() or result <= 0:
+        return Decimal(0)
+    return result
+
+
+def _daily_progression_days(
+    rows: Any,
+    *,
+    active_duration_seconds: int,
+    daily_online_seconds: int,
+) -> list[dict[str, Any]]:
+    source_rows = rows if isinstance(rows, list) else []
+    day_count = math.ceil(active_duration_seconds / daily_online_seconds)
+    grouped: dict[int, list[dict[str, Any]]] = {
+        day: [] for day in range(1, day_count + 1)
+    }
+    for source_row in source_rows:
+        if not isinstance(source_row, dict):
+            continue
+        try:
+            active_time = max(
+                0,
+                int(source_row.get("active_time_seconds", 0)),
+            )
+        except (TypeError, ValueError):
+            continue
+        day = _progression_day_index(source_row, active_time, daily_online_seconds)
+        grouped.setdefault(day, [])
+        local_time = max(
+            0,
+            min(
+                daily_online_seconds,
+                active_time - (day - 1) * daily_online_seconds,
+            ),
+        )
+        grouped[day].append(
+            {
+                **source_row,
+                "day_index": day,
+                "day_active_time_seconds": local_time,
+                "day_active_time": chart_point(local_time),
+            }
+        )
+    result = []
+    for day in sorted(grouped):
+        day_start = (day - 1) * daily_online_seconds
+        duration = max(
+            0,
+            min(
+                daily_online_seconds,
+                active_duration_seconds - day_start,
+            ),
+        )
+        day_rows = sorted(
+            grouped[day],
+            key=lambda row: (
+                int(row.get("day_active_time_seconds", 0)),
+                str(row.get("progression_category", "")),
+            ),
+        )
+        result.append(
+            {
+                "day_index": day,
+                "stage_id": f"online_day_{day}",
+                "duration_seconds": chart_point(duration),
+                "event_count": chart_point(len(day_rows)),
+                "rows": day_rows,
+            }
+        )
+    return result
+
+
+def _progression_day_index(
+    row: dict[str, Any],
+    active_time_seconds: int,
+    daily_online_seconds: int,
+) -> int:
+    stage_id = str(row.get("stage_id", ""))
+    prefix = "online_day_"
+    if stage_id.startswith(prefix):
+        try:
+            parsed = int(stage_id[len(prefix) :])
+        except ValueError:
+            parsed = 0
+        if parsed > 0:
+            return parsed
+    return max(1, (max(1, active_time_seconds) - 1) // daily_online_seconds + 1)
 
 
 def _behavior_progression_profiles(

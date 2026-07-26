@@ -191,7 +191,7 @@ def test_model_help_is_a_nested_command_group():
     nested = command_group(model)
     rendered = model.format_help()
 
-    assert set(nested.choices) == {"init", "status", "apply", "simulate"}
+    assert set(nested.choices) == {"init", "status", "apply", "simulate", "watch"}
     assert "Author a game economy one validated rule at a time." in rendered
     assert "igess model init --out projects/my-game" in rendered
     assert "Exit codes:" in rendered

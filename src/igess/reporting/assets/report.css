@@ -151,6 +151,33 @@ h2 {
   width: 100%;
 }
 
+.chart-primary {
+  min-height: 380px;
+}
+
+.daily-chart-list {
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.daily-chart-card {
+  border: 1px solid #dce4ed;
+  border-radius: 6px;
+  background: #f9fbfd;
+  padding: 12px 14px 4px;
+}
+
+.daily-chart-card h3 {
+  color: #334155;
+  font-size: 14px;
+  margin: 0 0 4px;
+}
+
+.daily-chart {
+  min-height: 270px;
+}
+
 .table-wrap {
   margin-top: 16px;
   max-height: 520px;

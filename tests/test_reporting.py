@@ -72,6 +72,10 @@ def test_generate_static_report_writes_html_and_assets(tmp_path):
     html = generated.read_text(encoding="utf-8")
     assert "Day 1 Economy" in html
     assert "Resource Curves" in html
+    assert "Fish 经济对称性总览" in html
+    assert "fish-acquisition-rate-chart" in html
+    assert "fish-cumulative-output-chart" in html
+    assert "data-daily-progression-charts" in html
     assert "Event Timeline" in html
     assert "Payback" in html
     assert "Analysis Warnings" in html
@@ -101,6 +105,9 @@ def test_generate_static_report_writes_chart_rendering_asset(tmp_path):
     assert "renderEventChart" in script
     assert "renderPaybackChart" in script
     assert "renderOverview" in script
+    assert "renderFishAcquisitionRateChart" in script
+    assert "renderFishCumulativeOutputChart" in script
+    assert "renderDailyProgressionCharts" in script
     assert "report.overview" in script
     assert "display_value" in script
     assert "exact_value" in script
@@ -498,7 +505,7 @@ def test_generate_static_report_embeds_parseable_json_payload(tmp_path):
     inline_payload = json.loads(html[start:end])
     file_payload = json.loads((report_dir / "report_data.json").read_text(encoding="utf-8"))
     assert inline_payload == file_payload
-    assert inline_payload["schema_version"] == 3
+    assert inline_payload["schema_version"] == 4
     assert inline_payload["series"]["resources"]
     assert set(inline_payload["overview"]["duration_seconds"]) == {
         "exact_value",

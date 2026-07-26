@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from fish_test_support import _snapshot
+from fish_test_support import _BigNumber, _snapshot
 from igess.behavior import BehaviorDecision
 from igess.fish_barbell import FishBarbellDataAdapter
 from igess.fish_behavior import (
@@ -55,6 +55,35 @@ def _adapters(tmp_path: Path):
         throw_config=config,
     )
     return hall_adapter, torpedo_adapter, behavior_adapter
+
+
+def test_torpedo_adapters_accept_generated_fixed_decimal_power(
+    tmp_path: Path,
+) -> None:
+    snapshot = _snapshot(tmp_path)
+    snapshot.table("tbtorpedo")[1].power = _BigNumber(
+        1,
+        "316.22776601683796",
+        0,
+    )
+    throw_adapter = FishThrowDataAdapter(
+        snapshot,
+        bonus_base_luck=1,
+        max_bonus_layers=4,
+    )
+
+    torpedo_adapter = FishTorpedoDataAdapter(
+        snapshot,
+        trash_luck_pools=throw_adapter.trash_luck_pools,
+        regular_luck_multiplier=1,
+    )
+
+    assert throw_adapter.torpedo(2).power == pytest.approx(
+        316.22776601683796
+    )
+    assert torpedo_adapter.rule(2).power.to_float() == pytest.approx(
+        316.22776601683796
+    )
 
 
 def test_torpedo_purchase_uses_only_price_and_selects_stronger_torpedo(

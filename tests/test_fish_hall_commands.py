@@ -80,7 +80,7 @@ def test_fish_level_price_and_income_formulas_use_bignumber(
     assert hall_adapter.upgrade_price(upgraded).to_decimal_string() == "15"
     assert (
         hall_adapter.upgrade_price(FishInstance(1, 1, 2, 2, 100, 0)).to_decimal_string()
-        == "15"
+        == "22.5"
     )
     assert (
         hall_adapter.income_trace(upgraded).income_per_second.to_decimal_string()
@@ -133,10 +133,11 @@ def test_fish_upgrade_atomically_pays_levels_and_reorders_hall(
     assert application.state.meta.revision == 1
     details = application.event_details()
     assert details["fish_upgrade_price_formula"] == (
-        "base_money_per_second*1.5^(current_level-1)"
+        "base_money_per_second*mutation_income_multiplier"
+        "*1.5^(current_level-1)"
     )
     assert details["fish_upgrade_price_resource"] == "material"
-    assert details["fish_upgrade_price_uses_mutation"] == "false"
+    assert details["fish_upgrade_price_uses_mutation"] == "true"
     assert details["material_before_fish_upgrade"] == "100"
     assert details["material_after_fish_upgrade"] == "90"
     assert details["fish_income_formula"] == (

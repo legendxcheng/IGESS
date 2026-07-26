@@ -509,7 +509,7 @@ def test_current_production_snapshot_resolves_one_throw() -> None:
 
     application = upgrade_fish(state, 1, hall_adapter=hall_adapter)
 
-    assert application.price == application.income_before.base_money_per_second
+    assert application.price == application.income_before.income_per_second
     assert application.to_level == 2
     assert application.income_after.income_per_second == (
         application.income_before.income_per_second * SimNumber.parse("1.25")

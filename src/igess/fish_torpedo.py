@@ -134,8 +134,10 @@ def _sim_number(
             raise FishDataError(f"{field} must be a generated number") from exc
         if type(sign) is not int or sign not in {-1, 0, 1}:
             raise FishDataError(f"{field}.sign must be -1, 0, or 1")
-        if not isinstance(digits, str) or not digits or not digits.isdigit():
-            raise FishDataError(f"{field}.digits must contain decimal digits")
+        if not _is_unsigned_decimal(digits):
+            raise FishDataError(
+                f"{field}.digits must contain an unsigned decimal value"
+            )
         if type(scale) is not int:
             raise FishDataError(f"{field}.scale must be an integer")
         prefix = "-" if sign < 0 else ""
@@ -148,3 +150,12 @@ def _sim_number(
         qualifier = "non-negative" if allow_zero else "positive"
         raise FishDataError(f"{field} must be a {qualifier} number")
     return parsed
+
+
+def _is_unsigned_decimal(value: Any) -> bool:
+    if not isinstance(value, str) or not value:
+        return False
+    whole, separator, fraction = value.partition(".")
+    return whole.isdigit() and (
+        not separator or (bool(fraction) and fraction.isdigit())
+    )

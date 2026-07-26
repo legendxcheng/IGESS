@@ -121,11 +121,11 @@ function finalResourcesCard(finalResources) {
 function renderFishProgression(report) {
   const fish = report.fish_progression || {};
   if (!fish.available) return;
-  renderCoreProgression(fish.core || {});
+  renderCoreProgression(fish.core || {}, fish.balance || {});
   renderPersistentProgression(fish.persistent || {});
 }
 
-function renderCoreProgression(core) {
+function renderCoreProgression(core, balance = {}) {
   const section = document.querySelector('[data-fish-core-section]');
   const profiles = core.profiles || {};
   const entries = Object.entries(profiles);
@@ -159,8 +159,117 @@ function renderCoreProgression(core) {
       ].join('');
     }).join('');
   }
-  renderCoreStrengthChart(profiles);
+  renderFishAcquisitionRateChart(balance.profiles || {});
+  renderFishCumulativeOutputChart(balance.profiles || {});
   renderLuckProgressionChart(profiles);
+}
+
+function renderFishAcquisitionRateChart(profiles) {
+  const series = [];
+  Object.entries(profiles).forEach(([profileId, profile]) => {
+    const rows = profile.rate_rows || [];
+    [
+      ['垃圾/秒', 'trash_per_second', '#d97706'],
+      ['金钱/秒', 'money_per_second', '#2563eb'],
+    ].forEach(([label, field, color]) => {
+      series.push({
+        name: `${profileId} · ${label}`,
+        type: 'line',
+        showSymbol: false,
+        connectNulls: false,
+        lineStyle: { width: 2 },
+        itemStyle: { color },
+        data: fishEconomyLineData(rows, field, { positiveOnly: true }),
+      });
+    });
+  });
+  replaceChart('fish-acquisition-rate-chart', fishBalanceLineOption(
+    '每秒获得的垃圾量与金钱量（5 分钟窗口）',
+    series,
+    '每秒获得量 · 对数同轴',
+    { logarithmic: true }
+  ));
+}
+
+function renderFishCumulativeOutputChart(profiles) {
+  const series = [];
+  Object.entries(profiles).forEach(([profileId, profile]) => {
+    const rows = profile.cumulative_rows || [];
+    [
+      ['累计金钱', 'money_acquired_cumulative', '#2563eb'],
+      ['累计资源', 'resource_acquired_cumulative', '#16a34a'],
+    ].forEach(([label, field, color]) => {
+      series.push({
+        name: `${profileId} · ${label}`,
+        type: 'line',
+        showSymbol: false,
+        connectNulls: false,
+        lineStyle: { width: 2 },
+        itemStyle: { color },
+        data: fishEconomyLineData(rows, field, { positiveOnly: true }),
+      });
+    });
+  });
+  replaceChart('fish-cumulative-output-chart', fishBalanceLineOption(
+    '累计获得的金钱量与资源量',
+    series,
+    '累计毛产出 · 对数同轴',
+    { logarithmic: true }
+  ));
+}
+
+function fishEconomyLineData(rows, field, { positiveOnly = false } = {}) {
+  return rows
+    .filter(row => Number.isFinite(row[field] && row[field].chart_value))
+    .map(row => ({
+      value: [
+        Number(row.active_time_seconds || 0),
+        positiveOnly && row[field].chart_value <= 0
+          ? null
+          : row[field].chart_value,
+      ],
+      row,
+      field,
+    }));
+}
+
+function fishBalanceLineOption(title, series, yAxisName, { logarithmic = false } = {}) {
+  const usable = series.filter(item =>
+    item.data.some(datum => Number.isFinite(datum.value[1]))
+  );
+  if (!usable.length) return null;
+  return {
+    title: {
+      text: title,
+      subtext: logarithmic ? '同一纵轴比较数量级；仅显示大于 0 的窗口' : '',
+      left: 'center',
+      textStyle: { fontSize: 15 },
+      subtextStyle: { fontSize: 11, color: '#64748b' },
+    },
+    tooltip: {
+      trigger: 'axis',
+      formatter: params => params.map(param => {
+        const datum = param.data;
+        const row = datum.row;
+        return [
+          `<strong>${escapeHtml(param.seriesName)}</strong>: ${numericTooltip(row[datum.field])}`,
+          `累计在线: ${formatDurationClock(row.active_time_seconds)} (${numericTooltip(row.active_time, 's')})`,
+        ].join('<br>');
+      }).join('<br><br>'),
+    },
+    legend: { top: 48, type: 'scroll' },
+    grid: { left: 92, right: 28, top: 98, bottom: 58 },
+    dataZoom: [{ type: 'inside' }, { type: 'slider' }],
+    xAxis: {
+      type: 'value',
+      name: '累计在线时间',
+      axisLabel: { formatter: value => formatDurationCompact(value) },
+    },
+    yAxis: logarithmic
+      ? { type: 'log', logBase: 10, name: yAxisName, minorSplitLine: { show: true } }
+      : { type: 'value', name: yAxisName, scale: true },
+    series: usable,
+  };
 }
 
 function renderCoreStrengthChart(profiles) {
@@ -207,7 +316,7 @@ function renderLuckProgressionChart(profiles) {
     });
   });
   replaceChart('luck-progression-chart', progressionLineOption(
-    'FishLuck / TrashLuck: current vs historical peak',
+    'FishLuck 与 TrashLuck 的变化曲线',
     series,
     'Luck'
   ));
@@ -287,8 +396,110 @@ function renderPersistentProgression(persistent) {
       ].join('');
     }).join('');
   }
-  renderProgressionDensityChart(profiles);
+  renderDailyProgressionCharts(profiles);
   renderProgressionEventsTable(profiles);
+}
+
+function renderDailyProgressionCharts(profiles) {
+  const target = document.querySelector('[data-daily-progression-charts]');
+  if (!target) return;
+  const entries = Object.entries(profiles).flatMap(([profileId, profile]) =>
+    (profile.days || []).map(day => ({ profileId, day }))
+  );
+  if (!entries.length) {
+    target.innerHTML = '<div class="empty">没有可展示的在线日。</div>';
+    return;
+  }
+  const categories = [...new Set(entries.flatMap(({ day }) =>
+    (day.rows || []).map(row => row.progression_category || 'other')
+  ))].sort((left, right) => progressionCategoryRank(left) - progressionCategoryRank(right));
+  const categoryLabels = categories.map(progressionCategoryLabel);
+  target.innerHTML = entries.map(({ profileId, day }, index) => {
+    const count = day.event_count && day.event_count.display_value != null
+      ? day.event_count.display_value
+      : (day.rows || []).length;
+    return [
+      '<article class="daily-chart-card">',
+      `<h3>第 ${escapeHtml(day.day_index)} 天 · ${escapeHtml(profileId)} · ${escapeHtml(count)} 次有效成长</h3>`,
+      `<div id="daily-progression-chart-${index}" class="chart daily-chart"></div>`,
+      '</article>',
+    ].join('');
+  }).join('');
+  entries.forEach(({ profileId, day }, index) => {
+    const duration = day.duration_seconds && day.duration_seconds.chart_value;
+    const rows = day.rows || [];
+    const series = categories.map((category, categoryIndex) => ({
+      name: progressionCategoryLabel(category),
+      type: 'scatter',
+      symbolSize: 12,
+      data: rows
+        .filter(row => (row.progression_category || 'other') === category)
+        .map(row => ({
+          value: [Number(row.day_active_time_seconds || 0), categoryIndex],
+          row,
+          profileId,
+        })),
+    })).filter(item => item.data.length);
+    replaceChart(`daily-progression-chart-${index}`, {
+      tooltip: {
+        trigger: 'item',
+        formatter: params => {
+          const row = params.data.row;
+          return [
+            `<strong>${escapeHtml(progressionCategoryLabel(row.progression_category))}</strong>`,
+            `当日在线: ${formatDurationClock(row.day_active_time_seconds)}`,
+            `累计在线: ${formatDurationClock(row.active_time_seconds)}`,
+            `事件: ${escapeHtml(row.source_event_kind)} · ${escapeHtml(row.item_id)}`,
+            `指标: ${escapeHtml(row.metric_id)}`,
+            `变化: ${numericTooltip(row.metric_before)} → ${numericTooltip(row.metric_after)}`,
+            `距上次有效成长: ${numericTooltip(row.gap_from_previous_progression_seconds, 's')}`,
+          ].join('<br>');
+        },
+      },
+      legend: { top: 0, type: 'scroll' },
+      grid: { left: 118, right: 24, top: 42, bottom: 48 },
+      xAxis: {
+        type: 'value',
+        name: '当日在线时间',
+        min: 0,
+        max: Number.isFinite(duration) && duration > 0 ? duration : undefined,
+        axisLabel: { formatter: value => formatDurationCompact(value) },
+      },
+      yAxis: { type: 'category', data: categoryLabels },
+      series,
+    });
+  });
+}
+
+function progressionCategoryLabel(category) {
+  const labels = {
+    best_hall_fish: '摸鱼厅最优鱼',
+    barbell: '杠铃',
+    fish_hall: '摸鱼厅容量',
+    strength_rebirth: '力量转生',
+    torpedo: '鱼雷 / TrashLuck',
+    trash_man_realm: '垃圾佬境界',
+    trash_man_rebirth: '垃圾佬转生',
+    permanent_unlock: '永久解锁',
+    other: '其他',
+  };
+  return labels[category] || category || labels.other;
+}
+
+function progressionCategoryRank(category) {
+  const order = [
+    'best_hall_fish',
+    'barbell',
+    'fish_hall',
+    'strength_rebirth',
+    'torpedo',
+    'trash_man_realm',
+    'trash_man_rebirth',
+    'permanent_unlock',
+    'other',
+  ];
+  const index = order.indexOf(category);
+  return index === -1 ? order.length : index;
 }
 
 function renderProgressionDensityChart(profiles) {
@@ -644,6 +855,26 @@ function numericTooltip(point, suffix = '') {
   const display = numericText(point);
   const exact = point.exact_value == null ? '' : String(point.exact_value);
   return `<span title="Exact value: ${escapeHtml(exact)}">${escapeHtml(display)}${escapeHtml(suffix)}</span>`;
+}
+
+function formatDurationCompact(value) {
+  const seconds = Math.max(0, Number(value) || 0);
+  if (seconds >= 3600) {
+    const hours = seconds / 3600;
+    return `${Number.isInteger(hours) ? hours : hours.toFixed(1)}h`;
+  }
+  if (seconds >= 60) return `${Math.round(seconds / 60)}m`;
+  return `${Math.round(seconds)}s`;
+}
+
+function formatDurationClock(value) {
+  const total = Math.max(0, Math.round(Number(value) || 0));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const seconds = total % 60;
+  return [hours, minutes, seconds]
+    .map(part => String(part).padStart(2, '0'))
+    .join(':');
 }
 
 function replaceChart(id, option) {

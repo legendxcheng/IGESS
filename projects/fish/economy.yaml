@@ -106,12 +106,12 @@ player_profiles:
       manual_throw: '1'
       upgrade_fish: '0.1'
       upgrade_fish_hall: '100'
-      purchase_torpedo: '100'
+      purchase_torpedo: '1e100'
       synthesize_barbell: '100'
       exercise_barbell: '1'
-      strength_rebirth: '1'
-      trash_man_rebirth: '1'
-      fund_trash_man_breakthrough: '100'
+      strength_rebirth: '1e100'
+      trash_man_rebirth: '1e100'
+      fund_trash_man_breakthrough: '1e100'
     behavior_durations:
       manual_throw:
         type: fixed

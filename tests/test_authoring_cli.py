@@ -81,7 +81,7 @@ def actions(parser: argparse.ArgumentParser) -> dict[str, argparse.Action]:
 def test_model_help_owns_exact_nested_arguments_defaults_examples_and_exit_codes():
     commands = model_commands()
 
-    assert set(commands) == {"init", "status", "apply", "simulate"}
+    assert set(commands) == {"init", "status", "apply", "simulate", "watch"}
     assert set(actions(commands["init"])) == {"help", "out", "model_id", "json"}
     assert set(actions(commands["status"])) == {"help", "project", "json"}
     assert set(actions(commands["apply"])) == {
@@ -100,6 +100,15 @@ def test_model_help_owns_exact_nested_arguments_defaults_examples_and_exit_codes
         "override",
         "json",
     }
+    assert set(actions(commands["watch"])) == {
+        "help",
+        "project",
+        "scenario",
+        "poll_seconds",
+        "debounce_seconds",
+        "port",
+        "no_browser",
+    }
     assert actions(commands["status"])["project"].default == "."
     assert actions(commands["apply"])["project"].default == "."
     assert actions(commands["apply"])["format_name"].default is None
@@ -108,6 +117,12 @@ def test_model_help_owns_exact_nested_arguments_defaults_examples_and_exit_codes
     assert actions(commands["simulate"])["scenario"].default == "smoke"
     assert actions(commands["simulate"])["checkpoint_in"].default is None
     assert actions(commands["simulate"])["override"].default == []
+    assert actions(commands["watch"])["project"].default == "."
+    assert actions(commands["watch"])["scenario"].default == "smoke"
+    assert actions(commands["watch"])["poll_seconds"].default == 0.5
+    assert actions(commands["watch"])["debounce_seconds"].default == 1.0
+    assert actions(commands["watch"])["port"].default == 0
+    assert actions(commands["watch"])["no_browser"].default is False
 
     for name, parser in commands.items():
         rendered = parser.format_help()
@@ -134,6 +149,7 @@ def test_model_parser_is_red_without_disturbing_legacy_help():
     assert "status" in model.stdout
     assert "apply" in model.stdout
     assert "simulate" in model.stdout
+    assert "watch" in model.stdout
 
 
 def test_model_init_human_and_json_return_exact_paths(tmp_path: Path):

@@ -398,7 +398,7 @@ def test_low_priority_fish_upgrade_selects_cheapest_below_material_tenth(
     state.fish.items = [
         FishInstance(3, 2, 7, 1, 100, 0),
         FishInstance(1, 1, 7, 1, 100, 1),
-        FishInstance(2, 2, 7, 1, 100, 2),
+        FishInstance(2, 2, 2, 1, 100, 2),
     ]
     state.fish.next_instance_id = 4
 
@@ -411,4 +411,4 @@ def test_low_priority_fish_upgrade_selects_cheapest_below_material_tenth(
     state.wallet.material = BigNumberDTO.from_value(81)
     candidate = adapter.candidates(state, profile)[0]
     assert candidate.available
-    assert tuple(target.target_id for target in candidate.targets) == ("2",)
+    assert tuple(target.target_id for target in candidate.targets) == ("3",)

@@ -486,8 +486,10 @@ def _generated_number(value: Any, field: str) -> float:
         raise FishDataError(f"{field} must be a generated big number") from exc
     if type(sign) is not int or sign not in {-1, 0, 1}:
         raise FishDataError(f"{field}.sign must be -1, 0, or 1")
-    if not isinstance(digits, str) or not digits or not digits.isdigit():
-        raise FishDataError(f"{field}.digits must contain decimal digits")
+    if not _is_unsigned_decimal(digits):
+        raise FishDataError(
+            f"{field}.digits must contain an unsigned decimal value"
+        )
     if type(scale) is not int:
         raise FishDataError(f"{field}.scale must be an integer")
     try:
@@ -495,6 +497,15 @@ def _generated_number(value: Any, field: str) -> float:
     except (InvalidOperation, ValueError) as exc:
         raise FishDataError(f"{field} is not a valid generated big number") from exc
     return _positive_number(parsed, field)
+
+
+def _is_unsigned_decimal(value: Any) -> bool:
+    if not isinstance(value, str) or not value:
+        return False
+    whole, separator, fraction = value.partition(".")
+    return whole.isdigit() and (
+        not separator or (bool(fraction) and fraction.isdigit())
+    )
 
 
 def _finite_number(value: Any, field: str) -> float:
