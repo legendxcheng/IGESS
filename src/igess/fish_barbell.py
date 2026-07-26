@@ -143,9 +143,9 @@ class FishBarbellDataAdapter:
                     f"tbbarbell contains duplicate id: {row_id}"
                 )
             name = _field(row, "name", "tbbarbell")
-            if not isinstance(name, str) or not name:
+            if not isinstance(name, str):
                 raise FishDataError(
-                    f"tbbarbell.{row_id}.name must be a non-empty string"
+                    f"tbbarbell.{row_id}.name must be a string"
                 )
             result[row_id] = BarbellRule(
                 barbell_id=row_id,
@@ -169,6 +169,20 @@ class FishBarbellDataAdapter:
             )
         if not result:
             raise FishDataError("tbbarbell must contain at least one row")
+        ordered_rules = [result[key] for key in sorted(result)]
+        for previous, current in zip(
+            ordered_rules,
+            ordered_rules[1:],
+            strict=False,
+        ):
+            if current.price <= previous.price:
+                raise FishDataError(
+                    "tbbarbell prices must be strictly increasing by id: "
+                    f"id {previous.barbell_id} price "
+                    f"{previous.price.to_decimal_string()} >= "
+                    f"id {current.barbell_id} price "
+                    f"{current.price.to_decimal_string()}"
+                )
         return result
 
 

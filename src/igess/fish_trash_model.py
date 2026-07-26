@@ -24,6 +24,7 @@ class TrashManRealmRule:
     realm_id: int
     decompose_speed_multiplier: SimNumber
     cultivation_seconds_to_next_realm: int
+    money_required_to_next_realm: SimNumber
 
 
 @dataclass(frozen=True)
@@ -44,6 +45,24 @@ class TrashManRealmTransition:
             "from_realm_id": self.from_realm_id,
             "to_realm_id": self.to_realm_id,
             "at_elapsed_seconds": self.at_elapsed_seconds,
+        }
+
+
+@dataclass(frozen=True)
+class TrashManBreakthroughCompletion:
+    from_realm_id: int
+    to_realm_id: int
+    at_elapsed_seconds: int
+    required_seconds: int
+    price: SimNumber
+
+    def to_dict(self) -> dict[str, int | str]:
+        return {
+            "from_realm_id": self.from_realm_id,
+            "to_realm_id": self.to_realm_id,
+            "at_elapsed_seconds": self.at_elapsed_seconds,
+            "required_seconds": self.required_seconds,
+            "price": self.price.to_decimal_string(),
         }
 
 
@@ -161,8 +180,13 @@ class TrashOnlineSettlement:
     training_progress_seconds_before: int
     training_progress_seconds_after: int
     paused_by_breakthrough: bool
+    breakthrough_active_after: bool
+    breakthrough_target_realm_id_after: int
+    breakthrough_progress_seconds_before: int
+    breakthrough_progress_seconds_after: int
     segments: tuple[TrashProcessingSettlement, ...]
     transitions: tuple[TrashManRealmTransition, ...]
+    breakthrough_completions: tuple[TrashManBreakthroughCompletion, ...]
 
     @property
     def completed_by_trash(self) -> tuple[tuple[int, int], ...]:
@@ -270,12 +294,15 @@ class TrashOnlineSettlement:
                 separators=(",", ":"),
             ),
             "trash_man_cultivation_formula": (
-                "online_elapsed advances current realm cultivation until "
-                "historical_highest_realm; each completed current-row "
+                "online_elapsed advances free historical catch-up or an "
+                "already-funded breakthrough; each completed current-row "
                 "cultivationSecondsToNextRealm advances one configured realm"
             ),
             "trash_man_cultivation_online_only": "true",
             "trash_man_cultivation_ceiling": "historical_highest_realm",
+            "trash_man_breakthrough_policy": (
+                "paid_current_row_price_then_online_current_row_duration"
+            ),
             "trash_man_cultivation_elapsed_seconds": str(
                 self.cultivation_elapsed_seconds
             ),
@@ -291,6 +318,29 @@ class TrashOnlineSettlement:
             "trash_man_cultivation_paused_by_breakthrough": str(
                 self.paused_by_breakthrough
             ).lower(),
+            "trash_man_breakthrough_active_after": str(
+                self.breakthrough_active_after
+            ).lower(),
+            "trash_man_breakthrough_target_realm_id_after": str(
+                self.breakthrough_target_realm_id_after
+            ),
+            "trash_man_breakthrough_progress_seconds_before": str(
+                self.breakthrough_progress_seconds_before
+            ),
+            "trash_man_breakthrough_progress_seconds_after": str(
+                self.breakthrough_progress_seconds_after
+            ),
+            "trash_man_breakthrough_completion_count": str(
+                len(self.breakthrough_completions)
+            ),
+            "trash_man_breakthrough_completions": json.dumps(
+                [
+                    completion.to_dict()
+                    for completion in self.breakthrough_completions
+                ],
+                sort_keys=True,
+                separators=(",", ":"),
+            ),
             "trash_man_realm_advance_count": str(len(self.transitions)),
             "trash_man_realm_transitions": json.dumps(
                 [transition.to_dict() for transition in self.transitions],

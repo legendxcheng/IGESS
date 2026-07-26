@@ -9,6 +9,9 @@ engine:
   python_schema: E:/fish-oasis/igess_export/python/schema.py
   production_data: true
   strategy_id: production_active_throw_loop
+  behavior_scheduler:
+    manual_throw_refill:
+      weight_multiplier: '10'
   active_throw:
     initial_strength: '50'
     interval_seconds: 1
@@ -108,31 +111,35 @@ player_profiles:
       exercise_barbell: '1'
       strength_rebirth: '1'
       trash_man_rebirth: '1'
+      fund_trash_man_breakthrough: '100'
     behavior_durations:
       manual_throw:
         type: fixed
-        seconds: 1
+        seconds: 30
       upgrade_fish:
         type: fixed
-        seconds: 1
+        seconds: 3
       upgrade_fish_hall:
         type: fixed
-        seconds: 1
+        seconds: 10
       purchase_torpedo:
         type: fixed
-        seconds: 1
+        seconds: 10
       synthesize_barbell:
         type: fixed
-        seconds: 1
+        seconds: 10
       exercise_barbell:
         type: fixed
-        seconds: 1
+        seconds: 60
       strength_rebirth:
         type: fixed
-        seconds: 1
+        seconds: 5
       trash_man_rebirth:
         type: fixed
-        seconds: 1
+        seconds: 10
+      fund_trash_man_breakthrough:
+        type: fixed
+        seconds: 10
     behavior_target_policies:
       upgrade_fish: cheapest_below_material_tenth
       purchase_torpedo: highest_affordable
@@ -167,6 +174,20 @@ scenarios:
     - bottleneck_report
   week_1_growth:
     duration_hours: '168'
+    time_mode: tick
+    profiles:
+    - default
+    start_state: new_player
+    record_interval_seconds: 86400
+    outputs:
+    - resource_curve
+    - purchase_timeline
+    - unlock_timeline
+    - prestige_timeline
+    - bottleneck_report
+    - compact_event_details
+  month_1_growth:
+    duration_hours: '720'
     time_mode: tick
     profiles:
     - default

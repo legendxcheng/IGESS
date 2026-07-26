@@ -94,7 +94,7 @@ def test_available_rebirths_preempt_every_normal_behavior(
         second_candidates,
         behavior_profile,
         sequence_id=1,
-        started_at_seconds=1,
+        started_at_seconds=first_decision.completes_at_seconds,
     )
     second = adapter.complete(
         first.state,

@@ -67,6 +67,33 @@ class FishTrashDataAdapter:
                 f"unknown production trash-man realm id: {realm_id}"
             ) from exc
 
+    def money_required_to_next_realm(self, realm_id: int) -> SimNumber:
+        try:
+            return self._realms[realm_id].money_required_to_next_realm
+        except KeyError as exc:
+            raise FishDataError(
+                f"unknown production trash-man realm id: {realm_id}"
+            ) from exc
+
+    def can_fund_realm_breakthrough(self, state: PlayerState) -> bool:
+        if not isinstance(state, PlayerState):
+            raise FishDataError("state must be a PlayerState")
+        realm_id = state.trash_man.realm_id
+        if realm_id not in self._realms:
+            raise FishDataError(
+                f"unknown production trash-man realm id: {realm_id}"
+            )
+        if (
+            state.trash_man.breakthrough.active
+            or realm_id != state.trash_man.highest_realm_id
+            or self.next_realm_id(realm_id) is None
+        ):
+            return False
+        return (
+            self.money_required_to_next_realm(realm_id)
+            <= state.wallet.money.to_sim_number()
+        )
+
     def next_realm_id(self, realm_id: int) -> int | None:
         try:
             index = self._realm_indexes[realm_id]
@@ -249,10 +276,38 @@ class FishTrashDataAdapter:
                     ),
                     ("tbtrashmanrealm." f"{row_id}.cultivationSecondsToNextRealm"),
                 ),
+                money_required_to_next_realm=_nonnegative_sim_number(
+                    _field(
+                        row,
+                        "moneyRequireToNextRealm",
+                        "tbtrashmanrealm",
+                    ),
+                    ("tbtrashmanrealm." f"{row_id}.moneyRequireToNextRealm"),
+                ),
             )
         if not result:
             raise FishDataError("tbtrashmanrealm must not be empty")
-        return result, tuple(sorted(result))
+        order = tuple(sorted(result))
+        for realm_id in order[:-1]:
+            if result[realm_id].money_required_to_next_realm <= SimNumber.zero():
+                raise FishDataError(
+                    "tbtrashmanrealm non-final moneyRequireToNextRealm "
+                    "must be positive"
+                )
+        for current_id, next_id in zip(order[:-2], order[1:-1]):
+            if (
+                result[current_id].money_required_to_next_realm
+                >= result[next_id].money_required_to_next_realm
+            ):
+                raise FishDataError(
+                    "tbtrashmanrealm non-final moneyRequireToNextRealm "
+                    "must strictly increase by id"
+                )
+        if result[order[-1]].money_required_to_next_realm != SimNumber.zero():
+            raise FishDataError(
+                "tbtrashmanrealm final moneyRequireToNextRealm must be zero"
+            )
+        return result, order
 
     def _rebirth_rows(self) -> tuple[TrashManRebirthRule, ...]:
         result: dict[int, TrashManRebirthRule] = {}
@@ -332,17 +387,24 @@ def _nonnegative_int(value: Any, field: str) -> int:
 
 
 def _positive_sim_number(value: Any, field: str) -> SimNumber:
+    parsed = _nonnegative_sim_number(value, field)
+    if parsed <= SimNumber.zero():
+        raise FishDataError(f"{field} must be a positive number")
+    return parsed
+
+
+def _nonnegative_sim_number(value: Any, field: str) -> SimNumber:
     raw: Any
     if hasattr(value, "sign") and hasattr(value, "digits") and hasattr(value, "scale"):
         sign = getattr(value, "sign")
         digits = getattr(value, "digits")
         scale = getattr(value, "scale")
         if sign not in {-1, 0, 1} or not isinstance(digits, str):
-            raise FishDataError(f"{field} must be a positive number")
+            raise FishDataError(f"{field} must be a non-negative number")
         try:
             raw = Decimal(digits) * (Decimal(10) ** int(scale))
         except (InvalidOperation, TypeError, ValueError) as exc:
-            raise FishDataError(f"{field} must be a positive number") from exc
+            raise FishDataError(f"{field} must be a non-negative number") from exc
         if sign < 0:
             raw = -raw
         elif sign == 0:
@@ -352,7 +414,7 @@ def _positive_sim_number(value: Any, field: str) -> SimNumber:
     try:
         parsed = SimNumber.parse(raw)
     except (ArithmeticError, TypeError, ValueError) as exc:
-        raise FishDataError(f"{field} must be a positive number") from exc
-    if parsed <= SimNumber.zero():
-        raise FishDataError(f"{field} must be a positive number")
+        raise FishDataError(f"{field} must be a non-negative number") from exc
+    if parsed < SimNumber.zero():
+        raise FishDataError(f"{field} must be a non-negative number")
     return parsed

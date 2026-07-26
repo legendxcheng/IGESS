@@ -519,6 +519,17 @@ def test_production_workflow_records_one_resolved_throw(tmp_path: Path) -> None:
             "completed_count_n_uses_table_id_n_minus_1"
         ),
     }
+    assert manifest["strategy"]["parameters"]["behavior_scheduler"][
+        "dynamic_weights"
+    ] == {
+        "manual_throw_refill": {
+            "behavior_id": "manual_throw",
+            "condition": (
+                "fish_hall_not_full_or_trash_processing_empty"
+            ),
+            "weight_multiplier": "10",
+        }
+    }
 
     resumed = service.run_authoring_scenario(
         "smoke",

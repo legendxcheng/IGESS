@@ -493,9 +493,9 @@ def test_exercise_barbell_is_the_only_strength_producing_behavior(
         profile_id="default",
         behavior_id=EXERCISE_BARBELL_BEHAVIOR_ID,
         target_id=None,
-        duration_seconds=4,
+        duration_seconds=60,
         started_at_seconds=0,
-        completes_at_seconds=4,
+        completes_at_seconds=60,
     )
 
     completion = adapter.complete(
@@ -508,7 +508,14 @@ def test_exercise_barbell_is_the_only_strength_producing_behavior(
     assert completion.event_kind == "barbell_exercise_completed"
     assert completion.item_id == "barbell:1"
     assert completion.state.wallet.strength.to_sim_number() == (
-        SimNumber.parse(8)
+        SimNumber.parse(120)
     )
     assert completion.details["barbell_training_active"] == "true"
-    assert completion.details["barbell_strength_added"] == "8"
+    assert completion.details["barbell_strength_added"] == "120"
+    assert completion.details["barbell_settlement_elapsed_seconds"] == "60"
+    assert completion.details[
+        "barbell_strength_per_exercise_before_command"
+    ] == "2"
+    assert completion.details[
+        "barbell_time_cost_seconds_before_command"
+    ] == "1"

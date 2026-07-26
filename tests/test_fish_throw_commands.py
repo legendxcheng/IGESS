@@ -371,6 +371,23 @@ def test_current_production_snapshot_resolves_one_throw() -> None:
     assert trash_adapter.cultivation_seconds_to_next_realm(first_realm.id) == int(
         first_realm.cultivationSecondsToNextRealm
     )
+    realm_rows = snapshot.table("tbtrashmanrealm")
+    assert len(realm_rows) == 60
+    assert trash_adapter.realm_speed(2) == SimNumber.parse("2.25")
+    assert trash_adapter.realm_speed(60) == SimNumber.parse("74.75")
+    realm_prices = [
+        trash_adapter.money_required_to_next_realm(row.id)
+        for row in realm_rows
+    ]
+    assert realm_prices[0] == SimNumber.parse(20)
+    assert realm_prices[1] == SimNumber.parse(100_000)
+    assert realm_prices[5] == SimNumber.parse(100_000_000_000)
+    assert realm_prices[6] == SimNumber.parse(1_000_000_000_000)
+    assert all(
+        current < following
+        for current, following in zip(realm_prices[:-2], realm_prices[1:-1])
+    )
+    assert realm_prices[-1] == SimNumber.zero()
     assert trash_adapter.max_trash_man_rebirth_count == 10
     assert trash_adapter.material_output_multiplier(0) == SimNumber.one()
     first_trash_man_rebirth = trash_adapter.next_trash_man_rebirth_rule(0)
@@ -410,6 +427,15 @@ def test_current_production_snapshot_resolves_one_throw() -> None:
     assert barbell_adapter.rule(1).strength_per_exercise == SimNumber.parse(2)
     assert barbell_adapter.rule(1).time_cost_seconds == 1
     assert barbell_adapter.rule(1).price == SimNumber.parse(20)
+    assert barbell_adapter.rule(3).price == SimNumber.parse(75000)
+    assert all(
+        current.price < following.price
+        for current, following in zip(
+            barbell_adapter.rules,
+            barbell_adapter.rules[1:],
+            strict=False,
+        )
+    )
     assert barbell_adapter.strength_per_second(15) == SimNumber.parse(
         5000000
     )

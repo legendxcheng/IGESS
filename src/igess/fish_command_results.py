@@ -300,6 +300,48 @@ class AppliedTrashManRebirth:
 
 
 @dataclass(frozen=True)
+class AppliedTrashManBreakthroughFunding:
+    state: PlayerState
+    from_realm_id: int
+    target_realm_id: int
+    price: SimNumber
+    required_online_seconds: int
+    money_before: SimNumber
+    money_after: SimNumber
+
+    def event_details(self) -> dict[str, str]:
+        return {
+            "trash_man_breakthrough_realm_before": str(self.from_realm_id),
+            "trash_man_breakthrough_target_realm_id": str(
+                self.target_realm_id
+            ),
+            "trash_man_breakthrough_price": self.price.to_decimal_string(),
+            "trash_man_breakthrough_price_resource": "money",
+            "trash_man_breakthrough_price_source": (
+                "tbtrashmanrealm"
+                f"[id={self.from_realm_id}].moneyRequireToNextRealm"
+            ),
+            "trash_man_breakthrough_required_online_seconds": str(
+                self.required_online_seconds
+            ),
+            "trash_man_breakthrough_duration_source": (
+                "tbtrashmanrealm"
+                f"[id={self.from_realm_id}]"
+                ".cultivationSecondsToNextRealm"
+            ),
+            "money_before_trash_man_breakthrough": (
+                self.money_before.to_decimal_string()
+            ),
+            "money_after_trash_man_breakthrough": (
+                self.money_after.to_decimal_string()
+            ),
+            "trash_man_breakthrough_online_only": "true",
+            "trash_man_breakthrough_processing_continues": "true",
+            "player_state_revision": str(self.state.meta.revision),
+        }
+
+
+@dataclass(frozen=True)
 class AppliedBarbellSynthesis:
     state: PlayerState
     barbell_id: int

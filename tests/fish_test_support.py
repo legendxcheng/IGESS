@@ -141,18 +141,21 @@ def _snapshot(
                 name="初境",
                 decomposeSpeedMultiplier=1,
                 cultivationSecondsToNextRealm=0,
+                moneyRequireToNextRealm=_big(20),
             ),
             SimpleNamespace(
                 id=2,
                 name="二境",
                 decomposeSpeedMultiplier=1.25,
                 cultivationSecondsToNextRealm=1,
+                moneyRequireToNextRealm=_big(100),
             ),
             SimpleNamespace(
                 id=3,
                 name="三境",
                 decomposeSpeedMultiplier=2,
                 cultivationSecondsToNextRealm=2,
+                moneyRequireToNextRealm=_big(0),
             ),
         ),
         "tbtrashmanrebirth": (

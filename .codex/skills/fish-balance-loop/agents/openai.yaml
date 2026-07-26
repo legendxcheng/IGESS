@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fish 数值平衡循环"
+  short_description: "校验导表、运行 Fish 模拟、打开网页并分析调优"
+  default_prompt: "Use $fish-balance-loop to run a Fish balance simulation, open its Web report, and summarize actionable tuning findings."

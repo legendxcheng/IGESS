@@ -51,16 +51,22 @@ Fish 正式数值的唯一权威生产快照是 `E:\fish-oasis\igess_export`。�
 `trashId` 升序稳定处理，一次结算可以批量跨越多份废料；不足一秒的基础工作
 进度保存在 checkpoint 的 `engine_runtime_state`，保证变速和分段恢复不丢失。
 垃圾佬在在线时间内还会按当前境界的
-`cultivationSecondsToNextRealm` 自动修炼，但首片只允许追赶至存档中的
-`highestRealmId`。跨境界结算会先用旧境界速度处理到边界，再切换新速度；
-前台行为中途 checkpoint 不会提前提交修炼。新境界瓶颈、资助突破和离线修炼
-仍等待正式规则，不由模拟器猜测。
+`cultivationSecondsToNextRealm` 修炼。转世后低于 `highestRealmId` 的境界免费
+在线追赶；达到历史最高境界后，`fund_trash_man_breakthrough` 按当前境界行的
+`moneyRequireToNextRealm` 扣金钱并开始付费突破。突破首版只累计在线时间，
+离线暂停，闭关期间仍按旧境界速度加工废料；完成边界后才更新当前/历史最高
+境界并启用新速度。前台行为中途 checkpoint 不会提前提交或重复扣款。生产
+价格 1～59 号严格递增、60 号为 `0` 满档哨兵；分解倍率采用
+`1 + 1.25 × (境界 ID - 1)`，用于补偿提价后较慢的境界节奏。
 
 IGESS 另提供可选的玩家行为循环。玩家画像可以分别配置
 `behavior_weights`、`behavior_durations` 和 `behavior_target_policies`；
 Fish 当前前台行为为 `manual_throw`、`upgrade_fish`、
 `upgrade_fish_hall`、`purchase_torpedo`、`synthesize_barbell`、
-`exercise_barbell`、`strength_rebirth`、`trash_man_rebirth`、`idle`。
+`exercise_barbell`、`fund_trash_man_breakthrough`、`strength_rebirth`、
+`trash_man_rebirth`、`idle`。
+其中 `fund_trash_man_breakthrough` 是固定 `1` 秒、权重 `100` 的无目标行为，
+只在当前境界等于历史最高境界、没有进行中的突破且金钱足够时进入候选。
 每次只允许一个前台行为；
 摸鱼厅金钱和垃圾佬加工属于后台系统，杠铃锻炼不是后台系统。
 `upgrade_fish_hall` 是无目标行为，只在未满级且当前材料可支付时进入候选。
@@ -93,7 +99,9 @@ Fish 当前前台行为为 `manual_throw`、`upgrade_fish`、
 稳定选择一种并在下一轮立即执行另一种。杠铃合成使用 `random_affordable`，鱼升级使用
 `cheapest_below_material_tenth`；没有可执行目标时相应行为自动过滤。未拥有杠铃
 时训练行为也会自动过滤。生产 `day_1_growth` 与 `week_1_growth` 已完成正式
-24h/7d 基线；周场景保留全部行为事件以及重生/鱼雷购买的完整 trace，但对
+24h/7d 基线；垃圾佬突破平衡后的系统级永久进展为 `9 / 23`，同生产输入的
+30d 领域运行结果为 `36`，均通过 `8..12 / 16..24 / 32..48` gate。周场景
+保留全部行为事件以及重生/鱼雷购买/境界突破的完整 trace，但对
 其他普通行为使用 `compact_event_details` 去除重复的大公式明细。重生直接
 产出与重置进度恢复结论见
 [`reports/rebirth-long-term-baseline.md`](reports/rebirth-long-term-baseline.md)。
@@ -104,7 +112,7 @@ FishLuck、TrashLuck 的当前值、历史峰值、变化速度、重生标记�
 效果。捕获只有在事件记录的最佳鱼厅 CPS 确实提高时才计入。静态 HTML 会显示
 双 Luck/Strength 曲线、永久进展触发密度、归一化变化幅度和事件明细。最新
 24h/7d 报表基线与结论见
-[`reports/torpedo-price-balance.md`](reports/torpedo-price-balance.md)；
+[`reports/trash-man-breakthrough-balance.md`](reports/trash-man-breakthrough-balance.md)；
 调价前报表基线保留在
 [`reports/progression-report-baseline.md`](reports/progression-report-baseline.md)。
 包含 FishLuck 机会成本的完整反事实经济回本仍需 Phase 9 的同 RNG 禁用重生分叉，
@@ -127,6 +135,7 @@ igess model apply --project . --change changes/next-rule.yaml
 igess model simulate --project . --scenario smoke
 igess model simulate --project projects/fish --scenario day_1_growth
 igess model simulate --project projects/fish --scenario week_1_growth
+igess model simulate --project projects/fish --scenario month_1_growth
 ```
 
 ## Artifacts

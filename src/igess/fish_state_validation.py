@@ -244,6 +244,22 @@ def validate_player_state(
             "archive_schema_reference_missing",
             "trashMan.breakthrough.targetRealmId",
         )
+    if breakthrough.active and (
+        self.trash_man.realm_id != self.trash_man.highest_realm_id
+        or breakthrough.target_realm_id <= self.trash_man.realm_id
+    ):
+        _fail(
+            "archive_schema_order_invalid",
+            "trashMan.breakthrough.targetRealmId",
+        )
+    if not breakthrough.active and (
+        breakthrough.target_realm_id != 0
+        or breakthrough.progress_seconds != 0
+    ):
+        _fail(
+            "archive_schema_inactive_progress",
+            "trashMan.breakthrough",
+        )
 
     processing = self.trash_man.processing
     if not isinstance(processing, TrashProcessingState):

@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from .fish_data import FishDataError
 from .fish_state import PlayerState, TrashProcessingState, TrashStock
 from .fish_trash_model import (
+    TrashManBreakthroughCompletion,
     TrashManRealmTransition,
     TrashOnlineSettlement,
     TrashProcessingRuntime,
@@ -168,12 +169,7 @@ def settle_trash_online(
     runtime: TrashProcessingRuntime | None = None,
     _mutate: bool = False,
 ) -> TrashOnlineSettlement:
-    """Settle trash processing while replaying confirmed online catch-up.
-
-    Cultivation is deliberately capped at highestRealmId. Progress beyond the
-    historical maximum, bottlenecks, paid breakthroughs, and offline
-    cultivation remain outside this confirmed rule slice.
-    """
+    """Settle trash processing, historical catch-up, and paid breakthroughs."""
     if not isinstance(state, PlayerState):
         raise TypeError("state must be a PlayerState")
     if type(elapsed_seconds) is not int or elapsed_seconds < 0:
@@ -187,6 +183,8 @@ def settle_trash_online(
     realm_before = state.trash_man.realm_id
     highest_realm = state.trash_man.highest_realm_id
     progress_before = state.trash_man.training_progress_seconds
+    breakthrough = state.trash_man.breakthrough
+    breakthrough_progress_before = breakthrough.progress_seconds
     try:
         realm_index = adapter._realm_indexes[realm_before]
         highest_index = adapter._realm_indexes[highest_realm]
@@ -202,12 +200,16 @@ def settle_trash_online(
     working = state if _mutate else state.copy()
     current_realm = realm_before
     progress = progress_before
+    breakthrough_active = breakthrough.active
+    breakthrough_target = breakthrough.target_realm_id
+    breakthrough_progress = breakthrough.progress_seconds
     remaining_elapsed = elapsed_seconds
     elapsed_offset = 0
     current_runtime = runtime
     segments: list[TrashProcessingSettlement] = []
     transitions: list[TrashManRealmTransition] = []
-    paused = state.trash_man.breakthrough.active
+    breakthrough_completions: list[TrashManBreakthroughCompletion] = []
+    paused = breakthrough.active
 
     def process_segment(seconds: int) -> None:
         nonlocal current_runtime
@@ -224,7 +226,63 @@ def settle_trash_online(
         segments.append(settlement)
 
     while remaining_elapsed > 0:
-        if paused or current_realm == highest_realm:
+        if breakthrough_active:
+            next_realm = adapter.next_realm_id(current_realm)
+            if current_realm != highest_realm or next_realm is None:
+                raise FishDataError(
+                    "active trash-man breakthrough must start at the "
+                    "historical highest non-final realm"
+                )
+            if breakthrough_target != next_realm:
+                raise FishDataError(
+                    "active trash-man breakthrough target must be the next "
+                    "configured realm"
+                )
+            requirement = adapter.cultivation_seconds_to_next_realm(
+                current_realm
+            )
+            if breakthrough_progress > requirement:
+                raise FishDataError(
+                    "trash-man breakthrough progress exceeds current realm "
+                    "cultivation requirement"
+                )
+            required_elapsed = requirement - breakthrough_progress
+            if required_elapsed > remaining_elapsed:
+                process_segment(remaining_elapsed)
+                breakthrough_progress += remaining_elapsed
+                elapsed_offset += remaining_elapsed
+                remaining_elapsed = 0
+                break
+
+            process_segment(required_elapsed)
+            remaining_elapsed -= required_elapsed
+            elapsed_offset += required_elapsed
+            transition = TrashManRealmTransition(
+                from_realm_id=current_realm,
+                to_realm_id=breakthrough_target,
+                at_elapsed_seconds=elapsed_offset,
+            )
+            transitions.append(transition)
+            breakthrough_completions.append(
+                TrashManBreakthroughCompletion(
+                    from_realm_id=current_realm,
+                    to_realm_id=breakthrough_target,
+                    at_elapsed_seconds=elapsed_offset,
+                    required_seconds=requirement,
+                    price=adapter.money_required_to_next_realm(
+                        current_realm
+                    ),
+                )
+            )
+            current_realm = breakthrough_target
+            highest_realm = current_realm
+            progress = 0
+            breakthrough_active = False
+            breakthrough_target = 0
+            breakthrough_progress = 0
+            continue
+
+        if current_realm == highest_realm:
             process_segment(remaining_elapsed)
             elapsed_offset += remaining_elapsed
             remaining_elapsed = 0
@@ -282,8 +340,15 @@ def settle_trash_online(
         training_progress_seconds_before=progress_before,
         training_progress_seconds_after=progress,
         paused_by_breakthrough=paused,
+        breakthrough_active_after=breakthrough_active,
+        breakthrough_target_realm_id_after=breakthrough_target,
+        breakthrough_progress_seconds_before=(
+            breakthrough_progress_before
+        ),
+        breakthrough_progress_seconds_after=breakthrough_progress,
         segments=tuple(segments),
         transitions=tuple(transitions),
+        breakthrough_completions=tuple(breakthrough_completions),
     )
 
 
@@ -326,6 +391,17 @@ def settle_trash_offline(
             state.trash_man.training_progress_seconds
         ),
         paused_by_breakthrough=state.trash_man.breakthrough.active,
+        breakthrough_active_after=state.trash_man.breakthrough.active,
+        breakthrough_target_realm_id_after=(
+            state.trash_man.breakthrough.target_realm_id
+        ),
+        breakthrough_progress_seconds_before=(
+            state.trash_man.breakthrough.progress_seconds
+        ),
+        breakthrough_progress_seconds_after=(
+            state.trash_man.breakthrough.progress_seconds
+        ),
         segments=(segment,),
         transitions=(),
+        breakthrough_completions=(),
     )

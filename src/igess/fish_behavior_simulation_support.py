@@ -10,6 +10,7 @@ from .behavior import (
 from .fish_barbell import FishBarbellDataAdapter
 from .fish_behavior import (
     EXERCISE_BARBELL_BEHAVIOR_ID,
+    FUND_TRASH_MAN_BREAKTHROUGH_BEHAVIOR_ID,
     FISH_BEHAVIOR_IDS,
     MANUAL_THROW_BEHAVIOR_ID,
     PURCHASE_TORPEDO_BEHAVIOR_ID,
@@ -205,6 +206,8 @@ def output_event_details(
             "strength_reborn",
             "torpedo_purchased",
             "trash_man_reborn",
+            "trash_man_breakthrough_funded",
+            "trash_man_realm_broken_through",
         }
     ):
         return details
@@ -260,6 +263,10 @@ def validate_checkpoint(
         f"{TRASH_MAN_REBIRTH_BEHAVIOR_ID}_completed",
         0,
     )
+    trash_man_breakthrough_fundings = event_counters.get(
+        f"{FUND_TRASH_MAN_BREAKTHROUGH_BEHAVIOR_ID}_completed",
+        0,
+    )
     idle = event_counters.get("idle_completed", 0)
     counters = (
         completed,
@@ -272,6 +279,7 @@ def validate_checkpoint(
         barbell_exercises,
         strength_rebirths,
         trash_man_rebirths,
+        trash_man_breakthrough_fundings,
         idle,
     )
     if any(type(value) is not int or value < 0 for value in counters):
@@ -298,6 +306,7 @@ def validate_checkpoint(
             + barbell_exercises
             + strength_rebirths
             + trash_man_rebirths
+            + trash_man_breakthrough_fundings
             + idle
         )
         or started != completed + int(active is not None)

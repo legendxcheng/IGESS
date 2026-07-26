@@ -63,39 +63,26 @@ def test_default_profile_prioritizes_growth_in_two_hour_session() -> None:
         profile.behavior_weights[UPGRADE_FISH_BEHAVIOR_ID]
         == SimNumber.parse("0.1")
     )
-    assert profile.behavior_durations["manual_throw"] == {
-        "type": "fixed",
-        "seconds": 1,
+    expected_durations = {
+        "manual_throw": 30,
+        EXERCISE_BARBELL_BEHAVIOR_ID: 60,
+        SYNTHESIZE_BARBELL_BEHAVIOR_ID: 10,
+        UPGRADE_FISH_HALL_BEHAVIOR_ID: 10,
+        PURCHASE_TORPEDO_BEHAVIOR_ID: 10,
+        UPGRADE_FISH_BEHAVIOR_ID: 3,
+        STRENGTH_REBIRTH_BEHAVIOR_ID: 5,
+        TRASH_MAN_REBIRTH_BEHAVIOR_ID: 10,
     }
-    assert profile.behavior_durations[EXERCISE_BARBELL_BEHAVIOR_ID] == {
-        "type": "fixed",
-        "seconds": 1,
-    }
-    assert profile.behavior_durations[SYNTHESIZE_BARBELL_BEHAVIOR_ID] == {
-        "type": "fixed",
-        "seconds": 1,
-    }
-    assert profile.behavior_durations[UPGRADE_FISH_HALL_BEHAVIOR_ID] == {
-        "type": "fixed",
-        "seconds": 1,
-    }
-    assert profile.behavior_durations[PURCHASE_TORPEDO_BEHAVIOR_ID] == {
-        "type": "fixed",
-        "seconds": 1,
-    }
-    assert profile.behavior_durations[UPGRADE_FISH_BEHAVIOR_ID] == {
-        "type": "fixed",
-        "seconds": 1,
-    }
+    for behavior_id, seconds in expected_durations.items():
+        assert profile.behavior_durations[behavior_id] == {
+            "type": "fixed",
+            "seconds": seconds,
+        }
     for rebirth_id in (
         STRENGTH_REBIRTH_BEHAVIOR_ID,
         TRASH_MAN_REBIRTH_BEHAVIOR_ID,
     ):
         assert profile.behavior_weights[rebirth_id] == SimNumber.one()
-        assert profile.behavior_durations[rebirth_id] == {
-            "type": "fixed",
-            "seconds": 1,
-        }
     assert profile.behavior_target_policies[
         UPGRADE_FISH_BEHAVIOR_ID
     ] == CHEAPEST_BELOW_MATERIAL_TENTH_POLICY_ID

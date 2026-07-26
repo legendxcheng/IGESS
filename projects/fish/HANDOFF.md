@@ -1,6 +1,6 @@
 # Fish 数值优化 Handoff
 
-更新时间：2026-07-25
+更新时间：2026-07-26
 
 项目范围：`projects/fish` 与 Fish 领域模拟代码
 
@@ -12,7 +12,90 @@
 > 当前工作区包含尚未提交的 Fish 长时模拟、性能优化、测试和文档改动。
 > 接手时先执行 `git status`，不要清理或覆盖不属于自己的改动。
 
-## 0. 2026-07-25 双 Luck 纯价格平衡更新
+## 0. 2026-07-26 垃圾佬新境界突破已完成
+
+上一版最高优先级阻塞已经解除。`tbtrashmanrealm.moneyRequireToNextRealm`
+现已完整接入 IGESS：默认画像可资助新境界突破，成功时按当前境界行原子扣除
+金钱；突破首版只累计在线时间，离线暂停，闭关期间继续按旧境界加工废料；
+完成边界后更新 `realmId / highestRealmId` 并输出一次系统级永久进展。转世后
+低于历史最高境界的部分仍免费在线追赶，不重复支付。
+
+本轮同时完成价格与材料效率联调：
+
+- 1～59 号突破价按 ID 严格递增，60 号为 `0` 满档哨兵；没有下调任何旧价。
+- 关键前期价格为
+  `20 / 100K / 5M / 50M / 500M / 100B / 1T`。
+- 分解倍率改为 `1 + 1.25 × (境界 ID - 1)`，从 `1×` 增至 `74.75×`。
+- 7d 累计材料约 `10.735M`，与旧曲线约 `11.366M` 相差约 `5.5%`，提价后
+  材料线没有明显落后。
+
+领域实现包括原子命令、默认权重 `100`/固定 `1s` 行为、在线/离线结算、
+跨边界不停产、checkpoint 恢复、完成事件和永久进展报表。第二次及后续垃圾佬
+转世已经在生产长时画像中可达。完整说明见
+[`reports/trash-man-breakthrough-balance.md`](reports/trash-man-breakthrough-balance.md)。
+
+仍未解决的是 30 天正式 authoring 产物在大体积 `simulation_artifact` 阶段的
+基础设施问题；这不影响同生产输入、seed 和规则的领域内存结果。
+
+## 0.1 系统级永久进展目标验收
+
+累计目标保持 `10 / 20 / 40`，只统计跨鱼保留的系统成长，不含最佳鱼厅捕获
+和单鱼升级。新境界突破完成后的结果为：
+
+| 阶段 | 目标 | ±20% gate | 当前结果 | 最高境界 | 结果 |
+| --- | ---: | ---: | ---: | ---: | --- |
+| 首日 | 10 | 8～12 | 9 | 3 | 通过 |
+| 首周 | 20 | 16～24 | 23 | 7 | 通过 |
+| 首月 | 40 | 32～48 | 36 | 14 | 通过 |
+
+正式短期回归：
+
+- 24h：`20260726T013137219561Z-day_1_growth`。
+- 7d：`20260726T013200487450Z-week_1_growth`。
+- 模型摘要：
+  `sha256:7721a63bd78f573cdd634b327faf0199fd1d7ee95e3a913ca97d8aff4528bfd1`。
+
+30d 为同一 `economy.yaml`、生产 Luban 表、seed 和画像的领域内存运行：系统
+进展 36 次，其中杠铃 5、鱼厅 2、力量重生 4、鱼雷 8、境界突破 13、垃圾佬
+转世 4；期末最高境界 14，且没有进行中的突破。旧的 `8 / 16 / 21` 结果只
+保留为“突破功能缺失”的历史对照，不再是调价基线。
+
+## 0.2 2026-07-25 杠铃价格递增更新
+
+人类已确认杠铃价格必须随 ID 严格递增。本轮将 3 号杠铃价格从
+`750,000` 下调为 `75,000`，形成
+`20 → 7,500 → 75,000 → 500,000 → 7,200,000` 的前五档价格序列，并在
+`FishBarbellDataAdapter` 增加严格递增数据契约。
+
+当时的杠铃独立调价基线（已由第 0～0.1 节当前基线取代）：
+
+- 24h：`20260725T061531328157Z-day_1_growth`
+- 7d：`20260725T061546887666Z-week_1_growth`
+- 模型摘要：
+  `sha256:6c6dd09c978d8b055bd7f3f8815185a64c25c40ff57ca8a696d991778269291f`
+- 结果说明：
+  [`reports/barbell-price-balance.md`](reports/barbell-price-balance.md)
+- HTML：
+  [`runs/20260725T061546887666Z-week_1_growth/report/index.html`](runs/20260725T061546887666Z-week_1_growth/report/index.html)
+
+7 天结果：
+
+- 1～4 号杠铃购买累计在线时刻为
+  `8s / 1,939s / 7,202s / 28,801s`。
+- 3 号在第 2 天上线第 2 秒购买，4 号仍在第 5 天购买，没有被推迟。
+- 第三次力量重生从累计在线 `28,871s` 提前到 `27,808s`，由第 5 天移动到
+  第 4 天。
+- 系统级永久进展由 15 次增加到 16 次；按重定标后的首周 `16..24` gate
+  恰好通过下边界，仍需保留改善空间。
+- 每日双 Luck 峰值最大相对误差由 `14.83%` 降至 `14.51%`，继续通过
+  `20%` 允许范围。
+
+权威源表、JSON 和当前 Lua 运行表已经同步。源
+`data-tables/Datas/Gameplay/Barbell.xlsx` 的 `Barbell!F7` 已由 `750`
+改为 `75`，与 `G7=3` 共同表示 3 号价格 `75,000`；其余单元格、公式和
+样式保持不变。
+
+## 0.3 2026-07-25 双 Luck 纯价格平衡更新
 
 人类已确认：`FishLuck` 与 `TrashLuck` 应保持绝对值大致同步，并明确拒绝
 “历史最高力量门槛”。本轮已经按纯价格方案完成实现和正式重跑：
@@ -28,7 +111,7 @@
 - 2～11 号鱼雷价格已经在权威生产表
   `E:\fish-oasis\igess_export\json\tbtorpedo.json` 调整；12 号以后未改。
 
-最新正式基线：
+当时正式基线（已由上面的杠铃调价基线取代）：
 
 - 24h：`20260725T040202603439Z-day_1_growth`
 - 7d：`20260725T040259487026Z-week_1_growth`
@@ -61,7 +144,7 @@ igess model status   Model is ready
 下一轮优先验证 10、11 号鱼雷的长期价格时点，并决定是否接受中段约 15% 的
 档位误差；不要重新加入力量门槛。
 
-## 0.1 2026-07-25 报表交付更新（调价前历史）
+## 0.4 2026-07-25 报表交付更新（调价前历史）
 
 本文原定的最小交付已经完成：
 
@@ -97,8 +180,8 @@ igess model status   Model is ready
 
 ## 1. 下一轮目标
 
-下一轮不再优先扩展通用经济报表，而是围绕两类直接影响留存的 Fish 指标开展
-数值优化：
+垃圾佬新境界突破生产闭环和 24h/7d/30d 基线已经完成。下一轮可以直接围绕
+两类影响留存的 Fish 指标继续数值优化：
 
 1. **长期提升行为的间隔和密度**
    - 前期持续给玩家可感知的成长反馈，避免长时间没有提升。
@@ -107,6 +190,10 @@ igess model status   Model is ready
 2. **核心成长感**
    - 以 `FishLuck` 和 `TrashLuck` 的当前值、峰值和增长速度作为核心进展指标。
    - 显式识别 Luck 停滞、重生回落、恢复时间和下一档位等待时间。
+
+当前最具体的后续项是：验证第 15～60 境界的长期价格斜率、让
+`behavior_progression` 进入 compare/gate/scan、压缩 30d 正式产物，以及继续
+检查 10/11 号鱼雷的长期时点。不要再重新实现或绕过已经完成的付费突破规则。
 
 这两个报表应成为 Fish 在 IGESS 中最优先的一等报表，并最终进入
 `report / compare / gate / scan` 工作流。
@@ -190,13 +277,13 @@ Fish 的领域数值由 Fish 专用引擎演算；IGESS 负责模型入口、场
 
 场景：
 
-- 24h：`20260725T040202603439Z-day_1_growth`
-- 7d：`20260725T040259487026Z-week_1_growth`
+- 24h：`20260726T013137219561Z-day_1_growth`
+- 7d：`20260726T013200487450Z-week_1_growth`
 
 模型摘要：
 
 ```text
-sha256:66017a648f3ccce9ddb100a6e14e6dd54c0ee9e85177172e6859195c9ea42674
+sha256:7721a63bd78f573cdd634b327faf0199fd1d7ee95e3a913ca97d8aff4528bfd1
 ```
 
 数据：
@@ -208,21 +295,22 @@ sha256:66017a648f3ccce9ddb100a6e14e6dd54c0ee9e85177172e6859195c9ea42674
 
 基线报告：
 
+- [`reports/trash-man-breakthrough-balance.md`](reports/trash-man-breakthrough-balance.md)
+- [`reports/barbell-price-balance.md`](reports/barbell-price-balance.md)
 - [`reports/torpedo-price-balance.md`](reports/torpedo-price-balance.md)
 - [`reports/rebirth-long-term-baseline.md`](reports/rebirth-long-term-baseline.md)
-- [`runs/20260725T040259487026Z-week_1_growth/report/index.html`](runs/20260725T040259487026Z-week_1_growth/report/index.html)
-- [`runs/20260725T040259487026Z-week_1_growth/output/run_manifest.json`](runs/20260725T040259487026Z-week_1_growth/output/run_manifest.json)
-- [`runs/20260725T040259487026Z-week_1_growth/output/events.csv`](runs/20260725T040259487026Z-week_1_growth/output/events.csv)
-- [`runs/20260725T040259487026Z-week_1_growth/output/luck_progression.csv`](runs/20260725T040259487026Z-week_1_growth/output/luck_progression.csv)
-- [`runs/20260725T040259487026Z-week_1_growth/output/behavior_progression.csv`](runs/20260725T040259487026Z-week_1_growth/output/behavior_progression.csv)
-- [`runs/20260725T040259487026Z-week_1_growth/output/final_checkpoint.json`](runs/20260725T040259487026Z-week_1_growth/output/final_checkpoint.json)
+- [`runs/20260726T013200487450Z-week_1_growth/report/index.html`](runs/20260726T013200487450Z-week_1_growth/report/index.html)
+- [`runs/20260726T013200487450Z-week_1_growth/output/run_manifest.json`](runs/20260726T013200487450Z-week_1_growth/output/run_manifest.json)
+- [`runs/20260726T013200487450Z-week_1_growth/output/events.csv`](runs/20260726T013200487450Z-week_1_growth/output/events.csv)
+- [`runs/20260726T013200487450Z-week_1_growth/output/luck_progression.csv`](runs/20260726T013200487450Z-week_1_growth/output/luck_progression.csv)
+- [`runs/20260726T013200487450Z-week_1_growth/output/behavior_progression.csv`](runs/20260726T013200487450Z-week_1_growth/output/behavior_progression.csv)
+- [`runs/20260726T013200487450Z-week_1_growth/output/final_checkpoint.json`](runs/20260726T013200487450Z-week_1_growth/output/final_checkpoint.json)
 
 ## 5. 调价前长期提升基线（历史对照）
 
-本节保留用于比较。当前调价后正式 7 天结果已经变为：总永久进展 102 次，
-其中系统级 15 次（含鱼雷 8 次）；系统级最大在线空窗 `14,330s`、尾部空窗
-`7,199s`，只有 1 个完整在线场次没有系统进展。当前结论以第 0 节和
-[`reports/torpedo-price-balance.md`](reports/torpedo-price-balance.md) 为准。
+本节只保留为突破功能完成前的历史比较，不再描述当前数值。当前结论以第 0 节
+和 [`reports/trash-man-breakthrough-balance.md`](reports/trash-man-breakthrough-balance.md)
+为准。
 
 7 天场景共有 14 小时玩家在线时间。排除 2482 次单鱼升级后，只剩 7 次明确
 长期提升：
@@ -266,12 +354,12 @@ sha256:66017a648f3ccce9ddb100a6e14e6dd54c0ee9e85177172e6859195c9ea42674
 | ---: | ---: | ---: | ---: | ---: |
 | 初始 | 3.0000 | 3.0000 | 0.0000 | 0.00% |
 | 1 | 11.9194 | 12.5901 | +0.6707 | +5.63% |
-| 2 | 15.0003 | 13.0000 | -2.0003 | -13.33% |
-| 3 | 16.6237 | 19.0209 | +2.3972 | +14.42% |
-| 4 | 18.2032 | 20.0000 | +1.7968 | +9.87% |
-| 5 | 25.0374 | 28.7493 | +3.7119 | +14.83% |
-| 6 | 28.5446 | 28.7493 | +0.2047 | +0.72% |
-| 7 | 29.9657 | 30.0000 | +0.0343 | +0.11% |
+| 2 | 15.1500 | 13.0000 | -2.1500 | -14.19% |
+| 3 | 16.9803 | 19.0209 | +2.0406 | +12.02% |
+| 4 | 18.2707 | 20.0000 | +1.7293 | +9.46% |
+| 5 | 25.1059 | 28.7493 | +3.6435 | +14.51% |
+| 6 | 28.6455 | 28.7493 | +0.1038 | +0.36% |
+| 7 | 29.9774 | 30.0000 | +0.0226 | +0.08% |
 
 解释：
 
@@ -385,7 +473,8 @@ HTML 报告应显示：
    - 对 24h/7d 基线建立快照测试。
 4. **补齐阻塞核心成长的机制**
    - `[x]` 鱼雷购买已完成，`TrashLuck` 已按纯价格方案增长到 30。
-   - 垃圾佬新境界突破，否则第二次转世长期不可达。
+   - `[!]` 垃圾佬新境界突破是当前最高优先级；完成前停止长期调价、扫描和
+     gate，否则第二次转世长期不可达，30 天结果不具备最终平衡意义。
    - 检查摸鱼厅首级 5,000,000 材料是否导致不可接受的成长空窗。
 5. **与人类确认数值目标**
    - 前 10/30/60 分钟长期提升间隔目标。
@@ -493,14 +582,15 @@ git diff --check                      passed
 
 ```powershell
 $events = Import-Csv `
-  'projects\fish\runs\20260725T040259487026Z-week_1_growth\output\events.csv'
+  'projects\fish\runs\20260726T013200487450Z-week_1_growth\output\events.csv'
 
 $events |
   Where-Object {
     $_.kind -in @(
       'strength_reborn',
       'torpedo_purchased',
-      'trash_man_reborn'
+      'trash_man_reborn',
+      'trash_man_realm_broken_through'
     )
   } |
   Select-Object time_seconds, kind, item_id
@@ -513,7 +603,7 @@ $fishTests = @(
   Get-ChildItem tests\test_fish_*.py |
   ForEach-Object { $_.FullName }
 )
-.\.tmp\py311-venv\Scripts\python.exe -m pytest -q @fishTests
+uv run pytest -q @fishTests
 ```
 
 ## 12. 接手时不要误做
@@ -526,7 +616,8 @@ $fishTests = @(
 - 不要把调价前 `TrashLuck=3` 的旧 run 当成当前基线。
 - 不要把通用 `Purchase events: 0` 解释为 Fish 没有发生经济行为。
 - 不要为鱼雷购买重新增加当前力量或历史最高力量门槛。
-- 不要在垃圾佬新境界突破缺失时宣称整条垃圾线已经完全验证。
+- 不要绕过 `moneyRequireToNextRealm`、把历史最高境界以上的突破重新当作免费
+  修炼；第 15～60 境界尚未做超月长时验证。
 - 不要通过提高临时鱼升级频率来修复长期成长空窗。
 - 不要在 10、11 号长期时点和目标阈值确认前进行大规模参数扫描。
 - 不要清理当前未提交工作区或删除失败 run；它们保留调试与性能证据。
@@ -544,8 +635,10 @@ $fishTests = @(
 
 本轮已完成第一轮正式数值调优。下一位接手者应：
 
-1. 增加超过 7 天的长期场景，验证 10、11 号鱼雷的 `300B / 600B` 价格。
+1. 增加超过 30 天的摘要场景，验证第 15～60 境界价格和 10、11 号鱼雷的
+   `300B / 600B` 价格。
 2. 与人类确认是否接受第 2～5 天由 power 档位导致的约 15% 双 Luck 误差。
 3. 若要进一步缩小误差，讨论调整鱼雷 power/Luck 档位；仅改价格已不能产生
    中间 TrashLuck。
 4. 将双 Luck 差值与系统级永久进展空窗接入 `compare / gate / scan`。
+5. 为 30d 正式 authoring run 增加产物压缩，替代当前领域内存月基线。

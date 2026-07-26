@@ -22,6 +22,7 @@ from .fish_commands import (
     purchase_torpedo,
     synthesize_barbell,
     upgrade_fish,
+    fund_trash_man_realm_breakthrough,
 )
 from .fish_throw_commands import trusted_lock_throw_request
 from .fish_behavior_targets import (
@@ -31,6 +32,10 @@ from .fish_behavior_targets import (
     barbell_synthesis_targets,
     fish_upgrade_targets,
     torpedo_purchase_targets,
+)
+from .fish_behavior_weights import (
+    MANUAL_THROW_BEHAVIOR_ID,
+    ManualThrowRefillRule,
 )
 from .fish_hall import FishHallDataAdapter
 from .fish_production import (
@@ -45,7 +50,6 @@ from .fish_upgrade_ranking import FishUpgradeRankingCache
 from .numbers import SimNumber
 from .schema import PlayerProfile
 
-MANUAL_THROW_BEHAVIOR_ID = "manual_throw"
 UPGRADE_FISH_BEHAVIOR_ID = "upgrade_fish"
 UPGRADE_FISH_HALL_BEHAVIOR_ID = "upgrade_fish_hall"
 PURCHASE_TORPEDO_BEHAVIOR_ID = "purchase_torpedo"
@@ -53,6 +57,9 @@ SYNTHESIZE_BARBELL_BEHAVIOR_ID = "synthesize_barbell"
 EXERCISE_BARBELL_BEHAVIOR_ID = "exercise_barbell"
 STRENGTH_REBIRTH_BEHAVIOR_ID = "strength_rebirth"
 TRASH_MAN_REBIRTH_BEHAVIOR_ID = "trash_man_rebirth"
+FUND_TRASH_MAN_BREAKTHROUGH_BEHAVIOR_ID = (
+    "fund_trash_man_breakthrough"
+)
 REBIRTH_BEHAVIOR_IDS = frozenset(
     {
         STRENGTH_REBIRTH_BEHAVIOR_ID,
@@ -69,6 +76,7 @@ FISH_BEHAVIOR_IDS = frozenset(
         EXERCISE_BARBELL_BEHAVIOR_ID,
         STRENGTH_REBIRTH_BEHAVIOR_ID,
         TRASH_MAN_REBIRTH_BEHAVIOR_ID,
+        FUND_TRASH_MAN_BREAKTHROUGH_BEHAVIOR_ID,
         IDLE_BEHAVIOR_ID,
     }
 )
@@ -99,6 +107,7 @@ class FishBehaviorAdapter:
         trash_adapter: FishTrashDataAdapter,
         barbell_adapter: FishBarbellDataAdapter,
         throw_config: ProductionThrowConfig,
+        manual_throw_refill_rule: ManualThrowRefillRule | None = None,
         _validate_state: bool = True,
     ) -> None:
         if type(_validate_state) is not bool:
@@ -108,6 +117,16 @@ class FishBehaviorAdapter:
         self.trash_adapter = trash_adapter
         self.barbell_adapter = barbell_adapter
         self.throw_config = throw_config
+        self.manual_throw_refill_rule = (
+            manual_throw_refill_rule or ManualThrowRefillRule()
+        )
+        if not isinstance(
+            self.manual_throw_refill_rule,
+            ManualThrowRefillRule,
+        ):
+            raise TypeError(
+                "manual_throw_refill_rule must be a ManualThrowRefillRule"
+            )
         self.torpedo_adapter = FishTorpedoDataAdapter(
             throw_adapter.snapshot,
             trash_luck_pools=throw_adapter.trash_luck_pools,
@@ -213,6 +232,21 @@ class FishBehaviorAdapter:
         return BehaviorProfile(
             profile_id=profile.id,
             weights=profile.behavior_weights,
+        )
+
+    def effective_behavior_profile(
+        self,
+        state: PlayerState,
+        profile: BehaviorProfile,
+    ) -> BehaviorProfile:
+        """Apply state-driven Fish weight rules without mutating base weights."""
+
+        return self.manual_throw_refill_rule.effective_profile(
+            state,
+            profile,
+            fish_hall_capacity=self.hall_adapter.capacity(
+                state.fish_hall.upgrade_level
+            ),
         )
 
     def candidates(
@@ -334,6 +368,18 @@ class FishBehaviorAdapter:
                         duration=duration,
                         available=(
                             self.trash_adapter.can_trash_man_rebirth(
+                                state
+                            )
+                        ),
+                    )
+                )
+            elif behavior_id == FUND_TRASH_MAN_BREAKTHROUGH_BEHAVIOR_ID:
+                candidates.append(
+                    BehaviorCandidate(
+                        behavior_id=behavior_id,
+                        duration=duration,
+                        available=(
+                            self.trash_adapter.can_fund_realm_breakthrough(
                                 state
                             )
                         ),
@@ -550,6 +596,25 @@ class FishBehaviorAdapter:
                 item_id=(
                     "trash_man_rebirth:"
                     f"{application.to_completed_count}"
+                ),
+                details=details,
+            )
+
+        if decision.behavior_id == FUND_TRASH_MAN_BREAKTHROUGH_BEHAVIOR_ID:
+            application = fund_trash_man_realm_breakthrough(
+                committed,
+                trash_adapter=self.trash_adapter,
+                _mutate=_mutate,
+            )
+            details.update(application.event_details())
+            return FishBehaviorCompletion(
+                state=application.state,
+                production_runtime=settlement.runtime,
+                next_throw_id=next_throw_id,
+                event_kind="trash_man_breakthrough_funded",
+                item_id=(
+                    "trash_man_realm:"
+                    f"{application.target_realm_id}"
                 ),
                 details=details,
             )

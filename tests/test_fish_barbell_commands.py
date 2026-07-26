@@ -40,6 +40,20 @@ def test_barbell_adapter_uses_strength_per_exercise_and_time_cost(
     with pytest.raises(FishDataError, match="timeCost"):
         FishBarbellDataAdapter(snapshot)
 
+    snapshot.table("tbbarbell")[0].timeCost = 1
+    snapshot.table("tbbarbell")[0].name = ""
+    assert FishBarbellDataAdapter(snapshot).rule(1).name == ""
+
+
+def test_barbell_adapter_requires_strictly_increasing_prices(
+    tmp_path: Path,
+) -> None:
+    snapshot = _snapshot(tmp_path)
+    snapshot.table("tbbarbell")[1].price = snapshot.table("tbbarbell")[0].price
+
+    with pytest.raises(FishDataError, match="strictly increasing"):
+        FishBarbellDataAdapter(snapshot)
+
 
 def test_barbell_synthesis_atomically_pays_material_and_equips_best(
     tmp_path: Path,

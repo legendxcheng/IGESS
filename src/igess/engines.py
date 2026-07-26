@@ -12,6 +12,7 @@ from .fish_data import (
     FishLubanProvider,
     GeneratedLubanProvider,
 )
+from .fish_behavior_weights import ManualThrowRefillRule
 from .fish_simulator import FishEconomySimulator
 from .fish_state import FishCheckpointCodec
 from .fish_throw_data import ProductionThrowConfig
@@ -238,11 +239,19 @@ class FishEngineAdapter:
             if profile.behavior_weights
         }
         if behavior_profiles:
+            manual_throw_refill_rule = (
+                ManualThrowRefillRule.from_engine_settings(settings)
+            )
             strategy_parameters["behavior_scheduler"] = {
                 "schema": "weighted_duration_v1",
                 "foreground_strength_behavior": "exercise_barbell",
                 "offline_barbell_strength_efficiency": "0",
                 "offline_passive_efficiency": "0.5",
+                "dynamic_weights": {
+                    "manual_throw_refill": (
+                        manual_throw_refill_rule.manifest_parameters()
+                    )
+                },
                 "profiles": behavior_profiles,
             }
         metadata = {

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from decimal import Decimal
 
 from .behavior import (
@@ -25,6 +26,7 @@ from .fish_behavior_simulation_support import (
     timeline_row,
     validate_checkpoint,
 )
+from .fish_behavior_weights import ManualThrowRefillRule
 from .fish_session import FishDailySessionSchedule
 from .fish_data import FishDataSnapshot
 from .fish_hall import FishHallDataAdapter
@@ -75,12 +77,18 @@ class FishBehaviorSimulator:
         self.hall_adapter = FishHallDataAdapter(data)
         self.trash_adapter = FishTrashDataAdapter(data)
         self.barbell_adapter = FishBarbellDataAdapter(data)
+        self.manual_throw_refill_rule = (
+            ManualThrowRefillRule.from_engine_settings(
+                model.engine_settings
+            )
+        )
         self.adapter = FishBehaviorAdapter(
             throw_adapter=self.throw_adapter,
             hall_adapter=self.hall_adapter,
             trash_adapter=self.trash_adapter,
             barbell_adapter=self.barbell_adapter,
             throw_config=self.throw_config,
+            manual_throw_refill_rule=self.manual_throw_refill_rule,
             _validate_state=not _mutate_state,
         )
         self.time_engine = TimeEngine(model.config.tick_seconds)
@@ -209,6 +217,13 @@ class FishBehaviorSimulator:
                     "engine_id": "fish",
                     "model_digest": self.model_digest,
                     "behavior_scheduler": "weighted_duration_v1",
+                    "manual_throw_refill_condition": (
+                        "fish_hall_not_full_or_trash_processing_empty"
+                    ),
+                    "manual_throw_refill_weight_multiplier": (
+                        self.manual_throw_refill_rule.weight_multiplier
+                        .to_decimal_string()
+                    ),
                     "daily_online_seconds": str(
                         session_schedule.daily_online_seconds
                     ),
@@ -352,9 +367,15 @@ class FishBehaviorSimulator:
                     )
                 )
                 if candidates:
+                    effective_behavior_profile = (
+                        self.adapter.effective_behavior_profile(
+                            state,
+                            behavior_profile,
+                        )
+                    )
                     decision = scheduler.decide(
                         candidates,
-                        behavior_profile,
+                        effective_behavior_profile,
                         sequence_id=runtime.next_sequence_id,
                         started_at_seconds=current_time,
                     )
@@ -439,6 +460,13 @@ class FishBehaviorSimulator:
                         ]
                     ),
                     int(completion.details["trash_completed_count"]),
+                )
+                _append_breakthrough_completion_events(
+                    events,
+                    event_counters,
+                    scenario_id=scenario_id,
+                    profile_id=profile_id,
+                    settlement_details=completion.details,
                 )
                 events.append(
                     Event(
@@ -538,6 +566,14 @@ class FishBehaviorSimulator:
                         event_counters,
                         "fish_offline_settled",
                     )
+                final_settlement_details = final_settlement.event_details()
+                _append_breakthrough_completion_events(
+                    events,
+                    event_counters,
+                    scenario_id=scenario_id,
+                    profile_id=profile_id,
+                    settlement_details=final_settlement_details,
+                )
                 events.append(
                     Event(
                         scenario_id=scenario_id,
@@ -553,7 +589,7 @@ class FishBehaviorSimulator:
                             if final_settlement.online
                             else "session:scenario_end"
                         ),
-                        details=final_settlement.event_details(),
+                        details=final_settlement_details,
                     )
                 )
 
@@ -576,3 +612,75 @@ class FishBehaviorSimulator:
             context=self.hall_adapter.validation_context(),
         )
         return result, final_checkpoint
+
+
+def _append_breakthrough_completion_events(
+    events: list[Event],
+    event_counters: dict[str, int],
+    *,
+    scenario_id: str,
+    profile_id: str,
+    settlement_details: dict[str, str],
+) -> None:
+    payload = settlement_details.get(
+        "trash_man_breakthrough_completions",
+        "[]",
+    )
+    try:
+        completions = json.loads(payload)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            "invalid trash-man breakthrough completion trace"
+        ) from exc
+    if not isinstance(completions, list):
+        raise ValueError(
+            "trash-man breakthrough completion trace must be a list"
+        )
+    settlement_from = int(
+        settlement_details["fish_production_settlement_from_seconds"]
+    )
+    for completion in completions:
+        if not isinstance(completion, dict):
+            raise ValueError(
+                "trash-man breakthrough completion must be an object"
+            )
+        from_realm = int(completion["from_realm_id"])
+        to_realm = int(completion["to_realm_id"])
+        at_elapsed = int(completion["at_elapsed_seconds"])
+        required_seconds = int(completion["required_seconds"])
+        price = str(completion["price"])
+        increment_counter(
+            event_counters,
+            "trash_man_realm_broken_through",
+        )
+        events.append(
+            Event(
+                scenario_id=scenario_id,
+                profile_id=profile_id,
+                time_seconds=settlement_from + at_elapsed,
+                kind="trash_man_realm_broken_through",
+                item_id=f"trash_man_realm:{to_realm}",
+                details={
+                    "trash_man_realm_before": str(from_realm),
+                    "trash_man_realm_after": str(to_realm),
+                    "trash_man_highest_realm_before": str(from_realm),
+                    "trash_man_highest_realm_after": str(to_realm),
+                    "trash_man_breakthrough_price": price,
+                    "trash_man_breakthrough_price_source": (
+                        "tbtrashmanrealm"
+                        f"[id={from_realm}].moneyRequireToNextRealm"
+                    ),
+                    "trash_man_breakthrough_required_online_seconds": str(
+                        required_seconds
+                    ),
+                    "trash_man_breakthrough_duration_source": (
+                        "tbtrashmanrealm"
+                        f"[id={from_realm}]"
+                        ".cultivationSecondsToNextRealm"
+                    ),
+                    "trash_man_breakthrough_online_only": "true",
+                    "trash_man_breakthrough_processing_continued": "true",
+                    "is_persistent_progression": "true",
+                },
+            )
+        )

@@ -5,13 +5,17 @@ from pathlib import Path
 from fish_test_support import _snapshot
 from igess import fish_state_validation
 from igess.builder import ModelBuilder
-from igess.fish_behavior import MANUAL_THROW_BEHAVIOR_ID
+from igess.fish_behavior import (
+    EXERCISE_BARBELL_BEHAVIOR_ID,
+    FUND_TRASH_MAN_BREAKTHROUGH_BEHAVIOR_ID,
+    MANUAL_THROW_BEHAVIOR_ID,
+)
 from igess.fish_behavior_simulator import FishBehaviorSimulator
 from igess.loader import ConfigLoader
 from igess.numbers import SimNumber
 
 
-def test_production_growth_scenarios_cover_one_day_and_one_week() -> None:
+def test_production_growth_scenarios_cover_day_week_and_month() -> None:
     rules = ConfigLoader.load_rules_only(
         "projects/fish/economy.yaml"
     ).rules
@@ -28,6 +32,24 @@ def test_production_growth_scenarios_cover_one_day_and_one_week() -> None:
     assert week.profiles == ["default"]
     assert week.start_state == "new_player"
     assert "compact_event_details" in week.outputs
+
+    month = rules.scenarios["month_1_growth"]
+    assert month.duration_hours == 720
+    assert month.record_interval_seconds == 86400
+    assert month.profiles == ["default"]
+    assert month.start_state == "new_player"
+    assert "compact_event_details" in month.outputs
+
+    profile = rules.player_profiles["default"]
+    assert profile.behavior_weights[
+        FUND_TRASH_MAN_BREAKTHROUGH_BEHAVIOR_ID
+    ] == SimNumber.parse(100)
+    assert profile.behavior_durations[
+        FUND_TRASH_MAN_BREAKTHROUGH_BEHAVIOR_ID
+    ] == {"type": "fixed", "seconds": 10}
+    assert profile.behavior_durations[
+        EXERCISE_BARBELL_BEHAVIOR_ID
+    ] == {"type": "fixed", "seconds": 60}
 
 
 def test_owned_state_mutation_matches_copy_on_commit(
@@ -115,7 +137,7 @@ def test_week_scenario_compacts_ordinary_events_but_keeps_rebirth_trace(
         model,
         _snapshot(tmp_path),
         model_digest="sha256:" + ("8" * 64),
-    ).run_scenario("week_1_growth", until_seconds=20)
+    ).run_scenario("week_1_growth", until_seconds=40)
 
     trash_rebirth = next(
         event for event in result.events if event.kind == "trash_man_reborn"

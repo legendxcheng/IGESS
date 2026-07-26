@@ -202,8 +202,18 @@ def settle_fish_production(
         )
         committed.trash_man.processing = trash.processing
         committed.trash_man.realm_id = trash.realm_id_after
+        committed.trash_man.highest_realm_id = trash.highest_realm_id
         committed.trash_man.training_progress_seconds = (
             trash.training_progress_seconds_after
+        )
+        committed.trash_man.breakthrough.active = (
+            trash.breakthrough_active_after
+        )
+        committed.trash_man.breakthrough.target_realm_id = (
+            trash.breakthrough_target_realm_id_after
+        )
+        committed.trash_man.breakthrough.progress_seconds = (
+            trash.breakthrough_progress_seconds_after
         )
         committed.production.last_settled_at = to_time_seconds
         committed.meta.revision += 1

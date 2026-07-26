@@ -66,15 +66,15 @@ def _populated_state() -> PlayerState:
     ]
     state.fish.next_instance_id = 3
     state.trash_man.realm_id = 2
-    state.trash_man.highest_realm_id = 3
+    state.trash_man.highest_realm_id = 2
     state.trash_man.upgrades = [
         TrashManUpgrade(upgrade_id=2, level=1),
         TrashManUpgrade(upgrade_id=1, level=2),
     ]
-    state.trash_man.training_progress_seconds = 50
+    state.trash_man.training_progress_seconds = 0
     state.trash_man.breakthrough.active = True
     state.trash_man.breakthrough.target_realm_id = 3
-    state.trash_man.breakthrough.progress_seconds = 5
+    state.trash_man.breakthrough.progress_seconds = 0
     state.trash_man.processing.active_trash_id = 1
     state.trash_man.processing.active_progress_seconds = 7
     state.trash_man.processing.stocks = [
