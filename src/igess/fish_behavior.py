@@ -42,6 +42,7 @@ from .fish_production import (
     FishProductionRuntime,
     settle_fish_production,
 )
+from .fish_rewards import FishRewardMultipliers
 from .fish_state import PlayerState
 from .fish_torpedo import FishTorpedoDataAdapter
 from .fish_trash import FishTrashDataAdapter
@@ -406,6 +407,7 @@ class FishBehaviorAdapter:
         root_random_seed: int,
         next_throw_id: int,
         production_runtime: FishProductionRuntime | None = None,
+        reward_multipliers: FishRewardMultipliers | None = None,
         _mutate: bool = False,
     ) -> FishBehaviorCompletion:
         if type(_mutate) is not bool:
@@ -424,6 +426,7 @@ class FishBehaviorAdapter:
                 decision.behavior_id
                 == EXERCISE_BARBELL_BEHAVIOR_ID
             ),
+            reward_multipliers=reward_multipliers,
             _mutate=_mutate,
         )
         committed = settlement.state

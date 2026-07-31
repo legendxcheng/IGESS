@@ -5,8 +5,8 @@ model:
   number_backend: bignum_log
   random_seed: 20260626
 engine:
-  data_root: E:/fish-oasis/igess_export/json
-  python_schema: E:/fish-oasis/igess_export/python/schema.py
+  data_root: production_snapshot/json
+  python_schema: production_snapshot/python/schema.py
   production_data: true
   strategy_id: production_active_throw_loop
   behavior_scheduler:
@@ -57,6 +57,10 @@ generator_types:
 source_types:
   active:
     description: Active player actions
+  barbell_strength:
+    description: Fish barbell-training strength reward
+  fish_hall_money:
+    description: Fish hall money reward
   generator:
     description: Automatic generator output
   offline:
@@ -65,6 +69,8 @@ source_types:
     description: Milestone reward
   prestige:
     description: Prestige reward
+  trash_material:
+    description: Fish trash-processing material reward
 modifier_pipeline:
   order:
   - base
@@ -93,10 +99,71 @@ player_profiles:
   default:
     source_efficiency:
       active: '1'
+      barbell_strength: '1'
+      fish_hall_money: '1'
       generator: '1'
       offline: '1'
       milestone: '1'
       prestige: '1'
+      trash_material: '1'
+    behavior_policy: cheap_unlock_first
+    session_pattern: authoring_default
+    prestige_policy: conservative
+    activity_weights:
+      starter_fish_hall: '1'
+    behavior_weights:
+      manual_throw: '1'
+      upgrade_fish: '0.1'
+      upgrade_fish_hall: '100'
+      purchase_torpedo: '1e100'
+      synthesize_barbell: '100'
+      exercise_barbell: '1'
+      strength_rebirth: '1e100'
+      trash_man_rebirth: '1e100'
+      fund_trash_man_breakthrough: '1e100'
+    behavior_durations:
+      manual_throw:
+        type: fixed
+        seconds: 30
+      upgrade_fish:
+        type: fixed
+        seconds: 3
+      upgrade_fish_hall:
+        type: fixed
+        seconds: 10
+      purchase_torpedo:
+        type: fixed
+        seconds: 10
+      synthesize_barbell:
+        type: fixed
+        seconds: 10
+      exercise_barbell:
+        type: fixed
+        seconds: 60
+      strength_rebirth:
+        type: fixed
+        seconds: 5
+      trash_man_rebirth:
+        type: fixed
+        seconds: 10
+      fund_trash_man_breakthrough:
+        type: fixed
+        seconds: 10
+    behavior_target_policies:
+      upgrade_fish: cheapest_below_material_tenth
+      purchase_torpedo: highest_affordable
+      synthesize_barbell: random_affordable
+    luck: '1'
+  paid_20pct:
+    source_efficiency:
+      active: '1'
+      barbell_strength: '1.2'
+      fish_hall_money: '1.2'
+      generator: '1'
+      offline: '1'
+      milestone: '1'
+      prestige: '1'
+      trash_material: '1.2'
     behavior_policy: cheap_unlock_first
     session_pattern: authoring_default
     prestige_policy: conservative

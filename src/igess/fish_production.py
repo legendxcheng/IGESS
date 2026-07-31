@@ -8,6 +8,7 @@ from .fish_barbell import (
     FishBarbellDataAdapter,
 )
 from .fish_hall import FishHallDataAdapter, FishHallIncomeSnapshot
+from .fish_rewards import FishRewardMultipliers
 from .fish_state import BigNumberDTO, PlayerState
 from .fish_trash import (
     FishTrashDataAdapter,
@@ -60,8 +61,12 @@ class AppliedFishProductionSettlement:
     online: bool
     passive_efficiency: SimNumber
     barbell_training_active: bool
+    reward_multipliers: FishRewardMultipliers
+    money_base_added: SimNumber
     money_added: SimNumber
+    material_base_added: SimNumber
     material_added: SimNumber
+    strength_base_added: SimNumber
     strength_added: SimNumber
     strength_before: SimNumber
     strength_after: SimNumber
@@ -80,11 +85,9 @@ class AppliedFishProductionSettlement:
             "fish_passive_production_efficiency": (
                 self.passive_efficiency.to_decimal_string()
             ),
-            "fish_hall_money_added": self.money_added.to_decimal_string(),
             "fish_hall_settlement_from_seconds": str(self.from_time_seconds),
             "fish_hall_settlement_to_seconds": str(self.to_time_seconds),
             "fish_hall_settlement_elapsed_seconds": str(self.elapsed_seconds),
-            "barbell_strength_added": self.strength_added.to_decimal_string(),
             "strength_before_settlement": (
                 self.strength_before.to_decimal_string()
             ),
@@ -102,6 +105,40 @@ class AppliedFishProductionSettlement:
         details.update(self.fish_hall.event_details(suffix="before_throw"))
         details.update(self.barbell.event_details(suffix="before_command"))
         details.update(self.trash_processing.event_details())
+        details.update(
+            {
+                "fish_hall_money_base_added": (
+                    self.money_base_added.to_decimal_string()
+                ),
+                "fish_hall_money_reward_multiplier": (
+                    self.reward_multipliers.fish_hall_money
+                    .to_decimal_string()
+                ),
+                "fish_hall_money_added": (
+                    self.money_added.to_decimal_string()
+                ),
+                "trash_material_base_added": (
+                    self.material_base_added.to_decimal_string()
+                ),
+                "trash_material_reward_multiplier": (
+                    self.reward_multipliers.trash_material
+                    .to_decimal_string()
+                ),
+                "trash_material_added": (
+                    self.material_added.to_decimal_string()
+                ),
+                "barbell_strength_base_added": (
+                    self.strength_base_added.to_decimal_string()
+                ),
+                "barbell_strength_reward_multiplier": (
+                    self.reward_multipliers.barbell_strength
+                    .to_decimal_string()
+                ),
+                "barbell_strength_added": (
+                    self.strength_added.to_decimal_string()
+                ),
+            }
+        )
         return details
 
 
@@ -115,6 +152,7 @@ def settle_fish_production(
     runtime: FishProductionRuntime | None = None,
     online: bool = True,
     barbell_training_active: bool = False,
+    reward_multipliers: FishRewardMultipliers | None = None,
     _mutate: bool = False,
 ) -> AppliedFishProductionSettlement:
     """Atomically settle one uninterrupted Fish production interval.
@@ -138,6 +176,11 @@ def settle_fish_production(
     runtime = runtime or FishProductionRuntime()
     if not isinstance(runtime, FishProductionRuntime):
         raise TypeError("runtime must be a FishProductionRuntime")
+    reward_multipliers = reward_multipliers or FishRewardMultipliers()
+    if not isinstance(reward_multipliers, FishRewardMultipliers):
+        raise TypeError(
+            "reward_multipliers must be a FishRewardMultipliers"
+        )
     if not _mutate:
         state.validate(hall_adapter.validation_context())
     from_time_seconds = state.production.last_settled_at
@@ -148,10 +191,13 @@ def settle_fish_production(
         SimNumber.one() if online else FISH_OFFLINE_EFFICIENCY
     )
     hall = hall_adapter.snapshot(state, use_cache=_mutate)
-    money_added = (
+    money_base_added = (
         hall.total_income_per_second
         * SimNumber.parse(elapsed_seconds)
         * passive_efficiency
+    )
+    money_added = (
+        money_base_added * reward_multipliers.fish_hall_money
     )
     barbell = (
         BarbellProductionSnapshot(
@@ -164,7 +210,7 @@ def settle_fish_production(
         if barbell_adapter is None
         else barbell_adapter.production_snapshot(state)
     )
-    strength_added = (
+    strength_base_added = (
         barbell.strength_per_second * SimNumber.parse(elapsed_seconds)
         if barbell_training_active
         else SimNumber.zero()
@@ -184,6 +230,13 @@ def settle_fish_production(
             processing_efficiency=passive_efficiency,
         )
     )
+    material_base_added = trash.material_added
+    material_added = (
+        material_base_added * reward_multipliers.trash_material
+    )
+    strength_added = (
+        strength_base_added * reward_multipliers.barbell_strength
+    )
 
     strength_before = state.wallet.strength.to_sim_number()
     committed = state if _mutate else state.copy()
@@ -193,7 +246,7 @@ def settle_fish_production(
             allow_negative=False,
         )
         committed.wallet.material = BigNumberDTO.from_value(
-            state.wallet.material.to_sim_number() + trash.material_added,
+            state.wallet.material.to_sim_number() + material_added,
             allow_negative=False,
         )
         committed.wallet.strength = BigNumberDTO.from_value(
@@ -228,8 +281,12 @@ def settle_fish_production(
         online=online,
         passive_efficiency=passive_efficiency,
         barbell_training_active=barbell_training_active,
+        reward_multipliers=reward_multipliers,
+        money_base_added=money_base_added,
         money_added=money_added,
-        material_added=trash.material_added,
+        material_base_added=material_base_added,
+        material_added=material_added,
+        strength_base_added=strength_base_added,
         strength_added=strength_added,
         strength_before=strength_before,
         strength_after=committed.wallet.strength.to_sim_number(),

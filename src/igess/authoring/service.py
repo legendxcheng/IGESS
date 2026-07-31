@@ -433,6 +433,7 @@ class AuthoringService:
         *,
         checkpoint_input: str | os.PathLike[str] | None = None,
         overrides: Sequence[str] = (),
+        profile_id: str | None = None,
     ) -> CommandResponse:
         """Run one manual/formal scenario from a source-consistent snapshot."""
 
@@ -454,6 +455,7 @@ class AuthoringService:
                     warnings,
                     checkpoint_input=checkpoint_input,
                     overrides=overrides,
+                    profile_id=profile_id,
                 )
                 phase = "recovery"
                 return response
@@ -853,6 +855,7 @@ class AuthoringService:
         *,
         checkpoint_input: str | os.PathLike[str] | None = None,
         overrides: Sequence[str] = (),
+        profile_id: str | None = None,
     ) -> CommandResponse:
         registry = self._registry_factory(project)
         record: RunRecord | None = None
@@ -880,6 +883,30 @@ class AuthoringService:
                             "scenario_id": scenario_id,
                         },
                     )
+                configured_profiles = list(
+                    scenarios[scenario_id].profiles
+                )
+                if profile_id is not None:
+                    if not isinstance(profile_id, str) or not profile_id:
+                        raise AuthoringError(
+                            "unknown_profile",
+                            "Profile id must be a non-empty string",
+                            {"profile_id": profile_id},
+                        )
+                    profiles = getattr(model, "player_profiles", {})
+                    if profile_id not in profiles:
+                        raise AuthoringError(
+                            "unknown_profile",
+                            f"Unknown player profile: {profile_id}",
+                            {
+                                "available_profiles": sorted(profiles),
+                                "profile_id": profile_id,
+                            },
+                        )
+                    model.scenarios[scenario_id] = replace(
+                        scenarios[scenario_id],
+                        profiles=[profile_id],
+                    )
                 adapter = self._engine_registry.resolve(model.config.engine_id)
                 prepared = adapter.prepare(
                     model,
@@ -887,6 +914,18 @@ class AuthoringService:
                     base_dir=project.root,
                     overrides=overrides,
                 )
+                if profile_id is not None:
+                    prepared = replace(
+                        prepared,
+                        manifest_metadata={
+                            **prepared.manifest_metadata,
+                            "profile_selection": {
+                                "configured_profiles": configured_profiles,
+                                "mode": "command_override",
+                                "selected_profiles": [profile_id],
+                            },
+                        },
+                    )
                 digest = prepared.model_digest
                 status_engine_id = (
                     prepared.engine_id
@@ -977,13 +1016,16 @@ class AuthoringService:
             )
 
         assert record is not None
+        result = _run_result(record)
+        if profile_id is not None:
+            result["profile_id"] = profile_id
         return CommandResponse(
             "model.simulate",
             True,
             "simulated",
             f"Simulation complete: {scenario_id}",
             details={"warnings": list(recovered)} if recovered else {},
-            result=_run_result(record),
+            result=result,
         )
 
 

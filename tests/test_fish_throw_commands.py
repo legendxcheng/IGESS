@@ -343,7 +343,12 @@ def test_current_production_snapshot_resolves_one_throw() -> None:
     assert len(adapter.rules.fish_pool) == 121
     assert len(adapter.rules.trash_pool) == 39
     assert resolution.outcome.strength_luck.base_fish_luck == 3
-    assert resolution.trash_luck_mapping.base_trash_luck == 3
+    assert resolution.torpedo_power == 5
+    assert resolution.trash_luck_mapping.base_trash_luck == pytest.approx(
+        1.7370055336225123,
+        abs=1e-15,
+        rel=0,
+    )
     assert resolution.outcome.fish_reward.id
     assert resolution.outcome.trash_reward.id
     expected_fish = next(
@@ -363,7 +368,7 @@ def test_current_production_snapshot_resolves_one_throw() -> None:
     )
     assert trash_adapter.trash_rule(
         first_trash.id
-    ).base_material_per_second == SimNumber.parse("2")
+    ).base_material_per_second == SimNumber.parse("400")
     assert trash_adapter.initial_realm_id == first_realm.id
     assert trash_adapter.realm_speed(first_realm.id) == SimNumber.parse(
         first_realm.decomposeSpeedMultiplier
@@ -513,4 +518,140 @@ def test_current_production_snapshot_resolves_one_throw() -> None:
     assert application.to_level == 2
     assert application.income_after.income_per_second == (
         application.income_before.income_per_second * SimNumber.parse("1.25")
+    )
+
+
+@pytest.mark.external_data
+@pytest.mark.parametrize(
+    (
+        "root_seed",
+        "expected_mutation_id",
+        "expected_final_fish_luck",
+        "expected_fish_random",
+        "expected_fish_roll_power",
+        "expected_fish_id",
+        "expected_fish_denominator",
+        "expected_trash_random",
+        "expected_trash_roll_power",
+        "expected_bonus_types",
+    ),
+    [
+        (
+            2,
+            1,
+            3,
+            0.6112649411653693,
+            4.907855494346749,
+            2,
+            4,
+            0.634941675023287,
+            2.7356930596165485,
+            ["no_bonus"],
+        ),
+        (
+            0,
+            3,
+            3,
+            0.21687358253175326,
+            13.832943436348495,
+            4,
+            12,
+            0.787002073141545,
+            2.207116846196803,
+            ["mutation", "no_bonus"],
+        ),
+        (
+            4,
+            1,
+            6,
+            0.39369076205461684,
+            15.240388087053,
+            4,
+            12,
+            0.6860131314850193,
+            2.532029568971077,
+            ["luck_double", "no_bonus"],
+        ),
+        (
+            183,
+            2,
+            12,
+            0.492489310982573,
+            24.366011063384533,
+            6,
+            21,
+            0.8396581855512804,
+            2.068705532218537,
+            ["mutation", "luck_double", "luck_double", "no_bonus"],
+        ),
+    ],
+)
+def test_current_production_snapshot_matches_lua_gold_vectors(
+    root_seed: int,
+    expected_mutation_id: int,
+    expected_final_fish_luck: float,
+    expected_fish_random: float,
+    expected_fish_roll_power: float,
+    expected_fish_id: int,
+    expected_fish_denominator: float,
+    expected_trash_random: float,
+    expected_trash_roll_power: float,
+    expected_bonus_types: list[str],
+) -> None:
+    snapshot = FishDataLoader(
+        GeneratedLubanProvider("E:/fish-oasis/igess_export/python/schema.py")
+    ).load(
+        "E:/fish-oasis/igess_export/json",
+        production_data=True,
+        required_tables=FISH_REQUIRED_TABLES,
+    )
+    adapter = FishThrowDataAdapter(
+        snapshot,
+        bonus_base_luck=1,
+        max_bonus_layers=4,
+    )
+
+    resolution = adapter.resolve(
+        ProductionThrowRequest(
+            root_random_seed=root_seed,
+            throw_id=0,
+            strength=50,
+            torpedo_id=1,
+        )
+    )
+    outcome = resolution.outcome
+
+    assert resolution.torpedo_power == 5
+    assert outcome.strength_luck.base_fish_luck == 3
+    assert resolution.trash_luck_mapping.base_trash_luck == pytest.approx(
+        1.7370055336225123,
+        abs=1e-15,
+        rel=0,
+    )
+    assert resolution.fish_mutation_id == expected_mutation_id
+    assert outcome.final_fish_luck == expected_final_fish_luck
+    assert outcome.final_fish_luck / outcome.fish_roll_power == pytest.approx(
+        expected_fish_random,
+        abs=1e-16,
+        rel=0,
+    )
+    assert outcome.fish_roll_power == pytest.approx(
+        expected_fish_roll_power,
+        abs=1e-14,
+        rel=0,
+    )
+    assert int(outcome.fish_reward.id) == expected_fish_id
+    assert outcome.fish_reward.denominator == expected_fish_denominator
+    assert resolution.trash_luck_mapping.trash_luck / (
+        outcome.trash_roll_power
+    ) == pytest.approx(expected_trash_random, abs=2e-16, rel=0)
+    assert outcome.trash_roll_power == pytest.approx(
+        expected_trash_roll_power,
+        abs=1e-14,
+        rel=0,
+    )
+    assert int(outcome.trash_reward.id) == 1
+    assert outcome.trash_reward.denominator == 1
+    assert [event.result_type for event in outcome.bonus_events] == (
+        expected_bonus_types
     )

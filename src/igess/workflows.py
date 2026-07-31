@@ -122,17 +122,19 @@ class WorkflowService:
         *,
         checkpoint_input: str | Path | None = None,
         overrides: Sequence[str] = (),
+        profile_id: str | None = None,
     ) -> CommandResponse:
         """Run a manual scenario through authoring's source-consistent snapshot."""
 
         if self.authoring_service is None:
             raise ValueError("authoring scenario requires an authoring project")
-        if checkpoint_input is None and not overrides:
+        if checkpoint_input is None and not overrides and profile_id is None:
             return self.authoring_service.simulate(scenario_id)
         return self.authoring_service.simulate(
             scenario_id,
             checkpoint_input=checkpoint_input,
             overrides=overrides,
+            profile_id=profile_id,
         )
 
     def lint(self, config: str | Path, tables: str | Path) -> WorkflowResult:

@@ -1,8 +1,8 @@
 # Fish 模拟 RoadMap
 
-更新时间：2026-07-26
+更新时间：2026-07-27
 项目范围：`projects/fish` 与 Fish 领域模拟代码
-当前总状态：**Fish 专用引擎已接入 IGESS；鱼厅金钱、垃圾佬材料、鱼雷、杠铃、两类重生以及垃圾佬付费新境界突破均已进入统一生产循环。默认画像每天在线 2 小时、离线 22 小时；突破行为权重 `100`、固定 `1s`，按当前境界 `moneyRequireToNextRealm` 付费，首版仅在线推进且闭关不停产。境界价格 1～59 号严格递增、60 号为零值哨兵，分解倍率为 `1 + 1.25×(ID-1)`。系统级永久进展目标首日/首周/首月为 `10 / 20 / 40`，当前结果 `9 / 23 / 36` 全部通过 gate；24h 离线上限、临时效果、30d 正式产物压缩和超月长期策略模拟仍未完成。**
+当前总状态：**Fish 专用引擎已接入 IGESS；鱼厅金钱、垃圾佬材料、鱼雷、杠铃、两类重生以及垃圾佬付费新境界突破均已进入统一生产循环。Profile 已支持分别配置鱼厅金钱、垃圾佬材料和杠铃力量收益倍率，并可用 `model simulate --profile` 在同一场景切换免费/付费画像；默认画像每天在线 2 小时、离线 22 小时。境界价格 1～59 号严格递增、60 号为零值哨兵，分解倍率为 `1 + 1.25×(ID-1)`。系统级永久进展目标首日/首周/首月为 `10 / 20 / 40`，当前结果 `9 / 23 / 36` 全部通过 gate；24h 离线上限、临时效果、30d 正式产物压缩和超月长期策略模拟仍未完成。**
 
 ## 1. 本文档是唯一进度源
 
@@ -41,6 +41,7 @@ IGESS 只关注会改变数值体验的资源、概率、时间、产出、消�
 | Fish checkpoint codec | `[x]` | `PlayerState` 可作为 Fish `engine_state` 保存和恢复 | `FishCheckpointCodec` 及定向测试 |
 | IGESS Fish 引擎接入 | `[x]` | 领域引擎协议、派发、Luban Python 强类型表、生产 smoke、标准产物、checkpoint 恢复和 compare 已接通 | `src/igess/engines.py`、`tests/test_fish_engine.py`、生产 run `20260722T052544104476Z-smoke` |
 | FishEconomySimulator | `[~]` | 鱼厅金钱/垃圾佬材料按在线或离线模式统一结算；杠铃力量只由互斥前台 `exercise_barbell` 在线产出。加权行为循环支持每日在线窗口、离线跳跃、两类重生和任意分段恢复 | `src/igess/fish_production.py`、`src/igess/fish_session.py`、`src/igess/fish_behavior*.py`、相关测试 |
+| 玩家类型与收益 Bonus | `[x]` | Profile 可分别配置鱼厅金钱、垃圾佬材料、杠铃力量正向收益倍率；正式命令可用 `--profile` 覆盖场景画像，选择与倍率进入 manifest/event/checkpoint | `src/igess/fish_rewards.py`、`tests/test_fish_profile_rewards.py`、正式 1d runs `20260727T050603893872Z-day_1_growth` / `20260727T050607907709Z-day_1_growth` |
 | 正式经济闭环 | `[~]` | 鱼厅/金钱、废料/材料、历史境界追赶、付费新境界突破、材料→鱼厅/杠铃、金钱→鱼雷、两类重生永久倍率及离线基础结算已接通；出售和未确认离线扩展尚未闭合 | Phase 4–8 |
 | 正式调参与报告 | `[~]` | 核心强度与永久养成一等报表、24h/7d KPI 基线和第一轮双 Luck 纯价格调参已完成；长期价格验证、策略分叉、compare/gate/scan 消费仍待实现 | Phase 9 |
 
@@ -52,6 +53,7 @@ IGESS 只关注会改变数值体验的资源、概率、时间、产出、消�
 + PlayerState / checkpoint 基础已完成
 + FishEconomySimulator 已接入生产数据驱动的投掷、鱼厅金钱、废料材料、在线历史境界追赶、付费新境界突破、摸鱼厅升级、鱼雷购买/自动装备、杠铃合成/装备/主动在线锻炼、两类重生永久倍率和可选加权行为循环
 + 默认画像 `daily_online_seconds=7200`，每天在线 2 小时、离线 22 小时；`purchase_torpedo / synthesize_barbell / upgrade_fish_hall / fund_trash_man_breakthrough` 权重均为 `100`，`manual_throw / exercise_barbell` 权重均为 `1`，`upgrade_fish` 权重为 `0.1`；鱼升级仅选择最低价且要求价格严格低于当前材料 `1/10`，成功时扣除材料
++ Profile 的 `fish_hall_money / trash_material / barbell_strength` 收益倍率已进入统一结算；`default=1×`，示例 `paid_20pct=1.2×`，正式模拟可用 `--profile` 切换且不修改场景源文件
 + 两类重生均已进入生产画像，达到要求时硬优先于全部普通前台行为
 + 24h 上限、双倍领取、临时效果、30d 正式产物压缩、第 15～60 境界和 10/11 号鱼雷的超月验证尚未完成
 ```
@@ -151,6 +153,11 @@ IGESS WorkflowService
 7. 玩家画像引用的 `session_pattern.daily_online_seconds` 定义每天从模拟日
    起点开始的连续在线预算；在线预算耗尽后不再选择前台行为，直到下一模拟日。
    行为候选时长会限制在剩余在线窗口内，无法完成的行为不进入本次候选。
+8. 玩家画像的 `source_efficiency` 可包含 `fish_hall_money`、
+   `trash_material`、`barbell_strength`。三者只乘正向入账，不乘价格或消耗，
+   不改变 RNG/Luck；事件必须同时记录 base、画像倍率和最终 added。正式命令
+   `model simulate --profile PROFILE_ID` 只覆盖本次场景选择，并把选择写入
+   manifest；checkpoint 恢复仍要求相同 `profile_id`。
 
 ### 3.4 GDD 数值规则基线
 

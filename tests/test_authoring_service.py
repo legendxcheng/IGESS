@@ -347,6 +347,72 @@ def test_manual_simulate_uses_ephemeral_exports_and_is_always_formal(tmp_path: P
     assert report["scenario"]["model_digest"] == captured_digest
 
 
+def test_manual_simulate_can_override_the_scenario_player_profile(
+    tmp_path: Path,
+) -> None:
+    root = initialize_authoring_project(tmp_path / "model", "service_test")
+    service = _service(
+        root,
+        ids=[
+            "setup-1",
+            "setup-2",
+            "setup-3",
+            "setup-4",
+            "setup-5",
+        ],
+    )
+    _add_runnable_activity(service)
+    assert service.apply(
+        _change(
+            "player_profile",
+            "paid",
+            {
+                "source_efficiency": {
+                    "active": "2",
+                    "generator": "1",
+                    "offline": "1",
+                    "milestone": "1",
+                    "prestige": "1",
+                },
+                "behavior_policy": "cheap_unlock_first",
+                "session_pattern": "authoring_default",
+                "prestige_policy": "conservative",
+                "activity_weights": {"gather": "1"},
+                "luck": "1",
+            },
+        )
+    ).ok
+
+    response = service.simulate(profile_id="paid")
+
+    assert response.ok is True
+    assert response.result["profile_id"] == "paid"
+    run_dir = root / "runs" / response.result["run_id"]
+    manifest = json.loads(
+        (run_dir / "output" / "run_manifest.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert manifest["profiles"] == ["paid"]
+    assert manifest["profile_selection"] == {
+        "configured_profiles": ["default"],
+        "mode": "command_override",
+        "selected_profiles": ["paid"],
+    }
+
+
+def test_manual_simulate_rejects_unknown_profile(tmp_path: Path) -> None:
+    root = initialize_authoring_project(tmp_path / "model", "service_test")
+    service = _service(root)
+    _add_runnable_activity(service)
+
+    response = service.simulate(profile_id="missing")
+
+    assert response.ok is False
+    assert response.code == "unknown_profile"
+    assert response.details["available_profiles"] == ("default",)
+
+
 def test_eligible_no_state_change_commits_probe_and_keeps_incomplete_status(tmp_path: Path) -> None:
     root = initialize_authoring_project(tmp_path / "model", "service_test")
     initial = _service(root, ids=["setup-1", "setup-2", "setup-3", "setup-4"])

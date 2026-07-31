@@ -22,6 +22,7 @@ from .fish_behavior import (
 )
 from .fish_hall import FishHallDataAdapter
 from .fish_production import FishProductionRuntime, settle_fish_production
+from .fish_rewards import FishRewardMultipliers
 from .fish_state import PlayerState
 from .fish_trash import FishTrashDataAdapter
 from .schema import EconomyModel, TimelineRow
@@ -33,7 +34,9 @@ _COMPACT_EVENT_DETAIL_KEYS = frozenset(
         "barbell_count_before",
         "barbell_equipped_id_after_synthesis",
         "barbell_id",
+        "barbell_strength_base_added",
         "barbell_strength_added",
+        "barbell_strength_reward_multiplier",
         "barbell_strength_per_second_after_synthesis",
         "barbell_strength_per_second_before_synthesis",
         "behavior_completes_at_seconds",
@@ -49,7 +52,9 @@ _COMPACT_EVENT_DETAIL_KEYS = frozenset(
         "fish_hall_cps_delta",
         "changed_best_hall_layout",
         "is_persistent_progression",
+        "fish_hall_money_base_added",
         "fish_hall_money_added",
+        "fish_hall_money_reward_multiplier",
         "fish_hall_upgrade_level_after",
         "fish_hall_upgrade_level_before",
         "fish_hall_upgrade_price",
@@ -78,7 +83,9 @@ _COMPACT_EVENT_DETAIL_KEYS = frozenset(
         "throw_id",
         "trash_id",
         "trash_luck",
+        "trash_material_base_added",
         "trash_material_added",
+        "trash_material_reward_multiplier",
         "trash_rarity_id",
         "trash_roll_power",
         "trash_stock_count",
@@ -96,6 +103,7 @@ def display_state(
     hall_adapter: FishHallDataAdapter,
     trash_adapter: FishTrashDataAdapter,
     barbell_adapter: FishBarbellDataAdapter,
+    reward_multipliers: FishRewardMultipliers | None = None,
 ) -> PlayerState:
     if state.production.last_settled_at >= time_seconds:
         return state
@@ -110,6 +118,7 @@ def display_state(
         barbell_training_active=(
             online and active_behavior_id == EXERCISE_BARBELL_BEHAVIOR_ID
         ),
+        reward_multipliers=reward_multipliers,
     ).state
 
 
@@ -176,6 +185,9 @@ def timeline_row(
     hall_adapter: FishHallDataAdapter,
 ) -> TimelineRow:
     hall = hall_adapter.snapshot(state)
+    reward_multipliers = FishRewardMultipliers.from_profile(
+        model.player_profiles[profile_id]
+    )
     return TimelineRow(
         scenario_id=scenario_id,
         profile_id=profile_id,
@@ -189,7 +201,10 @@ def timeline_row(
             generator_id: 0 for generator_id in model.generators
         },
         upgrades_purchased=[],
-        total_cps=hall.total_income_per_second.to_decimal_string(),
+        total_cps=(
+            hall.total_income_per_second
+            * reward_multipliers.fish_hall_money
+        ).to_decimal_string(),
     )
 
 

@@ -8,7 +8,14 @@ exports by hand.
 
 Fish 的经济建模、RNG、玩家存档、专用模拟器接入与正式调参进度统一记录在 [RoadMap.md](RoadMap.md)。该文件是唯一进度源。
 
-Fish 正式数值的唯一权威生产快照是 `E:\fish-oasis\igess_export`。正式表通过其中的 `python\schema.py` 加载同快照的 `json`；IGESS 只消费生成后的强类型表对象，并记录 JSON 与生成加载器哈希，不在本项目中维护手写业务字段解析器；机制测试可使用显式 fixture provider。
+Fish 正式数值的唯一权威生产快照是 `E:\fish-oasis\igess_export`。项目通过
+`production_snapshot` 这个项目内固定入口链接整份快照；正式表使用
+`production_snapshot\python\schema.py` 加载同快照的
+`production_snapshot\json`。不要分别链接两处，以免 JSON 与生成类型来自不同次
+导表。首次设置或生产目录变化后运行 `.\link-production-snapshot.ps1`。
+软链接本身不提交；制作发布版时应在同一相对路径放入一份带哈希的冻结快照。
+IGESS 只消费生成后的强类型表对象，并记录 JSON 与生成加载器哈希，不在本项目中
+维护手写业务字段解析器；机制测试可使用显式 fixture provider。
 
 当前 `smoke` 会从生产 `tbtorpedo` 第一行初始化新档鱼雷，并用
 `engine.active_throw.initial_strength` 初始化 `PlayerState` 力量。生产
@@ -112,7 +119,17 @@ FishLuck、TrashLuck 的当前值、历史峰值、变化速度、重生标记�
 效果。捕获只有在事件记录的最佳鱼厅 CPS 确实提高时才计入。静态 HTML 会显示
 双 Luck/Strength 曲线、永久进展触发密度、归一化变化幅度和事件明细。最新
 24h/7d 报表基线与结论见
-[`reports/trash-man-breakthrough-balance.md`](reports/trash-man-breakthrough-balance.md)；
+[`reports/trash-man-breakthrough-balance.md`](reports/trash-man-breakthrough-balance.md)。
+
+玩家画像还可以通过 `source_efficiency` 配置三类 Fish 正向收益倍率：
+`fish_hall_money`（鱼厅金钱）、`trash_material`（垃圾佬材料）和
+`barbell_strength`（杠铃训练力量）。倍率只作用于实际入账收益，不修改生产表、
+价格、资源消耗、掉落概率、FishLuck 或 TrashLuck；离线 `50%`、重生等系统倍率
+仍先按原规则计算，再与画像收益倍率相乘。每次结算事件同时记录 base、画像倍率
+和最终 added，run manifest 也保存各画像倍率。`default` 保持三项 `1×`，
+`paid_20pct` 是三项均为 `1.2×` 的明确模拟画像；可以复制该画像并分别调整三项，
+表达不同付费层级或权益组合。
+
 调价前报表基线保留在
 [`reports/progression-report-baseline.md`](reports/progression-report-baseline.md)。
 包含 FishLuck 机会成本的完整反事实经济回本仍需 Phase 9 的同 RNG 禁用重生分叉，
@@ -136,7 +153,12 @@ igess model simulate --project . --scenario smoke
 igess model simulate --project projects/fish --scenario day_1_growth
 igess model simulate --project projects/fish --scenario week_1_growth
 igess model simulate --project projects/fish --scenario month_1_growth
+igess model simulate --project projects/fish --scenario week_1_growth --profile default
+igess model simulate --project projects/fish --scenario week_1_growth --profile paid_20pct
 ```
+
+`--profile` 只覆盖本次运行选择，不修改场景 YAML；所选画像会写入 manifest、
+timeline、events 和 checkpoint。恢复 checkpoint 时仍要求画像一致。
 
 ### 无 Agent 快速报表循环
 
@@ -147,7 +169,7 @@ igess model simulate --project projects/fish --scenario month_1_growth
 ```
 
 监听器会立即运行默认的 `week_1_growth`，在默认浏览器打开一个固定的实时报表页，
-并监听本项目配置/工作簿以及 `E:\fish-oasis\igess_export` 的生产 JSON 与
+并监听本项目配置/工作簿以及 `production_snapshot` 指向的生产 JSON 与
 `python\schema.py`。设计师修改并导出生产表后，输入稳定 1 秒即自动通过正式
 `WorkflowService` 重跑；同一个浏览器页会切换到最新验证成功的报表。失败不会
 覆盖上一份成功报表，错误会显示在页顶。按 `Ctrl+C` 停止。

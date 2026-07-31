@@ -13,6 +13,7 @@ from .fish_data import (
     GeneratedLubanProvider,
 )
 from .fish_behavior_weights import ManualThrowRefillRule
+from .fish_rewards import FishRewardMultipliers
 from .fish_simulator import FishEconomySimulator
 from .fish_state import FishCheckpointCodec
 from .fish_throw_data import ProductionThrowConfig
@@ -223,6 +224,11 @@ class FishEngineAdapter:
                 },
                 "target_policies": dict(
                     sorted(profile.behavior_target_policies.items())
+                ),
+                "reward_multipliers": (
+                    FishRewardMultipliers.from_profile(
+                        profile
+                    ).manifest_parameters()
                 ),
                 "session_pattern": profile.session_pattern,
                 "session": dict(

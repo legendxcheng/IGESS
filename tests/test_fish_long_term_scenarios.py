@@ -43,7 +43,7 @@ def test_production_growth_scenarios_cover_day_week_and_month() -> None:
     profile = rules.player_profiles["default"]
     assert profile.behavior_weights[
         FUND_TRASH_MAN_BREAKTHROUGH_BEHAVIOR_ID
-    ] == SimNumber.parse(100)
+    ] == SimNumber.parse("1e100")
     assert profile.behavior_durations[
         FUND_TRASH_MAN_BREAKTHROUGH_BEHAVIOR_ID
     ] == {"type": "fixed", "seconds": 10}

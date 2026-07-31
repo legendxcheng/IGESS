@@ -145,6 +145,13 @@ def add_model_parser(subparsers: argparse._SubParsersAction) -> argparse.Argumen
         help="Scenario identifier to simulate.",
     )
     simulate.add_argument(
+        "--profile",
+        help=(
+            "Optional player profile override; runs only that profile without "
+            "editing the scenario."
+        ),
+    )
+    simulate.add_argument(
         "--checkpoint-in",
         help="Optional engine checkpoint to resume from.",
     )
@@ -221,6 +228,7 @@ def dispatch_model(args: argparse.Namespace) -> int:
             args.scenario,
             checkpoint_input=args.checkpoint_in,
             overrides=args.override,
+            profile_id=args.profile,
         )
     elif command == "watch":
         return run_live_report(

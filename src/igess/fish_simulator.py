@@ -16,6 +16,7 @@ from .fish_production import (
     FishProductionRuntime,
     settle_fish_production,
 )
+from .fish_rewards import FishRewardMultipliers
 from .fish_state import FishCheckpointCodec, PlayerState
 from .fish_trash import FishTrashDataAdapter
 from .fish_throw_data import (
@@ -98,6 +99,7 @@ class FishEconomySimulator:
             raise ValueError("Phase-0 Fish scenarios require exactly one profile")
         profile_id = scenario.profiles[0]
         profile = self.model.player_profiles[profile_id]
+        reward_multipliers = FishRewardMultipliers.from_profile(profile)
         if profile.behavior_weights:
             result, behavior_checkpoint = FishBehaviorSimulator(
                 self.model,
@@ -207,6 +209,12 @@ class FishEconomySimulator:
                     "model_digest": self.model_digest,
                     "production_data": str(self.data.production_data).lower(),
                     "table_count": str(len(self.data.files)),
+                    **{
+                        f"reward_multiplier_{source_id}": value
+                        for source_id, value in (
+                            reward_multipliers.manifest_parameters().items()
+                        )
+                    },
                 },
             )
         ]
@@ -248,6 +256,7 @@ class FishEconomySimulator:
                     trash_adapter=self.trash_adapter,
                     barbell_adapter=self.barbell_adapter,
                     runtime=production_runtime,
+                    reward_multipliers=reward_multipliers,
                 )
                 state = settlement.state
                 production_runtime = settlement.runtime
@@ -321,6 +330,7 @@ class FishEconomySimulator:
                         trash_adapter=self.trash_adapter,
                         barbell_adapter=self.barbell_adapter,
                         runtime=production_runtime,
+                        reward_multipliers=reward_multipliers,
                     ).state
                 timeline.append(
                     self._timeline_row(
@@ -405,13 +415,15 @@ class FishEconomySimulator:
         time_seconds: int,
         state: PlayerState,
     ) -> TimelineRow:
-        total_cps = (
-            "0"
-            if self.fish_hall_adapter is None
-            else self.fish_hall_adapter.snapshot(
-                state
-            ).total_income_per_second.to_decimal_string()
+        reward_multipliers = FishRewardMultipliers.from_profile(
+            self.model.player_profiles[profile_id]
         )
+        total_cps = "0"
+        if self.fish_hall_adapter is not None:
+            total_cps = (
+                self.fish_hall_adapter.snapshot(state).total_income_per_second
+                * reward_multipliers.fish_hall_money
+            ).to_decimal_string()
         return TimelineRow(
             scenario_id=scenario_id,
             profile_id=profile_id,

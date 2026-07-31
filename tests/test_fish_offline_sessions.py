@@ -57,7 +57,7 @@ def test_default_profile_prioritizes_growth_in_two_hour_session() -> None:
     )
     assert (
         profile.behavior_weights[PURCHASE_TORPEDO_BEHAVIOR_ID]
-        == SimNumber.parse(100)
+        == SimNumber.parse("1e100")
     )
     assert (
         profile.behavior_weights[UPGRADE_FISH_BEHAVIOR_ID]
@@ -82,7 +82,7 @@ def test_default_profile_prioritizes_growth_in_two_hour_session() -> None:
         STRENGTH_REBIRTH_BEHAVIOR_ID,
         TRASH_MAN_REBIRTH_BEHAVIOR_ID,
     ):
-        assert profile.behavior_weights[rebirth_id] == SimNumber.one()
+        assert profile.behavior_weights[rebirth_id] == SimNumber.parse("1e100")
     assert profile.behavior_target_policies[
         UPGRADE_FISH_BEHAVIOR_ID
     ] == CHEAPEST_BELOW_MATERIAL_TENTH_POLICY_ID

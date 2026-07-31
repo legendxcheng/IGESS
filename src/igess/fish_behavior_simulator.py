@@ -34,6 +34,7 @@ from .fish_production import (
     FishProductionRuntime,
     settle_fish_production,
 )
+from .fish_rewards import FishRewardMultipliers
 from .fish_state import FishCheckpointCodec, PlayerState
 from .fish_trash import FishTrashDataAdapter
 from .fish_throw_data import (
@@ -106,6 +107,7 @@ class FishBehaviorSimulator:
         )
         profile_id = scenario.profiles[0]
         profile = self.model.player_profiles[profile_id]
+        reward_multipliers = FishRewardMultipliers.from_profile(profile)
         behavior_profile = self.adapter.behavior_profile(profile)
         session_schedule = FishDailySessionSchedule.from_mapping(
             self.model.session_patterns[profile.session_pattern]
@@ -201,6 +203,7 @@ class FishBehaviorSimulator:
                     hall_adapter=self.hall_adapter,
                     trash_adapter=self.trash_adapter,
                     barbell_adapter=self.barbell_adapter,
+                    reward_multipliers=reward_multipliers,
                 ),
                 model=self.model,
                 hall_adapter=self.hall_adapter,
@@ -235,6 +238,12 @@ class FishBehaviorSimulator:
                         self.data.production_data
                     ).lower(),
                     "table_count": str(len(self.data.files)),
+                    **{
+                        f"reward_multiplier_{source_id}": value
+                        for source_id, value in (
+                            reward_multipliers.manifest_parameters().items()
+                        )
+                    },
                 },
             )
         ]
@@ -289,6 +298,7 @@ class FishBehaviorSimulator:
                         barbell_adapter=self.barbell_adapter,
                         runtime=production_runtime,
                         online=False,
+                        reward_multipliers=reward_multipliers,
                     )
                     state = settlement.state
                     production_runtime = settlement.runtime
@@ -345,6 +355,7 @@ class FishBehaviorSimulator:
                                 hall_adapter=self.hall_adapter,
                                 trash_adapter=self.trash_adapter,
                                 barbell_adapter=self.barbell_adapter,
+                                reward_multipliers=reward_multipliers,
                             ),
                             model=self.model,
                             hall_adapter=self.hall_adapter,
@@ -439,6 +450,7 @@ class FishBehaviorSimulator:
                     root_random_seed=root_random_seed,
                     next_throw_id=next_throw_id,
                     production_runtime=production_runtime,
+                    reward_multipliers=reward_multipliers,
                     _mutate=self._mutate_state,
                 )
                 state = completion.state
@@ -522,6 +534,7 @@ class FishBehaviorSimulator:
                             hall_adapter=self.hall_adapter,
                             trash_adapter=self.trash_adapter,
                             barbell_adapter=self.barbell_adapter,
+                            reward_multipliers=reward_multipliers,
                         ),
                         model=self.model,
                         hall_adapter=self.hall_adapter,
@@ -549,6 +562,7 @@ class FishBehaviorSimulator:
                     and runtime.active.behavior_id
                     == EXERCISE_BARBELL_BEHAVIOR_ID
                 ),
+                reward_multipliers=reward_multipliers,
             )
             state = final_settlement.state
             production_runtime = final_settlement.runtime
