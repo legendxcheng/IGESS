@@ -1,8 +1,25 @@
 # Fish 模拟 RoadMap
 
-更新时间：2026-07-27
+更新时间：2026-08-02
 项目范围：`projects/fish` 与 Fish 领域模拟代码
-当前总状态：**Fish 专用引擎已接入 IGESS；鱼厅金钱、垃圾佬材料、鱼雷、杠铃、两类重生以及垃圾佬付费新境界突破均已进入统一生产循环。Profile 已支持分别配置鱼厅金钱、垃圾佬材料和杠铃力量收益倍率，并可用 `model simulate --profile` 在同一场景切换免费/付费画像；默认画像每天在线 2 小时、离线 22 小时。境界价格 1～59 号严格递增、60 号为零值哨兵，分解倍率为 `1 + 1.25×(ID-1)`。系统级永久进展目标首日/首周/首月为 `10 / 20 / 40`，当前结果 `9 / 23 / 36` 全部通过 gate；24h 离线上限、临时效果、30d 正式产物压缩和超月长期策略模拟仍未完成。**
+当前总状态：**Fish 专用引擎已接入 IGESS；2026-08-02 新经济模型已迁入统一生产循环：杠铃消耗金钱，鱼雷与垃圾佬新境界突破消耗材料；力量重生提高垃圾加工材料产出，垃圾佬转世提高摸鱼厅金钱产出。历史境界追赶与已资助突破只按在线墙钟推进，离线暂停且加工不停。正式 1 天运行已通过；旧版 `9 / 23 / 36` gate 结果属于旧字段和旧资源流，不再作为当前模型结论，7 天与 30 天数值基线仍需重新建立。**
+
+## 0. 2026-08-02 经济模型迁移
+
+- 权威生产快照为 `E:\fish-oasis\igess_export\json` 与同批次
+  `python\schema.py`。当前生成契约使用
+  `TrashManRealm.breakthroughSecondsToNextRealm`；IGESS 严格读取该字段，
+  不对旧字段做静默兼容。
+- 资源流已改为：鱼升级/鱼厅升级/鱼雷/境界突破消耗材料，杠铃消耗金钱。
+  突破材料只在显式资助命令开始时扣一次，状态机不保存“境界材料进度”。
+- 永久倍率已改为：`StrengthRebirth.materialOutputMultiplier` 作用于垃圾加工；
+  `TrashManRebirth.fishHallOutputMultiplier` 作用于摸鱼厅收入。
+- 突破命令保留三种画像策略：`immediate`、`weighted_delay`、
+  `preserve_material`。生产默认采用 `immediate`；状态机本身不自动资助。
+- 新正式 1 天运行：`20260802T021144403218Z-day_1_growth`，模型摘要
+  `sha256:82d5b37fd2ce1573ad45425b1722d57420c0bf9af835d23c303aaaa3350b6301`。
+  期末境界 4、杠铃 6、鱼雷 3、力量重生 3 次、垃圾佬转世 2 次。
+  与旧运行的差异同时包含生产表和模拟语义变化，不作单字段归因。
 
 ## 1. 本文档是唯一进度源
 
@@ -42,8 +59,8 @@ IGESS 只关注会改变数值体验的资源、概率、时间、产出、消�
 | IGESS Fish 引擎接入 | `[x]` | 领域引擎协议、派发、Luban Python 强类型表、生产 smoke、标准产物、checkpoint 恢复和 compare 已接通 | `src/igess/engines.py`、`tests/test_fish_engine.py`、生产 run `20260722T052544104476Z-smoke` |
 | FishEconomySimulator | `[~]` | 鱼厅金钱/垃圾佬材料按在线或离线模式统一结算；杠铃力量只由互斥前台 `exercise_barbell` 在线产出。加权行为循环支持每日在线窗口、离线跳跃、两类重生和任意分段恢复 | `src/igess/fish_production.py`、`src/igess/fish_session.py`、`src/igess/fish_behavior*.py`、相关测试 |
 | 玩家类型与收益 Bonus | `[x]` | Profile 可分别配置鱼厅金钱、垃圾佬材料、杠铃力量正向收益倍率；正式命令可用 `--profile` 覆盖场景画像，选择与倍率进入 manifest/event/checkpoint | `src/igess/fish_rewards.py`、`tests/test_fish_profile_rewards.py`、正式 1d runs `20260727T050603893872Z-day_1_growth` / `20260727T050607907709Z-day_1_growth` |
-| 正式经济闭环 | `[~]` | 鱼厅/金钱、废料/材料、历史境界追赶、付费新境界突破、材料→鱼厅/杠铃、金钱→鱼雷、两类重生永久倍率及离线基础结算已接通；出售和未确认离线扩展尚未闭合 | Phase 4–8 |
-| 正式调参与报告 | `[~]` | 核心强度与永久养成一等报表、24h/7d KPI 基线和第一轮双 Luck 纯价格调参已完成；长期价格验证、策略分叉、compare/gate/scan 消费仍待实现 | Phase 9 |
+| 正式经济闭环 | `[~]` | 鱼厅/金钱、废料/材料、历史境界追赶、材料突破、材料→鱼/鱼厅/鱼雷、金钱→杠铃、两类新语义永久倍率及离线基础结算已接通；出售和未确认离线扩展尚未闭合 | Phase 4–8 |
+| 正式调参与报告 | `[~]` | 核心强度与永久养成一等报表和当前模型 24h 基线已完成；旧 7d/30d KPI 与双 Luck 调参仅作历史对照，当前长期基线、compare/gate/scan 消费仍待实现 | Phase 9 |
 
 当前不能把项目描述成“完整 Fish 经济模拟器”。准确口径是：
 
@@ -52,7 +69,7 @@ IGESS 只关注会改变数值体验的资源、概率、时间、产出、消�
 + RNG 一期基线已验证
 + PlayerState / checkpoint 基础已完成
 + FishEconomySimulator 已接入生产数据驱动的投掷、鱼厅金钱、废料材料、在线历史境界追赶、付费新境界突破、摸鱼厅升级、鱼雷购买/自动装备、杠铃合成/装备/主动在线锻炼、两类重生永久倍率和可选加权行为循环
-+ 默认画像 `daily_online_seconds=7200`，每天在线 2 小时、离线 22 小时；`purchase_torpedo / synthesize_barbell / upgrade_fish_hall / fund_trash_man_breakthrough` 权重均为 `100`，`manual_throw / exercise_barbell` 权重均为 `1`，`upgrade_fish` 权重为 `0.1`；鱼升级仅选择最低价且要求价格严格低于当前材料 `1/10`，成功时扣除材料
++ 默认画像 `daily_online_seconds=7200`，每天在线 2 小时、离线 22 小时；`purchase_torpedo / strength_rebirth / trash_man_rebirth / fund_trash_man_breakthrough` 配置为可执行时近似硬优先级，突破另由 `immediate` 策略明确抢占普通候选；`synthesize_barbell / upgrade_fish_hall` 权重为 `100`，`manual_throw / exercise_barbell` 权重为 `1`，`upgrade_fish` 权重为 `0.1`；鱼升级仅选择最低价且要求价格严格低于当前材料 `1/10`，成功时扣除材料
 + Profile 的 `fish_hall_money / trash_material / barbell_strength` 收益倍率已进入统一结算；`default=1×`，示例 `paid_20pct=1.2×`，正式模拟可用 `--profile` 切换且不修改场景源文件
 + 两类重生均已进入生产画像，达到要求时硬优先于全部普通前台行为
 + 24h 上限、双倍领取、临时效果、30d 正式产物压缩、第 15～60 境界和 10/11 号鱼雷的超月验证尚未完成
@@ -136,7 +153,7 @@ IGESS WorkflowService
    `cheapest_below_material_tenth`：从全部未满级鱼中取升级价格最低项，同价按
    `instanceId` 升序决胜；仅当该价格严格低于当前 `wallet.material / 10` 时
    才可选。鱼升级价格从材料余额扣除。杠铃合成使用
-   `random_affordable`，目标池只包含当前未拥有且材料可支付的 ID，避免重复
+   `random_affordable`，目标池只包含当前未拥有且金钱可支付的 ID，避免重复
    合成不提高产出的库存副本。相应行为权重大于零时必须明确配置目标策略。
    生产 `default` 画像为高优先级 `synthesize_barbell` 和
    `upgrade_fish_hall` 配置权重 `100`，为 `manual_throw` 和
@@ -238,17 +255,17 @@ FinalFishLuck = FishLuck × 2^BonusDoubleCount
 
 #### 3.4.6 经济、升级与持续产出
 
-1. 摸鱼厅基础每秒金钱为所有上阵鱼产出的和；鱼变异收入倍率作用于对应鱼，力量重生倍率作用于摸鱼厅整体产出，即 `摸鱼厅秒产出=sum(上阵鱼秒产出)×力量重生总倍率`。容量只限制求和项数量，不额外作为乘数。模拟不保留手动编队策略：每次鱼库存或单鱼收益变化后，按当前单鱼每秒收益降序取容量内前 `N` 条自动上阵，其余留在背包；同收益按 `instanceId` 升序稳定决胜，并按该顺序占用 `hallSlot=1..N`。
+1. 摸鱼厅基础每秒金钱为所有上阵鱼产出的和；鱼变异收入倍率作用于对应鱼，垃圾佬转世倍率作用于摸鱼厅整体产出，即 `摸鱼厅秒产出=sum(上阵鱼秒产出)×垃圾佬转世鱼厅总倍率`。容量只限制求和项数量，不额外作为乘数。模拟不保留手动编队策略：每次鱼库存或单鱼收益变化后，按当前单鱼每秒收益降序取容量内前 `N` 条自动上阵，其余留在背包；同收益按 `instanceId` 升序稳定决胜，并按该顺序占用 `hallSlot=1..N`。
 2. 鱼等级从 `1` 开始，最高 `100` 级。当前等级为 `n` 时，单鱼升级前的固有秒产出为 `B×变异倍率×1.25^(n-1)`。从 `n` 升到 `n+1` 的材料价格为 `B×变异倍率×1.5^(n-1)`；变异倍率属于鱼实例的 `P0`，因此高价值变异鱼的升级价格与自身收益保持同档增长。价格、产出和材料扣款统一使用 BigNumber，不额外做整数取整。
 3. 摸鱼厅容量读取 `FishHallUpgrade.slotQty`；当前 JSON 有 `21` 行，容量从 `10` 到 `30`，升级消耗材料。模拟采用顺序映射：`upgradeLevel=0` 读取第一行，等级 `n` 读取第 `n+1` 行；从 `n` 升到 `n+1` 消耗当前第 `n+1` 行的 `upgradePrice`。只有存在下一行时才能升级；最后一行容量 `30`、`upgradePrice=0` 是满级哨兵，不是免费升级。升级命令先按旧容量结算后台生产，再原子扣材料、提升等级和 revision；随后按 IGESS 已锁定的 `fixed_max_income` 模拟策略重排阵容。若后续配置增加显式等级字段，再替换顺序映射。
-4. 杠铃消耗材料，当前 `tbbarbell` 有 `15` 档，`strengthPerExercise` 从 `2` 到 `5,000,000`，生产行的 `timeCost` 当前均为 `1` 秒；主动锻炼的在线力量速度为 `strengthPerExercise / timeCost`。已装备杠铃本身不属于后台产出，只有当前互斥前台行为为 `exercise_barbell` 时才按 `equippedId` 产出力量，库存 `count` 不作为倍率；炸鱼、升级、合成、重生和 idle 期间均不产出力量。合成原子扣材料、增加一件库存和 revision，并按固定 `highest_strength_per_second` 策略自动装备当前速度最高的已拥有杠铃；显式换装命令只允许选择已拥有 ID。离线力量固定为 `0`。
-5. 鱼雷消耗金钱并提升废料 Luck；当前 `Torpedo` 表有 `25` 行、power 从
+4. 杠铃消耗金钱，当前 `tbbarbell` 有 `15` 档，`strengthPerExercise` 从 `2` 到 `5,000,000`，生产行的 `timeCost` 当前均为 `1` 秒；主动锻炼的在线力量速度为 `strengthPerExercise / timeCost`。已装备杠铃本身不属于后台产出，只有当前互斥前台行为为 `exercise_barbell` 时才按 `equippedId` 产出力量，库存 `count` 不作为倍率；炸鱼、升级、合成、重生和 idle 期间均不产出力量。合成原子扣金钱、增加一件库存和 revision，并按固定 `highest_strength_per_second` 策略自动装备当前速度最高的已拥有杠铃；显式换装命令只允许选择已拥有 ID。离线力量固定为 `0`。
+5. 鱼雷消耗材料并提升废料 Luck；当前 `Torpedo` 表有 `25` 行、power 从
    `50` 到 `30B`，`price` 由同表提供。购买只检查未拥有、比当前装备强和
-   金钱可支付，不读取当前力量或历史最高力量；成功后自动装备。生产画像采用
+   材料可支付，不读取当前力量或历史最高力量；成功后自动装备。生产画像采用
    `highest_affordable`，成长时点完全由价格控制。
-6. 废料当前 `39` 行，全部 `baseDecomposeSeconds = 300`；材料基础速度从 `2/s` 到 `10M/s`。Phase 5 v1 将其解释为基础工作量与每单位基础工作材料：每真实秒推进 `decomposeSpeedMultiplier` 单位工作，材料为 `baseMaterialPerSecond × 已消费工作量 × 转世产出倍率`。因此加速缩短耗时但不减少同一废料的基础总材料。
-7. 垃圾佬境界当前 `60` 档，`decomposeSpeedMultiplier = 1 + 1.25×(ID-1)`，从 `1` 到 `74.75`；修炼时间字段从 `0s` 到 `36310s`。`moneyRequireToNextRealm` 的 1～59 号为严格递增正价，60 号为 `0` 满档哨兵。
-8. 当 `realmId < highestRealmId` 且没有进行中的突破时，在线时间免费追赶至历史最高境界；达到历史最高境界后，`fund_trash_man_breakthrough` 按当前行价格扣金钱并创建目标为下一表行的突破。突破只累计在线时间，离线暂停；跨境界统一结算先按旧速度加工到完成边界，再更新当前/历史最高境界并启用新速度。闭关期间废料加工持续进行。
+6. 废料当前 `39` 行，全部 `baseDecomposeSeconds = 300`；材料基础速度从 `2/s` 到 `10M/s`。Phase 5 v1 将其解释为基础工作量与每单位基础工作材料：每真实秒推进 `decomposeSpeedMultiplier` 单位工作，材料为 `baseMaterialPerSecond × 已消费工作量 × 力量重生材料总倍率`。因此加速缩短耗时但不减少同一废料的基础总材料。
+7. 垃圾佬境界当前 `60` 档，`decomposeSpeedMultiplier = 1 + 1.25×(ID-1)`，从 `1` 到 `74.75`；当前正式生成契约的推进字段为 `breakthroughSecondsToNextRealm`，从 `0s` 到 `36310s`。`materialRequireToNextRealm` 的 1～59 号为严格递增正价，60 号为 `0` 满档哨兵。
+8. 当 `realmId < highestRealmId` 且没有进行中的突破时，在线墙钟免费追赶至历史最高境界；达到历史最高境界后，显式 `fund_trash_man_breakthrough` 命令按当前行价格一次性扣材料并创建目标为下一表行的突破。突破只累计未缩放在线墙钟，离线暂停；奖励倍率不改变推进秒数。跨境界统一结算先按旧速度加工到完成边界，再更新当前/历史最高境界并启用新速度，闭关期间废料加工持续进行。立即突破、延迟突破和保留材料属于玩家画像策略，不属于状态机自动行为。
 9. 资源变化必须先结算到当前服务端时间，再原子执行消费/换装/升级，成功后 `meta.revision += 1`。
 
 #### 3.4.7 重生规则
@@ -259,18 +276,18 @@ FinalFishLuck = FishLuck × 2^BonusDoubleCount
 
 - 力量重生 `completedCount=0` 时使用不在表内的默认 `1×`；生产
   `tbstrengthrebirth` 为一基 ID `1..10`，完成第 `n` 次后使用 `id=n`
-  的摸鱼厅总倍率。下一次重生读取 `id=completedCount+1` 的力量门槛；
+  的垃圾加工材料总倍率。下一次重生读取 `id=completedCount+1` 的力量门槛；
   共 `10` 档，门槛 `10^3` 到 `10^12`，总倍率 `2×` 到 `11×`。
 - 力量重生命令先按旧倍率结算全部后台生产到命令时刻，再原子把
   `wallet.strength` 归零、将 `strengthCompletedCount` 增加到目标表 ID、
   增加 revision 并立即启用新总倍率；其他数值状态全部保留。
-- 垃圾佬转世 `completedCount=0` 时使用不在表内的默认 `1×`；2026-07-24
+- 垃圾佬转世 `completedCount=0` 时使用不在表内的默认 `1×`；当前
   权威导出 `tbtrashmanrebirth` 为一基 ID `1..10`，完成第 `n` 次后使用
-  `id=n` 的材料总倍率，下一次读取 `id=completedCount+1`。表内境界门槛
-  `0,4,8,...,36` 按 `current realmId >= realmRequirement` 校验，材料总倍率
+  `id=n` 的摸鱼厅金钱总倍率，下一次读取 `id=completedCount+1`。表内境界门槛
+  `0,4,8,...,36` 按 `current realmId >= realmRequirement` 校验，鱼厅总倍率
   `2×` 到 `11×`；首行 `id=1 / realmRequirement=0` 表示第一次转世。
 - 垃圾佬转世命令先按旧倍率结算全部后台生产到命令时刻，再原子重置当前境界和
-  本境界修炼进度、增加转世次数与 revision，并立即启用新材料总倍率；进行中的
+  本境界修炼进度、增加转世次数与 revision，并立即启用新鱼厅总倍率；进行中的
   突破期间不可转世，历史最高境界及其他数值状态保留。
 - 垃圾佬转世后仅在线自动修炼至历史最高境界；超过历史最高境界后才重新需要资助突破。
 - 自动修炼和闭关期间仍按当前境界处理废料并产出材料。
@@ -298,7 +315,7 @@ FinalFishLuck = FishLuck × 2^BonusDoubleCount
 - `[x]` `strengthUpperBound` 是当前区域的包含性右端点；相邻行 Luck 不连续时按权威 JSON 原样保留跳变。
 - `[x]` 当前 `tbfish` 121/121 行均已有唯一正式 `Denominator`；已确认 `Fish.xlsx`/`tbfish` 全表就是所有可用鱼，正式结算使用全表门槛池。
 - `[x]` 当前 `tbtrash` 39/39 行均已有唯一正式 `Denominator`；已确认物品级门槛正式取代旧的稀有度池内权重随机，`05-核心随机算法.md` 已同步。
-- `[x]` `tbtorpedo.price` 已进入生产强类型表适配和“金钱→鱼雷”闭环；
+- `[x]` `tbtorpedo.price` 已进入生产强类型表适配和“材料→鱼雷”闭环；
   2～11 号价格已按双 Luck 峰值同步目标完成首轮平衡，且明确不增加力量门槛。
 - `[x]` `TrashRandomPool.powerUpperBound` 是当前鱼雷 power 区域的包含性右端点；TrashLuck 正式使用与 FishLuck 相同的对数进度 + smoothstep 区间插值并保留跨行跳变；表现层下探深度不进入经济结算。
 - `[x]` 新档初始拥有并选中 `tbtorpedo` 第一行鱼雷；具体 ID 从生成表第一行读取，不在存档工厂中硬编码。
@@ -307,8 +324,8 @@ FinalFishLuck = FishLuck × 2^BonusDoubleCount
 - `[x]` 鱼升级规则已确认：等级 `1..100`；等级 `n` 产出为 `B×变异倍率×1.25^(n-1)`，从 `n` 升到 `n+1` 的价格为 `B×变异倍率×1.5^(n-1)`，统一使用 BigNumber。
 - `[x]` 生产 `tbbarbell.timeCost` 已给出每次锻炼秒数，当前 15 行均为 `1`；在线速度按 `strengthPerExercise/timeCost`，只有互斥前台 `exercise_barbell` 使用已装备杠铃产出且库存数量不放大，离线力量为 `0`。
 - `[x]` 已于 2026-07-23 确认力量重生表是一基 ID：`completedCount=0` 为表外默认 `1×`；完成第 `n` 次后使用 `tbstrengthrebirth.id=n`，下一次门槛读取 `id=completedCount+1`。
-- `[x]` Phase 5 v1 已采用固定工作量公式并用 BigNumber 结算材料；`0` 次转世为表外 `1×`，第 `n>=1` 次转世读取一基 `tbtrashmanrebirth.id=n`。
-- `[x]` 垃圾佬新境界突破读取当前行 `moneyRequireToNextRealm` 作为价格、当前行 `cultivationSecondsToNextRealm` 作为在线闭关时长；转世后的历史境界追赶免费，历史最高境界以上必须重新付费，闭关期间继续按旧境界加工。
+- `[x]` Phase 5 v1 已采用固定工作量公式并用 BigNumber 结算材料；`0` 次力量重生为表外 `1×`，第 `n>=1` 次读取一基 `tbstrengthrebirth.id=n` 的 `materialOutputMultiplier`。
+- `[x]` 垃圾佬新境界突破读取当前行 `materialRequireToNextRealm` 作为价格、当前生成契约的 `breakthroughSecondsToNextRealm` 作为在线闭关时长；转世后的历史境界追赶免费，历史最高境界以上必须重新支付材料，闭关期间继续按旧境界加工。
 - `[x]` 已于 2026-07-24 确认新版 `tbtrashmanrebirth` 为一基 ID：`id=1` 表示第一次转世，初始转世次数为 `0`；首行 `realmRequirement=0` 按权威表原值校验。
 - `[x]` 已于 2026-07-23 确认摸鱼厅顺序映射：当前 `upgradeLevel` 使用当前行价格升级到下一行；最后一行 `upgradePrice=0` 是满级哨兵，不允许免费升级。
 - `[x]` 已于 2026-07-25 确认“全部永久进展”的阶段性频率目标。间隔统一按
@@ -423,7 +440,7 @@ Phase 2 的纯结算到此完成。`ThrowOutcome` 已通过独立领域命令原
 - `[x]` `TimeEngine` 已提供 `(start, end]` 绝对周期事件边界，鱼厅、废料加工、历史境界追赶和付费突破完成均按解析边界结算。
 - `[~]` 加权模式按“当前在线模式的后台金钱/材料与当前前台锻炼力量结算→境界突破完成→前台行为完成→会话边界→timeline 采样→选择下一行为”稳定排序；buff 等新增领域事件优先级仍待定义。
 - `[x]` 通用 `BehaviorScheduler` 已实现玩家级权重、固定/整数均匀时长、可用性过滤、目标选择、`idle` 和三路稳定 RNG。
-- `[x]` Fish 已接入 `manual_throw / upgrade_fish / upgrade_fish_hall / purchase_torpedo / synthesize_barbell / exercise_barbell / fund_trash_man_breakthrough / strength_rebirth / trash_man_rebirth / idle`；付费突破与鱼雷/杠铃/鱼厅同为权重 `100`、固定 `1s` 的普通高优先级候选，两类重生达到门槛时仍硬优先于全部普通行为。
+- `[x]` Fish 已接入 `manual_throw / upgrade_fish / upgrade_fish_hall / purchase_torpedo / synthesize_barbell / exercise_barbell / fund_trash_man_breakthrough / strength_rebirth / trash_man_rebirth / idle`；突破是显式命令，生产 `immediate` 策略在可支付时只保留该候选，另有 `weighted_delay / preserve_material` 两种策略；两类重生达到门槛时仍硬优先于全部普通行为。
 - `[~]` 已支持废料加工、历史境界在线追赶和付费新境界突破；buff 过期事件尚未实现。
 - `[x]` 旧主动投掷模式支持事件边界 checkpoint；加权行为模式可在行为中间 checkpoint，恢复时继续已保存行为而不重抽。
 - `[x]` 已验证在线训练后进入离线的连续运行与离线中 checkpoint 分段恢复一致，并完成生产 24h 与 7d 正式成长画像；两个 12 小时分段的正式运行不再作为当前验收口径。
@@ -467,27 +484,23 @@ checkpoint 和永久进展报表接入。
 目标链路：
 
 ```text
-金钱 -> 鱼雷 / 垃圾佬突破
-材料 -> 鱼升级 / 鱼厅 / 杠铃
+金钱 -> 杠铃
+材料 -> 鱼升级 / 鱼厅 / 鱼雷 / 垃圾佬突破
 杠铃 -> 力量 -> FishLuck
 鱼雷 -> TrashLuck
 ```
 
-- `[x]` 实现鱼雷购买、拥有和自动选用：严格消费 `wallet.money`，失败不修改
-  状态，成功后记录 `torpedo_purchased` 与 price/money/power/TrashLuck
+- `[x]` 实现鱼雷购买、拥有和自动选用：严格消费 `wallet.material`，失败不修改
+  状态，成功后记录 `torpedo_purchased` 与 price/material/power/TrashLuck
   before/after/delta。生产 `highest_affordable` 只按拥有、power 和价格过滤，
   不使用当前力量或历史最高力量。
-- `[x]` 实现鱼厅升级：当前等级行价格、末行零值满级哨兵、BigNumber 材料扣款、容量立即生效、`fixed_max_income` 重排和 `upgrade_fish_hall` 无目标行为均已接入；生产画像配置权重 `100`、固定 `1` 秒的高优先级行为。
-- `[x]` 实现杠铃合成、显式装备与互斥前台 `exercise_barbell` 在线力量产出：价格消耗材料，速度为 `strengthPerExercise/timeCost`，仅锻炼时的装备项产出，库存数量不放大；合成后固定自动装备最高每秒力量，其他行为和离线均不产力量。
-- `[x]` 生产画像已将鱼雷购买配置为权重 `100`、固定 `1s` 的优先行为，
-  使用 `highest_affordable`；7 天正式 run 验证 8 次购买分布在第
-  1/2/3/4/5/7 天；没有同秒或紧邻连续跳档，首日三次购买分别间隔
-  `1,159s / 4,883s`。
-- `[~]` 已验证鱼升级、鱼厅升级和杠铃合成严格消费材料、鱼雷严格消费金钱，
-  且失败均不修改状态；垃圾佬突破仍等待对应规则完成。
+- `[x]` 实现鱼厅升级：当前等级行价格、末行零值满级哨兵、BigNumber 材料扣款、容量立即生效、`fixed_max_income` 重排和 `upgrade_fish_hall` 无目标行为均已接入；生产画像配置权重 `100`、固定 `10` 秒的高优先级行为。
+- `[x]` 实现杠铃合成、显式装备与互斥前台 `exercise_barbell` 在线力量产出：价格消耗金钱，速度为 `strengthPerExercise/timeCost`，仅锻炼时的装备项产出，库存数量不放大；合成后固定自动装备最高每秒力量，其他行为和离线均不产力量。
+- `[x]` 生产画像的鱼雷购买使用 `highest_affordable`，配置为可执行时近似硬优先级、固定 `10s`；当前 1 天正式 run 购买 2 次，期末装备 3 号鱼雷。旧 7 天 8 次购买数据属于旧资源流，只保留作历史对照。
+- `[x]` 已验证鱼升级、鱼厅升级、鱼雷和垃圾佬突破严格消费材料，杠铃合成严格消费金钱，且失败均不修改状态。
 
 验证证据：原 Phase 6 回归覆盖鱼厅当前行价格、BigNumber 扣款、末行零值
-哨兵、容量严格递增、杠铃生产表 15 档与 `timeCost`、库存数量不放大、材料
+哨兵、容量严格递增、杠铃生产表 15 档与 `timeCost`、库存数量不放大、金钱
 不足失败不修改状态、`fixed_max_income` 扩容重排及行为中 checkpoint；
 `tests/test_fish_torpedo_commands.py` 覆盖纯价格可支付判定、最高可支付目标、
 扣款/拥有/自动装备、Luck 事件字段及失败不修改状态。正式结果见
@@ -497,8 +510,8 @@ checkpoint 和永久进展报表接入。
 
 状态：`[~]`，两类重生事务、永久总倍率、无目标行为、在线历史境界追赶、checkpoint、生产硬优先级策略和 24h/7d 直接产出/重置进度恢复分析已完成；包含 FishLuck 机会成本的禁用重生反事实比较留待 Phase 9。
 
-- `[x]` 实现力量重生及摸鱼厅永久倍率：`0 次=表外 1×`，完成第 `n` 次后读取 `tbstrengthrebirth.id=n`；命令先结算旧倍率，再仅清空当前力量并立即启用新总倍率。
-- `[x]` 实现垃圾佬转世及材料永久倍率：`0 次=表外 1×`，完成第 `n` 次后读取一基 `tbtrashmanrebirth.id=n`；命令先结算旧倍率，再重置当前境界/修炼进度并立即启用新总倍率。
+- `[x]` 实现力量重生及垃圾加工材料永久倍率：`0 次=表外 1×`，完成第 `n` 次后读取 `tbstrengthrebirth.id=n.materialOutputMultiplier`；命令先结算旧倍率，再仅清空当前力量并立即启用新总倍率。
+- `[x]` 实现垃圾佬转世及摸鱼厅金钱永久倍率：`0 次=表外 1×`，完成第 `n` 次后读取一基 `tbtrashmanrebirth.id=n.fishHallOutputMultiplier`；命令先结算旧倍率，再重置当前境界/修炼进度并立即启用新总倍率。
 - `[x]` 实现历史最高境界保留与转世后在线追赶；按旧/新境界边界分段加工废料，达到历史最高境界后停止自动推进。
 - `[x]` 实现统一生产重生策略：只要当前满足任一重生要求，本轮只允许选择可执行的重生；两种同时满足时先稳定选择一种，下一轮立即执行另一种。
 - `[x]` 在正式 24h/7d 场景中输出重生时间线、永久产出立即生效时间和被重置进度恢复时间；报告明确区分直接现金流与完整反事实经济回本。
@@ -627,7 +640,7 @@ Phase 0 已完成，后续顺序：
 6. `[x]` 建立通用加权行为/持续时长/目标调度接口，并以 Fish fixture 验证行为中 checkpoint、手动投掷、单鱼升级、鱼厅升级、杠铃合成和 idle。
 7. `[~]` 固定 `max_income` 自动上阵、等级鱼厅收入、鱼升级材料消费、最低价/材料 `1/10` 生产升级画像、生产手动炸鱼和 24h/7d 正式长时验证已完成；等待出售口径后闭合 Phase 4。
 8. `[x]` 废料聚合库存、批量加工、境界速度、材料产出、在线历史境界追赶、付费新境界突破与 checkpoint 已完成。
-9. `[~]` 交叉升级、两类重生、离线基础和金钱→鱼雷→TrashLuck 已完成；
+9. `[~]` 交叉升级、两类重生、离线基础和材料→鱼雷→TrashLuck 已完成；
    默认画像已配置 2h/22h 作息、高优先级鱼雷购买/杠铃合成/鱼厅升级、
    低优先级最低价鱼升级，以及“达到要求立即重生”的两类重生硬优先级。
    24h/7d 正式调价基线与 30d 领域基线已完成，下一步验证 10、11 号鱼雷和
@@ -637,6 +650,7 @@ Phase 0 已完成，后续顺序：
 
 | 日期 | 变更 |
 | --- | --- |
+| 2026-08-02 | 按新生产经济模型迁移 IGESS：杠铃改扣金钱，鱼雷和垃圾佬突破改扣材料；突破材料只在显式命令开始时扣一次；力量重生改读 `materialOutputMultiplier` 并作用于垃圾材料，垃圾佬转世改读 `fishHallOutputMultiplier` 并作用于摸鱼厅金钱。境界推进严格读取同批生成契约的 `breakthroughSecondsToNextRealm`，保持在线墙钟、多境界跨越、离线暂停、加工不停和 checkpoint 分段等价。新增 `immediate / weighted_delay / preserve_material` 三种突破画像策略，生产默认 `immediate`。正式 smoke `20260802T020830293437Z-smoke` 与 1 天运行 `20260802T021144403218Z-day_1_growth` 成功，模型摘要 `sha256:82d5b37fd2ce1573ad45425b1722d57420c0bf9af835d23c303aaaa3350b6301`。旧长期 gate 结果不再代表当前模型，等待同快照 7d/30d 重新基线。 |
 | 2026-07-26 | 按 GDD 的 `P0` 定义纠正鱼升级材料价格：价格现为 `tbfish.baseMoneyPerSecond×tbmutation.incomeMultiplier×1.5^(当前等级-1)`，最低价/材料 `1/10` 自动目标同步按变异后价格排序；100 级模拟上限保持不变。 |
 | 2026-07-26 | 完成垃圾佬付费新境界突破生产闭环和价格/分解倍率联调：`moneyRequireToNextRealm` 进入强类型适配、原子扣款命令、默认权重 `100`/固定 `1s` 行为、仅在线突破、离线暂停、闭关旧境界不停产、完成事件、checkpoint 和永久进展报表。权威 1～59 号价格严格递增且不低于旧值，60 号为零值哨兵；关键前期价为 `20 / 100K / 5M / 50M / 500M / 100B / 1T`，分解倍率改为 `1 + 1.25×(ID-1)`。正式 run `20260726T013137219561Z-day_1_growth`、`20260726T013200487450Z-week_1_growth` 使用模型摘要 `sha256:7721a63bd78f573cdd634b327faf0199fd1d7ee95e3a913ca97d8aff4528bfd1`，24h/7d 系统进展 `9 / 23`；同生产输入 30d 领域结果 36，三阶段均通过 gate。7d 累计材料约 `10.735M`，较旧曲线约低 `5.5%`。Fish 回归 `116 passed, 3 deselected`，生产表契约 `2 passed`；`TrashManRealm.xlsx`、JSON、Lua 已同步，报告见 `reports/trash-man-breakthrough-balance.md`。 |
 | 2026-07-25 | 人类将首月系统级永久进展目标由 25 提高到 40，首日/首周保持 `10 / 20`；20% 包含性 gate 相应改为 `8..12 / 16..24 / 32..48`。当前 30 天基线 21 次不再通过，距离首月下限 32 还差 11 次、距离名义目标还差 19 次，后续需要补第 8～30 日长期系统成长。 |

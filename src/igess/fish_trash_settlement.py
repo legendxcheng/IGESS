@@ -50,8 +50,9 @@ def settle_trash(
 
     realm_id = state.trash_man.realm_id
     speed = adapter.realm_speed(realm_id)
-    output_multiplier = adapter.material_output_multiplier(
-        state.rebirth.trash_man_completed_count
+    strength_rebirth_count = state.rebirth.strength_completed_count
+    output_multiplier = adapter.strength_material_output_multiplier(
+        strength_rebirth_count
     )
     available_work = (
         SimNumber.parse(elapsed_seconds)
@@ -151,7 +152,8 @@ def settle_trash(
         realm_id=realm_id,
         decompose_speed_multiplier=speed,
         processing_efficiency=processing_efficiency,
-        material_output_multiplier=output_multiplier,
+        strength_rebirth_completed_count=strength_rebirth_count,
+        strength_rebirth_material_multiplier=output_multiplier,
         work_consumed=work_consumed,
         unused_work=available_work,
         material_added=material_added,
@@ -238,7 +240,7 @@ def settle_trash_online(
                     "active trash-man breakthrough target must be the next "
                     "configured realm"
                 )
-            requirement = adapter.cultivation_seconds_to_next_realm(
+            requirement = adapter.progression_seconds_to_next_realm(
                 current_realm
             )
             if breakthrough_progress > requirement:
@@ -269,7 +271,7 @@ def settle_trash_online(
                     to_realm_id=breakthrough_target,
                     at_elapsed_seconds=elapsed_offset,
                     required_seconds=requirement,
-                    price=adapter.money_required_to_next_realm(
+                    material_cost=adapter.material_required_to_next_realm(
                         current_realm
                     ),
                 )
@@ -291,7 +293,7 @@ def settle_trash_online(
         next_realm = adapter.next_realm_id(current_realm)
         if next_realm is None:
             raise FishDataError("trash-man historical highest realm is unreachable")
-        requirement = adapter.cultivation_seconds_to_next_realm(current_realm)
+        requirement = adapter.progression_seconds_to_next_realm(current_realm)
         if progress > requirement:
             raise FishDataError(
                 "trash-man training progress exceeds current realm "

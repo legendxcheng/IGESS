@@ -21,17 +21,17 @@ def test_trash_man_rebirth_uses_one_based_rows_and_implicit_one_x(
     adapter = FishTrashDataAdapter(_snapshot(tmp_path))
 
     assert adapter.max_trash_man_rebirth_count == 2
-    assert adapter.material_output_multiplier(0) == SimNumber.one()
+    assert adapter.fish_hall_output_multiplier(0) == SimNumber.one()
     first = adapter.next_trash_man_rebirth_rule(0)
     assert first.completed_count == 1
     assert first.realm_requirement == 0
-    assert first.material_output_multiplier == SimNumber.parse(2)
-    assert adapter.material_output_multiplier(1) == SimNumber.parse(2)
+    assert first.fish_hall_output_multiplier == SimNumber.parse(2)
+    assert adapter.fish_hall_output_multiplier(1) == SimNumber.parse(2)
     second = adapter.next_trash_man_rebirth_rule(1)
     assert second.completed_count == 2
     assert second.realm_requirement == 4
-    assert second.material_output_multiplier == SimNumber.parse(3)
-    assert adapter.material_output_multiplier(2) == SimNumber.parse(3)
+    assert second.fish_hall_output_multiplier == SimNumber.parse(3)
+    assert adapter.fish_hall_output_multiplier(2) == SimNumber.parse(3)
 
     with pytest.raises(FishDataError, match="default 1x"):
         adapter.trash_man_rebirth_rule(0)
@@ -80,8 +80,8 @@ def test_trash_man_rebirth_resets_realm_and_keeps_permanent_state(
     assert application.realm_before == 3
     assert application.realm_after == 1
     assert application.highest_realm_id == 3
-    assert application.material_multiplier_before == SimNumber.one()
-    assert application.material_multiplier_after == SimNumber.parse(2)
+    assert application.fish_hall_multiplier_before == SimNumber.one()
+    assert application.fish_hall_multiplier_after == SimNumber.parse(2)
     assert committed.trash_man.realm_id == 1
     assert committed.trash_man.highest_realm_id == 3
     assert committed.trash_man.training_progress_seconds == 0
@@ -97,8 +97,12 @@ def test_trash_man_rebirth_resets_realm_and_keeps_permanent_state(
     assert details["trash_man_rebirth_realm_before"] == "3"
     assert details["trash_man_rebirth_realm_after"] == "1"
     assert details["trash_man_rebirth_highest_realm_preserved"] == "3"
-    assert details["trash_man_rebirth_material_multiplier_before"] == "1"
-    assert details["trash_man_rebirth_material_multiplier_after"] == "2"
+    assert details["trash_man_rebirth_fish_hall_multiplier_before"] == "1"
+    assert details["trash_man_rebirth_fish_hall_multiplier_after"] == "2"
+    assert hall_adapter.snapshot(state).total_income_per_second == SimNumber.zero()
+    assert hall_adapter.snapshot(committed).trash_man_rebirth_multiplier == (
+        SimNumber.parse(2)
+    )
 
     chased = settle_fish_production(
         committed,
@@ -108,7 +112,7 @@ def test_trash_man_rebirth_resets_realm_and_keeps_permanent_state(
     )
     assert chased.state.trash_man.realm_id == 3
     assert chased.state.trash_man.highest_realm_id == 3
-    assert chased.material_added == SimNumber.parse(5)
+    assert chased.material_added == SimNumber.parse("2.5")
     assert chased.trash_processing.transitions[0].from_realm_id == 1
     assert chased.trash_processing.transitions[-1].to_realm_id == 3
 

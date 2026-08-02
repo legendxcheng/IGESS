@@ -140,34 +140,34 @@ def _snapshot(
                 id=1,
                 name="初境",
                 decomposeSpeedMultiplier=1,
-                cultivationSecondsToNextRealm=0,
-                moneyRequireToNextRealm=_big(20),
+                breakthroughSecondsToNextRealm=0,
+                materialRequireToNextRealm=_big(20),
             ),
             SimpleNamespace(
                 id=2,
                 name="二境",
                 decomposeSpeedMultiplier=1.25,
-                cultivationSecondsToNextRealm=1,
-                moneyRequireToNextRealm=_big(100),
+                breakthroughSecondsToNextRealm=1,
+                materialRequireToNextRealm=_big(100),
             ),
             SimpleNamespace(
                 id=3,
                 name="三境",
                 decomposeSpeedMultiplier=2,
-                cultivationSecondsToNextRealm=2,
-                moneyRequireToNextRealm=_big(0),
+                breakthroughSecondsToNextRealm=2,
+                materialRequireToNextRealm=_big(0),
             ),
         ),
         "tbtrashmanrebirth": (
             SimpleNamespace(
                 id=1,
                 realmRequirement=0,
-                trashToTreasureOutputMultiplier=2,
+                fishHallOutputMultiplier=2,
             ),
             SimpleNamespace(
                 id=2,
                 realmRequirement=4,
-                trashToTreasureOutputMultiplier=3,
+                fishHallOutputMultiplier=3,
             ),
         ),
         "tbtorpedo": (
@@ -215,12 +215,12 @@ def _snapshot(
             SimpleNamespace(
                 id=1,
                 strengthRequirement=_big(1000),
-                fishHallOutputMultiplier=2,
+                materialOutputMultiplier=2,
             ),
             SimpleNamespace(
                 id=2,
                 strengthRequirement=_big(10000),
-                fishHallOutputMultiplier=3,
+                materialOutputMultiplier=3,
             ),
         ),
         "tbfishhallupgrade": (

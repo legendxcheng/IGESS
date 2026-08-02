@@ -102,13 +102,17 @@ def test_strength_rebirth_behavior_settles_old_multiplier_before_reset(
     assert completion.state.wallet.strength.to_sim_number() == SimNumber.zero()
     assert completion.state.rebirth.strength_completed_count == 1
     assert completion.details["fish_hall_money_added"] == "40"
-    assert completion.details["strength_rebirth_multiplier_before"] == "1"
-    assert completion.details["strength_rebirth_multiplier_after"] == "2"
+    assert completion.details[
+        "strength_rebirth_material_multiplier_before"
+    ] == "1"
+    assert completion.details[
+        "strength_rebirth_material_multiplier_after"
+    ] == "2"
     assert (
         hall_adapter.snapshot(
             completion.state
         ).total_income_per_second
-        == SimNumber.parse(20)
+        == SimNumber.parse(10)
     )
 
     below_requirement = state.copy()
@@ -258,7 +262,7 @@ def test_barbell_synthesis_behavior_uses_explicit_affordable_unowned_targets(
         initial_torpedo_id=1,
         initial_trash_man_realm_id=1,
     )
-    state.wallet.material = BigNumberDTO.from_value(20)
+    state.wallet.money = BigNumberDTO.from_value(20)
 
     with pytest.raises(FishBehaviorConfigError, match="explicit target"):
         adapter.behavior_profile(profile)
@@ -272,7 +276,7 @@ def test_barbell_synthesis_behavior_uses_explicit_affordable_unowned_targets(
 
     state.barbell.owned = [OwnedBarbell(1, 1)]
     state.barbell.equipped_id = 1
-    state.wallet.material = BigNumberDTO.from_value(75)
+    state.wallet.money = BigNumberDTO.from_value(75)
     candidate = adapter.candidates(state, profile)[0]
     assert [target.target_id for target in candidate.targets] == ["2"]
 
@@ -305,7 +309,7 @@ def test_barbell_synthesis_does_not_train_with_old_equipment(
         initial_strength=0,
         initial_trash_man_realm_id=1,
     )
-    state.wallet.material = BigNumberDTO.from_value(75)
+    state.wallet.money = BigNumberDTO.from_value(75)
     state.barbell.owned = [OwnedBarbell(1, 1)]
     state.barbell.equipped_id = 1
     decision = BehaviorDecision(
@@ -327,7 +331,7 @@ def test_barbell_synthesis_does_not_train_with_old_equipment(
 
     assert completion.details["barbell_strength_added"] == "0"
     assert completion.state.wallet.strength.to_sim_number().is_zero()
-    assert completion.state.wallet.material.to_sim_number().is_zero()
+    assert completion.state.wallet.money.to_sim_number().is_zero()
     assert completion.state.barbell.equipped_id == 2
     assert completion.details[
         "barbell_strength_per_second_before_command"
@@ -371,7 +375,7 @@ def test_barbell_synthesis_checkpoint_does_not_pay_or_produce_mid_behavior(
         initial_strength=0,
         initial_trash_man_realm_id=1,
     )
-    initial_state.wallet.material = BigNumberDTO.from_value(20)
+    initial_state.wallet.money = BigNumberDTO.from_value(20)
     initial_checkpoint = FishCheckpointCodec.new(
         initial_state,
         model_digest=model_digest,
@@ -395,8 +399,8 @@ def test_barbell_synthesis_checkpoint_does_not_pay_or_produce_mid_behavior(
         "equippedId": 0,
         "owned": [],
     }
-    assert first.checkpoint.engine_state["wallet"]["material"] == (
-        initial_checkpoint.engine_state["wallet"]["material"]
+    assert first.checkpoint.engine_state["wallet"]["money"] == (
+        initial_checkpoint.engine_state["wallet"]["money"]
     )
     assert first.checkpoint.engine_state["wallet"]["strength"]["sign"] == 0
     assert resumed.checkpoint.engine_state == continuous.checkpoint.engine_state

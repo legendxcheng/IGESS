@@ -32,6 +32,9 @@ class FishTrashDataAdapter:
         }
         self.initial_realm_id = self._realm_order[0]
         self._rebirth_rules = self._rebirth_rows()
+        self._strength_material_multipliers = (
+            self._strength_material_multiplier_rows()
+        )
 
     def trash_rule(self, trash_id: int) -> TrashRule:
         try:
@@ -59,17 +62,17 @@ class FishTrashDataAdapter:
                 f"unknown production trash-man realm id: {realm_id}"
             ) from exc
 
-    def cultivation_seconds_to_next_realm(self, realm_id: int) -> int:
+    def progression_seconds_to_next_realm(self, realm_id: int) -> int:
         try:
-            return self._realms[realm_id].cultivation_seconds_to_next_realm
+            return self._realms[realm_id].progression_seconds_to_next_realm
         except KeyError as exc:
             raise FishDataError(
                 f"unknown production trash-man realm id: {realm_id}"
             ) from exc
 
-    def money_required_to_next_realm(self, realm_id: int) -> SimNumber:
+    def material_required_to_next_realm(self, realm_id: int) -> SimNumber:
         try:
-            return self._realms[realm_id].money_required_to_next_realm
+            return self._realms[realm_id].material_required_to_next_realm
         except KeyError as exc:
             raise FishDataError(
                 f"unknown production trash-man realm id: {realm_id}"
@@ -90,8 +93,8 @@ class FishTrashDataAdapter:
         ):
             return False
         return (
-            self.money_required_to_next_realm(realm_id)
-            <= state.wallet.money.to_sim_number()
+            self.material_required_to_next_realm(realm_id)
+            <= state.wallet.material.to_sim_number()
         )
 
     def next_realm_id(self, realm_id: int) -> int | None:
@@ -105,7 +108,7 @@ class FishTrashDataAdapter:
             return None
         return self._realm_order[index + 1]
 
-    def material_output_multiplier(
+    def fish_hall_output_multiplier(
         self,
         completed_rebirth_count: int,
     ) -> SimNumber:
@@ -116,7 +119,29 @@ class FishTrashDataAdapter:
             return SimNumber.one()
         return self.trash_man_rebirth_rule(
             completed_rebirth_count
-        ).material_output_multiplier
+        ).fish_hall_output_multiplier
+
+    def strength_material_output_multiplier(
+        self,
+        completed_rebirth_count: int,
+    ) -> SimNumber:
+        if (
+            type(completed_rebirth_count) is not int
+            or completed_rebirth_count < 0
+        ):
+            raise FishDataError(
+                "strength rebirth completed count must be non-negative"
+            )
+        if completed_rebirth_count == 0:
+            return SimNumber.one()
+        if completed_rebirth_count > len(self._strength_material_multipliers):
+            raise FishDataError(
+                "strength rebirth completed count is out of range: "
+                f"{completed_rebirth_count}"
+            )
+        return self._strength_material_multipliers[
+            completed_rebirth_count - 1
+        ]
 
     @property
     def max_trash_man_rebirth_count(self) -> int:
@@ -268,44 +293,56 @@ class FishTrashDataAdapter:
                     ),
                     ("tbtrashmanrealm." f"{row_id}.decomposeSpeedMultiplier"),
                 ),
-                cultivation_seconds_to_next_realm=_nonnegative_int(
+                progression_seconds_to_next_realm=_nonnegative_int(
                     _field(
                         row,
-                        "cultivationSecondsToNextRealm",
+                        "breakthroughSecondsToNextRealm",
                         "tbtrashmanrealm",
                     ),
-                    ("tbtrashmanrealm." f"{row_id}.cultivationSecondsToNextRealm"),
+                    (
+                        "tbtrashmanrealm."
+                        f"{row_id}.breakthroughSecondsToNextRealm"
+                    ),
                 ),
-                money_required_to_next_realm=_nonnegative_sim_number(
+                material_required_to_next_realm=_nonnegative_sim_number(
                     _field(
                         row,
-                        "moneyRequireToNextRealm",
+                        "materialRequireToNextRealm",
                         "tbtrashmanrealm",
                     ),
-                    ("tbtrashmanrealm." f"{row_id}.moneyRequireToNextRealm"),
+                    (
+                        "tbtrashmanrealm."
+                        f"{row_id}.materialRequireToNextRealm"
+                    ),
                 ),
             )
         if not result:
             raise FishDataError("tbtrashmanrealm must not be empty")
         order = tuple(sorted(result))
         for realm_id in order[:-1]:
-            if result[realm_id].money_required_to_next_realm <= SimNumber.zero():
+            if (
+                result[realm_id].material_required_to_next_realm
+                <= SimNumber.zero()
+            ):
                 raise FishDataError(
-                    "tbtrashmanrealm non-final moneyRequireToNextRealm "
+                    "tbtrashmanrealm non-final materialRequireToNextRealm "
                     "must be positive"
                 )
         for current_id, next_id in zip(order[:-2], order[1:-1]):
             if (
-                result[current_id].money_required_to_next_realm
-                >= result[next_id].money_required_to_next_realm
+                result[current_id].material_required_to_next_realm
+                >= result[next_id].material_required_to_next_realm
             ):
                 raise FishDataError(
-                    "tbtrashmanrealm non-final moneyRequireToNextRealm "
+                    "tbtrashmanrealm non-final materialRequireToNextRealm "
                     "must strictly increase by id"
                 )
-        if result[order[-1]].money_required_to_next_realm != SimNumber.zero():
+        if (
+            result[order[-1]].material_required_to_next_realm
+            != SimNumber.zero()
+        ):
             raise FishDataError(
-                "tbtrashmanrealm final moneyRequireToNextRealm must be zero"
+                "tbtrashmanrealm final materialRequireToNextRealm must be zero"
             )
         return result, order
 
@@ -330,15 +367,15 @@ class FishTrashDataAdapter:
                     ),
                     f"tbtrashmanrebirth.{row_id}.realmRequirement",
                 ),
-                material_output_multiplier=_positive_sim_number(
+                fish_hall_output_multiplier=_positive_sim_number(
                     _field(
                         row,
-                        "trashToTreasureOutputMultiplier",
+                        "fishHallOutputMultiplier",
                         "tbtrashmanrebirth",
                     ),
                     (
                         "tbtrashmanrebirth."
-                        f"{row_id}.trashToTreasureOutputMultiplier"
+                        f"{row_id}.fishHallOutputMultiplier"
                     ),
                 ),
             )
@@ -350,6 +387,36 @@ class FishTrashDataAdapter:
         if set(result) != expected_ids:
             raise FishDataError(
                 "tbtrashmanrebirth ids must be contiguous and start at 1"
+            )
+        return tuple(result[row_id] for row_id in sorted(result))
+
+    def _strength_material_multiplier_rows(self) -> tuple[SimNumber, ...]:
+        result: dict[int, SimNumber] = {}
+        for row in self.data.table("tbstrengthrebirth"):
+            row_id = _positive_int(
+                _field(row, "id", "tbstrengthrebirth"),
+                "tbstrengthrebirth.id",
+            )
+            if row_id in result:
+                raise FishDataError(
+                    f"tbstrengthrebirth contains duplicate id: {row_id}"
+                )
+            result[row_id] = _positive_sim_number(
+                _field(
+                    row,
+                    "materialOutputMultiplier",
+                    "tbstrengthrebirth",
+                ),
+                f"tbstrengthrebirth.{row_id}.materialOutputMultiplier",
+            )
+        if not result:
+            raise FishDataError(
+                "tbstrengthrebirth must contain at least one row"
+            )
+        expected_ids = set(range(1, len(result) + 1))
+        if set(result) != expected_ids:
+            raise FishDataError(
+                "tbstrengthrebirth ids must be contiguous and start at 1"
             )
         return tuple(result[row_id] for row_id in sorted(result))
 

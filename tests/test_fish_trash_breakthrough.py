@@ -19,15 +19,19 @@ from igess.fish_data import FishDataError
 from igess.fish_hall import FishHallDataAdapter
 from igess.fish_production import FishProductionRuntime, settle_fish_production
 from igess.fish_simulator import FishEconomySimulator
+from igess.fish_behavior_simulator import FishBehaviorSimulator
 from igess.fish_state import BigNumberDTO, FishCheckpointCodec, PlayerState, TrashStock
 from igess.fish_trash import FishTrashDataAdapter
 from igess.loader import ConfigLoader
 from igess.numbers import SimNumber
 
 
-def _state_with_money(amount: int, *, realm_id: int = 1) -> PlayerState:
+def _state_with_material(amount: int, *, realm_id: int = 1) -> PlayerState:
     state = PlayerState.new(initial_trash_man_realm_id=realm_id)
-    state.wallet.money = BigNumberDTO.from_value(amount, allow_negative=False)
+    state.wallet.material = BigNumberDTO.from_value(
+        amount,
+        allow_negative=False,
+    )
     return state
 
 
@@ -36,9 +40,9 @@ def test_realm_table_exposes_nonfinal_prices_and_zero_final_sentinel(
 ) -> None:
     adapter = FishTrashDataAdapter(_snapshot(tmp_path))
 
-    assert adapter.money_required_to_next_realm(1) == SimNumber.parse(20)
-    assert adapter.money_required_to_next_realm(2) == SimNumber.parse(100)
-    assert adapter.money_required_to_next_realm(3) == SimNumber.zero()
+    assert adapter.material_required_to_next_realm(1) == SimNumber.parse(20)
+    assert adapter.material_required_to_next_realm(2) == SimNumber.parse(100)
+    assert adapter.material_required_to_next_realm(3) == SimNumber.zero()
 
 
 def test_realm_table_rejects_non_increasing_nonfinal_prices(
@@ -46,7 +50,7 @@ def test_realm_table_rejects_non_increasing_nonfinal_prices(
 ) -> None:
     snapshot = _snapshot(tmp_path)
     rows = snapshot.table("tbtrashmanrealm")
-    rows[0].moneyRequireToNextRealm = _big(100)
+    rows[0].materialRequireToNextRealm = _big(100)
 
     with pytest.raises(FishDataError, match="must strictly increase by id"):
         FishTrashDataAdapter(snapshot)
@@ -56,17 +60,20 @@ def test_fund_breakthrough_atomically_pays_and_rejects_invalid_states(
     tmp_path: Path,
 ) -> None:
     adapter = FishTrashDataAdapter(_snapshot(tmp_path))
-    state = _state_with_money(20)
+    state = _state_with_material(20)
+    state.wallet.money = BigNumberDTO.from_value(999)
 
     funded = fund_trash_man_realm_breakthrough(
         state,
         trash_adapter=adapter,
     )
 
-    assert state.wallet.money.to_sim_number() == SimNumber.parse(20)
+    assert state.wallet.material.to_sim_number() == SimNumber.parse(20)
+    assert state.wallet.money.to_sim_number() == SimNumber.parse(999)
     assert not state.trash_man.breakthrough.active
-    assert funded.money_before == SimNumber.parse(20)
-    assert funded.money_after == SimNumber.zero()
+    assert funded.material_before == SimNumber.parse(20)
+    assert funded.material_after == SimNumber.zero()
+    assert funded.state.wallet.money.to_sim_number() == SimNumber.parse(999)
     assert funded.price == SimNumber.parse(20)
     assert funded.required_online_seconds == 0
     assert funded.state.trash_man.realm_id == 1
@@ -76,8 +83,8 @@ def test_fund_breakthrough_atomically_pays_and_rejects_invalid_states(
     assert funded.state.trash_man.breakthrough.progress_seconds == 0
 
     for invalid in (
-        _state_with_money(19),
-        _state_with_money(100, realm_id=3),
+        _state_with_material(19),
+        _state_with_material(100, realm_id=3),
     ):
         before = invalid.to_dict()
         with pytest.raises(FishCommandError):
@@ -87,7 +94,7 @@ def test_fund_breakthrough_atomically_pays_and_rejects_invalid_states(
             )
         assert invalid.to_dict() == before
 
-    catching_up = _state_with_money(100)
+    catching_up = _state_with_material(100)
     catching_up.trash_man.highest_realm_id = 2
     before = catching_up.to_dict()
     with pytest.raises(FishCommandError, match="historical realm catch-up"):
@@ -113,7 +120,7 @@ def test_online_breakthrough_advances_realm_and_offline_only_processes_trash(
     snapshot = _snapshot(tmp_path, trash_duration=10)
     hall_adapter = FishHallDataAdapter(snapshot)
     trash_adapter = FishTrashDataAdapter(snapshot)
-    state = _state_with_money(100, realm_id=2)
+    state = _state_with_material(100, realm_id=2)
     state.trash_man.processing.active_trash_id = 1
     state.trash_man.processing.stocks = [TrashStock(1, 1)]
     funded = fund_trash_man_realm_breakthrough(
@@ -158,7 +165,7 @@ def test_online_breakthrough_advances_realm_and_offline_only_processes_trash(
     assert completion.to_realm_id == 3
     assert completion.at_elapsed_seconds == 1
     assert completion.required_seconds == 1
-    assert completion.price == SimNumber.parse(100)
+    assert completion.material_cost == SimNumber.parse(100)
 
 
 def test_breakthrough_behavior_emits_persistent_completion_and_replays_checkpoint(
@@ -184,7 +191,7 @@ def test_breakthrough_behavior_emits_persistent_completion_and_replays_checkpoin
     snapshot = _snapshot(tmp_path)
     digest = "sha256:" + ("b" * 64)
     simulator = FishEconomySimulator(model, snapshot, model_digest=digest)
-    initial_state = _state_with_money(20)
+    initial_state = _state_with_material(20)
     initial_checkpoint = FishCheckpointCodec.new(
         initial_state,
         model_digest=digest,
@@ -225,3 +232,81 @@ def test_breakthrough_behavior_emits_persistent_completion_and_replays_checkpoin
     assert realm_event.details["trash_man_realm_before"] == "1"
     assert realm_event.details["trash_man_realm_after"] == "2"
     assert realm_event.details["trash_man_breakthrough_price"] == "20"
+    assert realm_event.details["trash_man_breakthrough_price_resource"] == (
+        "material"
+    )
+
+
+@pytest.mark.parametrize(
+    ("policy", "expected_behavior_ids"),
+    [
+        ("immediate", (FUND_TRASH_MAN_BREAKTHROUGH_BEHAVIOR_ID,)),
+        (
+            "weighted_delay",
+            (FUND_TRASH_MAN_BREAKTHROUGH_BEHAVIOR_ID, "idle"),
+        ),
+        ("preserve_material", ("idle",)),
+    ],
+)
+def test_breakthrough_player_policy_controls_the_explicit_command_candidate(
+    tmp_path: Path,
+    policy: str,
+    expected_behavior_ids: tuple[str, ...],
+) -> None:
+    raw = ConfigLoader.load(
+        "projects/fish/economy.yaml",
+        "projects/fish/luban_exports",
+    )
+    model = ModelBuilder.build(raw)
+    model.engine_settings["behavior_scheduler"][
+        "trash_man_breakthrough_policy"
+    ] = policy
+    profile = model.player_profiles["default"]
+    profile.behavior_weights = {
+        FUND_TRASH_MAN_BREAKTHROUGH_BEHAVIOR_ID: SimNumber.one(),
+        "idle": SimNumber.one(),
+    }
+    profile.behavior_durations = {
+        FUND_TRASH_MAN_BREAKTHROUGH_BEHAVIOR_ID: {
+            "type": "fixed",
+            "seconds": 1,
+        },
+        "idle": {"type": "fixed", "seconds": 1},
+    }
+    profile.behavior_target_policies = {}
+    simulator = FishBehaviorSimulator(
+        model,
+        _snapshot(tmp_path),
+        model_digest="sha256:" + ("e" * 64),
+        _mutate_state=False,
+    )
+
+    candidates = simulator.adapter.candidates(
+        _state_with_material(20),
+        profile,
+    )
+
+    assert tuple(
+        candidate.behavior_id for candidate in candidates
+    ) == expected_behavior_ids
+
+
+def test_breakthrough_player_policy_rejects_non_string_configuration(
+    tmp_path: Path,
+) -> None:
+    raw = ConfigLoader.load(
+        "projects/fish/economy.yaml",
+        "projects/fish/luban_exports",
+    )
+    model = ModelBuilder.build(raw)
+    model.engine_settings["behavior_scheduler"][
+        "trash_man_breakthrough_policy"
+    ] = ["immediate"]
+
+    with pytest.raises(ValueError, match="must be a string"):
+        FishBehaviorSimulator(
+            model,
+            _snapshot(tmp_path),
+            model_digest="sha256:" + ("e" * 64),
+            _mutate_state=False,
+        )

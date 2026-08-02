@@ -55,14 +55,15 @@ def test_barbell_adapter_requires_strictly_increasing_prices(
         FishBarbellDataAdapter(snapshot)
 
 
-def test_barbell_synthesis_atomically_pays_material_and_equips_best(
+def test_barbell_synthesis_atomically_pays_money_and_equips_best(
     tmp_path: Path,
 ) -> None:
     snapshot = _snapshot(tmp_path)
     hall_adapter = FishHallDataAdapter(snapshot)
     barbell_adapter = FishBarbellDataAdapter(snapshot)
     state = PlayerState.new(initial_torpedo_id=1)
-    state.wallet.material = BigNumberDTO.from_value(200)
+    state.wallet.money = BigNumberDTO.from_value(200)
+    state.wallet.material = BigNumberDTO.from_value(999)
     original = state.to_dict(context=hall_adapter.validation_context())
 
     first = synthesize_barbell(
@@ -73,7 +74,8 @@ def test_barbell_synthesis_atomically_pays_material_and_equips_best(
     )
 
     assert state.to_dict(context=hall_adapter.validation_context()) == original
-    assert first.state.wallet.material.to_sim_number() == SimNumber.parse(180)
+    assert first.state.wallet.money.to_sim_number() == SimNumber.parse(180)
+    assert first.state.wallet.material.to_sim_number() == SimNumber.parse(999)
     assert first.state.barbell.owned == [OwnedBarbell(1, 1)]
     assert first.state.barbell.equipped_id == 1
     assert first.state.meta.revision == 1
@@ -86,7 +88,8 @@ def test_barbell_synthesis_atomically_pays_material_and_equips_best(
         barbell_adapter=barbell_adapter,
     )
 
-    assert second.state.wallet.material.to_sim_number() == SimNumber.parse(105)
+    assert second.state.wallet.money.to_sim_number() == SimNumber.parse(105)
+    assert second.state.wallet.material.to_sim_number() == SimNumber.parse(999)
     assert second.state.barbell.owned == [
         OwnedBarbell(1, 1),
         OwnedBarbell(2, 1),
@@ -94,7 +97,7 @@ def test_barbell_synthesis_atomically_pays_material_and_equips_best(
     assert second.state.barbell.equipped_id == 2
     assert second.production_after.strength_per_second == SimNumber.parse(5)
     details = second.event_details()
-    assert details["barbell_synthesis_price_resource"] == "material"
+    assert details["barbell_synthesis_price_resource"] == "money"
     assert details["barbell_auto_equip_policy"] == (
         "highest_strength_per_second"
     )
@@ -111,10 +114,10 @@ def test_barbell_synthesis_and_equip_failures_do_not_mutate_state(
     hall_adapter = FishHallDataAdapter(snapshot)
     barbell_adapter = FishBarbellDataAdapter(snapshot)
     state = PlayerState.new(initial_torpedo_id=1)
-    state.wallet.material = BigNumberDTO.from_value(19)
+    state.wallet.money = BigNumberDTO.from_value(19)
     original = state.to_dict(context=hall_adapter.validation_context())
 
-    with pytest.raises(FishCommandError, match="insufficient material"):
+    with pytest.raises(FishCommandError, match="insufficient money"):
         synthesize_barbell(
             state,
             1,

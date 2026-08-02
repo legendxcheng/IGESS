@@ -37,32 +37,32 @@ IGESS 只消费生成后的强类型表对象，并记录 JSON 与生成加载�
 金钱和材料，再原子扣除材料、提升等级和 `meta.revision`，容量立即生效，
 并按 IGESS 的固定 `max_income` 模拟策略补齐/重排阵容。
 
-杠铃使用生产 `tbbarbell`：`price` 严格消耗材料，
+杠铃使用生产 `tbbarbell`：`price` 严格消耗金钱，
 `strengthPerExercise / timeCost` 是主动锻炼时的在线每秒力量。当前生产 15 档
 `timeCost` 均为 1 秒。只有当前前台行为为 `exercise_barbell` 时，正在装备的
-杠铃才产出力量；库存 `count` 只表示持有数量，不放大产出。合成原子扣材料、
+杠铃才产出力量；库存 `count` 只表示持有数量，不放大产出。合成原子扣金钱、
 增加库存和 `meta.revision`，再按固定 `highest_strength_per_second` 策略自动
 装备当前每秒力量最高的已拥有杠铃；合成、炸鱼等其他前台行为不同时产出力量，
 领域层也保留显式换装命令。离线期间杠铃力量固定为零。
 
-力量重生使用生产 `tbstrengthrebirth` 的一基 ID：`completedCount=0` 时摸鱼厅
+力量重生使用生产 `tbstrengthrebirth` 的一基 ID：`completedCount=0` 时垃圾加工
 使用表外默认 `1×`，下一次重生读取 `id=completedCount+1` 的力量门槛，完成
-第 `n` 次后使用 `id=n` 的摸鱼厅永久总倍率。重生命令先结算旧倍率截至当前秒
+第 `n` 次后使用 `id=n` 的 `materialOutputMultiplier` 永久总倍率。重生命令先结算旧倍率截至当前秒
 的全部后台产出，再只把当前力量归零；鱼、资源、鱼雷、杠铃、摸鱼厅和其他
 永久进度均保留。
 
 废料按 `trashId` 聚合，并由垃圾佬在后台自动加工。每份废料的
 `baseDecomposeSeconds` 是基础工作量，每个真实秒按当前境界的
 `decomposeSpeedMultiplier` 推进工作；材料按
-`baseMaterialPerSecond × 已消费工作量 × 转世产出倍率` 连续增加。队列按
+`baseMaterialPerSecond × 已消费工作量 × 力量重生材料产出倍率` 连续增加。队列按
 `trashId` 升序稳定处理，一次结算可以批量跨越多份废料；不足一秒的基础工作
 进度保存在 checkpoint 的 `engine_runtime_state`，保证变速和分段恢复不丢失。
-垃圾佬在在线时间内还会按当前境界的
-`cultivationSecondsToNextRealm` 修炼。转世后低于 `highestRealmId` 的境界免费
-在线追赶；达到历史最高境界后，`fund_trash_man_breakthrough` 按当前境界行的
-`moneyRequireToNextRealm` 扣金钱并开始付费突破。突破首版只累计在线时间，
+垃圾佬在在线时间内还会按当前正式生成契约的
+`breakthroughSecondsToNextRealm` 推进。转世后低于 `highestRealmId` 的境界免费
+在线追赶；达到历史最高境界后，显式 `fund_trash_man_breakthrough` 命令按当前境界行的
+`materialRequireToNextRealm` 一次性扣材料并开始突破。突破只累计未缩放在线墙钟，
 离线暂停，闭关期间仍按旧境界速度加工废料；完成边界后才更新当前/历史最高
-境界并启用新速度。前台行为中途 checkpoint 不会提前提交或重复扣款。生产
+境界并启用新速度。奖励倍率不改变推进秒数，前台行为中途 checkpoint 不会提前提交或重复扣款。生产
 价格 1～59 号严格递增、60 号为 `0` 满档哨兵；分解倍率采用
 `1 + 1.25 × (境界 ID - 1)`，用于补偿提价后较慢的境界节奏。
 
@@ -72,8 +72,9 @@ Fish 当前前台行为为 `manual_throw`、`upgrade_fish`、
 `upgrade_fish_hall`、`purchase_torpedo`、`synthesize_barbell`、
 `exercise_barbell`、`fund_trash_man_breakthrough`、`strength_rebirth`、
 `trash_man_rebirth`、`idle`。
-其中 `fund_trash_man_breakthrough` 是固定 `1` 秒、权重 `100` 的无目标行为，
-只在当前境界等于历史最高境界、没有进行中的突破且金钱足够时进入候选。
+其中 `fund_trash_man_breakthrough` 是无目标显式命令，只在当前境界等于历史最高境界、
+没有进行中的突破且材料足够时可用。生产策略为 `immediate`；另支持
+`weighted_delay` 和 `preserve_material`，状态机本身不自动资助。
 每次只允许一个前台行为；
 摸鱼厅金钱和垃圾佬加工属于后台系统，杠铃锻炼不是后台系统。
 `upgrade_fish_hall` 是无目标行为，只在未满级且当前材料可支付时进入候选。
@@ -81,9 +82,9 @@ Fish 当前前台行为为 `manual_throw`、`upgrade_fish`、
 鱼中选择升级价格最低的一条，同价按 `instanceId` 升序决胜；只有该最低价格
 严格低于当前材料的 `1/10` 时才进入候选。鱼升级价格从材料余额扣除。
 `synthesize_barbell` 必须显式使用 `random_affordable` 目标策略，并只从当前
-未拥有且材料可支付的杠铃中选择，避免行为模拟反复合成不提高产出的副本。
+未拥有且金钱可支付的杠铃中选择，避免行为模拟反复合成不提高产出的副本。
 `purchase_torpedo` 必须使用 `highest_affordable`：只从未拥有、比当前装备
-更强且金钱可支付的鱼雷中选择最高档，购买后自动装备。该行为不读取当前力量
+更强且材料可支付的鱼雷中选择最高档，购买后自动装备。该行为不读取当前力量
 或历史最高力量，成长时点完全由 `tbtorpedo.price` 控制。
 `exercise_barbell` 仅在拥有有效已装备杠铃时进入候选，执行期间按装备速度
 持续增加力量，并与炸鱼、升级、合成和重生互斥。
@@ -92,7 +93,7 @@ Fish 当前前台行为为 `manual_throw`、`upgrade_fish`、
 `trash_man_rebirth` 同样无目标；`0` 次使用表外 `1×`，第 `n` 次对应
 `tbtrashmanrebirth.id=n`，只在当前境界达到下一行 `realmRequirement`
 且没有进行中的突破时进入候选。完成后当前境界和本境界修炼进度回到初始值，
-历史最高境界保留，新的材料总倍率立即生效。
+历史最高境界保留，新的 `fishHallOutputMultiplier` 摸鱼厅金钱总倍率立即生效。
 行为选择、随机时长和目标选择使用独立稳定随机域，checkpoint 可保存进行中的
 行为并在恢复时原样继续。默认画像的 `session_pattern.daily_online_seconds`
 为 `7200`，即每天从模拟日开始连续在线 2 小时、随后离线 22 小时，到下一模拟日重新
@@ -100,14 +101,14 @@ Fish 当前前台行为为 `manual_throw`、`upgrade_fish`、
 杠铃力量为 `0%`，垃圾佬修炼不推进。默认 `manual_throw` 与
 `exercise_barbell` 使用基准权重 `1`，低优先级 `upgrade_fish` 使用权重
 `0.1`；`synthesize_barbell` 与 `upgrade_fish_hall` 使用高优先级权重
-`100`；`purchase_torpedo` 同样使用权重 `100` 和固定 `1` 秒。两类重生也
-配置为固定 `1` 秒行为；只要任一种达到下一档要求，候选池
+`100`。`purchase_torpedo`、两类重生与突破资助配置为可执行时近似硬优先级；
+突破再由 `immediate` 策略明确抢占普通候选。只要任一种重生达到下一档要求，候选池
 就只保留当前可执行的重生，绝对优先于所有普通前台行为。若两种同时满足，则
 稳定选择一种并在下一轮立即执行另一种。杠铃合成使用 `random_affordable`，鱼升级使用
 `cheapest_below_material_tenth`；没有可执行目标时相应行为自动过滤。未拥有杠铃
-时训练行为也会自动过滤。生产 `day_1_growth` 与 `week_1_growth` 已完成正式
-24h/7d 基线；垃圾佬突破平衡后的系统级永久进展为 `9 / 23`，同生产输入的
-30d 领域运行结果为 `36`，均通过 `8..12 / 16..24 / 32..48` gate。周场景
+时训练行为也会自动过滤。当前经济模型的正式 `day_1_growth` 已完成，系统级
+永久进展为 `18`；旧模型的 `9 / 23 / 36` 首日/首周/首月结果仅作历史对照，
+不再代表当前 gate。当前 7d/30d 基线需要重新运行。周场景
 保留全部行为事件以及重生/鱼雷购买/境界突破的完整 trace，但对
 其他普通行为使用 `compact_event_details` 去除重复的大公式明细。重生直接
 产出与重置进度恢复结论见

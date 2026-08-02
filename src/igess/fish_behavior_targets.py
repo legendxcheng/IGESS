@@ -75,7 +75,7 @@ def barbell_synthesis_targets(
 ) -> tuple[BehaviorTarget, ...]:
     if policy != RANDOM_AFFORDABLE_POLICY_ID:
         return ()
-    material = state.wallet.material.to_sim_number()
+    money = state.wallet.money.to_sim_number()
     owned_ids = {
         item.barbell_id
         for item in state.barbell.owned
@@ -84,7 +84,7 @@ def barbell_synthesis_targets(
     return tuple(
         BehaviorTarget(str(rule.barbell_id))
         for rule in barbell_adapter.rules
-        if rule.barbell_id not in owned_ids and rule.price <= material
+        if rule.barbell_id not in owned_ids and rule.price <= money
     )
 
 
@@ -97,7 +97,7 @@ def torpedo_purchase_targets(
     if policy != HIGHEST_AFFORDABLE_POLICY_ID:
         return ()
     current = torpedo_adapter.rule(state.torpedo.selected_id)
-    money = state.wallet.money.to_sim_number()
+    material = state.wallet.material.to_sim_number()
     owned_ids = set(state.torpedo.owned_ids)
     affordable = tuple(
         rule
@@ -105,7 +105,7 @@ def torpedo_purchase_targets(
         if (
             rule.torpedo_id not in owned_ids
             and rule.power > current.power
-            and rule.price <= money
+            and rule.price <= material
         )
     )
     if not affordable:

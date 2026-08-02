@@ -515,8 +515,9 @@ def test_production_workflow_records_one_resolved_throw(tmp_path: Path) -> None:
         "queue_policy": "trash_id_ascending",
         "fractional_progress": "engine_runtime_state",
         "rebirth_mapping": (
-            "completed_count_0_is_1x;"
-            "completed_count_n_uses_table_id_n_minus_1"
+            "strength_completed_count_0_is_1x;"
+            "strength_completed_count_n_uses_"
+            "tbstrengthrebirth_id_n_materialOutputMultiplier"
         ),
     }
     assert manifest["strategy"]["parameters"]["behavior_scheduler"][
@@ -529,6 +530,13 @@ def test_production_workflow_records_one_resolved_throw(tmp_path: Path) -> None:
             ),
             "weight_multiplier": "10",
         }
+    }
+    assert manifest["strategy"]["parameters"]["behavior_scheduler"][
+        "trash_man_breakthrough_policy"
+    ] == {
+        "command_is_explicit": "true",
+        "mode": "immediate",
+        "state_machine_auto_funds": "false",
     }
 
     resumed = service.run_authoring_scenario(

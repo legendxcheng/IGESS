@@ -12,7 +12,10 @@ from .fish_data import (
     FishLubanProvider,
     GeneratedLubanProvider,
 )
-from .fish_behavior_weights import ManualThrowRefillRule
+from .fish_behavior_weights import (
+    ManualThrowRefillRule,
+    TrashManBreakthroughPolicy,
+)
 from .fish_rewards import FishRewardMultipliers
 from .fish_simulator import FishEconomySimulator
 from .fish_state import FishCheckpointCodec
@@ -204,8 +207,9 @@ class FishEngineAdapter:
                 "queue_policy": "trash_id_ascending",
                 "fractional_progress": "engine_runtime_state",
                 "rebirth_mapping": (
-                    "completed_count_0_is_1x;"
-                    "completed_count_n_uses_table_id_n_minus_1"
+                    "strength_completed_count_0_is_1x;"
+                    "strength_completed_count_n_uses_"
+                    "tbstrengthrebirth_id_n_materialOutputMultiplier"
                 ),
             }
         behavior_profiles = {
@@ -248,6 +252,9 @@ class FishEngineAdapter:
             manual_throw_refill_rule = (
                 ManualThrowRefillRule.from_engine_settings(settings)
             )
+            trash_man_breakthrough_policy = (
+                TrashManBreakthroughPolicy.from_engine_settings(settings)
+            )
             strategy_parameters["behavior_scheduler"] = {
                 "schema": "weighted_duration_v1",
                 "foreground_strength_behavior": "exercise_barbell",
@@ -258,6 +265,9 @@ class FishEngineAdapter:
                         manual_throw_refill_rule.manifest_parameters()
                     )
                 },
+                "trash_man_breakthrough_policy": (
+                    trash_man_breakthrough_policy.manifest_parameters()
+                ),
                 "profiles": behavior_profiles,
             }
         metadata = {

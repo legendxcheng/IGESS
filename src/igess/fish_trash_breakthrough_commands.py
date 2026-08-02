@@ -15,7 +15,7 @@ def fund_trash_man_realm_breakthrough(
     trash_adapter: FishTrashDataAdapter,
     _mutate: bool = False,
 ) -> AppliedTrashManBreakthroughFunding:
-    """Pay the current realm row's price and start an online breakthrough."""
+    """Pay material once and start an online breakthrough."""
 
     if not isinstance(state, PlayerState):
         raise FishCommandError("state must be a PlayerState")
@@ -38,26 +38,26 @@ def fund_trash_man_realm_breakthrough(
         )
     try:
         target_realm_id = trash_adapter.next_realm_id(realm_id)
-        price = trash_adapter.money_required_to_next_realm(realm_id)
+        price = trash_adapter.material_required_to_next_realm(realm_id)
         required_seconds = (
-            trash_adapter.cultivation_seconds_to_next_realm(realm_id)
+            trash_adapter.progression_seconds_to_next_realm(realm_id)
         )
     except FishDataError as exc:
         raise FishCommandError(str(exc)) from exc
     if target_realm_id is None:
         raise FishCommandError("trash-man realm is already at max")
 
-    money_before = state.wallet.money.to_sim_number()
-    if money_before < price:
+    material_before = state.wallet.material.to_sim_number()
+    if material_before < price:
         raise FishCommandError(
-            "insufficient money for trash-man breakthrough: "
+            "insufficient material for trash-man breakthrough: "
             f"need {price.to_decimal_string()}, "
-            f"have {money_before.to_decimal_string()}"
+            f"have {material_before.to_decimal_string()}"
         )
 
     committed = state if _mutate else state.copy()
-    committed.wallet.money = BigNumberDTO.from_value(
-        money_before - price,
+    committed.wallet.material = BigNumberDTO.from_value(
+        material_before - price,
         allow_negative=False,
     )
     committed.trash_man.breakthrough.active = True
@@ -72,6 +72,6 @@ def fund_trash_man_realm_breakthrough(
         target_realm_id=target_realm_id,
         price=price,
         required_online_seconds=required_seconds,
-        money_before=money_before,
-        money_after=committed.wallet.money.to_sim_number(),
+        material_before=material_before,
+        material_after=committed.wallet.material.to_sim_number(),
     )

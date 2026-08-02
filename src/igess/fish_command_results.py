@@ -176,8 +176,8 @@ class AppliedStrengthRebirth:
     strength_requirement: SimNumber
     strength_before: SimNumber
     strength_after: SimNumber
-    fish_hall_before: FishHallIncomeSnapshot
-    fish_hall_after: FishHallIncomeSnapshot
+    material_multiplier_before: SimNumber
+    material_multiplier_after: SimNumber
 
     def event_details(self) -> dict[str, str]:
         details = {
@@ -206,30 +206,19 @@ class AppliedStrengthRebirth:
                 "fish,trash,money,material,torpedo,barbell,fish_hall,"
                 "trash_man,collection,automation,statistics"
             ),
-            "strength_rebirth_multiplier_before": (
-                self.fish_hall_before.strength_rebirth_multiplier
-                .to_decimal_string()
+            "strength_rebirth_material_multiplier_before": (
+                self.material_multiplier_before.to_decimal_string()
             ),
-            "strength_rebirth_multiplier_after": (
-                self.fish_hall_after.strength_rebirth_multiplier
-                .to_decimal_string()
+            "strength_rebirth_material_multiplier_after": (
+                self.material_multiplier_after.to_decimal_string()
             ),
-            "strength_rebirth_multiplier_source": (
+            "strength_rebirth_material_multiplier_source": (
                 "completed_count_0_is_default_1x_not_in_table;"
-                "completed_count_n_uses_tbstrengthrebirth_id_n"
+                "completed_count_n_uses_"
+                "tbstrengthrebirth[id=n].materialOutputMultiplier"
             ),
             "player_state_revision": str(self.state.meta.revision),
         }
-        details.update(
-            self.fish_hall_before.event_details(
-                suffix="before_strength_rebirth"
-            )
-        )
-        details.update(
-            self.fish_hall_after.event_details(
-                suffix="after_strength_rebirth"
-            )
-        )
         return details
 
 
@@ -244,8 +233,8 @@ class AppliedTrashManRebirth:
     highest_realm_id: int
     training_progress_seconds_before: int
     training_progress_seconds_after: int
-    material_multiplier_before: SimNumber
-    material_multiplier_after: SimNumber
+    fish_hall_multiplier_before: SimNumber
+    fish_hall_multiplier_after: SimNumber
 
     def event_details(self) -> dict[str, str]:
         return {
@@ -286,15 +275,16 @@ class AppliedTrashManRebirth:
                 "trash_man.upgrades,trash_man.processing,collection,"
                 "automation,statistics,strength_rebirth"
             ),
-            "trash_man_rebirth_material_multiplier_before": (
-                self.material_multiplier_before.to_decimal_string()
+            "trash_man_rebirth_fish_hall_multiplier_before": (
+                self.fish_hall_multiplier_before.to_decimal_string()
             ),
-            "trash_man_rebirth_material_multiplier_after": (
-                self.material_multiplier_after.to_decimal_string()
+            "trash_man_rebirth_fish_hall_multiplier_after": (
+                self.fish_hall_multiplier_after.to_decimal_string()
             ),
-            "trash_man_rebirth_multiplier_source": (
+            "trash_man_rebirth_fish_hall_multiplier_source": (
                 "completed_count_0_is_default_1x_not_in_table;"
-                "completed_count_n_uses_tbtrashmanrebirth_id_n"
+                "completed_count_n_uses_"
+                "tbtrashmanrebirth[id=n].fishHallOutputMultiplier"
             ),
             "player_state_revision": str(self.state.meta.revision),
         }
@@ -307,8 +297,8 @@ class AppliedTrashManBreakthroughFunding:
     target_realm_id: int
     price: SimNumber
     required_online_seconds: int
-    money_before: SimNumber
-    money_after: SimNumber
+    material_before: SimNumber
+    material_after: SimNumber
 
     def event_details(self) -> dict[str, str]:
         return {
@@ -317,10 +307,10 @@ class AppliedTrashManBreakthroughFunding:
                 self.target_realm_id
             ),
             "trash_man_breakthrough_price": self.price.to_decimal_string(),
-            "trash_man_breakthrough_price_resource": "money",
+            "trash_man_breakthrough_price_resource": "material",
             "trash_man_breakthrough_price_source": (
                 "tbtrashmanrealm"
-                f"[id={self.from_realm_id}].moneyRequireToNextRealm"
+                f"[id={self.from_realm_id}].materialRequireToNextRealm"
             ),
             "trash_man_breakthrough_required_online_seconds": str(
                 self.required_online_seconds
@@ -328,13 +318,13 @@ class AppliedTrashManBreakthroughFunding:
             "trash_man_breakthrough_duration_source": (
                 "tbtrashmanrealm"
                 f"[id={self.from_realm_id}]"
-                ".cultivationSecondsToNextRealm"
+                ".breakthroughSecondsToNextRealm"
             ),
-            "money_before_trash_man_breakthrough": (
-                self.money_before.to_decimal_string()
+            "material_before_trash_man_breakthrough": (
+                self.material_before.to_decimal_string()
             ),
-            "money_after_trash_man_breakthrough": (
-                self.money_after.to_decimal_string()
+            "material_after_trash_man_breakthrough": (
+                self.material_after.to_decimal_string()
             ),
             "trash_man_breakthrough_online_only": "true",
             "trash_man_breakthrough_processing_continues": "true",
@@ -347,8 +337,8 @@ class AppliedBarbellSynthesis:
     state: PlayerState
     barbell_id: int
     price: SimNumber
-    material_before: SimNumber
-    material_after: SimNumber
+    money_before: SimNumber
+    money_after: SimNumber
     count_before: int
     count_after: int
     production_before: BarbellProductionSnapshot
@@ -358,16 +348,16 @@ class AppliedBarbellSynthesis:
         details = {
             "barbell_id": str(self.barbell_id),
             "barbell_synthesis_price": self.price.to_decimal_string(),
-            "barbell_synthesis_price_resource": "material",
+            "barbell_synthesis_price_resource": "money",
             "barbell_synthesis_price_source": "tbbarbell.price",
             "barbell_count_before": str(self.count_before),
             "barbell_count_after": str(self.count_after),
             "barbell_auto_equip_policy": "highest_strength_per_second",
-            "material_before_barbell_synthesis": (
-                self.material_before.to_decimal_string()
+            "money_before_barbell_synthesis": (
+                self.money_before.to_decimal_string()
             ),
-            "material_after_barbell_synthesis": (
-                self.material_after.to_decimal_string()
+            "money_after_barbell_synthesis": (
+                self.money_after.to_decimal_string()
             ),
             "player_state_revision": str(self.state.meta.revision),
         }
@@ -412,8 +402,8 @@ class AppliedTorpedoPurchase:
     from_torpedo_id: int
     to_torpedo_id: int
     price: SimNumber
-    money_before: SimNumber
-    money_after: SimNumber
+    material_before: SimNumber
+    material_after: SimNumber
     power_before: SimNumber
     power_after: SimNumber
     trash_luck_before: float
@@ -426,7 +416,7 @@ class AppliedTorpedoPurchase:
             "torpedo_id_before": str(self.from_torpedo_id),
             "torpedo_id_after": str(self.to_torpedo_id),
             "torpedo_purchase_price": self.price.to_decimal_string(),
-            "torpedo_purchase_price_resource": "money",
+            "torpedo_purchase_price_resource": "material",
             "torpedo_purchase_price_source": "tbtorpedo.price",
             "torpedo_power_before": self.power_before.to_decimal_string(),
             "torpedo_power_after": self.power_after.to_decimal_string(),
@@ -437,11 +427,11 @@ class AppliedTorpedoPurchase:
                 self.trash_luck_after - self.trash_luck_before,
                 ".17g",
             ),
-            "money_before_torpedo_purchase": (
-                self.money_before.to_decimal_string()
+            "material_before_torpedo_purchase": (
+                self.material_before.to_decimal_string()
             ),
-            "money_after_torpedo_purchase": (
-                self.money_after.to_decimal_string()
+            "material_after_torpedo_purchase": (
+                self.material_after.to_decimal_string()
             ),
             "torpedo_auto_select_policy": "purchased_torpedo",
             "player_state_revision": str(self.state.meta.revision),

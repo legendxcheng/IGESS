@@ -30,6 +30,9 @@ class FishHallDataAdapter:
         self._capacities = self._hall_capacities(hall_rows)
         self._hall_upgrade_prices = self._hall_prices(hall_rows)
         self._strength_rebirth_rules = self._strength_rebirth_rows()
+        self._trash_man_rebirth_multipliers = (
+            self._trash_man_rebirth_multiplier_rows()
+        )
         self._income_value_cache: dict[
             tuple[int, int, int],
             tuple[
@@ -46,7 +49,7 @@ class FishHallDataAdapter:
         self._cached_items: list[FishInstance] | None = None
         self._cached_item_count = -1
         self._cached_upgrade_level = -1
-        self._cached_strength_rebirth_count = -1
+        self._cached_trash_man_rebirth_count = -1
         self._cached_snapshot: FishHallIncomeSnapshot | None = None
         self._ranking = FishHallRankingCache(self._income_trace)
 
@@ -110,7 +113,7 @@ class FishHallDataAdapter:
             )
         return self.strength_rebirth_rule(completed_count + 1)
 
-    def strength_rebirth_multiplier(
+    def strength_material_output_multiplier(
         self,
         completed_count: int,
     ) -> SimNumber:
@@ -121,7 +124,24 @@ class FishHallDataAdapter:
             return SimNumber.one()
         return self.strength_rebirth_rule(
             completed_count
-        ).fish_hall_output_multiplier
+        ).material_output_multiplier
+
+    def trash_man_fish_hall_output_multiplier(
+        self,
+        completed_count: int,
+    ) -> SimNumber:
+        if type(completed_count) is not int or completed_count < 0:
+            raise FishDataError(
+                "trash-man rebirth completed count must be non-negative"
+            )
+        if completed_count == 0:
+            return SimNumber.one()
+        if completed_count > len(self._trash_man_rebirth_multipliers):
+            raise FishDataError(
+                "trash-man rebirth completed count is out of range: "
+                f"{completed_count}"
+            )
+        return self._trash_man_rebirth_multipliers[completed_count - 1]
 
     def can_strength_rebirth(self, state: PlayerState) -> bool:
         if not isinstance(state, PlayerState):
@@ -192,8 +212,8 @@ class FishHallDataAdapter:
             and self._cached_snapshot is not None
         ):
             if (
-                self._cached_strength_rebirth_count
-                == state.rebirth.strength_completed_count
+                self._cached_trash_man_rebirth_count
+                == state.rebirth.trash_man_completed_count
             ):
                 return self._cached_snapshot
             result = self._snapshot_from_traces(
@@ -271,8 +291,10 @@ class FishHallDataAdapter:
             (trace.income_per_second for trace in traces),
             SimNumber.zero(),
         )
-        strength_rebirth_multiplier = self.strength_rebirth_multiplier(
-            state.rebirth.strength_completed_count
+        trash_man_rebirth_multiplier = (
+            self.trash_man_fish_hall_output_multiplier(
+                state.rebirth.trash_man_completed_count
+            )
         )
         return FishHallIncomeSnapshot(
             capacity=self.capacity(state.fish_hall.upgrade_level),
@@ -280,12 +302,12 @@ class FishHallDataAdapter:
                 trace.instance_id for trace in traces
             ),
             base_total_income_per_second=base_total,
-            strength_rebirth_completed_count=(
-                state.rebirth.strength_completed_count
+            trash_man_rebirth_completed_count=(
+                state.rebirth.trash_man_completed_count
             ),
-            strength_rebirth_multiplier=strength_rebirth_multiplier,
+            trash_man_rebirth_multiplier=trash_man_rebirth_multiplier,
             total_income_per_second=(
-                base_total * strength_rebirth_multiplier
+                base_total * trash_man_rebirth_multiplier
             ),
             traces=traces,
         )
@@ -298,8 +320,8 @@ class FishHallDataAdapter:
         self._cached_items = state.fish.items
         self._cached_item_count = len(state.fish.items)
         self._cached_upgrade_level = state.fish_hall.upgrade_level
-        self._cached_strength_rebirth_count = (
-            state.rebirth.strength_completed_count
+        self._cached_trash_man_rebirth_count = (
+            state.rebirth.trash_man_completed_count
         )
         self._cached_snapshot = result
 
@@ -484,15 +506,15 @@ class FishHallDataAdapter:
                         f"{completed_count}.strengthRequirement"
                     ),
                 ),
-                fish_hall_output_multiplier=_positive_sim_number(
+                material_output_multiplier=_positive_sim_number(
                     _field(
                         row,
-                        "fishHallOutputMultiplier",
+                        "materialOutputMultiplier",
                         "tbstrengthrebirth",
                     ),
                     (
                         "tbstrengthrebirth."
-                        f"{completed_count}.fishHallOutputMultiplier"
+                        f"{completed_count}.materialOutputMultiplier"
                     ),
                 ),
             )
@@ -504,6 +526,40 @@ class FishHallDataAdapter:
         if set(by_id) != expected_ids:
             raise FishDataError(
                 "tbstrengthrebirth ids must be contiguous and start at 1"
+            )
+        return tuple(by_id[row_id] for row_id in sorted(by_id))
+
+    def _trash_man_rebirth_multiplier_rows(self) -> tuple[SimNumber, ...]:
+        by_id: dict[int, SimNumber] = {}
+        for row in self.data.table("tbtrashmanrebirth"):
+            completed_count = _positive_int(
+                _field(row, "id", "tbtrashmanrebirth"),
+                "tbtrashmanrebirth.id",
+            )
+            if completed_count in by_id:
+                raise FishDataError(
+                    "tbtrashmanrebirth contains duplicate id: "
+                    f"{completed_count}"
+                )
+            by_id[completed_count] = _positive_sim_number(
+                _field(
+                    row,
+                    "fishHallOutputMultiplier",
+                    "tbtrashmanrebirth",
+                ),
+                (
+                    "tbtrashmanrebirth."
+                    f"{completed_count}.fishHallOutputMultiplier"
+                ),
+            )
+        if not by_id:
+            raise FishDataError(
+                "tbtrashmanrebirth must contain at least one row"
+            )
+        expected_ids = set(range(1, len(by_id) + 1))
+        if set(by_id) != expected_ids:
+            raise FishDataError(
+                "tbtrashmanrebirth ids must be contiguous and start at 1"
             )
         return tuple(by_id[row_id] for row_id in sorted(by_id))
 

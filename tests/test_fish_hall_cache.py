@@ -31,10 +31,10 @@ def test_internal_hall_cache_invalidates_on_every_hall_input(
     )
     assert adapter.snapshot(state, use_cache=True) is changed_fish
 
-    state.rebirth.strength_completed_count = 1
+    state.rebirth.trash_man_completed_count = 1
     changed_rebirth = adapter.snapshot(state, use_cache=True)
     assert changed_rebirth is not changed_fish
-    assert changed_rebirth.strength_rebirth_multiplier == SimNumber.parse(2)
+    assert changed_rebirth.trash_man_rebirth_multiplier == SimNumber.parse(2)
 
     state.fish_hall.upgrade_level = 1
     changed_level = adapter.snapshot(state, use_cache=True)
@@ -77,7 +77,7 @@ def test_incremental_layout_matches_full_ranking_after_appends_and_upgrades(
         expected = verification.snapshot(state)
         assert actual == expected
 
-    state.rebirth.strength_completed_count = 1
+    state.rebirth.trash_man_completed_count = 1
     assert incremental.snapshot(
         state,
         use_cache=True,

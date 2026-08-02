@@ -91,10 +91,10 @@ def test_trash_man_rebirth_behavior_settles_old_multiplier_before_reset(
     assert completion.item_id == "trash_man_rebirth:1"
     assert completion.details["trash_material_added"] == "16"
     assert completion.details[
-        "trash_man_rebirth_material_multiplier_before"
+        "trash_man_rebirth_fish_hall_multiplier_before"
     ] == "1"
     assert completion.details[
-        "trash_man_rebirth_material_multiplier_after"
+        "trash_man_rebirth_fish_hall_multiplier_after"
     ] == "2"
     assert completion.state.wallet.material.to_sim_number() == (
         SimNumber.parse(16)
@@ -111,9 +111,9 @@ def test_trash_man_rebirth_behavior_settles_old_multiplier_before_reset(
         barbell_adapter=adapter.barbell_adapter,
         runtime=completion.production_runtime,
     )
-    assert post_rebirth.material_added == SimNumber.parse(5)
+    assert post_rebirth.material_added == SimNumber.parse("2.5")
     assert post_rebirth.state.wallet.material.to_sim_number() == (
-        SimNumber.parse(21)
+        SimNumber.parse("18.5")
     )
 
     second_candidate = adapter.candidates(

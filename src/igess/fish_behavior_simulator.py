@@ -26,7 +26,10 @@ from .fish_behavior_simulation_support import (
     timeline_row,
     validate_checkpoint,
 )
-from .fish_behavior_weights import ManualThrowRefillRule
+from .fish_behavior_weights import (
+    ManualThrowRefillRule,
+    TrashManBreakthroughPolicy,
+)
 from .fish_session import FishDailySessionSchedule
 from .fish_data import FishDataSnapshot
 from .fish_hall import FishHallDataAdapter
@@ -83,6 +86,11 @@ class FishBehaviorSimulator:
                 model.engine_settings
             )
         )
+        self.trash_man_breakthrough_policy = (
+            TrashManBreakthroughPolicy.from_engine_settings(
+                model.engine_settings
+            )
+        )
         self.adapter = FishBehaviorAdapter(
             throw_adapter=self.throw_adapter,
             hall_adapter=self.hall_adapter,
@@ -90,6 +98,9 @@ class FishBehaviorSimulator:
             barbell_adapter=self.barbell_adapter,
             throw_config=self.throw_config,
             manual_throw_refill_rule=self.manual_throw_refill_rule,
+            trash_man_breakthrough_policy=(
+                self.trash_man_breakthrough_policy
+            ),
             _validate_state=not _mutate_state,
         )
         self.time_engine = TimeEngine(model.config.tick_seconds)
@@ -226,6 +237,9 @@ class FishBehaviorSimulator:
                     "manual_throw_refill_weight_multiplier": (
                         self.manual_throw_refill_rule.weight_multiplier
                         .to_decimal_string()
+                    ),
+                    "trash_man_breakthrough_policy": (
+                        self.trash_man_breakthrough_policy.mode
                     ),
                     "daily_online_seconds": str(
                         session_schedule.daily_online_seconds
@@ -662,7 +676,7 @@ def _append_breakthrough_completion_events(
         to_realm = int(completion["to_realm_id"])
         at_elapsed = int(completion["at_elapsed_seconds"])
         required_seconds = int(completion["required_seconds"])
-        price = str(completion["price"])
+        material_cost = str(completion["material_cost"])
         increment_counter(
             event_counters,
             "trash_man_realm_broken_through",
@@ -679,10 +693,11 @@ def _append_breakthrough_completion_events(
                     "trash_man_realm_after": str(to_realm),
                     "trash_man_highest_realm_before": str(from_realm),
                     "trash_man_highest_realm_after": str(to_realm),
-                    "trash_man_breakthrough_price": price,
+                    "trash_man_breakthrough_price": material_cost,
+                    "trash_man_breakthrough_price_resource": "material",
                     "trash_man_breakthrough_price_source": (
                         "tbtrashmanrealm"
-                        f"[id={from_realm}].moneyRequireToNextRealm"
+                        f"[id={from_realm}].materialRequireToNextRealm"
                     ),
                     "trash_man_breakthrough_required_online_seconds": str(
                         required_seconds
@@ -690,7 +705,7 @@ def _append_breakthrough_completion_events(
                     "trash_man_breakthrough_duration_source": (
                         "tbtrashmanrealm"
                         f"[id={from_realm}]"
-                        ".cultivationSecondsToNextRealm"
+                        ".breakthroughSecondsToNextRealm"
                     ),
                     "trash_man_breakthrough_online_only": "true",
                     "trash_man_breakthrough_processing_continued": "true",

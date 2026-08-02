@@ -10,6 +10,7 @@ engine:
   production_data: true
   strategy_id: production_active_throw_loop
   behavior_scheduler:
+    trash_man_breakthrough_policy: immediate
     manual_throw_refill:
       weight_multiplier: '10'
   active_throw:

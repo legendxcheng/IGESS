@@ -12,6 +12,58 @@ MANUAL_THROW_BEHAVIOR_ID = "manual_throw"
 MANUAL_THROW_REFILL_CONDITION = (
     "fish_hall_not_full_or_trash_processing_empty"
 )
+TRASH_MAN_BREAKTHROUGH_IMMEDIATE = "immediate"
+TRASH_MAN_BREAKTHROUGH_WEIGHTED_DELAY = "weighted_delay"
+TRASH_MAN_BREAKTHROUGH_PRESERVE_MATERIAL = "preserve_material"
+TRASH_MAN_BREAKTHROUGH_POLICY_IDS = frozenset(
+    {
+        TRASH_MAN_BREAKTHROUGH_IMMEDIATE,
+        TRASH_MAN_BREAKTHROUGH_WEIGHTED_DELAY,
+        TRASH_MAN_BREAKTHROUGH_PRESERVE_MATERIAL,
+    }
+)
+
+
+@dataclass(frozen=True)
+class TrashManBreakthroughPolicy:
+    """Player strategy for the explicit realm-breakthrough command."""
+
+    mode: str = TRASH_MAN_BREAKTHROUGH_WEIGHTED_DELAY
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.mode, str):
+            raise TypeError("trash-man breakthrough policy must be a string")
+        if self.mode not in TRASH_MAN_BREAKTHROUGH_POLICY_IDS:
+            raise ValueError(
+                "unknown trash-man breakthrough policy: "
+                f"{self.mode}"
+            )
+
+    @classmethod
+    def from_engine_settings(
+        cls,
+        settings: Mapping[str, Any],
+    ) -> "TrashManBreakthroughPolicy":
+        scheduler = settings.get("behavior_scheduler", {})
+        if not isinstance(scheduler, Mapping):
+            raise ValueError("engine.behavior_scheduler must be a mapping")
+        mode = scheduler.get(
+            "trash_man_breakthrough_policy",
+            TRASH_MAN_BREAKTHROUGH_WEIGHTED_DELAY,
+        )
+        if not isinstance(mode, str):
+            raise ValueError(
+                "engine.behavior_scheduler."
+                "trash_man_breakthrough_policy must be a string"
+            )
+        return cls(mode=mode)
+
+    def manifest_parameters(self) -> dict[str, str]:
+        return {
+            "mode": self.mode,
+            "command_is_explicit": "true",
+            "state_machine_auto_funds": "false",
+        }
 
 
 @dataclass(frozen=True)

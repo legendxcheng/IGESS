@@ -18,7 +18,7 @@ def apply_strength_rebirth(
     hall_adapter: FishHallDataAdapter,
     _mutate: bool = False,
 ) -> AppliedStrengthRebirth:
-    """Atomically reset strength and earn the next permanent hall multiplier.
+    """Atomically reset strength and earn a permanent material multiplier.
 
     Callers must settle continuous production to the command timestamp before
     invoking this transaction.
@@ -48,7 +48,9 @@ def apply_strength_rebirth(
             f"have {strength_before.to_decimal_string()}"
         )
 
-    fish_hall_before = hall_adapter.snapshot(state, use_cache=_mutate)
+    multiplier_before = hall_adapter.strength_material_output_multiplier(
+        from_completed_count
+    )
     committed = state if _mutate else state.copy()
     committed.wallet.strength = BigNumberDTO.from_value(
         SimNumber.zero(),
@@ -58,9 +60,8 @@ def apply_strength_rebirth(
     committed.meta.revision += 1
     if not _mutate:
         committed.validate(hall_adapter.validation_context())
-    fish_hall_after = hall_adapter.snapshot(
-        committed,
-        use_cache=_mutate,
+    multiplier_after = hall_adapter.strength_material_output_multiplier(
+        rule.completed_count
     )
     return AppliedStrengthRebirth(
         state=committed,
@@ -69,8 +70,8 @@ def apply_strength_rebirth(
         strength_requirement=rule.strength_requirement,
         strength_before=strength_before,
         strength_after=committed.wallet.strength.to_sim_number(),
-        fish_hall_before=fish_hall_before,
-        fish_hall_after=fish_hall_after,
+        material_multiplier_before=multiplier_before,
+        material_multiplier_after=multiplier_after,
     )
 
 
@@ -80,7 +81,7 @@ def apply_trash_man_rebirth(
     trash_adapter: FishTrashDataAdapter,
     _mutate: bool = False,
 ) -> AppliedTrashManRebirth:
-    """Reset current realm and earn the next permanent material multiplier.
+    """Reset current realm and earn a permanent Fish Hall multiplier.
 
     Callers must settle continuous production to the command timestamp before
     invoking this transaction.
@@ -116,7 +117,7 @@ def apply_trash_man_rebirth(
             f"need {rule.realm_requirement}, have {realm_before}"
         )
 
-    multiplier_before = trash_adapter.material_output_multiplier(
+    multiplier_before = trash_adapter.fish_hall_output_multiplier(
         from_completed_count
     )
     training_progress_seconds_before = (
@@ -129,7 +130,7 @@ def apply_trash_man_rebirth(
     committed.meta.revision += 1
     if not _mutate:
         committed.validate()
-    multiplier_after = trash_adapter.material_output_multiplier(
+    multiplier_after = trash_adapter.fish_hall_output_multiplier(
         rule.completed_count
     )
     return AppliedTrashManRebirth(
@@ -144,6 +145,6 @@ def apply_trash_man_rebirth(
         training_progress_seconds_after=(
             committed.trash_man.training_progress_seconds
         ),
-        material_multiplier_before=multiplier_before,
-        material_multiplier_after=multiplier_after,
+        fish_hall_multiplier_before=multiplier_before,
+        fish_hall_multiplier_after=multiplier_after,
     )

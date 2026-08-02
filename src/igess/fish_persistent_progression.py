@@ -115,17 +115,21 @@ def _persistent_event_row(
         after = details.get("fish_hall_upgrade_level_after")
     elif event.kind == "strength_reborn":
         category = "strength_rebirth"
-        metric_id = "fish_hall_output_multiplier"
-        before = details.get("strength_rebirth_multiplier_before")
-        after = details.get("strength_rebirth_multiplier_after")
-    elif event.kind == "trash_man_reborn":
-        category = "trash_man_rebirth"
         metric_id = "material_output_multiplier"
         before = details.get(
-            "trash_man_rebirth_material_multiplier_before"
+            "strength_rebirth_material_multiplier_before"
         )
         after = details.get(
-            "trash_man_rebirth_material_multiplier_after"
+            "strength_rebirth_material_multiplier_after"
+        )
+    elif event.kind == "trash_man_reborn":
+        category = "trash_man_rebirth"
+        metric_id = "fish_hall_output_multiplier"
+        before = details.get(
+            "trash_man_rebirth_fish_hall_multiplier_before"
+        )
+        after = details.get(
+            "trash_man_rebirth_fish_hall_multiplier_after"
         )
     elif event.kind in {"torpedo_purchased", "torpedo_upgraded"}:
         category = "torpedo"

@@ -95,7 +95,8 @@ def test_torpedo_purchase_uses_only_price_and_selects_stronger_torpedo(
         initial_strength=0,
         initial_trash_man_realm_id=1,
     )
-    state.wallet.money = BigNumberDTO.from_value(100)
+    state.wallet.material = BigNumberDTO.from_value(100)
+    state.wallet.money = BigNumberDTO.from_value(999)
 
     application = purchase_torpedo(
         state,
@@ -107,7 +108,11 @@ def test_torpedo_purchase_uses_only_price_and_selects_stronger_torpedo(
     assert state.torpedo.selected_id == 1
     assert application.state.torpedo.selected_id == 2
     assert application.state.torpedo.owned_ids == [1, 2]
-    assert application.state.wallet.money.to_sim_number().is_zero()
+    assert application.state.wallet.material.to_sim_number().is_zero()
+    assert application.state.wallet.money.to_sim_number() == SimNumber.parse(999)
+    assert application.event_details()["torpedo_purchase_price_resource"] == (
+        "material"
+    )
     assert application.trash_luck_after > application.trash_luck_before
     assert application.event_details()["torpedo_purchase_price"] == "100"
     assert application.event_details()["trash_luck"] == format(
@@ -140,7 +145,7 @@ def test_torpedo_behavior_targets_highest_affordable_without_strength_gate(
         initial_strength=0,
         initial_trash_man_realm_id=1,
     )
-    state.wallet.money = BigNumberDTO.from_value(1_000)
+    state.wallet.material = BigNumberDTO.from_value(1_000)
 
     adapter.behavior_profile(profile)
     candidate = adapter.candidates(state, profile)[0]
@@ -163,7 +168,7 @@ def test_torpedo_behavior_targets_highest_affordable_without_strength_gate(
     )
     assert completion.event_kind == "torpedo_purchased"
     assert completion.state.torpedo.selected_id == 3
-    assert completion.details["money_after_torpedo_purchase"] == "0"
+    assert completion.details["material_after_torpedo_purchase"] == "0"
 
 
 def test_torpedo_purchase_rejects_unaffordable_or_owned_target(
@@ -175,7 +180,7 @@ def test_torpedo_purchase_rejects_unaffordable_or_owned_target(
         initial_trash_man_realm_id=1,
     )
 
-    with pytest.raises(FishCommandError, match="insufficient money"):
+    with pytest.raises(FishCommandError, match="insufficient material"):
         purchase_torpedo(
             state,
             2,

@@ -373,15 +373,15 @@ def test_current_production_snapshot_resolves_one_throw() -> None:
     assert trash_adapter.realm_speed(first_realm.id) == SimNumber.parse(
         first_realm.decomposeSpeedMultiplier
     )
-    assert trash_adapter.cultivation_seconds_to_next_realm(first_realm.id) == int(
-        first_realm.cultivationSecondsToNextRealm
+    assert trash_adapter.progression_seconds_to_next_realm(first_realm.id) == int(
+        first_realm.breakthroughSecondsToNextRealm
     )
     realm_rows = snapshot.table("tbtrashmanrealm")
     assert len(realm_rows) == 60
     assert trash_adapter.realm_speed(2) == SimNumber.parse("2.25")
     assert trash_adapter.realm_speed(60) == SimNumber.parse("74.75")
     realm_prices = [
-        trash_adapter.money_required_to_next_realm(row.id)
+        trash_adapter.material_required_to_next_realm(row.id)
         for row in realm_rows
     ]
     assert realm_prices[0] == SimNumber.parse(20)
@@ -394,19 +394,19 @@ def test_current_production_snapshot_resolves_one_throw() -> None:
     )
     assert realm_prices[-1] == SimNumber.zero()
     assert trash_adapter.max_trash_man_rebirth_count == 10
-    assert trash_adapter.material_output_multiplier(0) == SimNumber.one()
+    assert trash_adapter.fish_hall_output_multiplier(0) == SimNumber.one()
     first_trash_man_rebirth = trash_adapter.next_trash_man_rebirth_rule(0)
     assert first_trash_man_rebirth.completed_count == 1
     assert first_trash_man_rebirth.realm_requirement == 0
     assert (
-        first_trash_man_rebirth.material_output_multiplier
+        first_trash_man_rebirth.fish_hall_output_multiplier
         == SimNumber.parse("2")
     )
-    assert trash_adapter.material_output_multiplier(1) == SimNumber.parse("2")
+    assert trash_adapter.fish_hall_output_multiplier(1) == SimNumber.parse("2")
     final_trash_man_rebirth = trash_adapter.trash_man_rebirth_rule(10)
     assert final_trash_man_rebirth.realm_requirement == 36
     assert (
-        final_trash_man_rebirth.material_output_multiplier
+        final_trash_man_rebirth.fish_hall_output_multiplier
         == SimNumber.parse("11")
     )
     production_trash_man_rebirth_state = PlayerState.new(
@@ -423,7 +423,7 @@ def test_current_production_snapshot_resolves_one_throw() -> None:
         == 1
     )
     assert (
-        production_trash_man_rebirth.material_multiplier_after
+        production_trash_man_rebirth.fish_hall_multiplier_after
         == SimNumber.parse(2)
     )
 
@@ -448,14 +448,16 @@ def test_current_production_snapshot_resolves_one_throw() -> None:
     hall_adapter = FishHallDataAdapter(snapshot)
     assert hall_adapter.max_hall_upgrade_level == 20
     assert hall_adapter.max_strength_rebirth_count == 10
-    assert hall_adapter.strength_rebirth_multiplier(0) == SimNumber.one()
+    assert hall_adapter.strength_material_output_multiplier(0) == (
+        SimNumber.one()
+    )
     first_strength_rebirth = hall_adapter.next_strength_rebirth_rule(0)
     assert first_strength_rebirth.completed_count == 1
     assert first_strength_rebirth.strength_requirement == SimNumber.parse(
         "1000"
     )
     assert (
-        first_strength_rebirth.fish_hall_output_multiplier
+        first_strength_rebirth.material_output_multiplier
         == SimNumber.parse(2)
     )
     final_strength_rebirth = hall_adapter.strength_rebirth_rule(10)
@@ -463,7 +465,7 @@ def test_current_production_snapshot_resolves_one_throw() -> None:
         "1e12"
     )
     assert (
-        final_strength_rebirth.fish_hall_output_multiplier
+        final_strength_rebirth.material_output_multiplier
         == SimNumber.parse(11)
     )
     production_rebirth_state = PlayerState.new(
@@ -484,7 +486,7 @@ def test_current_production_snapshot_resolves_one_throw() -> None:
         SimNumber.zero()
     )
     assert (
-        production_rebirth.fish_hall_after.strength_rebirth_multiplier
+        production_rebirth.material_multiplier_after
         == SimNumber.parse(2)
     )
     assert hall_adapter.capacity(0) == 10

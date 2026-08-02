@@ -8,6 +8,7 @@ from igess.behavior import BehaviorRuntimeState
 from igess.builder import ModelBuilder
 from igess.fish_hall import FishHallDataAdapter
 from igess.fish_production import FishProductionRuntime, settle_fish_production
+from igess.fish_rewards import FishRewardMultipliers
 from igess.fish_simulator import FishEconomySimulator
 from igess.fish_state import FishCheckpointCodec, PlayerState, TrashStock
 from igess.fish_trash import FishTrashDataAdapter, TrashProcessingRuntime
@@ -49,13 +50,13 @@ def test_trash_processing_speed_change_preserves_total_batch_yield(
 ) -> None:
     adapter = FishTrashDataAdapter(_snapshot(tmp_path))
     state = PlayerState.new(initial_trash_man_realm_id=2)
-    state.rebirth.trash_man_completed_count = 1
+    state.rebirth.strength_completed_count = 1
     state.trash_man.processing.active_trash_id = 1
     state.trash_man.processing.stocks = [TrashStock(trash_id=1, count=1)]
 
     first = adapter.settle(state, 1)
     assert first.decompose_speed_multiplier == SimNumber.parse("1.25")
-    assert first.material_output_multiplier == SimNumber.parse("2")
+    assert first.strength_rebirth_material_multiplier == SimNumber.parse("2")
     assert first.material_added == SimNumber.parse("5")
     assert first.processing.active_progress_seconds == 1
     assert first.runtime.progress_remainder == SimNumber.parse("0.25")
@@ -215,6 +216,59 @@ def test_online_cultivation_handles_zero_duration_and_stops_at_highest(
     assert capped_settlement.realm_id_after == 3
     assert capped_settlement.training_progress_seconds_after == 7
     assert capped_settlement.transitions == ()
+
+
+def test_progression_is_segmentation_invariant_and_ignores_reward_multiplier(
+    tmp_path: Path,
+) -> None:
+    snapshot = _snapshot(tmp_path, trash_duration=10)
+    hall_adapter = FishHallDataAdapter(snapshot)
+    trash_adapter = FishTrashDataAdapter(snapshot)
+    state = PlayerState.new(initial_trash_man_realm_id=1)
+    state.trash_man.highest_realm_id = 3
+    state.trash_man.processing.active_trash_id = 1
+    state.trash_man.processing.stocks = [TrashStock(trash_id=1, count=1)]
+
+    continuous = settle_fish_production(
+        state,
+        2,
+        hall_adapter=hall_adapter,
+        trash_adapter=trash_adapter,
+    )
+    first = settle_fish_production(
+        state,
+        1,
+        hall_adapter=hall_adapter,
+        trash_adapter=trash_adapter,
+    )
+    split = settle_fish_production(
+        first.state,
+        2,
+        hall_adapter=hall_adapter,
+        trash_adapter=trash_adapter,
+        runtime=first.runtime,
+    )
+
+    split_state = split.state.to_dict()
+    continuous_state = continuous.state.to_dict()
+    split_state.pop("meta")
+    continuous_state.pop("meta")
+    assert split_state == continuous_state
+    assert split.runtime == continuous.runtime
+
+    boosted = settle_fish_production(
+        state,
+        2,
+        hall_adapter=hall_adapter,
+        trash_adapter=trash_adapter,
+        reward_multipliers=FishRewardMultipliers(trash_material=3),
+    )
+
+    assert boosted.state.to_dict()["trashMan"] == (
+        continuous.state.to_dict()["trashMan"]
+    )
+    assert boosted.runtime == continuous.runtime
+    assert boosted.material_added == continuous.material_added * 3
 
 
 def test_online_cultivation_checkpoint_resume_does_not_split_active_behavior(

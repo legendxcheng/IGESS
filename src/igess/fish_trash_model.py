@@ -23,15 +23,15 @@ class TrashRule:
 class TrashManRealmRule:
     realm_id: int
     decompose_speed_multiplier: SimNumber
-    cultivation_seconds_to_next_realm: int
-    money_required_to_next_realm: SimNumber
+    progression_seconds_to_next_realm: int
+    material_required_to_next_realm: SimNumber
 
 
 @dataclass(frozen=True)
 class TrashManRebirthRule:
     completed_count: int
     realm_requirement: int
-    material_output_multiplier: SimNumber
+    fish_hall_output_multiplier: SimNumber
 
 
 @dataclass(frozen=True)
@@ -54,7 +54,7 @@ class TrashManBreakthroughCompletion:
     to_realm_id: int
     at_elapsed_seconds: int
     required_seconds: int
-    price: SimNumber
+    material_cost: SimNumber
 
     def to_dict(self) -> dict[str, int | str]:
         return {
@@ -62,7 +62,7 @@ class TrashManBreakthroughCompletion:
             "to_realm_id": self.to_realm_id,
             "at_elapsed_seconds": self.at_elapsed_seconds,
             "required_seconds": self.required_seconds,
-            "price": self.price.to_decimal_string(),
+            "material_cost": self.material_cost.to_decimal_string(),
         }
 
 
@@ -111,7 +111,8 @@ class TrashProcessingSettlement:
     realm_id: int
     decompose_speed_multiplier: SimNumber
     processing_efficiency: SimNumber
-    material_output_multiplier: SimNumber
+    strength_rebirth_completed_count: int
+    strength_rebirth_material_multiplier: SimNumber
     work_consumed: SimNumber
     unused_work: SimNumber
     material_added: SimNumber
@@ -132,7 +133,7 @@ class TrashProcessingSettlement:
                 "work=elapsed_seconds*decompose_speed_multiplier"
                 "*processing_efficiency;"
                 "material=base_material_per_second*work_consumed"
-                "*trash_to_treasure_output_multiplier"
+                "*strength_rebirth_material_output_multiplier"
             ),
             "trash_processing_queue_policy": "trash_id_ascending",
             "trash_processing_elapsed_seconds": str(self.elapsed_seconds),
@@ -143,8 +144,20 @@ class TrashProcessingSettlement:
             "trash_processing_efficiency": (
                 self.processing_efficiency.to_decimal_string()
             ),
-            "trash_material_output_multiplier": (
-                self.material_output_multiplier.to_decimal_string()
+            "strength_rebirth_completed_count": str(
+                self.strength_rebirth_completed_count
+            ),
+            "strength_rebirth_material_multiplier": (
+                self.strength_rebirth_material_multiplier.to_decimal_string()
+            ),
+            "strength_rebirth_material_multiplier_source": (
+                "default_1x_not_in_table"
+                if self.strength_rebirth_completed_count == 0
+                else (
+                    "tbstrengthrebirth"
+                    f"[id={self.strength_rebirth_completed_count}]"
+                    ".materialOutputMultiplier"
+                )
             ),
             "trash_processing_work_consumed": (self.work_consumed.to_decimal_string()),
             "trash_processing_unused_work": (self.unused_work.to_decimal_string()),
@@ -255,7 +268,7 @@ class TrashOnlineSettlement:
                 "work=elapsed_seconds*decompose_speed_multiplier"
                 "*processing_efficiency;"
                 "material=base_material_per_second*work_consumed"
-                "*trash_to_treasure_output_multiplier"
+                "*strength_rebirth_material_output_multiplier"
             ),
             "trash_processing_mode": self.settlement_mode,
             "trash_processing_queue_policy": "trash_id_ascending",
@@ -267,8 +280,21 @@ class TrashOnlineSettlement:
             "trash_processing_efficiency": (
                 first_segment.processing_efficiency.to_decimal_string()
             ),
-            "trash_material_output_multiplier": (
-                first_segment.material_output_multiplier.to_decimal_string()
+            "strength_rebirth_completed_count": str(
+                first_segment.strength_rebirth_completed_count
+            ),
+            "strength_rebirth_material_multiplier": (
+                first_segment.strength_rebirth_material_multiplier
+                .to_decimal_string()
+            ),
+            "strength_rebirth_material_multiplier_source": (
+                "default_1x_not_in_table"
+                if first_segment.strength_rebirth_completed_count == 0
+                else (
+                    "tbstrengthrebirth"
+                    f"[id={first_segment.strength_rebirth_completed_count}]"
+                    ".materialOutputMultiplier"
+                )
             ),
             "trash_processing_work_consumed": (self.work_consumed.to_decimal_string()),
             "trash_processing_unused_work": (self.unused_work.to_decimal_string()),
@@ -296,12 +322,12 @@ class TrashOnlineSettlement:
             "trash_man_cultivation_formula": (
                 "online_elapsed advances free historical catch-up or an "
                 "already-funded breakthrough; each completed current-row "
-                "cultivationSecondsToNextRealm advances one configured realm"
+                "breakthroughSecondsToNextRealm advances one configured realm"
             ),
             "trash_man_cultivation_online_only": "true",
             "trash_man_cultivation_ceiling": "historical_highest_realm",
             "trash_man_breakthrough_policy": (
-                "paid_current_row_price_then_online_current_row_duration"
+                "material_paid_once_then_online_current_row_duration"
             ),
             "trash_man_cultivation_elapsed_seconds": str(
                 self.cultivation_elapsed_seconds

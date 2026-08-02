@@ -55,16 +55,16 @@ def test_max_income_layout_uses_capacity_income_and_stable_ties(
     ]
     assert state.fish.items[2].hall_slot == 0
 
-    state.rebirth.strength_completed_count = 1
+    state.rebirth.trash_man_completed_count = 1
     reborn_snapshot = hall_adapter.snapshot(state)
     assert reborn_snapshot.base_total_income_per_second == SimNumber.parse(22)
-    assert reborn_snapshot.strength_rebirth_multiplier == SimNumber.parse(2)
+    assert reborn_snapshot.trash_man_rebirth_multiplier == SimNumber.parse(2)
     assert reborn_snapshot.total_income_per_second == SimNumber.parse(44)
     assert (
         reborn_snapshot.event_details()[
-            "strength_rebirth_fish_hall_multiplier_source"
+            "trash_man_rebirth_fish_hall_multiplier_source"
         ]
-        == "tbstrengthrebirth[id=1].fishHallOutputMultiplier"
+        == "tbtrashmanrebirth[id=1].fishHallOutputMultiplier"
     )
 
 
@@ -208,17 +208,17 @@ def test_strength_rebirth_uses_implicit_one_x_then_one_based_table_rows(
     adapter = FishHallDataAdapter(_snapshot(tmp_path))
 
     assert adapter.max_strength_rebirth_count == 2
-    assert adapter.strength_rebirth_multiplier(0) == SimNumber.one()
+    assert adapter.strength_material_output_multiplier(0) == SimNumber.one()
     first = adapter.next_strength_rebirth_rule(0)
     assert first.completed_count == 1
     assert first.strength_requirement == SimNumber.parse(1000)
-    assert first.fish_hall_output_multiplier == SimNumber.parse(2)
-    assert adapter.strength_rebirth_multiplier(1) == SimNumber.parse(2)
+    assert first.material_output_multiplier == SimNumber.parse(2)
+    assert adapter.strength_material_output_multiplier(1) == SimNumber.parse(2)
     second = adapter.next_strength_rebirth_rule(1)
     assert second.completed_count == 2
     assert second.strength_requirement == SimNumber.parse(10000)
-    assert second.fish_hall_output_multiplier == SimNumber.parse(3)
-    assert adapter.strength_rebirth_multiplier(2) == SimNumber.parse(3)
+    assert second.material_output_multiplier == SimNumber.parse(3)
+    assert adapter.strength_material_output_multiplier(2) == SimNumber.parse(3)
 
     with pytest.raises(FishDataError, match="default 1x"):
         adapter.strength_rebirth_rule(0)
@@ -231,7 +231,7 @@ def test_strength_rebirth_uses_implicit_one_x_then_one_based_table_rows(
         FishHallDataAdapter(zero_based)
 
 
-def test_strength_rebirth_resets_only_strength_and_applies_hall_multiplier(
+def test_strength_rebirth_resets_only_strength_and_applies_material_multiplier(
     tmp_path: Path,
 ) -> None:
     adapter = FishHallDataAdapter(_snapshot(tmp_path))
@@ -259,15 +259,10 @@ def test_strength_rebirth_resets_only_strength_and_applies_hall_multiplier(
     assert committed.wallet.strength.to_sim_number() == SimNumber.zero()
     assert committed.rebirth.strength_completed_count == 1
     assert committed.meta.revision == state.meta.revision + 1
-    assert application.fish_hall_before.total_income_per_second == (
-        SimNumber.parse(10)
-    )
-    assert application.fish_hall_after.base_total_income_per_second == (
-        SimNumber.parse(10)
-    )
-    assert application.fish_hall_after.total_income_per_second == (
-        SimNumber.parse(20)
-    )
+    assert application.material_multiplier_before == SimNumber.one()
+    assert application.material_multiplier_after == SimNumber.parse(2)
+    assert adapter.snapshot(state).total_income_per_second == SimNumber.parse(10)
+    assert adapter.snapshot(committed).total_income_per_second == SimNumber.parse(10)
     after = committed.to_dict(context=adapter.validation_context())
     for field in (
         "fish",
@@ -288,8 +283,8 @@ def test_strength_rebirth_resets_only_strength_and_applies_hall_multiplier(
             assert after[field] == before[field]
     details = application.event_details()
     assert details["strength_rebirth_table_id"] == "1"
-    assert details["strength_rebirth_multiplier_before"] == "1"
-    assert details["strength_rebirth_multiplier_after"] == "2"
+    assert details["strength_rebirth_material_multiplier_before"] == "1"
+    assert details["strength_rebirth_material_multiplier_after"] == "2"
     assert details["strength_rebirth_reset_fields"] == "wallet.strength"
 
 

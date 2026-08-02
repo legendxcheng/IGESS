@@ -48,7 +48,7 @@ class FishIncomeTrace:
 class StrengthRebirthRule:
     completed_count: int
     strength_requirement: SimNumber
-    fish_hall_output_multiplier: SimNumber
+    material_output_multiplier: SimNumber
 
 
 @dataclass(frozen=True)
@@ -56,8 +56,8 @@ class FishHallIncomeSnapshot:
     capacity: int
     deployed_instance_ids: tuple[int, ...]
     base_total_income_per_second: SimNumber
-    strength_rebirth_completed_count: int
-    strength_rebirth_multiplier: SimNumber
+    trash_man_rebirth_completed_count: int
+    trash_man_rebirth_multiplier: SimNumber
     total_income_per_second: SimNumber
     traces: tuple[FishIncomeTrace, ...]
 
@@ -65,10 +65,10 @@ class FishHallIncomeSnapshot:
         label = f"_{suffix}" if suffix else ""
         multiplier_source = (
             "default_1x_not_in_table"
-            if self.strength_rebirth_completed_count == 0
+            if self.trash_man_rebirth_completed_count == 0
             else (
-                "tbstrengthrebirth"
-                f"[id={self.strength_rebirth_completed_count}]"
+                "tbtrashmanrebirth"
+                f"[id={self.trash_man_rebirth_completed_count}]"
                 ".fishHallOutputMultiplier"
             )
         )
@@ -86,18 +86,18 @@ class FishHallIncomeSnapshot:
             f"fish_hall_base_income_per_second{label}": (
                 self.base_total_income_per_second.to_decimal_string()
             ),
-            f"strength_rebirth_completed_count{label}": str(
-                self.strength_rebirth_completed_count
+            f"trash_man_rebirth_completed_count{label}": str(
+                self.trash_man_rebirth_completed_count
             ),
-            f"strength_rebirth_fish_hall_multiplier{label}": (
-                self.strength_rebirth_multiplier.to_decimal_string()
+            f"trash_man_rebirth_fish_hall_multiplier{label}": (
+                self.trash_man_rebirth_multiplier.to_decimal_string()
             ),
-            f"strength_rebirth_fish_hall_multiplier_source{label}": (
+            f"trash_man_rebirth_fish_hall_multiplier_source{label}": (
                 multiplier_source
             ),
             f"fish_hall_income_formula{label}": (
                 "sum(deployed_fish_income_per_second)"
-                "*strength_rebirth_fish_hall_multiplier"
+                "*trash_man_rebirth_fish_hall_multiplier"
             ),
             f"fish_hall_formula_trace{label}": json.dumps(
                 [trace.event_entry() for trace in self.traces],

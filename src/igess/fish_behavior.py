@@ -35,7 +35,10 @@ from .fish_behavior_targets import (
 )
 from .fish_behavior_weights import (
     MANUAL_THROW_BEHAVIOR_ID,
+    TRASH_MAN_BREAKTHROUGH_IMMEDIATE,
+    TRASH_MAN_BREAKTHROUGH_PRESERVE_MATERIAL,
     ManualThrowRefillRule,
+    TrashManBreakthroughPolicy,
 )
 from .fish_hall import FishHallDataAdapter
 from .fish_production import (
@@ -109,6 +112,9 @@ class FishBehaviorAdapter:
         barbell_adapter: FishBarbellDataAdapter,
         throw_config: ProductionThrowConfig,
         manual_throw_refill_rule: ManualThrowRefillRule | None = None,
+        trash_man_breakthrough_policy: (
+            TrashManBreakthroughPolicy | None
+        ) = None,
         _validate_state: bool = True,
     ) -> None:
         if type(_validate_state) is not bool:
@@ -127,6 +133,18 @@ class FishBehaviorAdapter:
         ):
             raise TypeError(
                 "manual_throw_refill_rule must be a ManualThrowRefillRule"
+            )
+        self.trash_man_breakthrough_policy = (
+            trash_man_breakthrough_policy
+            or TrashManBreakthroughPolicy()
+        )
+        if not isinstance(
+            self.trash_man_breakthrough_policy,
+            TrashManBreakthroughPolicy,
+        ):
+            raise TypeError(
+                "trash_man_breakthrough_policy must be a "
+                "TrashManBreakthroughPolicy"
             )
         self.torpedo_adapter = FishTorpedoDataAdapter(
             throw_adapter.snapshot,
@@ -397,7 +415,34 @@ class FishBehaviorAdapter:
                 and candidate.available
             )
         )
-        return available_rebirths or result
+        if available_rebirths:
+            return available_rebirths
+        if (
+            self.trash_man_breakthrough_policy.mode
+            == TRASH_MAN_BREAKTHROUGH_PRESERVE_MATERIAL
+        ):
+            return tuple(
+                candidate
+                for candidate in result
+                if candidate.behavior_id
+                != FUND_TRASH_MAN_BREAKTHROUGH_BEHAVIOR_ID
+            )
+        if (
+            self.trash_man_breakthrough_policy.mode
+            == TRASH_MAN_BREAKTHROUGH_IMMEDIATE
+        ):
+            available_breakthroughs = tuple(
+                candidate
+                for candidate in result
+                if (
+                    candidate.behavior_id
+                    == FUND_TRASH_MAN_BREAKTHROUGH_BEHAVIOR_ID
+                    and candidate.available
+                )
+            )
+            if available_breakthroughs:
+                return available_breakthroughs
+        return result
 
     def complete(
         self,

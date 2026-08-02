@@ -19,7 +19,7 @@ def synthesize_barbell(
     barbell_adapter: FishBarbellDataAdapter,
     _mutate: bool = False,
 ) -> AppliedBarbellSynthesis:
-    """Atomically pay material, add one barbell, and equip the best owned.
+    """Atomically pay money, add one barbell, and equip the best owned.
 
     Callers must settle continuous production to the command timestamp before
     invoking this transaction.
@@ -44,12 +44,12 @@ def synthesize_barbell(
         price = barbell_adapter.synthesis_price(barbell_id)
     except FishDataError as exc:
         raise FishCommandError(str(exc)) from exc
-    material_before = state.wallet.material.to_sim_number()
-    if material_before < price:
+    money_before = state.wallet.money.to_sim_number()
+    if money_before < price:
         raise FishCommandError(
-            "insufficient material for barbell synthesis: "
+            "insufficient money for barbell synthesis: "
             f"need {price.to_decimal_string()}, "
-            f"have {material_before.to_decimal_string()}"
+            f"have {money_before.to_decimal_string()}"
         )
 
     source_owned = next(
@@ -76,8 +76,8 @@ def synthesize_barbell(
     else:
         committed_owned.count += 1
     committed.barbell.equipped_id = barbell_adapter.best_owned_id(committed)
-    committed.wallet.material = BigNumberDTO.from_value(
-        material_before - price,
+    committed.wallet.money = BigNumberDTO.from_value(
+        money_before - price,
         allow_negative=False,
     )
     committed.meta.revision += 1
@@ -88,8 +88,8 @@ def synthesize_barbell(
         state=committed,
         barbell_id=barbell_id,
         price=price,
-        material_before=material_before,
-        material_after=committed.wallet.material.to_sim_number(),
+        money_before=money_before,
+        money_after=committed.wallet.money.to_sim_number(),
         count_before=count_before,
         count_after=committed_owned.count,
         production_before=production_before,
