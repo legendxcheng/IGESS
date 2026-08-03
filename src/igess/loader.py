@@ -36,16 +36,17 @@ class ConfigLoader:
         tables_dir = Path(tables_dir)
         data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
         rules = cls._load_rules(data)
+        table_loader = cls._load_table if rules.model.engine_id == "generic" else cls._load_optional_table
         return RawConfig(
             rules=rules,
-            resources=cls._load_table(tables_dir / "resources.json", ResourceRow),
-            generators=cls._load_table(tables_dir / "generators.json", GeneratorRow),
+            resources=table_loader(tables_dir / "resources.json", ResourceRow),
+            generators=table_loader(tables_dir / "generators.json", GeneratorRow),
             activities=cls._load_optional_table(tables_dir / "activities.json", ActivityRow),
             activity_outputs=cls._load_optional_table(
                 tables_dir / "activity_outputs.json", ActivityOutputRow
             ),
-            upgrades=cls._load_table(tables_dir / "upgrades.json", UpgradeRow),
-            constants=cls._load_table(tables_dir / "constants.json", ConstantRow),
+            upgrades=table_loader(tables_dir / "upgrades.json", UpgradeRow),
+            constants=table_loader(tables_dir / "constants.json", ConstantRow),
             milestones=cls._load_optional_table(tables_dir / "milestones.json", MilestoneRow),
             prestige_layers=cls._load_optional_table(
                 tables_dir / "prestige_layers.json", PrestigeLayerRow

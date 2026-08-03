@@ -13,6 +13,7 @@ EXPECTED_COMMANDS = {
     "dashboard",
     "doctor",
     "explain",
+    "export-operator-toolkit",
     "export-tables",
     "gate",
     "init",

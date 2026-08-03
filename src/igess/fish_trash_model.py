@@ -322,7 +322,7 @@ class TrashOnlineSettlement:
             "trash_man_cultivation_formula": (
                 "online_elapsed advances free historical catch-up or an "
                 "already-funded breakthrough; each completed current-row "
-                "breakthroughSecondsToNextRealm advances one configured realm"
+                "progression duration advances one configured realm"
             ),
             "trash_man_cultivation_online_only": "true",
             "trash_man_cultivation_ceiling": "historical_highest_realm",

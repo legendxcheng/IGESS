@@ -294,15 +294,15 @@ class FishTrashDataAdapter:
                     ("tbtrashmanrealm." f"{row_id}.decomposeSpeedMultiplier"),
                 ),
                 progression_seconds_to_next_realm=_nonnegative_int(
-                    _field(
+                    _field_alias(
                         row,
-                        "breakthroughSecondsToNextRealm",
+                        (
+                            "breakthroughSecondsToNextRealm",
+                            "cultivationSecondsToNextRealm",
+                        ),
                         "tbtrashmanrealm",
                     ),
-                    (
-                        "tbtrashmanrealm."
-                        f"{row_id}.breakthroughSecondsToNextRealm"
-                    ),
+                    f"tbtrashmanrealm.{row_id}.progressionSecondsToNextRealm",
                 ),
                 material_required_to_next_realm=_nonnegative_sim_number(
                     _field(
@@ -439,6 +439,18 @@ def _field(row: Any, name: str, table_name: str) -> Any:
         raise FishDataError(
             f"generated {table_name} row is missing field: {name}"
         ) from exc
+
+
+def _field_alias(row: Any, names: tuple[str, ...], table_name: str) -> Any:
+    for name in names:
+        try:
+            return getattr(row, name)
+        except AttributeError:
+            continue
+    supported = " or ".join(names)
+    raise FishDataError(
+        f"generated {table_name} row is missing supported field: {supported}"
+    )
 
 
 def _positive_int(value: Any, field: str) -> int:

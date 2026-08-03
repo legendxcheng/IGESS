@@ -16,6 +16,7 @@ from .linter import ConfigError, ConfigLinter
 from .loader import ConfigLoader
 from .luban_exporter import export_registered_workbooks
 from .outputs import OutputWriter
+from .operator_export import export_operator_toolkit
 from .reporting.loader import ReportLoadError
 from .reporting.static import generate_static_report
 from .rng import RngSimulator
@@ -87,6 +88,30 @@ def build_parser() -> argparse.ArgumentParser:
         "--datas", required=True, help="Directory containing registered Luban workbooks."
     )
     export.add_argument("--out", required=True, help="Directory for exported JSON tables.")
+
+    operator_export = add_command(
+        "export-operator-toolkit",
+        "Export a sourceless execution-planner toolkit",
+        "igess export-operator-toolkit --project projects/fish --out ../igess-operator",
+    )
+    operator_export.add_argument(
+        "--project",
+        required=True,
+        help="IGESS model project containing economy.yaml.",
+    )
+    operator_export.add_argument(
+        "--out",
+        required=True,
+        help="Distribution repository working tree to synchronize.",
+    )
+    operator_export.add_argument(
+        "--version",
+        help="Optional displayed toolkit version; defaults to the project package version.",
+    )
+    operator_export.add_argument(
+        "--python",
+        help="Optional Python 3.11 x64 executable used to compile bytecode.",
+    )
 
     stone_role_level = add_command(
         "stone-role-level",
@@ -358,6 +383,21 @@ def main(argv: list[str] | None = None) -> int:
             require_directory(args.datas, "source workbook directory")
             written = export_registered_workbooks(args.datas, args.out)
             print(f"Exported {len(written)} tables to {args.out}")
+            return 0
+        if args.command == "export-operator-toolkit":
+            require_directory(args.project, "IGESS model project")
+            result = export_operator_toolkit(
+                args.project,
+                args.out,
+                tool_version=args.version,
+                python_command=(args.python,) if args.python else None,
+            )
+            print(
+                f"Exported operator toolkit {result.tool_version} to "
+                f"{result.output_root} ({len(result.managed_files)} managed file(s), "
+                f"{len(result.removed_files)} removed)"
+            )
+            print("Review the distribution repository diff before committing or pushing.")
             return 0
         if args.command == "stone-role-level":
             require_file(args.role_lv, "role-level workbook")

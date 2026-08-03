@@ -102,6 +102,21 @@ For a browser UI:
 
 Open `http://127.0.0.1:8765/`.
 
+## Source-isolated execution-planner toolkit
+
+IGESS can export a Windows x64 / Python 3.11 toolkit for an execution planner who
+needs local JSON-driven simulation and reports without access to IGESS `.py`
+sources:
+
+```powershell
+python -m igess.cli export-operator-toolkit --project projects/fish --out E:\path\to\igess-operator --python C:\Path\To\Python311\python.exe
+```
+
+The export is a fail-closed, allowlisted sourceless `.pyc` distribution. It
+synchronizes only files owned by its previous delivery manifest and never runs
+Git commands. Review the distribution repository diff manually before commit or
+push. See [Execution-planner toolkit publishing](docs/operator-toolkit.md).
+
 ### Static Reports
 
 `report` reads a run directory and writes a self-contained report folder:

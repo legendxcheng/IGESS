@@ -45,6 +45,21 @@ def test_realm_table_exposes_nonfinal_prices_and_zero_final_sentinel(
     assert adapter.material_required_to_next_realm(3) == SimNumber.zero()
 
 
+def test_realm_table_accepts_current_cultivation_duration_field(
+    tmp_path: Path,
+) -> None:
+    snapshot = _snapshot(tmp_path)
+    for row in snapshot.table("tbtrashmanrealm"):
+        row.cultivationSecondsToNextRealm = row.breakthroughSecondsToNextRealm
+        del row.breakthroughSecondsToNextRealm
+
+    adapter = FishTrashDataAdapter(snapshot)
+
+    assert adapter.progression_seconds_to_next_realm(1) == 0
+    assert adapter.progression_seconds_to_next_realm(2) == 1
+    assert adapter.progression_seconds_to_next_realm(3) == 2
+
+
 def test_realm_table_rejects_non_increasing_nonfinal_prices(
     tmp_path: Path,
 ) -> None:

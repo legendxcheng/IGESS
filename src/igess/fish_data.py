@@ -155,7 +155,7 @@ class GeneratedLubanProvider:
             raise FishDataError(
                 f"Luban generated Python schema is unavailable: {self.schema_path}"
             ) from exc
-        if not resolved.is_file() or resolved.suffix.lower() != ".py":
+        if not resolved.is_file() or resolved.suffix.lower() not in {".py", ".pyc"}:
             raise FishDataError(
                 f"Luban generated Python schema is invalid: {resolved}"
             )
