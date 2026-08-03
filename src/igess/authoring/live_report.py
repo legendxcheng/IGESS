@@ -614,7 +614,7 @@ _LIVE_PAGE = r"""<!doctype html>
     <a id="direct" href="/report/index.html" target="_blank" hidden>单独打开报表</a>
   </header>
   <div id="empty">第一轮正式模拟完成后会自动显示报表</div>
-  <iframe id="report" title="IGESS report" hidden></iframe>
+  <iframe id="report" title="IGESS 调优报告" hidden></iframe>
   <script>
     const body = document.body;
     const message = document.querySelector('#message');

@@ -66,19 +66,22 @@ def test_generate_static_report_writes_html_and_assets(tmp_path):
     run_dir = _write_sample_run(tmp_path)
     report_dir = tmp_path / "report"
 
-    generated = generate_static_report(run_dir, report_dir, title="Day 1 Economy")
+    generated = generate_static_report(run_dir, report_dir, title="首日经济报告")
 
     assert generated == report_dir / "index.html"
     html = generated.read_text(encoding="utf-8")
-    assert "Day 1 Economy" in html
-    assert "Resource Curves" in html
-    assert "Fish 经济对称性总览" in html
+    assert "首日经济报告" in html
+    assert "运行总览" in html
+    assert "资源曲线" in html
+    assert "摸鱼经济对称性总览" in html
     assert "fish-acquisition-rate-chart" in html
     assert "fish-cumulative-output-chart" in html
     assert "data-daily-progression-charts" in html
-    assert "Event Timeline" in html
-    assert "Payback" in html
-    assert "Analysis Warnings" in html
+    assert "事件时间线" in html
+    assert "回本压力" in html
+    assert "分析预警" in html
+    assert "Resource Curves" not in html
+    assert "Analysis Warnings" not in html
     assert 'data-overview-kpis' in html
     assert 'class="kpi-grid"' in html
     assert "fisherman" in html
@@ -117,6 +120,33 @@ def test_generate_static_report_writes_chart_rendering_asset(tmp_path):
     assert "exact_value" in script
     assert "exact-value" in script
     assert "escapeHtml" in script
+
+
+@pytest.mark.parametrize("asset_name", ["report.js", "report.min.js"])
+def test_report_frontend_assets_use_chinese_user_facing_copy(asset_name):
+    script = Path(
+        "src/igess/reporting/assets",
+        asset_name,
+    ).read_text(encoding="utf-8")
+
+    for expected in (
+        "模拟时长",
+        "首次关键解锁",
+        "永久成长次数",
+        "总产出速率",
+        "成长瓶颈",
+        "公式计算过程",
+        "没有可展示的数据",
+    ):
+        assert expected in script
+    for removed in (
+        "First key unlock",
+        "Persistent gains",
+        "Total CPS",
+        "Formula traces",
+        "No data available",
+    ):
+        assert removed not in script
 
 
 @pytest.mark.skipif(NODE is None, reason="Node.js is required to execute the report renderer")
@@ -168,9 +198,9 @@ context.renderDailyProgressionCharts({
 });
 
 const firstDayTorpedo = options['daily-progression-chart-0'].series
-  .find(series => series.name === '鱼雷 / TrashLuck');
+  .find(series => series.name === '鱼雷 / 垃圾幸运值');
 const secondDayTorpedo = options['daily-progression-chart-1'].series
-  .find(series => series.name === '鱼雷 / TrashLuck');
+  .find(series => series.name === '鱼雷 / 垃圾幸运值');
 process.stdout.write(JSON.stringify({
   first: firstDayTorpedo.itemStyle.color,
   second: secondDayTorpedo.itemStyle.color,
@@ -373,27 +403,27 @@ process.stdout.write(JSON.stringify({
     assert "&lt;profile&gt;" in html
     assert "&lt;resource&gt;" in html
     assert "&lt;display&gt;" in html
-    duration_card = html.split("<h3>Duration</h3>", 1)[1].split("</article>", 1)[0]
-    purchases_card = html.split("<h3>Purchases</h3>", 1)[1].split("</article>", 1)[0]
+    duration_card = html.split("<h3>模拟时长</h3>", 1)[1].split("</article>", 1)[0]
+    purchases_card = html.split("<h3>购买次数</h3>", 1)[1].split("</article>", 1)[0]
     assert '<details class="exact-value">' in duration_card
     assert '<details class="exact-value">' in purchases_card
-    assert "<summary>Exact</summary>" in duration_card
+    assert "<summary>精确值</summary>" in duration_card
     assert "<code>&quot;&gt;&lt;script&gt;" in duration_card
     assert "&lt;gap-profile&gt;" in rendered["diagnostics"]
-    assert 'title="Exact value: 2"' in rendered["diagnostics"]
-    assert "2</span> gaps" in rendered["diagnostics"]
+    assert 'title="精确值：2"' in rendered["diagnostics"]
+    assert "2</span> 个空窗" in rendered["diagnostics"]
     assert "&lt;trace-profile&gt;" in rendered["evidence"]
-    assert "1.23457e-5s" in rendered["evidence"]
-    assert 'title="Exact value: 0.0000123456789"' in rendered["evidence"]
+    assert "1.23457e-5秒" in rendered["evidence"]
+    assert 'title="精确值：0.0000123456789"' in rendered["evidence"]
 
     assert "&lt;series&gt;" in rendered["resourceTooltip"]
-    assert 'title="Exact value: 123.456789"' in rendered["resourceTooltip"]
-    assert 'title="Exact value: 0.0000123456789"' in rendered["resourceTooltip"]
-    assert 'title="Exact value: 123.456789"' in rendered["cpsTooltip"]
+    assert 'title="精确值：123.456789"' in rendered["resourceTooltip"]
+    assert 'title="精确值：0.0000123456789"' in rendered["resourceTooltip"]
+    assert 'title="精确值：123.456789"' in rendered["cpsTooltip"]
     assert "&lt;event-kind&gt;" in rendered["eventTooltip"]
-    assert 'title="Exact value: 0.0000123456789"' in rendered["eventTooltip"]
+    assert 'title="精确值：0.0000123456789"' in rendered["eventTooltip"]
     assert "&lt;pay-profile&gt;" in rendered["paybackTooltip"]
-    assert 'title="Exact value: 123.456789"' in rendered["paybackTooltip"]
+    assert 'title="精确值：123.456789"' in rendered["paybackTooltip"]
 
     for value in rendered.values():
         assert "<script>" not in value
@@ -572,6 +602,7 @@ def test_generate_static_report_embeds_parseable_json_payload(tmp_path):
     generated = generate_static_report(run_dir, report_dir)
 
     html = generated.read_text(encoding="utf-8")
+    assert "IGESS 调优报告 - 首日成长" in html
     marker = '<script id="igess-report-data" type="application/json">'
     start = html.index(marker) + len(marker)
     end = html.index("</script>", start)

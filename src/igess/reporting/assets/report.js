@@ -31,7 +31,7 @@ async function loadReport() {
 function renderOverview(report) {
   const scenario = document.querySelector('[data-scenario]');
   if (scenario) {
-    scenario.textContent = report.scenario.id;
+    scenario.textContent = scenarioLabel(report.scenario.id);
   }
   const container = document.querySelector('[data-overview-kpis]');
   if (!container) return;
@@ -40,26 +40,29 @@ function renderOverview(report) {
   const worstPayback = overview.worst_payback;
   const profiles = overview.profiles || [];
   container.innerHTML = [
-    kpiCard('Duration', numericMarkup(overview.duration_seconds, 's')),
-    kpiCard('Profiles', `<span class="kpi-value">${escapeHtml(profiles.join(', ') || 'None')}</span>`),
-    kpiCard('Purchases', numericMarkup(overview.purchase_count)),
+    kpiCard('模拟时长', numericMarkup(overview.duration_seconds, '秒')),
     kpiCard(
-      'First key unlock',
-      firstUnlock ? numericMarkup(firstUnlock.time_seconds, 's') : '<span class="kpi-value">None</span>',
+      '玩家档案',
+      `<span class="kpi-value">${escapeHtml(profiles.map(profileLabel).join('、') || '无')}</span>`
+    ),
+    kpiCard('购买次数', numericMarkup(overview.purchase_count)),
+    kpiCard(
+      '首次关键解锁',
+      firstUnlock ? numericMarkup(firstUnlock.time_seconds, '秒') : '<span class="kpi-value">无</span>',
       firstUnlock ? identityMarkup(firstUnlock) : ''
     ),
-    kpiCard('Prestige resets', numericMarkup(overview.prestige_reset_count)),
+    kpiCard('转生重置次数', numericMarkup(overview.prestige_reset_count)),
     kpiCard(
-      'Worst payback',
-      worstPayback ? numericMarkup(worstPayback.payback_seconds, 's') : '<span class="kpi-value">None</span>',
+      '最长回本周期',
+      worstPayback ? numericMarkup(worstPayback.payback_seconds, '秒') : '<span class="kpi-value">无</span>',
       worstPayback ? identityMarkup(worstPayback) : ''
     ),
     kpiCard(
-      'Never reached',
-      `<div class="kpi-pair"><div><span>Purchased</span>${numericMarkup(overview.never_purchased_count)}</div>` +
-        `<div><span>Unlocked</span>${numericMarkup(overview.never_unlocked_count)}</div></div>`
+      '未触达内容',
+      `<div class="kpi-pair"><div><span>从未购买</span>${numericMarkup(overview.never_purchased_count)}</div>` +
+        `<div><span>从未解锁</span>${numericMarkup(overview.never_unlocked_count)}</div></div>`
     ),
-    kpiCard('Warning categories', numericMarkup(overview.warning_category_count)),
+    kpiCard('预警类别数', numericMarkup(overview.warning_category_count)),
     finalResourcesCard(overview.final_resources || {}),
   ].join('');
 }
@@ -82,39 +85,42 @@ function numericMarkup(point, suffix = '') {
     ? '—'
     : String(point.display_value);
   const exact = point.exact_value == null ? '' : String(point.exact_value);
-  const exactTitle = exact ? ` title="Exact value: ${escapeHtml(exact)}"` : '';
+  const exactTitle = exact ? ` title="精确值：${escapeHtml(exact)}"` : '';
   const exactDetails = exact
-    ? `<details class="exact-value"><summary>Exact</summary><code>${escapeHtml(exact)}</code></details>`
+    ? `<details class="exact-value"><summary>精确值</summary><code>${escapeHtml(exact)}</code></details>`
     : '';
   return `<span class="kpi-value" data-exact-value="${escapeHtml(exact)}"${exactTitle}>` +
     `${escapeHtml(display)}${escapeHtml(suffix)}</span>${exactDetails}`;
 }
 
 function identityMarkup(row) {
-  const identity = `${row.profile_id || ''} ${row.kind || ''}:${row.item_id || ''}`.trim();
+  const identity = [
+    profileLabel(row.profile_id || ''),
+    `${contentKindLabel(row.kind || '')}：${itemIdentityLabel(row.item_id || '')}`,
+  ].filter(Boolean).join(' · ');
   return identity ? `<p class="kpi-detail">${escapeHtml(identity)}</p>` : '';
 }
 
 function finalResourcesCard(finalResources) {
   const profiles = Object.entries(finalResources);
   if (!profiles.length) {
-    return kpiCard('Final resources', '<span class="kpi-value">None</span>');
+    return kpiCard('最终资源', '<span class="kpi-value">无</span>');
   }
   const displayRows = profiles.flatMap(([profileId, resources]) =>
     Object.entries(resources || {}).map(([resourceId, point]) =>
-      `<li><strong>${escapeHtml(profileId)}</strong> · ${escapeHtml(resourceId)}: ${numericMarkup(point)}</li>`
+      `<li><strong>${escapeHtml(profileLabel(profileId))}</strong> · ${escapeHtml(resourceLabel(resourceId))}：${numericMarkup(point)}</li>`
     )
   );
   const exactRows = profiles.flatMap(([profileId, resources]) =>
     Object.entries(resources || {}).map(([resourceId, point]) =>
-      `<li><strong>${escapeHtml(profileId)}</strong> · ${escapeHtml(resourceId)}: ` +
+      `<li><strong>${escapeHtml(profileLabel(profileId))}</strong> · ${escapeHtml(resourceLabel(resourceId))}：` +
         `<code>${escapeHtml(point && point.exact_value != null ? point.exact_value : '')}</code></li>`
     )
   );
   return kpiCard(
-    'Final resources',
+    '最终资源',
     `<ul class="kpi-resources">${displayRows.join('')}</ul>`,
-    `<details class="exact-values"><summary>Exact values</summary><ul>${exactRows.join('')}</ul></details>`
+    `<details class="exact-values"><summary>精确值</summary><ul>${exactRows.join('')}</ul></details>`
   );
 }
 
@@ -137,24 +143,24 @@ function renderCoreProgression(core, balance = {}) {
       const summary = profile.summary || {};
       return [
         kpiCard(
-          `${profileId} · FishLuck`,
+          `${profileLabel(profileId)} · 摸鱼幸运值`,
           numericMarkup(summary.fish_luck_final),
-          `<p class="kpi-detail">Peak ${numericInline(summary.fish_luck_peak)}</p>`
+          `<p class="kpi-detail">峰值 ${numericInline(summary.fish_luck_peak)}</p>`
         ),
         kpiCard(
-          `${profileId} · TrashLuck`,
+          `${profileLabel(profileId)} · 垃圾幸运值`,
           numericMarkup(summary.trash_luck_final),
-          `<p class="kpi-detail">Peak ${numericInline(summary.trash_luck_peak)}</p>`
+          `<p class="kpi-detail">峰值 ${numericInline(summary.trash_luck_peak)}</p>`
         ),
         kpiCard(
-          `${profileId} · Strength`,
+          `${profileLabel(profileId)} · 力量`,
           numericMarkup(summary.strength_final),
-          `<p class="kpi-detail">Peak ${numericInline(summary.strength_peak)}</p>`
+          `<p class="kpi-detail">峰值 ${numericInline(summary.strength_peak)}</p>`
         ),
         kpiCard(
-          `${profileId} · Longest Luck stalls`,
-          `<div class="kpi-pair"><div><span>Fish</span>${numericMarkup(summary.longest_fish_luck_stagnation_seconds, 's')}</div>` +
-            `<div><span>Trash</span>${numericMarkup(summary.longest_trash_luck_stagnation_seconds, 's')}</div></div>`
+          `${profileLabel(profileId)} · 幸运值最长停滞`,
+          `<div class="kpi-pair"><div><span>摸鱼</span>${numericMarkup(summary.longest_fish_luck_stagnation_seconds, '秒')}</div>` +
+            `<div><span>垃圾</span>${numericMarkup(summary.longest_trash_luck_stagnation_seconds, '秒')}</div></div>`
         ),
       ].join('');
     }).join('');
@@ -173,7 +179,7 @@ function renderFishAcquisitionRateChart(profiles) {
       ['金钱/秒', 'money_per_second', '#2563eb'],
     ].forEach(([label, field, color]) => {
       series.push({
-        name: `${profileId} · ${label}`,
+        name: `${profileLabel(profileId)} · ${label}`,
         type: 'line',
         showSymbol: false,
         connectNulls: false,
@@ -200,7 +206,7 @@ function renderFishCumulativeOutputChart(profiles) {
       ['累计资源', 'resource_acquired_cumulative', '#16a34a'],
     ].forEach(([label, field, color]) => {
       series.push({
-        name: `${profileId} · ${label}`,
+        name: `${profileLabel(profileId)} · ${label}`,
         type: 'line',
         showSymbol: false,
         connectNulls: false,
@@ -252,8 +258,8 @@ function fishBalanceLineOption(title, series, yAxisName, { logarithmic = false }
         const datum = param.data;
         const row = datum.row;
         return [
-          `<strong>${escapeHtml(param.seriesName)}</strong>: ${numericTooltip(row[datum.field])}`,
-          `累计在线: ${formatDurationClock(row.active_time_seconds)} (${numericTooltip(row.active_time, 's')})`,
+          `<strong>${escapeHtml(param.seriesName)}</strong>：${numericTooltip(row[datum.field])}`,
+          `累计在线：${formatDurationClock(row.active_time_seconds)}（${numericTooltip(row.active_time, '秒')}）`,
         ].join('<br>');
       }).join('<br><br>'),
     },
@@ -277,11 +283,11 @@ function renderCoreStrengthChart(profiles) {
   Object.entries(profiles).forEach(([profileId, profile]) => {
     const rows = profile.rows || [];
     [
-      ['Current', 'strength_current', 'solid'],
-      ['Peak', 'strength_peak', 'dashed'],
+      ['当前值', 'strength_current', 'solid'],
+      ['历史峰值', 'strength_peak', 'dashed'],
     ].forEach(([label, field, lineType]) => {
       series.push({
-        name: `${profileId} · ${label}`,
+        name: `${profileLabel(profileId)} · ${label}`,
         type: 'line',
         showSymbol: false,
         lineStyle: { type: lineType },
@@ -290,9 +296,9 @@ function renderCoreStrengthChart(profiles) {
     });
   });
   replaceChart('core-strength-chart', progressionLineOption(
-    'Strength: current vs historical peak',
+    '力量当前值与历史峰值',
     series,
-    'strength'
+    '力量'
   ));
 }
 
@@ -301,13 +307,13 @@ function renderLuckProgressionChart(profiles) {
   Object.entries(profiles).forEach(([profileId, profile]) => {
     const rows = profile.rows || [];
     [
-      ['FishLuck current', 'fish_luck_current', 'solid'],
-      ['FishLuck peak', 'fish_luck_peak', 'dashed'],
-      ['TrashLuck current', 'trash_luck_current', 'solid'],
-      ['TrashLuck peak', 'trash_luck_peak', 'dashed'],
+      ['摸鱼幸运值（当前）', 'fish_luck_current', 'solid'],
+      ['摸鱼幸运值（峰值）', 'fish_luck_peak', 'dashed'],
+      ['垃圾幸运值（当前）', 'trash_luck_current', 'solid'],
+      ['垃圾幸运值（峰值）', 'trash_luck_peak', 'dashed'],
     ].forEach(([label, field, lineType]) => {
       series.push({
-        name: `${profileId} · ${label}`,
+        name: `${profileLabel(profileId)} · ${label}`,
         type: 'line',
         showSymbol: false,
         lineStyle: { type: lineType },
@@ -316,9 +322,9 @@ function renderLuckProgressionChart(profiles) {
     });
   });
   replaceChart('luck-progression-chart', progressionLineOption(
-    'FishLuck 与 TrashLuck 的变化曲线',
+    '摸鱼幸运值与垃圾幸运值变化曲线',
     series,
-    'Luck'
+    '幸运值'
   ));
 }
 
@@ -346,17 +352,17 @@ function progressionLineOption(title, series, yAxisName) {
         const datum = param.data;
         const row = datum.row;
         const marker = row.reset_or_milestone_marker
-          ? `<br>Marker: ${escapeHtml(row.reset_or_milestone_marker)}`
+          ? `<br>标记：${escapeHtml(eventKindLabel(row.reset_or_milestone_marker))}`
           : '';
-        return `${escapeHtml(param.seriesName)}: ${numericTooltip(row[datum.field])}` +
-          `<br>Active: ${numericTooltip(row.active_time, 's')}` +
-          `<br>Wall: ${numericTooltip(row.wall_time, 's')}${marker}`;
+        return `${escapeHtml(param.seriesName)}：${numericTooltip(row[datum.field])}` +
+          `<br>累计在线：${numericTooltip(row.active_time, '秒')}` +
+          `<br>模拟时间：${numericTooltip(row.wall_time, '秒')}${marker}`;
       }).join('<br><br>'),
     },
     legend: { top: 28, type: 'scroll' },
     grid: { left: 80, right: 24, top: 76, bottom: 54 },
     dataZoom: [{ type: 'inside' }, { type: 'slider' }],
-    xAxis: { type: 'value', name: 'cumulative active seconds' },
+    xAxis: { type: 'value', name: '累计在线时间（秒）' },
     yAxis: { type: 'value', name: yAxisName, scale: true },
     series: usable,
   };
@@ -374,24 +380,24 @@ function renderPersistentProgression(persistent) {
       const summary = profile.summary || {};
       return [
         kpiCard(
-          `${profileId} · Persistent gains`,
+          `${profileLabel(profileId)} · 永久成长次数`,
           numericMarkup(summary.total_progression_count),
-          `<p class="kpi-detail">${numericInline(summary.events_per_active_hour)} per active hour</p>`
+          `<p class="kpi-detail">每在线小时 ${numericInline(summary.events_per_active_hour)} 次</p>`
         ),
         kpiCard(
-          `${profileId} · Maximum gap`,
-          `<div class="kpi-pair"><div><span>All gains</span>${numericMarkup(summary.max_interval_seconds, 's')}</div>` +
-            `<div><span>System gains</span>${numericMarkup(summary.system_progression_max_interval_seconds, 's')}</div></div>`
+          `${profileLabel(profileId)} · 最长成长空窗`,
+          `<div class="kpi-pair"><div><span>全部成长</span>${numericMarkup(summary.max_interval_seconds, '秒')}</div>` +
+            `<div><span>系统成长</span>${numericMarkup(summary.system_progression_max_interval_seconds, '秒')}</div></div>`
         ),
         kpiCard(
-          `${profileId} · Tail gap`,
-          numericMarkup(summary.tail_gap_seconds, 's')
+          `${profileLabel(profileId)} · 尾部成长空窗`,
+          numericMarkup(summary.tail_gap_seconds, '秒')
         ),
         kpiCard(
-          `${profileId} · Empty sessions`,
-          `<div class="kpi-pair"><div><span>All gains</span>${numericMarkup(summary.complete_online_sessions_without_progression)}</div>` +
-            `<div><span>System gains</span>${numericMarkup(summary.complete_online_sessions_without_system_progression)}</div></div>`,
-          `<p class="kpi-detail">of ${numericInline(summary.complete_online_sessions)} complete online sessions</p>`
+          `${profileLabel(profileId)} · 无成长在线时段`,
+          `<div class="kpi-pair"><div><span>全部成长</span>${numericMarkup(summary.complete_online_sessions_without_progression)}</div>` +
+            `<div><span>系统成长</span>${numericMarkup(summary.complete_online_sessions_without_system_progression)}</div></div>`,
+          `<p class="kpi-detail">共 ${numericInline(summary.complete_online_sessions)} 个完整在线时段</p>`
         ),
       ].join('');
     }).join('');
@@ -420,7 +426,7 @@ function renderDailyProgressionCharts(profiles) {
       : (day.rows || []).length;
     return [
       '<article class="daily-chart-card">',
-      `<h3>第 ${escapeHtml(day.day_index)} 天 · ${escapeHtml(profileId)} · ${escapeHtml(count)} 次有效成长</h3>`,
+      `<h3>第 ${escapeHtml(day.day_index)} 天 · ${escapeHtml(profileLabel(profileId))} · ${escapeHtml(count)} 次有效成长</h3>`,
       `<div id="daily-progression-chart-${index}" class="chart daily-chart"></div>`,
       '</article>',
     ].join('');
@@ -448,12 +454,12 @@ function renderDailyProgressionCharts(profiles) {
           const row = params.data.row;
           return [
             `<strong>${escapeHtml(progressionCategoryLabel(row.progression_category))}</strong>`,
-            `当日在线: ${formatDurationClock(row.day_active_time_seconds)}`,
-            `累计在线: ${formatDurationClock(row.active_time_seconds)}`,
-            `事件: ${escapeHtml(row.source_event_kind)} · ${escapeHtml(row.item_id)}`,
-            `指标: ${escapeHtml(row.metric_id)}`,
-            `变化: ${numericTooltip(row.metric_before)} → ${numericTooltip(row.metric_after)}`,
-            `距上次有效成长: ${numericTooltip(row.gap_from_previous_progression_seconds, 's')}`,
+            `当日在线：${formatDurationClock(row.day_active_time_seconds)}`,
+            `累计在线：${formatDurationClock(row.active_time_seconds)}`,
+            `事件：${escapeHtml(eventKindLabel(row.source_event_kind))} · ${escapeHtml(itemIdentityLabel(row.item_id))}`,
+            `指标：${escapeHtml(metricLabel(row.metric_id))}`,
+            `变化：${numericTooltip(row.metric_before)} → ${numericTooltip(row.metric_after)}`,
+            `距上次有效成长：${numericTooltip(row.gap_from_previous_progression_seconds, '秒')}`,
           ].join('<br>');
         },
       },
@@ -478,7 +484,7 @@ function progressionCategoryLabel(category) {
     barbell: '杠铃',
     fish_hall: '摸鱼厅容量',
     strength_rebirth: '力量转生',
-    torpedo: '鱼雷 / TrashLuck',
+    torpedo: '鱼雷 / 垃圾幸运值',
     trash_man_realm: '垃圾佬境界',
     trash_man_rebirth: '垃圾佬转生',
     permanent_unlock: '永久解锁',
@@ -524,7 +530,7 @@ function renderProgressionDensityChart(profiles) {
     const density = profile.density_by_active_hour || [];
     const rows = profile.rows || [];
     series.push({
-      name: `${profileId} · events/hour`,
+      name: `${profileLabel(profileId)} · 每小时事件数`,
       type: 'bar',
       yAxisIndex: 0,
       data: density
@@ -540,7 +546,7 @@ function renderProgressionDensityChart(profiles) {
         })),
     });
     series.push({
-      name: `${profileId} · event magnitude`,
+      name: `${profileLabel(profileId)} · 事件变化幅度`,
       type: 'scatter',
       yAxisIndex: 1,
       symbolSize: 9,
@@ -562,7 +568,7 @@ function renderProgressionDensityChart(profiles) {
   }
   replaceChart('progression-density-chart', {
     title: {
-      text: 'Trigger density and normalized change magnitude',
+      text: '成长触发密度与标准化变化幅度',
       left: 'center',
       textStyle: { fontSize: 14 },
     },
@@ -574,27 +580,27 @@ function renderProgressionDensityChart(profiles) {
         if (datum.kind === 'density') {
           return [
             `<strong>${escapeHtml(params.seriesName)}</strong>`,
-            `Window: ${numericTooltip(row.active_time_start_seconds, 's')}–${numericTooltip(row.active_time_end_seconds, 's')}`,
-            `Events: ${numericTooltip(row.event_count)}`,
-            `Average magnitude: ${numericTooltip(row.average_relative_delta)}`,
+            `时间窗：${numericTooltip(row.active_time_start_seconds, '秒')}–${numericTooltip(row.active_time_end_seconds, '秒')}`,
+            `事件数：${numericTooltip(row.event_count)}`,
+            `平均变化幅度：${numericTooltip(row.average_relative_delta)}`,
           ].join('<br>');
         }
         return [
-          `<strong>${escapeHtml(row.progression_category)} · ${escapeHtml(row.item_id)}</strong>`,
-          `Active: ${numericTooltip(row.active_time, 's')}`,
-          `Change: ${numericTooltip(row.metric_before)} → ${numericTooltip(row.metric_after)}`,
-          `Delta: ${numericTooltip(row.metric_delta)}`,
-          `Normalized: ${numericTooltip(row.relative_delta)}`,
+          `<strong>${escapeHtml(progressionCategoryLabel(row.progression_category))} · ${escapeHtml(itemIdentityLabel(row.item_id))}</strong>`,
+          `累计在线：${numericTooltip(row.active_time, '秒')}`,
+          `变化：${numericTooltip(row.metric_before)} → ${numericTooltip(row.metric_after)}`,
+          `差值：${numericTooltip(row.metric_delta)}`,
+          `标准化幅度：${numericTooltip(row.relative_delta)}`,
         ].join('<br>');
       },
     },
     legend: { top: 28, type: 'scroll' },
     grid: { left: 70, right: 80, top: 76, bottom: 54 },
     dataZoom: [{ type: 'inside' }, { type: 'slider' }],
-    xAxis: { type: 'value', name: 'cumulative active seconds' },
+    xAxis: { type: 'value', name: '累计在线时间（秒）' },
     yAxis: [
-      { type: 'value', name: 'events / active hour', minInterval: 1 },
-      { type: 'value', name: 'normalized delta %', position: 'right' },
+      { type: 'value', name: '每在线小时事件数', minInterval: 1 },
+      { type: 'value', name: '标准化变化幅度（%）', position: 'right' },
     ],
     series,
   });
@@ -607,27 +613,27 @@ function renderProgressionEventsTable(profiles) {
     (profile.rows || []).map(row => ({ ...row, profile_id: profileId }))
   );
   if (!rows.length) {
-    target.innerHTML = '<div class="empty">No persistent progression events occurred.</div>';
+    target.innerHTML = '<div class="empty">没有发生永久成长事件。</div>';
     return;
   }
   const body = rows.slice(0, 500).map(row => [
     '<tr>',
-    `<td>${escapeHtml(row.profile_id)}</td>`,
-    `<td>${numericTooltip(row.active_time, 's')}</td>`,
-    `<td>${escapeHtml(row.progression_category)}</td>`,
-    `<td><code>${escapeHtml(row.source_event_kind)}</code><br>${escapeHtml(row.item_id)}</td>`,
-    `<td>${numericTooltip(row.gap_from_previous_progression_seconds, 's')}</td>`,
+    `<td>${escapeHtml(profileLabel(row.profile_id))}</td>`,
+    `<td>${numericTooltip(row.active_time, '秒')}</td>`,
+    `<td>${escapeHtml(progressionCategoryLabel(row.progression_category))}</td>`,
+    `<td>${escapeHtml(eventKindLabel(row.source_event_kind))}<br><code>${escapeHtml(itemIdentityLabel(row.item_id))}</code></td>`,
+    `<td>${numericTooltip(row.gap_from_previous_progression_seconds, '秒')}</td>`,
     `<td>${numericTooltip(row.metric_before)} → ${numericTooltip(row.metric_after)}</td>`,
     `<td>${numericTooltip(row.metric_delta)}</td>`,
     '</tr>',
   ].join('')).join('');
   const truncated = rows.length > 500
-    ? `<p class="section-note">Showing 500 of ${escapeHtml(rows.length)} events; use behavior_progression.csv for the full data.</p>`
+    ? `<p class="section-note">共 ${escapeHtml(rows.length)} 条事件，当前显示前 500 条；完整数据请查看 behavior_progression.csv。</p>`
     : '';
   target.innerHTML = [
     truncated,
     '<table class="data-table">',
-    '<thead><tr><th>Profile</th><th>Active time</th><th>Category</th><th>Event</th><th>Gap</th><th>Before → after</th><th>Delta</th></tr></thead>',
+    '<thead><tr><th>玩家档案</th><th>累计在线</th><th>类别</th><th>事件</th><th>间隔</th><th>变化前 → 变化后</th><th>差值</th></tr></thead>',
     `<tbody>${body}</tbody>`,
     '</table>',
   ].join('');
@@ -637,7 +643,7 @@ function numericInline(point, suffix = '') {
   if (!point || typeof point !== 'object') return '—';
   const display = point.display_value == null ? '—' : String(point.display_value);
   const exact = point.exact_value == null ? '' : String(point.exact_value);
-  return `<span title="Exact value: ${escapeHtml(exact)}">${escapeHtml(display)}${escapeHtml(suffix)}</span>`;
+  return `<span title="精确值：${escapeHtml(exact)}">${escapeHtml(display)}${escapeHtml(suffix)}</span>`;
 }
 
 function renderResourceControls(report) {
@@ -645,11 +651,11 @@ function renderResourceControls(report) {
   if (!container) return;
   const ids = report.overview.resource_ids || [];
   if (!ids.length) {
-    container.innerHTML = '<div class="empty">No resource data available.</div>';
+    container.innerHTML = '<div class="empty">没有可展示的资源数据。</div>';
     return;
   }
   container.innerHTML = ids.map((id, index) =>
-    `<button type="button" data-resource="${escapeHtml(id)}" class="${index === 0 ? 'active' : ''}">${escapeHtml(id)}</button>`
+    `<button type="button" data-resource="${escapeHtml(id)}" class="${index === 0 ? 'active' : ''}">${escapeHtml(resourceLabel(id))}</button>`
   ).join('');
   container.querySelectorAll('[data-resource]').forEach(button => {
     button.addEventListener('click', () => {
@@ -662,13 +668,13 @@ function renderResourceControls(report) {
 
 function renderResourceChart(report, resourceId) {
   const rows = (report.series.resources || []).filter(row => row.resource_id === resourceId);
-  const option = lineOption(`Resource: ${resourceId || 'none'}`, rows, 'Resource');
+  const option = lineOption(`资源：${resourceId ? resourceLabel(resourceId) : '无'}`, rows, '资源数量');
   replaceChart('resource-chart', option);
 }
 
 function renderCpsChart(report) {
   const rows = report.series.total_cps || [];
-  const option = lineOption('Total CPS', rows, 'CPS');
+  const option = lineOption('总产出速率', rows, '每秒产出');
   replaceChart('cps-chart', option);
 }
 
@@ -681,7 +687,7 @@ function renderEventChart(report) {
   const profiles = report.scenario.profiles || [];
   const kinds = [...new Set(events.map(event => event.kind || 'event'))].sort();
   const series = kinds.map(kind => ({
-    name: kind,
+    name: eventKindLabel(kind),
     type: 'scatter',
     symbolSize: 10,
     data: events
@@ -697,18 +703,18 @@ function renderEventChart(report) {
       formatter: params => {
         const event = params.data.event;
         return [
-          `<strong>${escapeHtml(event.kind)}</strong>`,
-          `Profile: ${escapeHtml(event.profile_id)}`,
-          `Time: ${numericTooltip(event.time, 's')}`,
-          `Item: ${escapeHtml(event.item_id || '')}`,
+          `<strong>${escapeHtml(eventKindLabel(event.kind))}</strong>`,
+          `玩家档案：${escapeHtml(profileLabel(event.profile_id))}`,
+          `时间：${numericTooltip(event.time, '秒')}`,
+          `内容项：${escapeHtml(itemIdentityLabel(event.item_id || ''))}`,
         ].join('<br>');
       },
     },
     legend: { top: 0 },
     grid: { left: 90, right: 24, top: 48, bottom: 48 },
     dataZoom: [{ type: 'inside' }, { type: 'slider' }],
-    xAxis: { type: 'value', name: 'seconds' },
-    yAxis: { type: 'category', data: profiles },
+    xAxis: { type: 'value', name: '时间（秒）' },
+    yAxis: { type: 'category', data: profiles.map(profileLabel) },
     series,
   });
 }
@@ -728,19 +734,19 @@ function renderPaybackChart(report) {
       formatter: params => {
         const row = params.data.row;
         return [
-          `<strong>${escapeHtml(row.profile_id)} ${escapeHtml(row.kind)}:${escapeHtml(row.item_id)}</strong>`,
-          `Payback: ${numericTooltip(row.payback_seconds, 's')}`,
-          `Cost: ${numericTooltip(row.cost)}`,
-          `Delta CPS: ${numericTooltip(row.delta_cps)}`,
-          `Source: ${escapeHtml(row.source_ref || '')}`,
+          `<strong>${escapeHtml(profileLabel(row.profile_id))} · ${escapeHtml(contentKindLabel(row.kind))}：${escapeHtml(itemIdentityLabel(row.item_id))}</strong>`,
+          `回本周期：${numericTooltip(row.payback_seconds, '秒')}`,
+          `成本：${numericTooltip(row.cost)}`,
+          `每秒产出增量：${numericTooltip(row.delta_cps)}`,
+          `数据来源：${escapeHtml(row.source_ref || '')}`,
         ].join('<br>');
       },
     },
     grid: { left: 170, right: 24, top: 24, bottom: 40 },
-    xAxis: { type: 'value', name: 'seconds' },
+    xAxis: { type: 'value', name: '回本时间（秒）' },
     yAxis: {
       type: 'category',
-      data: rows.map(row => `${row.profile_id} ${row.kind}:${row.item_id}`),
+      data: rows.map(row => `${profileLabel(row.profile_id)} ${contentKindLabel(row.kind)}：${itemIdentityLabel(row.item_id)}`),
       inverse: true,
     },
     series: [{
@@ -761,18 +767,18 @@ function lineOption(title, rows, valueName) {
       formatter: params => params.map(param => {
         const row = param.data.row;
         return [
-          `${escapeHtml(param.seriesName)}: ${numericTooltip(row)}`,
-          `Time: ${numericTooltip(row.time, 's')}`,
+          `${escapeHtml(profileLabel(param.seriesName))}：${numericTooltip(row)}`,
+          `时间：${numericTooltip(row.time, '秒')}`,
         ].join('<br>');
       }).join('<br>'),
     },
     legend: { top: 28 },
     grid: { left: 70, right: 24, top: 72, bottom: 54 },
     dataZoom: [{ type: 'inside' }, { type: 'slider' }],
-    xAxis: { type: 'value', name: 'seconds' },
+    xAxis: { type: 'value', name: '时间（秒）' },
     yAxis: { type: 'value', name: valueName },
     series: profiles.map(profile => ({
-      name: profile,
+      name: profileLabel(profile),
       type: 'line',
       showSymbol: false,
       data: plottable
@@ -795,27 +801,35 @@ function renderDiagnostics(report) {
     .filter(row => row.payback_seconds && row.payback_seconds.exact_value === 'Infinity')
     .slice(0, 10);
   target.innerHTML = [
-    diagnosticBlock('Never purchased', invalid.never_purchased || []),
-    diagnosticBlock('Never unlocked', invalid.never_unlocked || []),
-    diagnosticBlock('Overpowered', (diagnostics.overpowered_content || []).map(row => row.item_id)),
-    diagnosticHtmlBlock('Bottlenecks', Object.entries(bottleneckGapCounts).map(([profile, count]) =>
-      `${escapeHtml(profile)}: ${numericTooltip(count)} gaps`
+    diagnosticBlock('从未购买', (invalid.never_purchased || []).map(itemIdentityLabel)),
+    diagnosticBlock('从未解锁', (invalid.never_unlocked || []).map(itemIdentityLabel)),
+    diagnosticBlock(
+      '强度异常内容',
+      (diagnostics.overpowered_content || []).map(row => itemIdentityLabel(row.item_id))
+    ),
+    diagnosticHtmlBlock('成长瓶颈', Object.entries(bottleneckGapCounts).map(([profile, count]) =>
+      `${escapeHtml(profileLabel(profile))}：${numericTooltip(count)} 个空窗`
     )),
-    diagnosticBlock('Infinite payback', infinitePaybacks.map(row => `${row.profile_id} ${row.kind}:${row.item_id}`)),
+    diagnosticBlock(
+      '无法回本',
+      infinitePaybacks.map(row =>
+        `${profileLabel(row.profile_id)} ${contentKindLabel(row.kind)}：${itemIdentityLabel(row.item_id)}`
+      )
+    ),
   ].join('');
 }
 
 function diagnosticBlock(title, values) {
   const body = values.length
     ? `<ul>${values.map(value => `<li>${escapeHtml(value)}</li>`).join('')}</ul>`
-    : '<p>None</p>';
+    : '<p>无</p>';
   return `<div class="metric"><strong>${escapeHtml(title)}</strong>${body}</div>`;
 }
 
 function diagnosticHtmlBlock(title, safeRows) {
   const body = safeRows.length
     ? `<ul>${safeRows.map(row => `<li>${row}</li>`).join('')}</ul>`
-    : '<p>None</p>';
+    : '<p>无</p>';
   return `<div class="metric"><strong>${escapeHtml(title)}</strong>${body}</div>`;
 }
 
@@ -826,23 +840,23 @@ function renderEvidence(report) {
   const traces = evidence.traces || [];
   const refs = evidence.source_refs || [];
   if (!traces.length && !refs.length) {
-    target.innerHTML = '<div class="empty">No trace evidence available.</div>';
+    target.innerHTML = '<div class="empty">没有可展示的分析依据。</div>';
     return;
   }
   const traceRows = traces.map(trace => [
-    escapeHtml(trace.profile_id || ''),
-    numericTooltip(trace.time, 's'),
-    `${escapeHtml(trace.kind || '')}:${escapeHtml(trace.item_id || '')}`,
+    escapeHtml(profileLabel(trace.profile_id || '')),
+    numericTooltip(trace.time, '秒'),
+    `${escapeHtml(eventKindLabel(trace.kind || ''))}：${escapeHtml(itemIdentityLabel(trace.item_id || ''))}`,
     `<code>${escapeHtml(trace.formula_trace || '')}</code>`,
   ].join(' '));
   const referenceRows = refs.map(ref => [
-    escapeHtml(ref.profile_id || ''),
-    `${escapeHtml(ref.kind || '')}:${escapeHtml(ref.item_id || '')}`,
+    escapeHtml(profileLabel(ref.profile_id || '')),
+    `${escapeHtml(contentKindLabel(ref.kind || ''))}：${escapeHtml(itemIdentityLabel(ref.item_id || ''))}`,
     `<code>${escapeHtml(ref.source_ref || '')}</code>`,
   ].join(' '));
   target.innerHTML = [
-    evidenceHtmlDetails('Formula traces', traceRows),
-    evidenceHtmlDetails('Source references', referenceRows),
+    evidenceHtmlDetails('公式计算过程', traceRows),
+    evidenceHtmlDetails('数据来源', referenceRows),
   ].join('');
 }
 
@@ -852,6 +866,124 @@ function evidenceHtmlDetails(title, safeRows) {
     .slice(0, 100)
     .map(row => `<li>${row}</li>`)
     .join('')}</ul></details>`;
+}
+
+function scenarioLabel(scenarioId) {
+  const labels = {
+    smoke: '冒烟验证',
+    analytic_smoke: '解析式冒烟验证',
+    day_1_progression: '首日成长',
+    day_1_growth: '首日成长',
+    week_1_growth: '首周成长',
+    month_1_growth: '首月成长',
+  };
+  return labels[scenarioId] || scenarioId || '';
+}
+
+function profileLabel(profileId) {
+  const labels = {
+    default: '默认玩家',
+    casual: '休闲玩家',
+    explorer: '探索型玩家',
+    optimizer: '效率型玩家',
+    paid_20pct: '付费二成玩家',
+  };
+  return labels[profileId] || profileId || '';
+}
+
+function resourceLabel(resourceId) {
+  const labels = {
+    gold: '金币',
+    money: '金钱',
+    material: '材料',
+    strength: '力量',
+    shell: '贝壳',
+    shells: '贝壳',
+    prestige_point: '转生点',
+    prestige_points: '转生点',
+  };
+  return labels[resourceId] || resourceId || '';
+}
+
+function contentKindLabel(kind) {
+  const labels = {
+    activity: '活动',
+    generator: '生产器',
+    upgrade: '升级',
+    milestone: '里程碑',
+    prestige: '转生',
+  };
+  return labels[kind] || eventKindLabel(kind);
+}
+
+function itemIdentityLabel(itemId) {
+  const text = String(itemId || '');
+  const match = text.match(/^([a-z][a-z0-9_]*):(.*)$/);
+  if (!match) return text;
+  const labels = {
+    activity: '活动',
+    generator: '生产器',
+    upgrade: '升级',
+    prestige: '转生',
+    fish: '鱼',
+    throw: '投掷',
+    fish_hall: '摸鱼厅',
+    fish_hall_upgrade: '摸鱼厅升级',
+    barbell: '杠铃',
+    torpedo: '鱼雷',
+    strength_rebirth: '力量转生',
+    trash_man_rebirth: '垃圾佬转生',
+    trash_man_realm: '垃圾佬境界',
+  };
+  const prefix = labels[match[1]] || match[1];
+  return `${prefix}：${match[2]}`;
+}
+
+function eventKindLabel(kind) {
+  const labels = {
+    event: '事件',
+    buy_generator: '购买生产器',
+    buy_upgrade: '购买升级',
+    unlock_activity: '解锁活动',
+    unlock_generator: '解锁生产器',
+    unlock_upgrade: '解锁升级',
+    prestige_reset: '转生重置',
+    fish_engine_ready: '摸鱼模拟就绪',
+    fish_throw_resolved: '摸鱼投掷结算',
+    fish_upgraded: '鱼升级',
+    fish_hall_upgraded: '摸鱼厅升级',
+    fish_offline_settled: '离线收益结算',
+    fish_session_online_started: '在线时段开始',
+    fish_session_offline_started: '离线时段开始',
+    fish_behavior_started: '摸鱼行为开始',
+    fish_behavior_idle_completed: '摸鱼空闲行为完成',
+    fish_system_unlocked: '系统永久解锁',
+    fish_ability_unlocked: '能力永久解锁',
+    fish_strategy_unlocked: '策略永久解锁',
+    torpedo_purchased: '购买鱼雷',
+    torpedo_upgraded: '鱼雷升级',
+    barbell_synthesized: '合成杠铃',
+    barbell_exercise_completed: '完成杠铃锻炼',
+    strength_reborn: '力量转生',
+    trash_man_reborn: '垃圾佬转生',
+    trash_man_breakthrough_funded: '垃圾佬突破筹资完成',
+    trash_man_realm_broken_through: '垃圾佬境界突破',
+  };
+  return labels[kind] || kind || '';
+}
+
+function metricLabel(metricId) {
+  const labels = {
+    fish_hall_cps: '摸鱼厅每秒产出',
+    barbell_strength_per_second: '杠铃每秒力量',
+    fish_hall_level: '摸鱼厅等级',
+    material_output_multiplier: '材料产出倍率',
+    fish_hall_output_multiplier: '摸鱼厅产出倍率',
+    trash_luck: '垃圾幸运值',
+    trash_man_realm_id: '垃圾佬境界',
+    unlock_state: '解锁状态',
+  };
+  return labels[metricId] || metricId || '';
 }
 
 function firstResource(report) {
@@ -870,17 +1002,17 @@ function numericTooltip(point, suffix = '') {
   if (!point || typeof point !== 'object') return '';
   const display = numericText(point);
   const exact = point.exact_value == null ? '' : String(point.exact_value);
-  return `<span title="Exact value: ${escapeHtml(exact)}">${escapeHtml(display)}${escapeHtml(suffix)}</span>`;
+  return `<span title="精确值：${escapeHtml(exact)}">${escapeHtml(display)}${escapeHtml(suffix)}</span>`;
 }
 
 function formatDurationCompact(value) {
   const seconds = Math.max(0, Number(value) || 0);
   if (seconds >= 3600) {
     const hours = seconds / 3600;
-    return `${Number.isInteger(hours) ? hours : hours.toFixed(1)}h`;
+    return `${Number.isInteger(hours) ? hours : hours.toFixed(1)}小时`;
   }
-  if (seconds >= 60) return `${Math.round(seconds / 60)}m`;
-  return `${Math.round(seconds)}s`;
+  if (seconds >= 60) return `${Math.round(seconds / 60)}分`;
+  return `${Math.round(seconds)}秒`;
 }
 
 function formatDurationClock(value) {
@@ -909,7 +1041,7 @@ function mountChart(id, option) {
   const element = document.getElementById(id);
   if (!element) return null;
   if (!option || typeof echarts === 'undefined') {
-    element.innerHTML = '<div class="empty">No data available.</div>';
+    element.innerHTML = '<div class="empty">没有可展示的数据。</div>';
     return null;
   }
   const chart = echarts.init(element);
