@@ -19,8 +19,8 @@ def _full_hall_state(*, with_trash: bool) -> PlayerState:
         initial_trash_man_realm_id=1,
     )
     state.fish.items = [
-        FishInstance(1, 1, 7, 1, 100, 1),
-        FishInstance(2, 1, 7, 1, 100, 2),
+        FishInstance(1, 101, 7, 1, 100, 1),
+        FishInstance(2, 101, 7, 1, 100, 2),
     ]
     state.fish.next_instance_id = 3
     if with_trash:

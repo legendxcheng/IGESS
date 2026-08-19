@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
-from fish_test_support import _snapshot
+from fish_test_support import _big, _snapshot
 from igess.fish_barbell import FishBarbellDataAdapter
 from igess.fish_commands import (
     FishCommandError,
@@ -60,8 +61,8 @@ def test_generated_rows_drive_one_replayable_throw(tmp_path: Path) -> None:
     assert (
         resolution.fish_weight_gram
         == {
-            "1": 1250,
-            "2": 800,
+            "101": 1250,
+            "201": 800,
         }[resolution.outcome.fish_reward.id]
     )
     assert resolution.fish_mutation_id == (
@@ -70,6 +71,59 @@ def test_generated_rows_drive_one_replayable_throw(tmp_path: Path) -> None:
         else int(resolution.outcome.mutation.id)
     )
     assert "reward_application" not in resolution.event_details()
+
+
+def test_sparse_fish_insertion_and_shuffled_rows_preserve_throw_behavior(
+    tmp_path: Path,
+) -> None:
+    base = _snapshot(tmp_path)
+    first, last = base.table("tbfish")
+    inserted = SimpleNamespace(
+        id=105,
+        baseMoneyPerSecond=_big(9),
+        name="鱼5",
+        rarityId=1,
+        Denominator=_big(5),
+        weight=900,
+    )
+    ordered = replace(
+        base,
+        tables={**base.tables, "tbfish": (first, inserted, last)},
+    )
+    shuffled = replace(
+        base,
+        tables={**base.tables, "tbfish": (last, first, inserted)},
+    )
+
+    ordered_adapter = FishThrowDataAdapter(
+        ordered,
+        bonus_base_luck=1,
+        max_bonus_layers=4,
+    )
+    shuffled_adapter = FishThrowDataAdapter(
+        shuffled,
+        bonus_base_luck=1,
+        max_bonus_layers=4,
+    )
+    request = ProductionThrowRequest(
+        root_random_seed=20260722,
+        throw_id=0,
+        strength=50,
+        torpedo_id=1,
+    )
+
+    assert shuffled.fish(105) is inserted
+    assert [row.id for row in shuffled_adapter.rules.fish_pool] == [
+        "101",
+        "105",
+        "201",
+    ]
+    assert [row.denominator for row in shuffled_adapter.rules.fish_pool] == [
+        1,
+        5,
+        10,
+    ]
+    assert shuffled_adapter.resolve(request) == ordered_adapter.resolve(request)
 
 
 def test_throw_application_atomically_persists_rewards(tmp_path: Path) -> None:
@@ -278,12 +332,14 @@ def test_fish_weight_must_be_a_positive_integer(tmp_path: Path) -> None:
     snapshot = _snapshot(tmp_path)
     snapshot.table("tbfish")[0].weight = 0
 
-    with pytest.raises(FishDataError, match=r"tbfish\.1\.weight"):
+    with pytest.raises(FishDataError, match=r"tbfish\.101\.weight"):
         FishThrowDataAdapter(
             snapshot,
             bonus_base_luck=1,
             max_bonus_layers=4,
         )
+
+
 def test_initial_torpedo_uses_first_generated_row_without_hardcoded_id(
     tmp_path: Path,
 ) -> None:
@@ -351,11 +407,7 @@ def test_current_production_snapshot_resolves_one_throw() -> None:
     )
     assert resolution.outcome.fish_reward.id
     assert resolution.outcome.trash_reward.id
-    expected_fish = next(
-        row
-        for row in snapshot.table("tbfish")
-        if row.id == int(resolution.outcome.fish_reward.id)
-    )
+    expected_fish = snapshot.fish(int(resolution.outcome.fish_reward.id))
     assert resolution.fish_weight_gram == expected_fish.weight
     assert resolution.fish_weight_gram > 0
 
@@ -544,7 +596,7 @@ def test_current_production_snapshot_resolves_one_throw() -> None:
             3,
             0.6112649411653693,
             4.907855494346749,
-            2,
+            102,
             4,
             0.634941675023287,
             2.7356930596165485,
@@ -556,7 +608,7 @@ def test_current_production_snapshot_resolves_one_throw() -> None:
             3,
             0.21687358253175326,
             13.832943436348495,
-            4,
+            104,
             12,
             0.787002073141545,
             2.207116846196803,
@@ -568,7 +620,7 @@ def test_current_production_snapshot_resolves_one_throw() -> None:
             6,
             0.39369076205461684,
             15.240388087053,
-            4,
+            104,
             12,
             0.6860131314850193,
             2.532029568971077,
@@ -580,7 +632,7 @@ def test_current_production_snapshot_resolves_one_throw() -> None:
             12,
             0.492489310982573,
             24.366011063384533,
-            6,
+            106,
             21,
             0.8396581855512804,
             2.068705532218537,

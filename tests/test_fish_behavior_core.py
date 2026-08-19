@@ -396,9 +396,9 @@ def test_low_priority_fish_upgrade_selects_cheapest_below_material_tenth(
         initial_trash_man_realm_id=1,
     )
     state.fish.items = [
-        FishInstance(3, 2, 7, 1, 100, 0),
-        FishInstance(1, 1, 7, 1, 100, 1),
-        FishInstance(2, 2, 2, 1, 100, 2),
+        FishInstance(3, 201, 7, 1, 100, 0),
+        FishInstance(1, 101, 7, 1, 100, 1),
+        FishInstance(2, 201, 2, 1, 100, 2),
     ]
     state.fish.next_instance_id = 4
 

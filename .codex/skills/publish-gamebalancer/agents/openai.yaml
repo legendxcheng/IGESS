@@ -1,0 +1,4 @@
+interface:
+  display_name: "发布 GameBalancer"
+  short_description: "导出、实测、审计并发布 GameBalancer 新版本"
+  default_prompt: "Use $publish-gamebalancer to prepare and publish the next GameBalancer toolkit version."

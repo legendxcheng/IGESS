@@ -17,7 +17,7 @@ def test_internal_hall_cache_invalidates_on_every_hall_input(
         initial_strength=50,
         initial_trash_man_realm_id=1,
     )
-    state.fish.items = [FishInstance(1, 1, 7, 1, 100, 1)]
+    state.fish.items = [FishInstance(1, 101, 7, 1, 100, 1)]
     state.fish.next_instance_id = 2
 
     first = adapter.snapshot(state)
@@ -57,7 +57,7 @@ def test_incremental_layout_matches_full_ranking_after_appends_and_upgrades(
     for instance_id in range(1, 401):
         item = FishInstance(
             instance_id=instance_id,
-            fish_id=1 if instance_id % 3 else 2,
+            fish_id=101 if instance_id % 3 else 201,
             mutation_id=2 if instance_id % 5 == 0 else 7,
             level=1,
             weight_gram=100,

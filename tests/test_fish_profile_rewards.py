@@ -55,7 +55,7 @@ def test_profile_reward_multipliers_compose_with_fish_production(
         initial_strength=10,
         initial_trash_man_realm_id=1,
     )
-    state.fish.items = [FishInstance(1, 1, 7, 1, 100, 1)]
+    state.fish.items = [FishInstance(1, 101, 7, 1, 100, 1)]
     state.fish.next_instance_id = 2
     state.trash_man.processing.active_trash_id = 1
     state.trash_man.processing.stocks = [

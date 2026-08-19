@@ -69,7 +69,7 @@ def test_checkpoint_canonical_round_trip_and_atomic_file_write(
 def test_checkpoint_supports_week_scale_fish_inventory() -> None:
     fish_items = [
         {
-            "fishId": 1,
+            "fishId": 101,
             "hallSlot": 0,
             "instanceId": instance_id,
             "level": 1,

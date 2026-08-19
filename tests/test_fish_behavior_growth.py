@@ -77,7 +77,7 @@ def test_strength_rebirth_behavior_settles_old_multiplier_before_reset(
         initial_strength=1000,
         initial_trash_man_realm_id=1,
     )
-    state.fish.items = [FishInstance(1, 1, 7, 1, 100, 1)]
+    state.fish.items = [FishInstance(1, 101, 7, 1, 100, 1)]
     state.fish.next_instance_id = 2
     candidate = adapter.candidates(state, profile)[0]
     decision = BehaviorScheduler(23).decide(

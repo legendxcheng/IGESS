@@ -413,13 +413,10 @@ class FishHallDataAdapter:
 
     def _fish_income_rows(self) -> dict[int, SimNumber]:
         result: dict[int, SimNumber] = {}
-        for row in self.data.table("tbfish"):
-            row_id = _positive_int(_field(row, "id", "tbfish"), "tbfish.id")
-            if row_id in result:
-                raise FishDataError(f"tbfish contains duplicate id: {row_id}")
-            result[row_id] = _positive_sim_number(
+        for fish_id, row in self.data.fish_by_id.items():
+            result[fish_id] = _positive_sim_number(
                 _field(row, "baseMoneyPerSecond", "tbfish"),
-                f"tbfish.{row_id}.baseMoneyPerSecond",
+                f"tbfish.{fish_id}.baseMoneyPerSecond",
             )
         return result
 

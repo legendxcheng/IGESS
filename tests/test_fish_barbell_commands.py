@@ -225,9 +225,9 @@ def test_fish_hall_income_settlement_is_atomic_and_traced(
     state = PlayerState.new(initial_torpedo_id=1)
     state.wallet.money = state.wallet.money.from_value("5")
     state.fish.items = [
-        FishInstance(1, 1, 7, 1, 100, 2),
-        FishInstance(2, 2, 2, 1, 100, 1),
-        FishInstance(3, 1, 7, 1, 100, 0),
+        FishInstance(1, 101, 7, 1, 100, 2),
+        FishInstance(2, 201, 2, 1, 100, 1),
+        FishInstance(3, 101, 7, 1, 100, 0),
     ]
     state.fish.next_instance_id = 4
     original = state.to_dict(context=hall_adapter.validation_context())

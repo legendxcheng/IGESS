@@ -28,9 +28,9 @@ def test_max_income_layout_uses_capacity_income_and_stable_ties(
     hall_adapter = FishHallDataAdapter(_snapshot(tmp_path))
     state = PlayerState.new(initial_torpedo_id=1)
     state.fish.items = [
-        FishInstance(1, 1, 7, 1, 100, 0),
-        FishInstance(2, 2, 2, 1, 100, 0),
-        FishInstance(3, 1, 7, 1, 100, 0),
+        FishInstance(1, 101, 7, 1, 100, 0),
+        FishInstance(2, 201, 2, 1, 100, 0),
+        FishInstance(3, 101, 7, 1, 100, 0),
     ]
     state.fish.next_instance_id = 4
 
@@ -72,14 +72,14 @@ def test_fish_level_price_and_income_formulas_use_bignumber(
     tmp_path: Path,
 ) -> None:
     hall_adapter = FishHallDataAdapter(_snapshot(tmp_path))
-    normal = FishInstance(1, 1, 7, 1, 100, 0)
-    upgraded = FishInstance(1, 1, 7, 2, 100, 0)
-    mutated = FishInstance(1, 1, 2, 3, 100, 0)
+    normal = FishInstance(1, 101, 7, 1, 100, 0)
+    upgraded = FishInstance(1, 101, 7, 2, 100, 0)
+    mutated = FishInstance(1, 101, 2, 3, 100, 0)
 
     assert hall_adapter.upgrade_price(normal).to_decimal_string() == "10"
     assert hall_adapter.upgrade_price(upgraded).to_decimal_string() == "15"
     assert (
-        hall_adapter.upgrade_price(FishInstance(1, 1, 2, 2, 100, 0)).to_decimal_string()
+        hall_adapter.upgrade_price(FishInstance(1, 101, 2, 2, 100, 0)).to_decimal_string()
         == "22.5"
     )
     assert (
@@ -96,7 +96,7 @@ def test_fish_level_price_and_income_formulas_use_bignumber(
         == "base_money_per_second*1.25^(level-1)*mutation_income_multiplier"
     )
 
-    at_cap = FishInstance(1, 1, 7, 100, 100, 0)
+    at_cap = FishInstance(1, 101, 7, 100, 100, 0)
     with pytest.raises(FishDataError, match="already at max level"):
         hall_adapter.upgrade_price(at_cap)
 
@@ -109,8 +109,8 @@ def test_fish_upgrade_atomically_pays_levels_and_reorders_hall(
     state.wallet.money = state.wallet.money.from_value("100")
     state.wallet.material = state.wallet.material.from_value("100")
     state.fish.items = [
-        FishInstance(1, 1, 7, 1, 100, 2),
-        FishInstance(2, 2, 2, 1, 100, 1),
+        FishInstance(1, 101, 7, 1, 100, 2),
+        FishInstance(2, 201, 2, 1, 100, 1),
     ]
     state.fish.next_instance_id = 3
     original = state.to_dict(context=hall_adapter.validation_context())
@@ -153,7 +153,7 @@ def test_fish_upgrade_rejects_insufficient_material_without_mutation(
     state = PlayerState.new(initial_torpedo_id=1)
     state.wallet.money = state.wallet.money.from_value("100")
     state.wallet.material = state.wallet.material.from_value("9")
-    state.fish.items = [FishInstance(1, 1, 7, 1, 100, 1)]
+    state.fish.items = [FishInstance(1, 101, 7, 1, 100, 1)]
     state.fish.next_instance_id = 2
     original = state.to_dict(context=hall_adapter.validation_context())
 
@@ -242,7 +242,7 @@ def test_strength_rebirth_resets_only_strength_and_applies_material_multiplier(
     )
     state.wallet.money = BigNumberDTO.from_value(123)
     state.wallet.material = BigNumberDTO.from_value(456)
-    state.fish.items = [FishInstance(1, 1, 7, 1, 100, 1)]
+    state.fish.items = [FishInstance(1, 101, 7, 1, 100, 1)]
     state.fish.next_instance_id = 2
     state.trash_man.processing.stocks = [TrashStock(1, 2)]
     before = state.to_dict(context=adapter.validation_context())
@@ -329,9 +329,9 @@ def test_fish_hall_upgrade_atomically_pays_material_and_expands_layout(
     state = PlayerState.new(initial_torpedo_id=1)
     state.wallet.material = BigNumberDTO.from_value("12.75")
     state.fish.items = [
-        FishInstance(1, 1, 7, 1, 100, 2),
-        FishInstance(2, 2, 2, 1, 100, 1),
-        FishInstance(3, 1, 7, 1, 100, 0),
+        FishInstance(1, 101, 7, 1, 100, 2),
+        FishInstance(2, 201, 2, 1, 100, 1),
+        FishInstance(3, 101, 7, 1, 100, 0),
     ]
     state.fish.next_instance_id = 4
     original = state.to_dict(context=hall_adapter.validation_context())
@@ -390,7 +390,7 @@ def test_fish_hall_upgrade_failure_does_not_mutate_state(
     state = PlayerState.new(initial_torpedo_id=1)
     state.wallet.material = BigNumberDTO.from_value(material)
     state.fish_hall.upgrade_level = upgrade_level
-    state.fish.items = [FishInstance(1, 1, 7, 1, 100, 1)]
+    state.fish.items = [FishInstance(1, 101, 7, 1, 100, 1)]
     state.fish.next_instance_id = 2
     original = state.to_dict(context=hall_adapter.validation_context())
 

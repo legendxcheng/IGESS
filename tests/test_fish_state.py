@@ -29,7 +29,7 @@ def _known_id(category: str, item_id: int) -> bool:
     known = {
         "torpedo": {1, 2},
         "barbell": {1, 2},
-        "fish": {17, 18},
+        "fish": {301, 302},
         "mutation": {1, 2},
         "trashManRealm": {1, 2, 3},
         "trashManUpgrade": {1, 2},
@@ -61,8 +61,8 @@ def _populated_state() -> PlayerState:
     state.barbell.equipped_id = 1
     state.fish_hall.upgrade_level = 1
     state.fish.items = [
-        FishInstance(2, 18, 2, 3, 800, 0),
-        FishInstance(1, 17, 1, 1, 1_250, 1),
+        FishInstance(2, 302, 2, 3, 800, 0),
+        FishInstance(1, 301, 1, 1, 1_250, 1),
     ]
     state.fish.next_instance_id = 3
     state.trash_man.realm_id = 2
@@ -83,8 +83,8 @@ def _populated_state() -> PlayerState:
     ]
     state.rebirth.strength_completed_count = 2
     state.rebirth.trash_man_completed_count = 1
-    state.collection.unlocked_keys = ["18:2", "17:1"]
-    state.collection.viewed_keys = ["17:1"]
+    state.collection.unlocked_keys = ["302:2", "301:1"]
+    state.collection.viewed_keys = ["301:1"]
     state.collection.claimed_reward_ids = [2, 1]
     state.automation.auto_throw_unlocked = True
     state.automation.auto_throw_enabled = True
@@ -199,14 +199,14 @@ def test_copy_is_deep_and_does_not_share_nested_state() -> None:
     copied = original.copy()
 
     copied.fish.items[0].level = 99
-    copied.collection.unlocked_keys.append("17:2")
+    copied.collection.unlocked_keys.append("301:2")
     copied.trash_man.processing.stocks[0].count = 999
 
     assert {item.instance_id: item.level for item in original.fish.items} == {
         1: 1,
         2: 3,
     }
-    assert original.collection.unlocked_keys == ["18:2", "17:1"]
+    assert original.collection.unlocked_keys == ["302:2", "301:1"]
     assert {stock.trash_id: stock.count for stock in original.trash_man.processing.stocks} == {
         1: 2,
         2: 4,
@@ -238,8 +238,8 @@ def test_copy_is_deep_and_does_not_share_nested_state() -> None:
         (
             lambda state: state.fish.items.extend(
                 [
-                    FishInstance(1, 17, 1, 1, 100, 1),
-                    FishInstance(2, 18, 1, 1, 100, 1),
+                    FishInstance(1, 301, 1, 1, 100, 1),
+                    FishInstance(2, 302, 1, 1, 100, 1),
                 ]
             ),
             "archive_schema_duplicate_slot",
@@ -247,14 +247,14 @@ def test_copy_is_deep_and_does_not_share_nested_state() -> None:
         ),
         (
             lambda state: state.fish.items.append(
-                FishInstance(1, 17, 1, 1, 100, 3)
+                FishInstance(1, 301, 1, 1, 100, 3)
             ),
             "archive_schema_capacity_exceeded",
             "fish.items[1].hallSlot",
         ),
         (
             lambda state: state.fish.items.append(
-                FishInstance(1, 17, 1, 101, 100, 0)
+                FishInstance(1, 301, 1, 101, 100, 0)
             ),
             "archive_schema_invalid_value",
             "fish.items[1].level",
@@ -262,7 +262,7 @@ def test_copy_is_deep_and_does_not_share_nested_state() -> None:
         (
             lambda state: (
                 state.fish.items.append(
-                    FishInstance(1, 17, 1, 1, 100, 0)
+                    FishInstance(1, 301, 1, 1, 100, 0)
                 ),
                 setattr(state.fish, "next_instance_id", 1),
             ),
@@ -278,7 +278,7 @@ def test_copy_is_deep_and_does_not_share_nested_state() -> None:
             "trashMan.realmId",
         ),
         (
-            lambda state: state.collection.viewed_keys.append("17:1"),
+            lambda state: state.collection.viewed_keys.append("301:1"),
             "archive_schema_reference_missing",
             "collection.viewedKeys",
         ),

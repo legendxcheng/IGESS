@@ -6,6 +6,7 @@ import json
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any, Mapping, Protocol, Sequence
 
 
@@ -200,12 +201,30 @@ class FishDataSnapshot:
     loader_files: tuple[FishLoaderFile, ...]
     production_data: bool
     overrides: tuple[FishDataOverride, ...] = field(default_factory=tuple)
+    fish_by_id: Mapping[int, Any] = field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "fish_by_id",
+            MappingProxyType(
+                _index_fish_rows(self.tables.get("tbfish", ()))
+            ),
+        )
 
     def table(self, name: str) -> Sequence[Any]:
         try:
             return self.tables[name]
         except KeyError as exc:
             raise FishDataError(f"unknown Fish data table: {name}") from exc
+
+    def fish(self, fish_id: int) -> Any:
+        if type(fish_id) is not int or fish_id <= 0:
+            raise FishDataError("Fish id must be a positive integer")
+        try:
+            return self.fish_by_id[fish_id]
+        except KeyError as exc:
+            raise FishDataError(f"unknown Fish id: {fish_id}") from exc
 
     def model_digest(self, source_digest: str) -> str:
         digest = hashlib.sha256()
@@ -353,3 +372,41 @@ class FishDataLoader:
             production_data=production_data,
             overrides=tuple(applied),
         )
+
+
+def _index_fish_rows(rows: Sequence[Any]) -> dict[int, Any]:
+    fish_by_id: dict[int, Any] = {}
+    for row in rows:
+        try:
+            fish_id = row.id
+        except AttributeError as exc:
+            raise FishDataError(
+                "generated tbfish row is missing field: id"
+            ) from exc
+        if type(fish_id) is not int or fish_id <= 0:
+            raise FishDataError("tbfish.id must be a positive integer")
+
+        try:
+            rarity_id = row.rarityId
+        except AttributeError as exc:
+            raise FishDataError(
+                f"generated tbfish.{fish_id} row is missing field: rarityId"
+            ) from exc
+        if type(rarity_id) is not int or rarity_id <= 0:
+            raise FishDataError(
+                f"tbfish.{fish_id}.rarityId must be a positive integer"
+            )
+
+        id_rarity, slot = divmod(fish_id, 100)
+        if not 1 <= slot <= 99:
+            raise FishDataError(
+                f"tbfish.{fish_id}.id slot must be within 1..99"
+            )
+        if id_rarity != rarity_id:
+            raise FishDataError(
+                f"tbfish.{fish_id}.rarityId must match id prefix {id_rarity}"
+            )
+        if fish_id in fish_by_id:
+            raise FishDataError(f"tbfish contains duplicate id: {fish_id}")
+        fish_by_id[fish_id] = row
+    return fish_by_id

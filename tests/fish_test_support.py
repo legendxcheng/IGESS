@@ -101,7 +101,7 @@ def _snapshot(
         ),
         "tbfish": (
             SimpleNamespace(
-                id=1,
+                id=101,
                 baseMoneyPerSecond=_big(10),
                 name="鱼1",
                 rarityId=1,
@@ -109,7 +109,7 @@ def _snapshot(
                 weight=1250,
             ),
             SimpleNamespace(
-                id=2,
+                id=201,
                 baseMoneyPerSecond=_big(8),
                 name="鱼2",
                 rarityId=2,

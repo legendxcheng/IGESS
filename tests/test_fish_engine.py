@@ -33,6 +33,12 @@ class _FishRandomPoolRow:
     startLuck: int
 
 
+@dataclass(frozen=True)
+class _FishRow:
+    id: int
+    rarityId: int
+
+
 class _GeneratedLubanFixture:
     """Stand-in for generated Luban classes; it never decodes JSON itself."""
 
@@ -56,6 +62,19 @@ class _GeneratedLubanFixture:
             updated[table] = (replace(row, startLuck=value),)
             details.append(FishDataOverride(path, row.startLuck, value))
         return updated, details
+
+
+class _GeneratedFishFixture:
+    def __init__(self, rows: tuple[_FishRow, ...]) -> None:
+        self.rows = rows
+
+    def load_tables(self, data_root: Path, required_tables: tuple[str, ...]):
+        assert data_root.is_dir()
+        assert required_tables == ("tbfish",)
+        return {"tbfish": self.rows}
+
+    def apply_overrides(self, tables, assignments):
+        raise AssertionError("Fish identity tests do not apply overrides")
 
 
 def _generated_to_plain(value):
@@ -131,6 +150,76 @@ def test_fish_data_loader_requires_generated_luban_provider(tmp_path: Path) -> N
         )
 
 
+def test_fish_data_loader_indexes_sparse_fish_ids_without_reordering_rows(
+    tmp_path: Path,
+) -> None:
+    rows = (
+        _FishRow(id=1305, rarityId=13),
+        _FishRow(id=101, rarityId=1),
+        _FishRow(id=603, rarityId=6),
+        _FishRow(id=201, rarityId=2),
+        _FishRow(id=1011, rarityId=10),
+    )
+    data_root = tmp_path / "data"
+    data_root.mkdir()
+    (data_root / "tbfish.json").write_text("[]", encoding="utf-8")
+
+    snapshot = FishDataLoader(_GeneratedFishFixture(rows)).load(
+        data_root,
+        production_data=False,
+        required_tables=["tbfish"],
+    )
+
+    assert snapshot.table("tbfish") == rows
+    assert [
+        snapshot.fish(fish_id).id
+        for fish_id in (101, 201, 603, 1011, 1305)
+    ] == [101, 201, 603, 1011, 1305]
+    assert set(snapshot.fish_by_id).isdisjoint({1, 46, 95, 121})
+
+
+@pytest.mark.parametrize(
+    ("rows", "message"),
+    [
+        (
+            (_FishRow(id=201, rarityId=1),),
+            "tbfish.201.rarityId must match id prefix 2",
+        ),
+        (
+            (_FishRow(id=200, rarityId=2),),
+            "tbfish.200.id slot must be within 1..99",
+        ),
+        (
+            (_FishRow(id=101, rarityId=1), _FishRow(id=101, rarityId=1)),
+            "tbfish contains duplicate id: 101",
+        ),
+        (
+            (_FishRow(id=0, rarityId=1),),
+            "tbfish.id must be a positive integer",
+        ),
+        (
+            (_FishRow(id=101, rarityId=0),),
+            "tbfish.101.rarityId must be a positive integer",
+        ),
+    ],
+)
+def test_fish_data_loader_rejects_invalid_fish_identity_contract(
+    tmp_path: Path,
+    rows: tuple[_FishRow, ...],
+    message: str,
+) -> None:
+    data_root = tmp_path / "data"
+    data_root.mkdir()
+    (data_root / "tbfish.json").write_text("[]", encoding="utf-8")
+
+    with pytest.raises(FishDataError, match=message.replace(".", r"\.")):
+        FishDataLoader(_GeneratedFishFixture(rows)).load(
+            data_root,
+            production_data=False,
+            required_tables=["tbfish"],
+        )
+
+
 @pytest.mark.external_data
 def test_generated_luban_provider_loads_current_fish_export() -> None:
     snapshot = FishDataLoader(
@@ -154,8 +243,13 @@ def test_generated_luban_provider_loads_current_fish_export() -> None:
     assert first_trash_pool.endLuck == 3
     fish_rows = snapshot.table("tbfish")
     assert len(fish_rows) == 121
+    assert len(snapshot.fish_by_id) == 121
+    assert [
+        snapshot.fish(fish_id).id
+        for fish_id in (101, 201, 603, 1011, 1305)
+    ] == [101, 201, 603, 1011, 1305]
+    assert set(snapshot.fish_by_id).isdisjoint({1, 46, 95, 121})
     assert fish_rows[0].Denominator.digits == "1"
-    assert fish_rows[-1].Denominator.digits == "10000000"
     assert all(
         type(row.weight) is int and row.weight > 0 for row in fish_rows
     )
@@ -165,6 +259,8 @@ def test_generated_luban_provider_loads_current_fish_export() -> None:
             f"E:/fish-oasis/igess_export/json/{table_name}.json"
         )
         source_rows = json.loads(export_path.read_text(encoding="utf-8"))
+        if table_name == "tbfish":
+            assert isinstance(source_rows, list)
         actual_rows = [
             _generated_to_plain(row) for row in snapshot.table(table_name)
         ]
@@ -323,7 +419,7 @@ def test_active_throw_checkpoint_progress_must_be_consistent() -> None:
     committed.fish.items = [
         FishInstance(
             instance_id=1,
-            fish_id=1,
+            fish_id=101,
             mutation_id=1,
             level=1,
             weight_gram=1,
@@ -386,16 +482,15 @@ def test_production_workflow_records_one_resolved_throw(tmp_path: Path) -> None:
     assert details["torpedo_id"] == "1"
     assert details["fish_id"]
     assert details["trash_id"]
-    production_fish = json.loads(
+    production_fish_rows = json.loads(
         Path("E:/fish-oasis/igess_export/json/tbfish.json").read_text(
             encoding="utf-8"
         )
     )
-    expected_weight = next(
-        row["weight"]
-        for row in production_fish
-        if row["id"] == int(details["fish_id"])
-    )
+    production_fish_by_id = {
+        row["id"]: row for row in production_fish_rows
+    }
+    expected_weight = production_fish_by_id[int(details["fish_id"])]["weight"]
     assert details["fish_weight_gram"] == str(expected_weight)
     assert details["reward_application"] == "applied_to_player_state"
     assert details["fish_instance_id"] == "1"

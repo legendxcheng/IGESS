@@ -412,18 +412,15 @@ class FishThrowDataAdapter:
 
     def _fish_weights(self) -> dict[str, int]:
         result: dict[str, int] = {}
-        for row in self.snapshot.table("tbfish"):
-            fish_id = str(_row_id(row, "tbfish"))
-            if fish_id in result:
-                raise FishDataError(f"tbfish contains duplicate id: {fish_id}")
-            result[fish_id] = _positive_int(
+        for fish_id, row in self.snapshot.fish_by_id.items():
+            result[str(fish_id)] = _positive_int(
                 _field(row, "weight", "tbfish"),
                 f"tbfish.{fish_id}.weight",
             )
         return result
 
     def _threshold_pool(self, table_name: str) -> tuple[ThresholdItem, ...]:
-        return tuple(
+        parsed = tuple(
             ThresholdItem(
                 id=str(_row_id(row, table_name)),
                 name=_required_name(row, table_name),
@@ -438,6 +435,7 @@ class FishThrowDataAdapter:
             )
             for row in self.snapshot.table(table_name)
         )
+        return tuple(sorted(parsed, key=lambda item: item.denominator))
 
     def _torpedoes(self) -> tuple[_Torpedo, ...]:
         return tuple(
