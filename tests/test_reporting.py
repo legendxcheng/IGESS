@@ -191,6 +191,7 @@ context.renderDailyProgressionCharts({
       { day_index: 1, duration_seconds: { chart_value: 7200 }, rows: [
         row('best_hall_fish', 60),
         row('torpedo', 120),
+        row('torpedo', 240),
       ] },
       { day_index: 2, duration_seconds: { chart_value: 7200 }, rows: [
         row('torpedo', 180),
@@ -206,6 +207,8 @@ const secondDayTorpedo = options['daily-progression-chart-1'].series
 process.stdout.write(JSON.stringify({
   first: firstDayTorpedo.itemStyle.color,
   second: secondDayTorpedo.itemStyle.color,
+  firstCard: target.innerHTML.split('</article>')[0],
+  secondCard: target.innerHTML.split('</article>')[1],
 }));
 """
 
@@ -217,7 +220,13 @@ process.stdout.write(JSON.stringify({
     )
 
     colors = json.loads(result.stdout)
-    assert colors == {"first": "#73c0de", "second": "#73c0de"}
+    assert colors["first"] == "#73c0de"
+    assert colors["second"] == "#73c0de"
+    assert 'data-progression-category="best_hall_fish"' in colors["firstCard"]
+    assert 'data-progression-category="torpedo"' in colors["firstCard"]
+    assert "鱼雷 / 垃圾幸运值 <strong>2</strong>" in colors["firstCard"]
+    assert 'data-progression-category="barbell"' not in colors["firstCard"]
+    assert "鱼雷 / 垃圾幸运值 <strong>1</strong>" in colors["secondCard"]
 
 
 @pytest.mark.skipif(NODE is None, reason="Node.js is required to execute the report renderer")
@@ -258,6 +267,11 @@ context.renderWeeklyProgressionCharts({
           week_active_time_seconds: 14500,
           active_time_seconds: 14500,
         },
+        {
+          progression_category: 'torpedo',
+          week_active_time_seconds: 18000,
+          active_time_seconds: 18000,
+        },
       ] },
       { week_index: 2, duration_seconds: { chart_value: 7200 }, rows: [
         {
@@ -278,6 +292,8 @@ process.stdout.write(JSON.stringify({
   firstMax: first.xAxis.max,
   secondX: second.series[0].data[0].value[0],
   secondMax: second.xAxis.max,
+  firstCard: target.innerHTML.split('</article>')[0],
+  secondCard: target.innerHTML.split('</article>')[1],
 }));
 """
 
@@ -295,6 +311,40 @@ process.stdout.write(JSON.stringify({
     assert rendered["firstMax"] == 50400
     assert rendered["secondX"] == 900
     assert rendered["secondMax"] == 7200
+    assert "鱼雷 / 垃圾幸运值 <strong>2</strong>" in rendered["firstCard"]
+    assert 'data-progression-category="barbell"' not in rendered["firstCard"]
+    assert "杠铃 <strong>1</strong>" in rendered["secondCard"]
+
+
+@pytest.mark.skipif(NODE is None, reason="Node.js is required to execute the report renderer")
+def test_progression_category_counts_handle_empty_and_escaped_categories():
+    script_path = Path("src/igess/reporting/assets/report.js").resolve()
+    harness = r"""
+const fs = require('fs');
+const vm = require('vm');
+const source = fs.readFileSync(process.argv[1], 'utf8');
+const context = { console };
+vm.createContext(context);
+vm.runInContext(source, context);
+process.stdout.write(JSON.stringify({
+  empty: context.progressionCategoryCountsMarkup([]),
+  escaped: context.progressionCategoryCountsMarkup([
+    { progression_category: '<script>alert(1)</script>' },
+  ]),
+}));
+"""
+
+    result = subprocess.run(
+        [NODE, "-e", harness, str(script_path)],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    markup = json.loads(result.stdout)
+    assert "暂无分类成长点" in markup["empty"]
+    assert "<script>" not in markup["escaped"]
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in markup["escaped"]
 
 
 @pytest.mark.skipif(NODE is None, reason="Node.js is required to execute the report renderer")

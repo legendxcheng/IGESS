@@ -183,6 +183,41 @@ h2 {
   margin: 0 0 4px;
 }
 
+.progression-category-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin: 8px 0 2px;
+}
+
+.progression-category-count {
+  align-items: center;
+  background: #fff;
+  border: 1px solid #dce4ed;
+  border-radius: 999px;
+  color: #475569;
+  display: inline-flex;
+  font-size: 12px;
+  gap: 5px;
+  padding: 3px 8px;
+}
+
+.progression-category-count strong {
+  color: #0f172a;
+}
+
+.progression-category-count-dot {
+  border-radius: 50%;
+  height: 8px;
+  width: 8px;
+}
+
+.progression-category-counts-empty {
+  color: #64748b;
+  font-size: 12px;
+  margin: 8px 0 2px;
+}
+
 .weekly-chart,
 .daily-chart {
   min-height: 270px;

@@ -428,6 +428,7 @@ function renderWeeklyProgressionCharts(profiles) {
     return [
       '<article class="weekly-chart-card">',
       `<h3>第 ${escapeHtml(week.week_index)} 周 · ${escapeHtml(profileLabel(profileId))} · ${escapeHtml(count)} 次有效成长</h3>`,
+      progressionCategoryCountsMarkup(week.rows || []),
       `<div id="weekly-progression-chart-${index}" class="chart weekly-chart"></div>`,
       '</article>',
     ].join('');
@@ -500,6 +501,7 @@ function renderDailyProgressionCharts(profiles) {
     return [
       '<article class="daily-chart-card">',
       `<h3>第 ${escapeHtml(day.day_index)} 天 · ${escapeHtml(profileLabel(profileId))} · ${escapeHtml(count)} 次有效成长</h3>`,
+      progressionCategoryCountsMarkup(day.rows || []),
       `<div id="daily-progression-chart-${index}" class="chart daily-chart"></div>`,
       '</article>',
     ].join('');
@@ -564,6 +566,31 @@ function progressionCategoryLabel(category) {
     other: '其他',
   };
   return labels[category] || category || labels.other;
+}
+
+function progressionCategoryCountsMarkup(rows) {
+  const counts = new Map();
+  (Array.isArray(rows) ? rows : []).forEach(row => {
+    const category = row.progression_category || 'other';
+    counts.set(category, (counts.get(category) || 0) + 1);
+  });
+  if (!counts.size) {
+    return '<p class="progression-category-counts-empty">暂无分类成长点</p>';
+  }
+  const categories = [...counts.keys()].sort((left, right) => {
+    const rankDelta = progressionCategoryRank(left) - progressionCategoryRank(right);
+    return rankDelta || String(left).localeCompare(String(right));
+  });
+  return [
+    '<div class="progression-category-counts" aria-label="各类成长点计数">',
+    categories.map(category => [
+      `<span class="progression-category-count" data-progression-category="${escapeHtml(category)}">`,
+      `<span class="progression-category-count-dot" style="background-color:${escapeHtml(progressionCategoryColor(category))}" aria-hidden="true"></span>`,
+      `${escapeHtml(progressionCategoryLabel(category))} <strong>${escapeHtml(counts.get(category))}</strong>`,
+      '</span>',
+    ].join('')).join(''),
+    '</div>',
+  ].join('');
 }
 
 function progressionCategoryRank(category) {

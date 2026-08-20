@@ -82,7 +82,7 @@ def _html(inline_payload: str, title: str) -> str:
             "    </section>",
             '    <section class="band" data-fish-persistent-section hidden>',
             "      <h2>有效成长时间点</h2>",
-            '      <p class="section-note">先按每 7 个在线日汇总，再保留每日明细；横轴只累计在线时间。单鱼升级、训练结算与临时增益不计入有效成长。</p>',
+            '      <p class="section-note">先按每 7 个在线日汇总，再保留每日明细；每张图列出图内各类成长点计数，横轴只累计在线时间。单鱼升级、训练结算与临时增益不计入有效成长。</p>',
             '      <div data-fish-persistent-kpis class="kpi-grid" role="list" aria-label="永久成长"></div>',
             '      <h3 class="chart-list-heading">每周汇总</h3>',
             '      <div data-weekly-progression-charts class="weekly-chart-list"></div>',
