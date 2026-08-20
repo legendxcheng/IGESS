@@ -93,7 +93,7 @@ def test_build_report_view_model_contains_chart_ready_sections(tmp_path):
 
     payload = build_report_view_model(data)
 
-    assert payload["schema_version"] == 4
+    assert payload["schema_version"] == 5
     assert payload["scenario"]["id"] == "day_1_progression"
     assert payload["scenario"]["profiles"] == ["casual", "explorer", "optimizer"]
     assert payload["series"]["resources"]
@@ -324,6 +324,86 @@ def test_fish_balance_curves_use_online_gross_output_and_daily_growth(
     assert [day["event_count"]["exact_value"] for day in days] == ["1", "1"]
     assert days[0]["rows"][0]["day_active_time_seconds"] == 120
     assert days[1]["rows"][0]["day_active_time_seconds"] == 60
+
+
+def test_fish_progression_groups_each_seven_online_days_into_a_week(
+    tmp_path: Path,
+) -> None:
+    data = ReportData(
+        run_dir=tmp_path,
+        manifest={
+            "scenario_id": "fish_fixture",
+            "model_id": "fish",
+            "profiles": ["default"],
+            "strategy": {
+                "parameters": {
+                    "behavior_scheduler": {
+                        "profiles": {
+                            "default": {
+                                "session": {"daily_online_seconds": 100}
+                            }
+                        }
+                    }
+                }
+            },
+        },
+        timeline=[],
+        events=[],
+        analysis={},
+        payback_rows=[],
+        missing_artifacts=[],
+        luck_progression={
+            "profiles": {
+                "default": {
+                    "summary": {"active_duration_seconds": 750},
+                    "rows": [],
+                }
+            }
+        },
+        behavior_progression={
+            "profiles": {
+                "default": {
+                    "summary": {},
+                    "rows": [
+                        {
+                            "active_time_seconds": 50,
+                            "stage_id": "online_day_1",
+                            "progression_category": "best_hall_fish",
+                        },
+                        {
+                            "active_time_seconds": 700,
+                            "stage_id": "online_day_7",
+                            "progression_category": "barbell",
+                        },
+                        {
+                            "active_time_seconds": 725,
+                            "stage_id": "online_day_8",
+                            "progression_category": "torpedo",
+                        },
+                    ],
+                }
+            }
+        },
+    )
+
+    profile = build_report_view_model(data)["fish_progression"]["persistent"][
+        "profiles"
+    ]["default"]
+
+    assert [week["week_index"] for week in profile["weeks"]] == [1, 2]
+    assert [week["duration_seconds"]["exact_value"] for week in profile["weeks"]] == [
+        "700",
+        "50",
+    ]
+    assert [week["event_count"]["exact_value"] for week in profile["weeks"]] == [
+        "2",
+        "1",
+    ]
+    assert [
+        row["week_active_time_seconds"]
+        for week in profile["weeks"]
+        for row in week["rows"]
+    ] == [50, 700, 25]
 
 
 def test_report_view_model_wraps_sorted_bottleneck_gap_counts(tmp_path):

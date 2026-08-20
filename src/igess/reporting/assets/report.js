@@ -402,8 +402,81 @@ function renderPersistentProgression(persistent) {
       ].join('');
     }).join('');
   }
+  renderWeeklyProgressionCharts(profiles);
   renderDailyProgressionCharts(profiles);
   renderProgressionEventsTable(profiles);
+}
+
+function renderWeeklyProgressionCharts(profiles) {
+  const target = document.querySelector('[data-weekly-progression-charts]');
+  if (!target) return;
+  const entries = Object.entries(profiles).flatMap(([profileId, profile]) =>
+    (profile.weeks || []).map(week => ({ profileId, week }))
+  );
+  if (!entries.length) {
+    target.innerHTML = '<div class="empty">没有可展示的在线周。</div>';
+    return;
+  }
+  const categories = [...new Set(entries.flatMap(({ week }) =>
+    (week.rows || []).map(row => row.progression_category || 'other')
+  ))].sort((left, right) => progressionCategoryRank(left) - progressionCategoryRank(right));
+  const categoryLabels = categories.map(progressionCategoryLabel);
+  target.innerHTML = entries.map(({ profileId, week }, index) => {
+    const count = week.event_count && week.event_count.display_value != null
+      ? week.event_count.display_value
+      : (week.rows || []).length;
+    return [
+      '<article class="weekly-chart-card">',
+      `<h3>第 ${escapeHtml(week.week_index)} 周 · ${escapeHtml(profileLabel(profileId))} · ${escapeHtml(count)} 次有效成长</h3>`,
+      `<div id="weekly-progression-chart-${index}" class="chart weekly-chart"></div>`,
+      '</article>',
+    ].join('');
+  }).join('');
+  entries.forEach(({ profileId, week }, index) => {
+    const duration = week.duration_seconds && week.duration_seconds.chart_value;
+    const rows = week.rows || [];
+    const series = categories.map((category, categoryIndex) => ({
+      name: progressionCategoryLabel(category),
+      type: 'scatter',
+      symbolSize: 12,
+      itemStyle: { color: progressionCategoryColor(category) },
+      data: rows
+        .filter(row => (row.progression_category || 'other') === category)
+        .map(row => ({
+          value: [Number(row.week_active_time_seconds || 0), categoryIndex],
+          row,
+          profileId,
+        })),
+    })).filter(item => item.data.length);
+    replaceChart(`weekly-progression-chart-${index}`, {
+      tooltip: {
+        trigger: 'item',
+        formatter: params => {
+          const row = params.data.row;
+          return [
+            `<strong>${escapeHtml(progressionCategoryLabel(row.progression_category))}</strong>`,
+            `本周在线：${formatDurationClock(row.week_active_time_seconds)}`,
+            `累计在线：${formatDurationClock(row.active_time_seconds)}`,
+            `事件：${escapeHtml(eventKindLabel(row.source_event_kind))} · ${escapeHtml(itemIdentityLabel(row.item_id))}`,
+            `指标：${escapeHtml(metricLabel(row.metric_id))}`,
+            `变化：${numericTooltip(row.metric_before)} → ${numericTooltip(row.metric_after)}`,
+            `距上次有效成长：${numericTooltip(row.gap_from_previous_progression_seconds, '秒')}`,
+          ].join('<br>');
+        },
+      },
+      legend: { top: 0, type: 'scroll' },
+      grid: { left: 118, right: 24, top: 42, bottom: 48 },
+      xAxis: {
+        type: 'value',
+        name: '本周累计在线时间',
+        min: 0,
+        max: Number.isFinite(duration) && duration > 0 ? duration : undefined,
+        axisLabel: { formatter: value => formatDurationCompact(value) },
+      },
+      yAxis: { type: 'category', data: categoryLabels },
+      series,
+    });
+  });
 }
 
 function renderDailyProgressionCharts(profiles) {

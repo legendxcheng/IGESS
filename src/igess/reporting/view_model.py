@@ -23,7 +23,7 @@ def build_report_view_model(data: ReportData) -> dict[str, Any]:
         }
     )
     return {
-        "schema_version": 4,
+        "schema_version": 5,
         "scenario": {
             "id": data.scenario_id,
             "model_id": data.manifest.get("model_id"),
@@ -318,8 +318,14 @@ def _fish_balance_profiles(
             behavior_profile["daily_online_seconds"] = chart_point(
                 daily_online_seconds
             )
-            behavior_profile["days"] = _daily_progression_days(
+            days = _daily_progression_days(
                 behavior_profile.get("rows", []),
+                active_duration_seconds=active_duration,
+                daily_online_seconds=daily_online_seconds,
+            )
+            behavior_profile["days"] = days
+            behavior_profile["weeks"] = _weekly_progression_weeks(
+                days,
                 active_duration_seconds=active_duration,
                 daily_online_seconds=daily_online_seconds,
             )
@@ -543,6 +549,74 @@ def _daily_progression_days(
                 "duration_seconds": chart_point(duration),
                 "event_count": chart_point(len(day_rows)),
                 "rows": day_rows,
+            }
+        )
+    return result
+
+
+def _weekly_progression_weeks(
+    days: list[dict[str, Any]],
+    *,
+    active_duration_seconds: int,
+    daily_online_seconds: int,
+) -> list[dict[str, Any]]:
+    weekly_online_seconds = daily_online_seconds * 7
+    week_count = math.ceil(active_duration_seconds / weekly_online_seconds)
+    grouped: dict[int, list[dict[str, Any]]] = {
+        week: [] for week in range(1, week_count + 1)
+    }
+    for day in days:
+        try:
+            day_index = max(1, int(day.get("day_index", 1)))
+        except (TypeError, ValueError):
+            continue
+        week_index = (day_index - 1) // 7 + 1
+        day_offset = (day_index - (week_index - 1) * 7 - 1) * daily_online_seconds
+        grouped.setdefault(week_index, [])
+        for source_row in day.get("rows", []):
+            if not isinstance(source_row, dict):
+                continue
+            try:
+                day_active_time = max(
+                    0,
+                    int(source_row.get("day_active_time_seconds", 0)),
+                )
+            except (TypeError, ValueError):
+                continue
+            week_active_time = day_offset + day_active_time
+            grouped[week_index].append(
+                {
+                    **source_row,
+                    "week_index": week_index,
+                    "week_active_time_seconds": week_active_time,
+                    "week_active_time": chart_point(week_active_time),
+                }
+            )
+
+    result = []
+    for week_index in sorted(grouped):
+        week_start = (week_index - 1) * weekly_online_seconds
+        duration = max(
+            0,
+            min(
+                weekly_online_seconds,
+                active_duration_seconds - week_start,
+            ),
+        )
+        week_rows = sorted(
+            grouped[week_index],
+            key=lambda row: (
+                int(row.get("week_active_time_seconds", 0)),
+                str(row.get("progression_category", "")),
+            ),
+        )
+        result.append(
+            {
+                "week_index": week_index,
+                "stage_id": f"online_week_{week_index}",
+                "duration_seconds": chart_point(duration),
+                "event_count": chart_point(len(week_rows)),
+                "rows": week_rows,
             }
         )
     return result

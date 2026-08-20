@@ -76,6 +76,7 @@ def test_generate_static_report_writes_html_and_assets(tmp_path):
     assert "摸鱼经济对称性总览" in html
     assert "fish-acquisition-rate-chart" in html
     assert "fish-cumulative-output-chart" in html
+    assert "data-weekly-progression-charts" in html
     assert "data-daily-progression-charts" in html
     assert "事件时间线" in html
     assert "回本压力" in html
@@ -114,6 +115,7 @@ def test_generate_static_report_writes_chart_rendering_asset(tmp_path):
     assert "resource_per_second" in script
     assert "trash_per_second" not in script
     assert "renderDailyProgressionCharts" in script
+    assert "renderWeeklyProgressionCharts" in script
     assert "progressionCategoryColor" in script
     assert "report.overview" in script
     assert "display_value" in script
@@ -216,6 +218,83 @@ process.stdout.write(JSON.stringify({
 
     colors = json.loads(result.stdout)
     assert colors == {"first": "#73c0de", "second": "#73c0de"}
+
+
+@pytest.mark.skipif(NODE is None, reason="Node.js is required to execute the report renderer")
+def test_weekly_progression_charts_use_week_local_online_time():
+    script_path = Path("src/igess/reporting/assets/report.js").resolve()
+    harness = r"""
+const fs = require('fs');
+const vm = require('vm');
+const source = fs.readFileSync(process.argv[1], 'utf8');
+const context = { console };
+vm.createContext(context);
+vm.runInContext(source, context);
+
+const target = { innerHTML: '' };
+const options = {};
+context.document = {
+  querySelector(selector) {
+    return selector === '[data-weekly-progression-charts]' ? target : null;
+  },
+  getElementById(id) { return { id, innerHTML: '' }; },
+};
+context.echarts = {
+  init(element) {
+    return {
+      setOption(option) { options[element.id] = option; },
+      dispose() {},
+      resize() {},
+    };
+  },
+};
+
+context.renderWeeklyProgressionCharts({
+  default: {
+    weeks: [
+      { week_index: 1, duration_seconds: { chart_value: 50400 }, rows: [
+        {
+          progression_category: 'torpedo',
+          week_active_time_seconds: 14500,
+          active_time_seconds: 14500,
+        },
+      ] },
+      { week_index: 2, duration_seconds: { chart_value: 7200 }, rows: [
+        {
+          progression_category: 'barbell',
+          week_active_time_seconds: 900,
+          active_time_seconds: 51300,
+        },
+      ] },
+    ],
+  },
+});
+
+const first = options['weekly-progression-chart-0'];
+const second = options['weekly-progression-chart-1'];
+process.stdout.write(JSON.stringify({
+  html: target.innerHTML,
+  firstX: first.series[0].data[0].value[0],
+  firstMax: first.xAxis.max,
+  secondX: second.series[0].data[0].value[0],
+  secondMax: second.xAxis.max,
+}));
+"""
+
+    result = subprocess.run(
+        [NODE, "-e", harness, str(script_path)],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    rendered = json.loads(result.stdout)
+    assert "第 1 周" in rendered["html"]
+    assert "第 2 周" in rendered["html"]
+    assert rendered["firstX"] == 14500
+    assert rendered["firstMax"] == 50400
+    assert rendered["secondX"] == 900
+    assert rendered["secondMax"] == 7200
 
 
 @pytest.mark.skipif(NODE is None, reason="Node.js is required to execute the report renderer")
@@ -609,7 +688,7 @@ def test_generate_static_report_embeds_parseable_json_payload(tmp_path):
     inline_payload = json.loads(html[start:end])
     file_payload = json.loads((report_dir / "report_data.json").read_text(encoding="utf-8"))
     assert inline_payload == file_payload
-    assert inline_payload["schema_version"] == 4
+    assert inline_payload["schema_version"] == 5
     assert inline_payload["series"]["resources"]
     assert set(inline_payload["overview"]["duration_seconds"]) == {
         "exact_value",

@@ -155,12 +155,20 @@ h2 {
   min-height: 380px;
 }
 
+.weekly-chart-list,
 .daily-chart-list {
   display: grid;
   gap: 14px;
   margin-top: 16px;
 }
 
+.chart-list-heading {
+  color: #334155;
+  font-size: 16px;
+  margin: 22px 0 0;
+}
+
+.weekly-chart-card,
 .daily-chart-card {
   border: 1px solid #dce4ed;
   border-radius: 6px;
@@ -168,12 +176,14 @@ h2 {
   padding: 12px 14px 4px;
 }
 
+.weekly-chart-card h3,
 .daily-chart-card h3 {
   color: #334155;
   font-size: 14px;
   margin: 0 0 4px;
 }
 
+.weekly-chart,
 .daily-chart {
   min-height: 270px;
 }
