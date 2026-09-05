@@ -13,7 +13,7 @@ from .loader import ConfigLoader
 from .outputs import OutputWriter
 from .reporting.loader import ReportData, load_report_data
 from .reporting.static import generate_static_report
-from .simulator import Simulator
+from .simulator import Simulator, require_generic_engine
 
 
 def run_advise(
@@ -26,11 +26,11 @@ def run_advise(
     output_dir = Path(output_dir)
     run_dir = output_dir / "run"
     report_dir = output_dir / "report"
-    output_dir.mkdir(parents=True, exist_ok=True)
-
     raw = ConfigLoader.load(config, tables)
+    require_generic_engine(raw.rules.model.engine_id, "advise")
     ConfigLinter.validate(raw)
     model = ModelBuilder.build(raw)
+    output_dir.mkdir(parents=True, exist_ok=True)
     result = Simulator(model).run_scenario(scenario_id)
     OutputWriter.write_all(result, run_dir, model)
     report_index = generate_static_report(run_dir, report_dir)

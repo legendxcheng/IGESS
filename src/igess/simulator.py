@@ -9,8 +9,18 @@ from .time_engine import TimeEngine
 from .trace import action_formula_trace, prestige_formula_trace
 
 
+def require_generic_engine(engine_id: str, operation: str = "generic simulation") -> None:
+    if engine_id != "generic":
+        raise ValueError(
+            f"{operation} only supports engine_id='generic'; got {engine_id!r}. "
+            "For Fish formal simulation use 'igess model simulate --project <project>'. "
+            "Scanning and advice for this engine are not supported by the legacy commands."
+        )
+
+
 class Simulator:
     def __init__(self, model: EconomyModel):
+        require_generic_engine(model.config.engine_id)
         self.model = model
         self.policy = PolicyEngine(model)
         self.time = TimeEngine(model.config.tick_seconds)

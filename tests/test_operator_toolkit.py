@@ -20,9 +20,12 @@ from igess.operator_dashboard import (
 )
 from igess.operator_export import (
     ToolkitExportError,
+    _python_module_paths,
+    _runtime_dependency_closure,
     export_operator_toolkit,
     scan_operator_candidate,
 )
+from igess.run_registry import RunRegistry
 from igess.operator_runtime import (
     OperatorBundle,
     OperatorError,
@@ -151,6 +154,62 @@ def test_failed_run_uses_sanitized_business_diagnostic_and_can_be_deleted(tmp_pa
     assert service.list_runs() == []
 
 
+@pytest.mark.parametrize("status_write_fails", [False, True])
+def test_operator_report_failure_is_sanitized_and_skips_comparison(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, status_write_fails: bool,
+) -> None:
+    import io
+    import zipfile
+
+    service = OperatorService(_bundle(tmp_path), tmp_path / "history")
+
+    def broken_report(*_args: object) -> None:
+        raise RuntimeError(r"Cannot render E:\private\source\renderer.py")
+
+    class BrokenFinalStatus(RunRegistry):
+        def write_status(self, *args, **kwargs):
+            if kwargs["status"] != "running":
+                raise OSError(r"Cannot write E:\private\history\status.json")
+            return super().write_status(*args, **kwargs)
+
+    if status_write_fails:
+        service.registry = BrokenFinalStatus(service.history_root)
+    monkeypatch.setattr("igess.operator_runtime.generate_static_report", broken_report)
+    # A failed run must not try to resolve even an invalid baseline.
+    result = service.run(TABLES, "analytic_smoke", baseline_run_id="missing-baseline")
+
+    assert result.record.status == "failed"
+    assert result.comparison_index is None
+    assert result.gates_ok is None
+    assert result.diagnostic_code in result.record.message
+    assert "Cannot render" in result.record.message
+    assert "[report]" in result.record.message
+    assert "E:" not in result.record.message
+    assert "Traceback" not in result.record.message
+    assert (result.record.output_dir / "timeline.json").is_file()
+    assert not (tmp_path / ".igess/diagnostics").exists()
+    if status_write_fails:
+        assert "未能保存" in result.record.message
+    else:
+        persisted = (result.record.run_dir / "run_status.json").read_text(encoding="utf-8")
+        with zipfile.ZipFile(io.BytesIO(service.diagnostic_zip(result.record.run_id))) as archive:
+            assert archive.namelist() == ["diagnostic.json"]
+            diagnostic = archive.read("diagnostic.json").decode("utf-8")
+        for text in (persisted, diagnostic):
+            assert "private" not in text
+            assert "Traceback" not in text
+            assert "development_diagnostics" not in text
+
+
+def test_operator_dependency_closure_excludes_owner_diagnostics_and_authoring() -> None:
+    modules = _python_module_paths(ROOT / "src/igess")
+    closure = _runtime_dependency_closure(modules, "igess.operator_cli")
+
+    assert "igess.formal_run" in closure
+    assert "igess.development_diagnostics" not in closure
+    assert not any(name.startswith("igess.authoring") for name in closure)
+
+
 def test_workbench_only_exposes_planner_actions_and_manual_history_cleanup(tmp_path: Path) -> None:
     service = OperatorService(_bundle(tmp_path), tmp_path / "history")
 
@@ -272,6 +331,53 @@ def test_exports_sourceless_python311_toolkit_and_preserves_unmanaged_files(tmp_
     assert rerun.removed_files == ("obsolete-managed.txt",)
     assert not obsolete.exists()
     assert unmanaged.exists()
+
+
+@pytest.mark.skipif(not PYTHON311.is_file(), reason="repository Python 3.11 build environment unavailable")
+def test_exported_toolkit_executes_formal_run_and_sanitizes_report_failure(tmp_path: Path) -> None:
+    output = tmp_path / "distribution"
+    export_operator_toolkit(
+        CONFIG.parent, output, tool_version="generic-smoke",
+        python_command=(str(PYTHON311),), source_root=ROOT,
+    )
+    probe = subprocess.run(
+        [
+            str(PYTHON311), "-c",
+            """
+import importlib.util
+from pathlib import Path
+import sys
+import igess.operator_runtime as runtime
+
+assert Path(runtime.__file__).resolve() == Path('igess/operator_runtime.pyc').resolve()
+assert importlib.util.find_spec('igess.development_diagnostics') is None
+assert importlib.util.find_spec('igess.authoring') is None
+service = runtime.OperatorService(runtime.OperatorBundle.load('.'), sys.argv[2])
+success = service.run(sys.argv[1], 'analytic_smoke').record
+assert success.status == 'success', success.message
+assert success.report_index.is_file()
+
+def fail_report(*args):
+    raise RuntimeError('render failed at E:/private/source/renderer.py')
+
+runtime.generate_static_report = fail_report
+failed = service.run(sys.argv[1], 'analytic_smoke', baseline_run_id=success.run_id)
+assert failed.record.status == 'failed'
+assert failed.comparison_index is None
+assert '[report]' in failed.record.message
+assert 'private' not in failed.record.message
+assert 'Traceback' not in failed.record.message
+assert (failed.record.output_dir / 'timeline.json').is_file()
+print('formal success and sanitized report failure verified')
+""",
+            str(TABLES), str(tmp_path / "history"),
+        ],
+        cwd=output, capture_output=True, text=True, encoding="utf-8", check=False,
+    )
+
+    assert probe.returncode == 0, probe.stdout + probe.stderr
+    assert probe.stdout.strip() == "formal success and sanitized report failure verified"
+    assert not list(output.rglob("*.py"))
 
 
 def test_candidate_scan_fails_closed_on_python_source(tmp_path: Path) -> None:

@@ -17,7 +17,15 @@ import uuid
 import yaml
 
 from ..builder import ModelBuilder
+from ..development_diagnostics import DevelopmentDiagnostics
 from ..engines import EngineAdapterError, EngineRegistry
+from ..formal_run import (
+    FormalRunExecutor,
+    PreparedRun,
+    RunFailure,
+    legacy_failure_phase,
+    record_diagnostic,
+)
 from ..linter import ConfigLinter
 from ..loader import ConfigLoader
 from ..outputs import OutputWriter
@@ -460,12 +468,12 @@ class AuthoringService:
                 phase = "recovery"
                 return response
         except Exception as exc:
-            error = _phase_error(exc, phase)
-            return _error_response(
-                "model.simulate",
-                error,
-                details=_details_with_warnings(error.details, warnings),
+            failure = RunFailure(phase, exc)
+            record_diagnostic(
+                failure, {"scenario_id": scenario_id, "profile_id": profile_id},
+                DevelopmentDiagnostics(project_root or self.project_root or Path.cwd()),
             )
+            return _formal_failure_response(failure, None, warnings)
 
     def _discover(
         self,
@@ -860,7 +868,18 @@ class AuthoringService:
         registry = self._registry_factory(project)
         record: RunRecord | None = None
         reserved_run_dir: Path | None = None
-        phase = "simulate"
+        prepared_run: PreparedRun | None = None
+        failure: RunFailure | None = None
+        diagnostics = DevelopmentDiagnostics(project.root)
+        context = {
+            "scenario_id": scenario_id,
+            "profile_id": profile_id,
+            "config": str(project.config),
+            "tables": str(project.exports),
+            "overrides": list(overrides),
+            "checkpoint_input": str(checkpoint_input) if checkpoint_input is not None else None,
+        }
+        phase = "prepare"
         try:
             if not isinstance(scenario_id, str) or not scenario_id:
                 raise AuthoringError(
@@ -870,6 +889,7 @@ class AuthoringService:
                 )
             with self._ephemeral_exporter(project) as exported:
                 source_digest = exported.source_digest
+                context["source_digest"] = source_digest
                 raw = self._loader(exported.candidate_config, exported.export_root)
                 self._linter(raw)
                 model = self._builder(raw)
@@ -938,6 +958,7 @@ class AuthoringService:
                     scenario_id,
                 )
                 reserved_run_dir = run_dir
+                context["run_id"] = run_dir.name
                 paths = _run_paths(run_dir)
                 phase = "run_status"
                 record = registry.write_status(
@@ -951,53 +972,47 @@ class AuthoringService:
                     engine_id=status_engine_id,
                     **paths,
                 )
-                phase = "simulate"
-                execution = adapter.run_scenario(
-                    prepared,
-                    scenario_id,
-                    checkpoint_input=checkpoint_input,
+                prepared_run = PreparedRun(
+                    prepared, adapter, record,
+                    checkpoint_input=checkpoint_input, overrides=tuple(overrides),
+                    source_context=context,
                 )
-                phase = "simulation_artifact"
-                checkpoint_name = "final_checkpoint.json"
-                checkpoint_path = adapter.write_checkpoint(
-                    execution,
-                    paths["output_dir"] / checkpoint_name,
-                    model_digest=digest,
-                )
-                self._output_writer(
-                    execution.result,
-                    paths["output_dir"],
-                    model,
-                    model_digest=digest,
-                    overrides=list(overrides),
-                    manifest_metadata=prepared.manifest_metadata,
-                    extra_artifacts=(checkpoint_name,) if checkpoint_path else (),
-                    domain_model=prepared.domain_model,
-                )
-                self._report_writer(paths["output_dir"], paths["report_dir"])
-                phase = "run_status"
-                record = registry.write_status(
-                    run_dir,
-                    status="success",
-                    scenario_id=scenario_id,
-                    message="Run complete",
-                    kind="formal",
-                    change_id=None,
-                    model_digest=digest,
-                    engine_id=status_engine_id,
-                    **paths,
-                )
+                outcome = FormalRunExecutor(
+                    registry, output_writer=self._output_writer,
+                    report_writer=self._report_writer, diagnostics=diagnostics,
+                    failure_message=lambda error, stage: _phase_error(
+                        error, legacy_failure_phase(stage),
+                    ).message,
+                ).execute(prepared_run)
+                record, failure = outcome.record, outcome.failure
+                phase = "snapshot_cleanup"
         except Exception as exc:
-            error = _phase_error(exc, phase)
+            if failure is None:
+                failure = RunFailure(phase, exc)
+            else:
+                failure.secondary_errors.append(("snapshot_cleanup", exc))
+            diagnostic_context = {"run_id": None, **context}
+            if prepared_run is not None:
+                try:
+                    diagnostic_context = prepared_run.diagnostic_context()
+                except Exception as context_exc:
+                    failure.secondary_errors.append(("diagnostic_context", context_exc))
+            record_diagnostic(failure, diagnostic_context, diagnostics)
             if record is None and reserved_run_dir is not None:
-                _remove_empty_reservation(reserved_run_dir)
+                try:
+                    _remove_empty_reservation(reserved_run_dir)
+                except Exception as cleanup_exc:
+                    failure.secondary_errors.append(("reservation_cleanup", cleanup_exc))
+                    record_diagnostic(failure, diagnostic_context, diagnostics)
             if record is not None:
                 try:
                     record = registry.write_status(
                         record.run_dir,
                         status="failed",
                         scenario_id=record.scenario_id,
-                        message=error.message,
+                        message=failure.message(_phase_error(
+                            failure.error, legacy_failure_phase(failure.stage),
+                        ).message),
                         kind="formal",
                         change_id=None,
                         model_digest=record.model_digest,
@@ -1007,13 +1022,12 @@ class AuthoringService:
                         report_index=record.report_index,
                     )
                 except Exception as status_exc:
-                    error = _phase_error(status_exc, "run_status")
-            return _error_response(
-                "model.simulate",
-                error,
-                result=_run_result(record) if record is not None else {},
-                details=_details_with_warnings(error.details, recovered),
-            )
+                    failure.secondary_errors.append(("run_status", status_exc))
+                    record = replace(record, status="failed")
+                    record_diagnostic(failure, diagnostic_context, diagnostics)
+
+        if failure is not None:
+            return _formal_failure_response(failure, record, recovered)
 
         assert record is not None
         result = _run_result(record)
@@ -1027,6 +1041,22 @@ class AuthoringService:
             details={"warnings": list(recovered)} if recovered else {},
             result=result,
         )
+
+
+def _formal_failure_response(
+    failure: RunFailure,
+    record: RunRecord | None,
+    warnings: Sequence[Mapping[str, object]],
+) -> CommandResponse:
+    error = _phase_error(
+        failure.status_error or failure.error,
+        "run_status" if failure.status_error is not None else legacy_failure_phase(failure.stage),
+    )
+    return CommandResponse(
+        "model.simulate", False, error.code, failure.message(error.message),
+        details=_details_with_warnings({**error.details, **failure.details()}, warnings),
+        result=_run_result(record) if record is not None else {},
+    )
 
 
 def _parse_change_against_current(

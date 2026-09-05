@@ -267,6 +267,43 @@ def test_generated_luban_provider_loads_current_fish_export() -> None:
         assert actual_rows == source_rows
 
 
+def test_fish_report_failure_keeps_resumable_checkpoint_and_run_identity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    data_root = tmp_path / "data"
+    data_root.mkdir()
+    (data_root / "tbfishrandompool.json").write_text("generated fixture", encoding="utf-8")
+    config = _fish_config(tmp_path, data_root)
+    service = WorkflowService(
+        project_root=tmp_path, authoring=False,
+        engine_registry=EngineRegistry.standard(fish_luban_provider=_GeneratedLubanFixture()),
+    )
+
+    def broken_report(*_args: object) -> None:
+        raise RuntimeError("Fish report failed")
+
+    with monkeypatch.context() as patch:
+        patch.setattr("igess.workflows.generate_static_report", broken_report)
+        failed = service.run_scenario(config, TABLES.resolve(), "day_1_progression")
+
+    assert failed.status == "failed"
+    assert failed.engine_id == "fish"
+    checkpoint = failed.output_dir / "final_checkpoint.json"
+    assert checkpoint.is_file()
+    manifest = json.loads((failed.output_dir / "run_manifest.json").read_text())
+    assert manifest["model_digest"] == failed.model_digest
+    assert "final_checkpoint.json" in manifest["artifacts"]
+    diagnostic = json.loads((tmp_path / ".igess/diagnostics" / f"{failed.run_id}.json").read_text())
+    assert diagnostic["phase"] == "report"
+    assert diagnostic["context"]["engine_id"] == "fish"
+    assert diagnostic["context"]["model_digest"] == failed.model_digest
+    resumed = service.run_scenario(
+        config, TABLES.resolve(), "day_1_progression", checkpoint_input=checkpoint,
+    )
+    assert resumed.status == "success", resumed.message
+    assert resumed.model_digest == failed.model_digest
+
+
 def test_fish_workflow_writes_registry_artifacts_checkpoint_and_compare(
     tmp_path: Path,
 ) -> None:

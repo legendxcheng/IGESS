@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import hashlib
 import io
 import json
@@ -20,6 +20,7 @@ import yaml
 from .compare import compare_runs
 from .builder import ModelBuilder
 from .engines import EngineRegistry
+from .formal_run import FormalRunExecutor, PreparedRun
 from .gates import evaluate_gates
 from .linter import ConfigLinter
 from .loader import ConfigLoader
@@ -357,7 +358,7 @@ class OperatorService:
         output_dir = run_dir / "output"
         report_dir = run_dir / "report"
         report_index = report_dir / "index.html"
-        self.registry.write_status(
+        record = self.registry.write_status(
             run_dir,
             status="running",
             scenario_id=scenario_id,
@@ -377,43 +378,13 @@ class OperatorService:
                 source_digest=_operator_source_digest(self.bundle.config_path, input_files),
                 base_dir=config_path.parent,
             )
-            execution = adapter.run_scenario(prepared, scenario_id)
-            checkpoint_name = "final_checkpoint.json"
-            checkpoint_path = adapter.write_checkpoint(
-                execution,
-                output_dir / checkpoint_name,
-                model_digest=prepared.model_digest,
-            )
-            fish_run = prepared.engine_id != "generic"
-            OutputWriter.write_all(
-                execution.result,
-                output_dir,
-                model,
-                model_digest=prepared.model_digest if fish_run else None,
-                manifest_metadata=prepared.manifest_metadata,
-                extra_artifacts=(checkpoint_name,) if checkpoint_path else (),
-                domain_model=prepared.domain_model,
-            )
-            generate_static_report(output_dir, report_dir)
-            return self.registry.write_status(
-                run_dir,
-                status="success",
-                scenario_id=scenario_id,
-                message="运行完成",
-                output_dir=output_dir,
-                report_dir=report_dir,
-                report_index=report_index,
-                kind="formal" if fish_run else None,
-                model_digest=prepared.model_digest if fish_run else None,
-                engine_id=prepared.engine_id if fish_run else None,
-            )
         except Exception as error:  # noqa: BLE001 - persisted, then sanitized at the boundary.
             fish_run = prepared is not None and prepared.engine_id != "generic"
             return self.registry.write_status(
                 run_dir,
                 status="failed",
                 scenario_id=scenario_id,
-                message=str(error),
+                message=sanitize_diagnostic(str(error)),
                 output_dir=output_dir,
                 report_dir=report_dir,
                 report_index=report_index,
@@ -421,6 +392,19 @@ class OperatorService:
                 model_digest=prepared.model_digest if fish_run else None,
                 engine_id=prepared.engine_id if fish_run else None,
             )
+
+        if prepared.engine_id != "generic":
+            record = replace(
+                record, version=1, kind="formal",
+                model_digest=prepared.model_digest, engine_id=prepared.engine_id,
+            )
+        return FormalRunExecutor(
+            self.registry, output_writer=OutputWriter.write_all,
+            report_writer=generate_static_report,
+            failure_message=lambda error, _stage: sanitize_diagnostic(str(error)),
+        ).execute(PreparedRun(
+            prepared, adapter, record, success_message="运行完成",
+        )).record
 
     def _sanitize_record(
         self,
@@ -436,19 +420,22 @@ class OperatorService:
         )
         code = "OPR-" + hashlib.sha256(message.encode("utf-8")).hexdigest()[:10].upper()
         safe_message = f"{message}（错误编号：{code}）"
-        record = self.registry.write_status(
-            record.run_dir,
-            status="failed",
-            scenario_id=record.scenario_id,
-            message=safe_message,
-            output_dir=record.output_dir,
-            report_dir=record.report_dir,
-            report_index=record.report_index,
-            kind=record.kind if record.version is not None else None,
-            change_id=record.change_id,
-            model_digest=record.model_digest,
-            engine_id=record.engine_id,
-        )
+        try:
+            record = self.registry.write_status(
+                record.run_dir,
+                status="failed",
+                scenario_id=record.scenario_id,
+                message=safe_message,
+                output_dir=record.output_dir,
+                report_dir=record.report_dir,
+                report_index=record.report_index,
+                kind=record.kind if record.version is not None else None,
+                change_id=record.change_id,
+                model_digest=record.model_digest,
+                engine_id=record.engine_id,
+            )
+        except Exception:
+            record = replace(record, message=safe_message + "\n失败状态未能保存。")
         return record, code
 
     def _record(self, run_id: str) -> RunRecord:

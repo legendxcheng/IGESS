@@ -555,6 +555,8 @@ def _atomic_write_status(root: Path, run_dir: Path, payload: dict[str, Any]) -> 
                 else:
                     fd = _open_exclusive_regular(candidate.name, dir_fd=binding.fd)
             except FileExistsError:
+                if not _binding_matches(root, run_dir, binding):
+                    raise ValueError("run directory changed during temporary-file creation") from None
                 continue
             temp_path = candidate
             break

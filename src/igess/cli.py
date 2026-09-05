@@ -22,7 +22,7 @@ from .reporting.static import generate_static_report
 from .rng import RngSimulator
 from .rng_outputs import RngOutputWriter
 from .scan import run_scan
-from .simulator import Simulator
+from .simulator import Simulator, require_generic_engine
 from .stone_role_level import (
     build_realm_progression_curve,
     build_role_level_curve,
@@ -537,6 +537,8 @@ def main(argv: list[str] | None = None) -> int:
         require_file(args.config, "config file")
         require_directory(args.tables, "runtime export directory")
         raw = ConfigLoader.load(args.config, args.tables)
+        if args.command == "run":
+            require_generic_engine(raw.rules.model.engine_id, "run")
         ConfigLinter.validate(raw)
         if args.command == "lint":
             print("Config OK")

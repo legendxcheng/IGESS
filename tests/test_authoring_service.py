@@ -100,6 +100,148 @@ def _formal_bytes(root: Path) -> dict[str, bytes]:
     }
 
 
+def test_formal_report_failure_keeps_artifacts_and_compatible_error_details(tmp_path: Path) -> None:
+    root = initialize_authoring_project(tmp_path / "model")
+    _add_runnable_activity(_service(root))
+
+    def broken_report(*_args: object) -> None:
+        raise RuntimeError("report render failed")
+
+    response = AuthoringService(root, report_writer=broken_report).simulate()
+
+    assert not response.ok
+    assert response.code == "simulation_failed"
+    assert response.details["phase"] == "simulation_artifact"
+    assert response.details["execution_stage"] == "report"
+    assert response.result["status"] == "failed"
+    output = Path(response.result["output_dir"])
+    assert (output / "timeline.json").is_file()
+    manifest = json.loads((output / "run_manifest.json").read_text())
+    assert manifest["model_digest"] == AuthoringProject.discover(root).model_digest()
+    diagnostic = Path(response.details["diagnostic_path"])
+    assert diagnostic == root / ".igess/diagnostics" / f"{response.result['run_id']}.json"
+    payload = json.loads(diagnostic.read_text())
+    assert payload["phase"] == "report"
+    assert payload["context"]["model_digest"] == manifest["model_digest"]
+    assert "report render failed" in payload["primary_error"]["traceback"]
+
+
+def test_formal_engine_failure_survives_failed_terminal_status(tmp_path: Path) -> None:
+    root = initialize_authoring_project(tmp_path / "model")
+    _add_runnable_activity(_service(root))
+
+    class BrokenSimulator:
+        def run_scenario(self, _scenario: str) -> None:
+            raise RuntimeError("first engine failure")
+
+    class BrokenFinalStatus(RunRegistry):
+        def write_status(self, *args, **kwargs):
+            if kwargs["status"] != "running":
+                raise OSError("second status failure")
+            return super().write_status(*args, **kwargs)
+
+    response = AuthoringService(
+        root,
+        simulator_factory=lambda _model: BrokenSimulator(),
+        registry_factory=lambda project: BrokenFinalStatus(project.runs),
+    ).simulate()
+
+    assert not response.ok
+    assert response.code == "run_status_failed"
+    assert response.details["phase"] == "run_status"
+    assert response.details["execution_stage"] == "simulate"
+    assert response.result["status"] == "failed"
+    payload = json.loads(Path(response.details["diagnostic_path"]).read_text())
+    assert payload["primary_error"]["message"] == "first engine failure"
+    assert payload["secondary_errors"][0]["message"] == "second status failure"
+
+
+def test_preparation_failure_has_attempt_diagnostic_without_registering_run(tmp_path: Path) -> None:
+    root = initialize_authoring_project(tmp_path / "model")
+    project = AuthoringProject.discover(root)
+    before = list(RunRegistry(project.runs).list_runs())
+
+    response = AuthoringService(root).simulate("missing")
+
+    assert response.code == "unknown_scenario"
+    assert response.result == {}
+    assert response.details["diagnostic_id"].startswith("attempt-")
+    payload = json.loads(Path(response.details["diagnostic_path"]).read_text())
+    assert payload["context"]["run_id"] is None
+    assert payload["context"]["scenario_id"] == "missing"
+    assert RunRegistry(project.runs).list_runs() == before
+
+
+@pytest.mark.parametrize("report_fails", [False, True])
+def test_snapshot_cleanup_failure_keeps_original_failure_and_model_context(
+    tmp_path: Path, report_fails: bool,
+) -> None:
+    from igess.authoring.exports import ephemeral_export
+
+    root = initialize_authoring_project(tmp_path / "model")
+    _add_runnable_activity(_service(root))
+
+    @contextmanager
+    def broken_cleanup(project):
+        with ephemeral_export(project) as exported:
+            yield exported
+        raise OSError("snapshot cleanup failed")
+
+    def broken_report(*_args: object) -> None:
+        raise RuntimeError("report render failed")
+
+    options = {"report_writer": broken_report} if report_fails else {}
+    response = AuthoringService(root, ephemeral_exporter=broken_cleanup, **options).simulate()
+
+    assert not response.ok
+    assert response.result["status"] == "failed"
+    payload = json.loads(Path(response.details["diagnostic_path"]).read_text())
+    assert payload["context"]["engine_id"] == "generic"
+    assert payload["context"]["model_digest"] == AuthoringProject.discover(root).model_digest()
+    assert payload["context"]["output_dir"] == response.result["output_dir"]
+    if report_fails:
+        assert response.code == "simulation_failed"
+        assert payload["phase"] == "report"
+        assert payload["primary_error"]["message"] == "report render failed"
+        assert payload["secondary_errors"][0]["stage"] == "snapshot_cleanup"
+        assert payload["secondary_errors"][0]["message"] == "snapshot cleanup failed"
+    else:
+        assert response.code == "run_status_failed"
+        assert payload["phase"] == "snapshot_cleanup"
+        assert payload["primary_error"]["message"] == "snapshot cleanup failed"
+
+
+def test_formal_entrypoints_produce_equivalent_generic_simulation(tmp_path: Path) -> None:
+    from igess.operator_runtime import OperatorBundle, OperatorService
+    from igess.workflows import WorkflowService
+
+    root = initialize_authoring_project(tmp_path / "model")
+    service = _service(root)
+    _add_runnable_activity(service)
+    project = AuthoringProject.discover(root)
+    authored = service.simulate()
+    workflow = WorkflowService(root, authoring=False).run_scenario(project.config, project.exports, "smoke")
+    operator = OperatorService(
+        OperatorBundle(root, "test", "test-model", "generic", project.config, None, ("smoke",)),
+        tmp_path / "operator-history",
+    ).run(project.exports, "smoke").record
+
+    assert authored.ok
+    assert workflow.status == operator.status == "success"
+    assert set(authored.result) == {
+        "run_id", "kind", "scenario_id", "status", "output_dir", "report_index", "change_id",
+    }
+    authored_output = Path(authored.result["output_dir"])
+    for artifact in ("timeline.json", "events.json", "analysis.json"):
+        expected = json.loads((authored_output / artifact).read_text())
+        assert json.loads((workflow.output_dir / artifact).read_text()) == expected
+        assert json.loads((operator.output_dir / artifact).read_text()) == expected
+    assert workflow.model_digest is operator.model_digest is None
+    assert "model_digest" in json.loads((authored_output / "run_manifest.json").read_text())
+    assert "model_digest" not in json.loads((workflow.output_dir / "run_manifest.json").read_text())
+    assert "model_digest" not in json.loads((operator.output_dir / "run_manifest.json").read_text())
+
+
 def test_snapshot_operation_recovers_then_runs_inside_strict_shared_snapshot(
     tmp_path: Path,
 ) -> None:

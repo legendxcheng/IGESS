@@ -5,7 +5,7 @@ import json
 import os
 import stat
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -16,7 +16,9 @@ from .authoring.project import AuthoringProject
 from .authoring.response import CommandResponse
 from .authoring.service import AuthoringService
 from .builder import ModelBuilder
+from .development_diagnostics import DevelopmentDiagnostics
 from .engines import EngineRegistry
+from .formal_run import FormalRunExecutor, PreparedRun, RunFailure, record_diagnostic
 from .linter import ConfigLinter
 from .loader import ConfigLoader
 from .outputs import OutputWriter
@@ -158,17 +160,25 @@ class WorkflowService:
         output_dir = run_dir / "output"
         report_dir = run_dir / "report"
         report_index = report_dir / "index.html"
-        self.registry.write_status(
-            run_dir,
-            status="running",
-            scenario_id=scenario_id,
-            message="Running simulation",
-            output_dir=output_dir,
-            report_dir=report_dir,
-            report_index=report_index,
-        )
         prepared = None
+        record = None
+        phase = "run_status"
+        diagnostics = DevelopmentDiagnostics(self.project_root)
+        context = {
+            "run_id": run_dir.name,
+            "scenario_id": scenario_id,
+            "config": str(self._path(config)),
+            "tables": str(self._path(tables)),
+            "overrides": list(overrides),
+            "checkpoint_input": str(checkpoint_input) if checkpoint_input is not None else None,
+        }
         try:
+            record = self.registry.write_status(
+                run_dir, status="running", scenario_id=scenario_id,
+                message="Running simulation", output_dir=output_dir,
+                report_dir=report_dir, report_index=report_index,
+            )
+            phase = "prepare"
             resolved_config = self._path(config)
             resolved_tables = self._path(tables)
             raw = ConfigLoader.load(resolved_config, resolved_tables)
@@ -184,55 +194,38 @@ class WorkflowService:
                 base_dir=resolved_config.parent,
                 overrides=overrides,
             )
-            execution = adapter.run_scenario(
-                prepared,
-                scenario_id,
-                checkpoint_input=checkpoint_input,
-            )
-            checkpoint_name = "final_checkpoint.json"
-            checkpoint_path = adapter.write_checkpoint(
-                execution,
-                output_dir / checkpoint_name,
-                model_digest=prepared.model_digest,
-            )
-            fish_run = prepared.engine_id != "generic"
-            OutputWriter.write_all(
-                execution.result,
-                output_dir,
-                model,
-                overrides=list(overrides),
-                model_digest=prepared.model_digest if fish_run else None,
-                manifest_metadata=prepared.manifest_metadata,
-                extra_artifacts=(checkpoint_name,) if checkpoint_path else (),
-                domain_model=prepared.domain_model,
-            )
-            generate_static_report(output_dir, report_dir)
-            return self.registry.write_status(
-                run_dir,
-                status="success",
-                scenario_id=scenario_id,
-                message="Run complete",
-                output_dir=output_dir,
-                report_dir=report_dir,
-                report_index=report_index,
-                kind="formal" if fish_run else None,
-                model_digest=prepared.model_digest if fish_run else None,
-                engine_id=prepared.engine_id if fish_run else None,
-            )
         except Exception as exc:  # noqa: BLE001 - failure is persisted for dashboard history.
-            fish_run = prepared is not None and prepared.engine_id != "generic"
-            return self.registry.write_status(
-                run_dir,
-                status="failed",
-                scenario_id=scenario_id,
-                message=str(exc),
-                output_dir=output_dir,
-                report_dir=report_dir,
-                report_index=report_index,
-                kind="formal" if fish_run else None,
-                model_digest=prepared.model_digest if fish_run else None,
-                engine_id=prepared.engine_id if fish_run else None,
+            failure = RunFailure(phase, exc)
+            record_diagnostic(failure, context, diagnostics)
+            if record is None:
+                exc.add_note(failure.message("Formal run could not be registered."))
+                raise
+            try:
+                return self.registry.write_status(
+                    run_dir, status="failed", scenario_id=scenario_id,
+                    message=failure.message(str(exc)), output_dir=output_dir,
+                    report_dir=report_dir, report_index=report_index,
+                )
+            except Exception as status_error:
+                failure.secondary_errors.append(("run_status", status_error))
+                record_diagnostic(failure, context, diagnostics)
+                return replace(
+                    record, status="failed",
+                    message=failure.message(str(exc)) + "\nFailed run status could not be saved.",
+                )
+
+        if prepared.engine_id != "generic":
+            record = replace(
+                record, version=1, kind="formal",
+                model_digest=prepared.model_digest, engine_id=prepared.engine_id,
             )
+        return FormalRunExecutor(
+            self.registry, output_writer=OutputWriter.write_all,
+            report_writer=generate_static_report, diagnostics=diagnostics,
+        ).execute(PreparedRun(
+            prepared, adapter, record, checkpoint_input=checkpoint_input,
+            overrides=tuple(overrides), source_context=context,
+        )).record
 
     def run_advice(
         self,

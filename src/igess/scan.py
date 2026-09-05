@@ -12,7 +12,7 @@ from .linter import ConfigLinter
 from .loader import ConfigLoader
 from .outputs import OutputWriter
 from .reporting.static import generate_static_report
-from .simulator import Simulator
+from .simulator import Simulator, require_generic_engine
 
 
 MAX_SCAN_VARIANTS = 1000
@@ -174,6 +174,7 @@ def run_scan(
 ) -> Path:
     parameter = parse_scan_parameter(param)
     raw = ConfigLoader.load(config, tables)
+    require_generic_engine(raw.rules.model.engine_id, "scan")
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     variants = []

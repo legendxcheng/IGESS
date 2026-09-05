@@ -30,6 +30,11 @@ one-change schema, response envelope, progressive model states, failure recovery
 Dashboard boundary, and handoff to formal tuning. Existing flat commands remain
 compatible for established batch, reporting, and analysis workflows.
 
+For the shared formal-run execution path, failure stages, and local diagnostic
+files, see [Formal runs and debugging](docs/formal-runs.md). The legacy `run`,
+`scan`, and `advise` commands support only the Generic engine; use `model simulate`
+for Fish formal simulation.
+
 ## Quick Start
 
 ```powershell
