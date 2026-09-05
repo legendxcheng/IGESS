@@ -55,6 +55,22 @@ Outputs are deterministic JSON, CSV, and Markdown files:
 - `analysis.md`
 - `payback.csv`
 
+## Paid-player Simulation
+
+`paid-run` compares explicit purchase plans with a zero-purchase baseline using
+the same source model, player profile, and random seed. Products can grant
+resources and permanent or timed production multipliers. Generic and Fish's
+weighted behavior engine produce registered formal runs plus a Chinese HTML,
+JSON, and CSV comparison of spending, progression, and time saved.
+
+```powershell
+.\.venv\Scripts\python.exe -m igess.cli paid-run --project projects/fish --experiment examples/paid/fish-example.yaml --out .tmp/paid-fish
+```
+
+The supplied products are explicitly marked examples, not production prices.
+See [Paid-player simulation](docs/paid-player-simulation.md) for the schema,
+timing and stacking rules, generic example, and report interpretation.
+
 ## Standard RNG Simulation
 
 `rng-run` simulates Roblox-style rarity-score RNG tables without requiring

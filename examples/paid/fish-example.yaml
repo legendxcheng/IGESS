@@ -1,0 +1,27 @@
+schema_version: 1
+data_status: example
+source: "示例资源礼包与产出增益，非 Fish 生产商品；用于机制验证。"
+currency: TEST_CREDITS
+profile: default
+scenarios: [day_1_growth, week_1_growth, month_1_growth]
+products:
+  starter_resources:
+    price: "6.00"
+    grants: {money: "1000", material: "1000"}
+  permanent_bonus:
+    price: "30.00"
+    multipliers: {fish_hall_money: "1.2", trash_material: "1.2", barbell_strength: "1.2"}
+  training_boost:
+    price: "3.00"
+    multipliers: {barbell_strength: "2"}
+    duration_seconds: 3600
+plans:
+  starter_only:
+    purchases:
+      - {at_seconds: 0, product_id: starter_resources}
+  permanent_and_boost:
+    purchases:
+      - {at_seconds: 0, product_id: starter_resources}
+      - {at_seconds: 0, product_id: permanent_bonus}
+      - {at_seconds: 1800, product_id: training_boost}
+      - {at_seconds: 86400, product_id: training_boost}

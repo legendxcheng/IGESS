@@ -19,6 +19,7 @@ EXPECTED_COMMANDS = {
     "init",
     "lint",
     "model",
+    "paid-run",
     "report",
     "review-proposal",
     "review-run",
@@ -33,6 +34,15 @@ EXPECTED_COMMANDS = {
 }
 
 CRITICAL_HELP_CASES = (
+    (
+        "paid-run",
+        (
+            ("project", "Model project directory."),
+            ("experiment", "YAML product catalog and purchase plans."),
+            ("out", "New directory for the paired comparison report."),
+        ),
+        "igess paid-run --project projects/fish --experiment examples/paid/fish-example.yaml --out .tmp/paid-fish",
+    ),
     (
         "lint",
         (

@@ -183,9 +183,10 @@ def timeline_row(
     *,
     model: EconomyModel,
     hall_adapter: FishHallDataAdapter,
+    reward_multipliers: FishRewardMultipliers | None = None,
 ) -> TimelineRow:
     hall = hall_adapter.snapshot(state)
-    reward_multipliers = FishRewardMultipliers.from_profile(
+    reward_multipliers = reward_multipliers or FishRewardMultipliers.from_profile(
         model.player_profiles[profile_id]
     )
     return TimelineRow(

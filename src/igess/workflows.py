@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import stat
+from contextlib import ExitStack
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -226,6 +227,41 @@ class WorkflowService:
             prepared, adapter, record, checkpoint_input=checkpoint_input,
             overrides=tuple(overrides), source_context=context,
         )).record
+
+    def run_paid_experiment(
+        self,
+        experiment_path: str | Path,
+        output_dir: str | Path,
+        *,
+        config: str | Path = "economy.yaml",
+        tables: str | Path = "luban_exports",
+    ) -> dict[str, Any]:
+        """Compare explicit purchase plans against one frozen source model."""
+        from .authoring.locking import recovered_shared_snapshot
+        from .authoring.transactions import recover_transactions
+        from .paid_experiments import execute_paid_experiment
+        from .payments import PaymentExperiment
+
+        experiment = PaymentExperiment.read(experiment_path)
+        with ExitStack() as stack:
+            project = self.authoring_project
+            if project is not None:
+                stack.enter_context(recovered_shared_snapshot(project, lambda: recover_transactions(project)))
+                exported = stack.enter_context(self._ephemeral_exporter(project))
+                resolved_config, resolved_tables = exported.candidate_config, exported.export_root
+                source_digest = exported.source_digest
+                base_dir = project.root
+            else:
+                resolved_config, resolved_tables = self._path(config), self._path(tables)
+                source_digest = _legacy_model_digest(resolved_config, resolved_tables)
+                base_dir = resolved_config.parent
+            raw = ConfigLoader.load(resolved_config, resolved_tables)
+            model = ModelBuilder.build(raw)
+            adapter = self._engine_registry.resolve(model.config.engine_id)
+            prepared = adapter.prepare(model, source_digest=source_digest, base_dir=base_dir)
+            return execute_paid_experiment(
+                prepared, adapter, experiment, self.registry, output_dir, self.project_root,
+            )
 
     def run_advice(
         self,

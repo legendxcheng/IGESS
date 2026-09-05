@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from bisect import bisect_right
 from decimal import Decimal
 
 from .behavior import (
@@ -38,7 +39,7 @@ from .fish_production import (
     settle_fish_production,
 )
 from .fish_rewards import FishRewardMultipliers
-from .fish_state import FishCheckpointCodec, PlayerState
+from .fish_state import BigNumberDTO, FishCheckpointCodec, PlayerState
 from .fish_trash import FishTrashDataAdapter
 from .fish_throw_data import (
     FishThrowDataAdapter,
@@ -196,6 +197,53 @@ class FishBehaviorSimulator:
             )
 
         scheduler = BehaviorScheduler(root_random_seed)
+        plan = self.model.payment_plan
+        payment_times = () if plan is None else plan.boundaries
+        payment_time_set = set(payment_times)
+        events: list[Event] = []
+        if plan is not None:
+            plan.validate_model(self.model, profile_id)
+            if checkpoint is not None and event_counters.get("paid_purchase_quantity", 0) != plan.count_at(start_time):
+                raise ValueError("checkpoint purchases do not match the payment plan")
+            reward_multipliers = FishRewardMultipliers.from_profile(
+                plan.effective_profile(profile, start_time if checkpoint else -1)
+            )
+
+        def apply_payments(seconds: int, *, interval_online: bool) -> None:
+            nonlocal state, production_runtime, reward_multipliers
+            if plan is None or seconds not in payment_time_set:
+                return
+            if state.production.last_settled_at < seconds:
+                settlement = settle_fish_production(
+                    state, seconds, hall_adapter=self.hall_adapter,
+                    trash_adapter=self.trash_adapter, barbell_adapter=self.barbell_adapter,
+                    runtime=production_runtime, online=interval_online,
+                    barbell_training_active=(interval_online and runtime.active is not None and runtime.active.behavior_id == EXERCISE_BARBELL_BEHAVIOR_ID),
+                    reward_multipliers=reward_multipliers,
+                )
+                state, production_runtime = settlement.state, settlement.runtime
+                record_production_counters(event_counters, settlement.elapsed_seconds, settlement.trash_processing.completed_count)
+                details = settlement.event_details()
+                _append_breakthrough_completion_events(events, event_counters, scenario_id=scenario_id, profile_id=profile_id, settlement_details=details)
+                events.append(Event(scenario_id, profile_id, seconds, "paid_boundary_settled", "payment", details))
+            grants = plan.grants_at(seconds)
+            if grants:
+                state = state.copy()
+                for resource, amount in grants.items():
+                    current = getattr(state.wallet, resource).to_sim_number()
+                    setattr(state.wallet, resource, BigNumberDTO.from_value(current + amount, allow_negative=False))
+                state.meta.revision += 1
+                state.validate(self.hall_adapter.validation_context())
+            reward_multipliers = FishRewardMultipliers.from_profile(plan.effective_profile(profile, seconds))
+            purchase_events = plan.events_at(seconds, scenario_id, profile_id)
+            for event in purchase_events:
+                if event.kind == "paid_purchase":
+                    event.details["strength_after_settlement"] = state.wallet.strength.to_decimal_string()
+            events.extend(purchase_events)
+            event_counters["paid_purchase_quantity"] = plan.count_at(seconds)
+
+        if checkpoint is None:
+            apply_payments(0, interval_online=True)
         timeline = [
             timeline_row(
                 scenario_id,
@@ -218,9 +266,10 @@ class FishBehaviorSimulator:
                 ),
                 model=self.model,
                 hall_adapter=self.hall_adapter,
+                reward_multipliers=reward_multipliers,
             )
         ]
-        events = [
+        events += [
             Event(
                 scenario_id=scenario_id,
                 profile_id=profile_id,
@@ -275,6 +324,8 @@ class FishBehaviorSimulator:
         current_time = start_time
 
         while current_time < target_time:
+            payment_index = bisect_right(payment_times, current_time)
+            next_payment = payment_times[payment_index] if payment_index < len(payment_times) else target_time
             online = session_schedule.is_online(current_time)
             next_session_transition = (
                 session_schedule.next_transition_after(current_time)
@@ -293,6 +344,7 @@ class FishBehaviorSimulator:
                 boundary = min(
                     target_time,
                     next_record,
+                    next_payment,
                     (
                         next_session_transition
                         if next_session_transition is not None
@@ -351,6 +403,7 @@ class FishBehaviorSimulator:
                     )
 
                 current_time = boundary
+                apply_payments(boundary, interval_online=False)
                 if (
                     record_index < len(record_times)
                     and record_times[record_index] == boundary
@@ -373,6 +426,7 @@ class FishBehaviorSimulator:
                             ),
                             model=self.model,
                             hall_adapter=self.hall_adapter,
+                            reward_multipliers=reward_multipliers,
                         )
                     )
                     record_index += 1
@@ -442,6 +496,7 @@ class FishBehaviorSimulator:
                 active.completes_at_seconds,
                 next_record,
                 target_time,
+                next_payment,
                 (
                     next_session_transition
                     if next_session_transition is not None
@@ -526,6 +581,7 @@ class FishBehaviorSimulator:
                     )
 
             current_time = boundary
+            apply_payments(boundary, interval_online=True)
             if (
                 record_index < len(record_times)
                 and record_times[record_index] == boundary
@@ -552,6 +608,7 @@ class FishBehaviorSimulator:
                         ),
                         model=self.model,
                         hall_adapter=self.hall_adapter,
+                        reward_multipliers=reward_multipliers,
                     )
                 )
                 record_index += 1

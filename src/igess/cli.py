@@ -89,6 +89,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     export.add_argument("--out", required=True, help="Directory for exported JSON tables.")
 
+    paid = add_command(
+        "paid-run",
+        "Simulate paid-player purchase plans",
+        "igess paid-run --project projects/fish --experiment examples/paid/fish-example.yaml --out .tmp/paid-fish",
+    )
+    paid.add_argument("--project", required=True, help="Model project directory.")
+    paid.add_argument("--experiment", required=True, help="YAML product catalog and purchase plans.")
+    paid.add_argument("--out", required=True, help="New directory for the paired comparison report.")
+    paid.add_argument("--config", default="economy.yaml", help="Config relative to a non-authoring project.")
+    paid.add_argument("--tables", default="luban_exports", help="Exports relative to a non-authoring project.")
+
     operator_export = add_command(
         "export-operator-toolkit",
         "Export a sourceless execution-planner toolkit",
@@ -379,6 +390,20 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "model":
         return dispatch_model(args)
     try:
+        if args.command == "paid-run":
+            from .workflows import WorkflowService
+
+            require_directory(args.project, "model project")
+            require_file(args.experiment, "payment experiment")
+            try:
+                result = WorkflowService(args.project).run_paid_experiment(
+                    args.experiment, args.out, config=args.config, tables=args.tables,
+                )
+            except OSError as error:
+                print(f"igess paid-run: {error}", file=sys.stderr)
+                return 1
+            print(f"Paid simulation {result['status']}: {args.out}/index.html")
+            return 0 if result["status"] == "success" else 1
         if args.command == "export-tables":
             require_directory(args.datas, "source workbook directory")
             written = export_registered_workbooks(args.datas, args.out)

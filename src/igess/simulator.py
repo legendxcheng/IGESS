@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import copy
+
 from .conditions import evaluate
 from .modifiers import ModifierStack
 from .numbers import SimNumber
@@ -21,8 +23,8 @@ def require_generic_engine(engine_id: str, operation: str = "generic simulation"
 class Simulator:
     def __init__(self, model: EconomyModel):
         require_generic_engine(model.config.engine_id)
-        self.model = model
-        self.policy = PolicyEngine(model)
+        self.model = copy.deepcopy(model) if model.payment_plan is not None else model
+        self.policy = PolicyEngine(self.model)
         self.time = TimeEngine(model.config.tick_seconds)
 
     def run_scenario(self, scenario_id: str) -> SimulationResult:
@@ -36,7 +38,14 @@ class Simulator:
         timeline: list[TimelineRow] = []
         events: list[Event] = []
         for profile_id in scenario.profiles:
+            plan = self.model.payment_plan
+            payment_times = set(plan.boundaries) if plan is not None else set()
+            base_profile = self.model.player_profiles[profile_id]
+            if plan is not None:
+                plan.validate_model(self.model, profile_id)
             state = SimulationState.new(self.model)
+            if plan is not None:
+                self._apply_payments(plan, base_profile, scenario_id, 0, state, events)
             self._update_unlocks(scenario_id, profile_id, 0, state, events)
             current_time = 0
             timeline.append(self._timeline_row(scenario_id, profile_id, current_time, state))
@@ -53,6 +62,8 @@ class Simulator:
                 current_time = next_time
                 self._produce(profile_id, state, delta_seconds)
                 self._apply_offline_reward(scenario_id, profile_id, current_time, state, events)
+                if plan is not None and current_time in payment_times:
+                    self._apply_payments(plan, base_profile, scenario_id, current_time, state, events)
                 self._update_unlocks(scenario_id, profile_id, current_time, state, events)
                 if scenario.time_mode == "analytic":
                     self._apply_milestones(scenario_id, profile_id, current_time, state, events)
@@ -67,7 +78,14 @@ class Simulator:
                 self._update_unlocks(scenario_id, profile_id, current_time, state, events)
                 if current_time == duration_seconds or current_time % scenario.record_interval_seconds == 0:
                     timeline.append(self._timeline_row(scenario_id, profile_id, current_time, state))
+            self.model.player_profiles[profile_id] = base_profile
         return SimulationResult(scenario_id=scenario_id, timeline=timeline, events=events)
+
+    def _apply_payments(self, plan, base_profile, scenario_id, seconds, state, events):
+        for resource, amount in plan.grants_at(seconds).items():
+            state.resources[resource] += amount
+        self.model.player_profiles[base_profile.id] = plan.effective_profile(base_profile, seconds)
+        events.extend(plan.events_at(seconds, scenario_id, base_profile.id))
 
     def _next_time(
         self,
@@ -93,6 +111,8 @@ class Simulator:
         next_prestige = self._next_prestige_time(profile_id, state, current_time, duration_seconds)
         if next_prestige is not None:
             candidates.add(next_prestige)
+        if self.model.payment_plan is not None:
+            candidates.update(value for value in self.model.payment_plan.boundaries if current_time < value <= duration_seconds)
         next_time = min(candidate for candidate in candidates if candidate > current_time)
         return current_time + self.time.analytic_leap(current_time, next_time)
 

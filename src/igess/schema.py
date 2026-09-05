@@ -5,6 +5,7 @@ from typing import Any
 
 from .formula import CompiledFormula
 from .numbers import SimNumber
+from .payments import PaymentPlan
 
 
 @dataclass
@@ -233,6 +234,7 @@ class EconomyModel:
     activities: dict[str, ActivityRow] = field(default_factory=dict)
     activity_outputs: dict[str, ActivityOutputRow] = field(default_factory=dict)
     engine_settings: dict[str, Any] = field(default_factory=dict)
+    payment_plan: PaymentPlan | None = None
 
     def generator_cost(self, generator_id: str, owned: int) -> SimNumber:
         generator = self.generators[generator_id]

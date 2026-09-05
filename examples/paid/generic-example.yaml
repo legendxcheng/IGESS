@@ -1,0 +1,22 @@
+schema_version: 1
+data_status: example
+source: "演示商品，仅用于验证 IGESS 付费模拟机制，非实际游戏定价。"
+currency: TEST_CREDITS
+profile: casual
+scenarios: [day_1_progression]
+products:
+  starter:
+    price: "6.00"
+    grants: {fish: "100"}
+  boost:
+    price: "3.00"
+    multipliers: {generator: "2"}
+    duration_seconds: 60
+plans:
+  starter_only:
+    purchases:
+      - {at_seconds: 0, product_id: starter}
+  starter_and_boost:
+    purchases:
+      - {at_seconds: 0, product_id: starter}
+      - {at_seconds: 30, product_id: boost}
