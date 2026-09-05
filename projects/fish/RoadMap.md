@@ -244,7 +244,7 @@ FishLuck = max(1, BaseFishLuck × RegularLuckMultiplier)
 FinalFishLuck = FishLuck × 2^BonusDoubleCount
 ```
 
-5. 精确等于 `Ri` 时使用第 `i` 行的 `endLuck`；刚超过 `Ri` 时进入下一行并从其 `startLuck` 开始。相邻行 Luck 端点允许不连续，必须原样保留生产 JSON 的跳变，不得平滑或补齐。
+5. 精确等于 `Ri` 时使用第 `i` 行的 `endLuck`；刚超过 `Ri` 时进入下一行并从其 `startLuck` 开始。相邻行 Luck 端点允许不连续，必须原样保留生产 JSON 的跳变，不得平滑或补齐。`FishRandomPool` 与 `TrashRandomPool` 的 `startLuck/endLuck` 当前均以 Luban `BigNumber`（`sign/digits/scale`）导出；IGESS 同时兼容该结构和旧数值标量。
 6. 常规 Luck 倍率在 BonusChain 前相乘；同类型效果如何合并由效果所属系统先处理。
 
 #### 3.4.5 鱼雷轨迹边界
@@ -263,7 +263,7 @@ FinalFishLuck = FishLuck × 2^BonusDoubleCount
    `50` 到 `30B`，`price` 由同表提供。购买只检查未拥有、比当前装备强和
    材料可支付，不读取当前力量或历史最高力量；成功后自动装备。生产画像采用
    `highest_affordable`，成长时点完全由价格控制。
-6. 废料当前 `39` 行，全部 `baseDecomposeSeconds = 300`；材料基础速度从 `2/s` 到 `10M/s`。Phase 5 v1 将其解释为基础工作量与每单位基础工作材料：每真实秒推进 `decomposeSpeedMultiplier` 单位工作，材料为 `baseMaterialPerSecond × 已消费工作量 × 力量重生材料总倍率`。因此加速缩短耗时但不减少同一废料的基础总材料。
+6. 废料当前 `40` 行，全部 `baseDecomposeSeconds = 600`；材料基础速度从 `8/s` 到 `100M/s`。Phase 5 v1 将其解释为基础工作量与每单位基础工作材料：每真实秒推进 `decomposeSpeedMultiplier` 单位工作，材料为 `baseMaterialPerSecond × 已消费工作量 × 力量重生材料总倍率`。因此加速缩短耗时但不减少同一废料的基础总材料。
 7. 垃圾佬境界当前 `60` 档，`decomposeSpeedMultiplier = 1 + 1.25×(ID-1)`，从 `1` 到 `74.75`；当前正式生成契约的推进字段为 `breakthroughSecondsToNextRealm`，从 `0s` 到 `36310s`。`materialRequireToNextRealm` 的 1～59 号为严格递增正价，60 号为 `0` 满档哨兵。
 8. 当 `realmId < highestRealmId` 且没有进行中的突破时，在线墙钟免费追赶至历史最高境界；达到历史最高境界后，显式 `fund_trash_man_breakthrough` 命令按当前行价格一次性扣材料并创建目标为下一表行的突破。突破只累计未缩放在线墙钟，离线暂停；奖励倍率不改变推进秒数。跨境界统一结算先按旧速度加工到完成边界，再更新当前/历史最高境界并启用新速度，闭关期间废料加工持续进行。立即突破、延迟突破和保留材料属于玩家画像策略，不属于状态机自动行为。
 9. 资源变化必须先结算到当前服务端时间，再原子执行消费/换装/升级，成功后 `meta.revision += 1`。
@@ -310,11 +310,11 @@ FinalFishLuck = FishLuck × 2^BonusDoubleCount
 
 #### 3.4.9 待人类确认清单
 
-- `[~]` `05-a-力量与Luck计算流程.md` 的 FishRandomPool Luck 连续区间（如池 1 为 `1→5`）与当前 `igess_export/json/tbfishrandompool.json`（池 1 为 `1→3`，且多处池间有空档）冲突；模拟数值已明确以权威导出 JSON 为准，需人类确认的只是文字 GDD 是否同步修订。
+- `[~]` `05-a-力量与Luck计算流程.md` 的 FishRandomPool Luck 连续区间（如池 1 为 `1→5`）与当前 `igess_export/json/tbfishrandompool.json`（池 1 为 `1→20`，且多处池间有空档）冲突；模拟数值已明确以权威导出 JSON 为准，需人类确认的只是文字 GDD 是否同步修订。
 - `[x]` 已于 2026-07-22 拍定正式流程为 `力量快照→按 strengthUpperBound 右端点选区→区内插值 FishLuck→BonusChain→FinalFishLuck→FishRollPower→鱼结果`；轨迹由最终落点反推，不进入经济结算，废料继续使用独立的 TrashLuck/TrashRollPower 链。
 - `[x]` `strengthUpperBound` 是当前区域的包含性右端点；相邻行 Luck 不连续时按权威 JSON 原样保留跳变。
 - `[x]` 当前 `tbfish` 121/121 行均已有唯一正式 `Denominator`；已确认 `Fish.xlsx`/`tbfish` 全表就是所有可用鱼，正式结算使用全表门槛池。
-- `[x]` 当前 `tbtrash` 39/39 行均已有唯一正式 `Denominator`；已确认物品级门槛正式取代旧的稀有度池内权重随机，`05-核心随机算法.md` 已同步。
+- `[x]` 当前 `tbtrash` 40/40 行均已有唯一正式 `Denominator`；已确认物品级门槛正式取代旧的稀有度池内权重随机，`05-核心随机算法.md` 已同步。
 - `[x]` `tbtorpedo.price` 已进入生产强类型表适配和“材料→鱼雷”闭环；
   2～11 号价格已按双 Luck 峰值同步目标完成首轮平衡，且明确不增加力量门槛。
 - `[x]` `TrashRandomPool.powerUpperBound` 是当前鱼雷 power 区域的包含性右端点；TrashLuck 正式使用与 FishLuck 相同的对数进度 + smoothstep 区间插值并保留跨行跳变；表现层下探深度不进入经济结算。
@@ -650,6 +650,7 @@ Phase 0 已完成，后续顺序：
 
 | 日期 | 变更 |
 | --- | --- |
+| 2026-08-31 | `FishRandomPool` 与 `TrashRandomPool` 的 `startLuck/endLuck` 从 `int` 改为 Luban `BigNumber` 后，生产适配器改为读取 `sign/digits/scale`，同时保留旧数值标量兼容；当前生产快照两类池 1 的端点均为 `1→20`。BigNumber 生产契约测试 `2 passed`、Fish 默认回归 `141 passed`；正式 smoke `20260831T052452956234Z-smoke` 成功，模型摘要 `sha256:59082524624772b0f9bdabd67f8da5e0713abe9106b00a6f30f9d1c7b01742ec`。 |
 | 2026-08-02 | 按新生产经济模型迁移 IGESS：杠铃改扣金钱，鱼雷和垃圾佬突破改扣材料；突破材料只在显式命令开始时扣一次；力量重生改读 `materialOutputMultiplier` 并作用于垃圾材料，垃圾佬转世改读 `fishHallOutputMultiplier` 并作用于摸鱼厅金钱。境界推进严格读取同批生成契约的 `breakthroughSecondsToNextRealm`，保持在线墙钟、多境界跨越、离线暂停、加工不停和 checkpoint 分段等价。新增 `immediate / weighted_delay / preserve_material` 三种突破画像策略，生产默认 `immediate`。正式 smoke `20260802T020830293437Z-smoke` 与 1 天运行 `20260802T021144403218Z-day_1_growth` 成功，模型摘要 `sha256:82d5b37fd2ce1573ad45425b1722d57420c0bf9af835d23c303aaaa3350b6301`。旧长期 gate 结果不再代表当前模型，等待同快照 7d/30d 重新基线。 |
 | 2026-07-26 | 按 GDD 的 `P0` 定义纠正鱼升级材料价格：价格现为 `tbfish.baseMoneyPerSecond×tbmutation.incomeMultiplier×1.5^(当前等级-1)`，最低价/材料 `1/10` 自动目标同步按变异后价格排序；100 级模拟上限保持不变。 |
 | 2026-07-26 | 完成垃圾佬付费新境界突破生产闭环和价格/分解倍率联调：`moneyRequireToNextRealm` 进入强类型适配、原子扣款命令、默认权重 `100`/固定 `1s` 行为、仅在线突破、离线暂停、闭关旧境界不停产、完成事件、checkpoint 和永久进展报表。权威 1～59 号价格严格递增且不低于旧值，60 号为零值哨兵；关键前期价为 `20 / 100K / 5M / 50M / 500M / 100B / 1T`，分解倍率改为 `1 + 1.25×(ID-1)`。正式 run `20260726T013137219561Z-day_1_growth`、`20260726T013200487450Z-week_1_growth` 使用模型摘要 `sha256:7721a63bd78f573cdd634b327faf0199fd1d7ee95e3a913ca97d8aff4528bfd1`，24h/7d 系统进展 `9 / 23`；同生产输入 30d 领域结果 36，三阶段均通过 gate。7d 累计材料约 `10.735M`，较旧曲线约低 `5.5%`。Fish 回归 `116 passed, 3 deselected`，生产表契约 `2 passed`；`TrashManRealm.xlsx`、JSON、Lua 已同步，报告见 `reports/trash-man-breakthrough-balance.md`。 |

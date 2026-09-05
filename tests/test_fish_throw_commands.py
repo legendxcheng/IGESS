@@ -499,11 +499,11 @@ def test_current_production_snapshot_resolves_one_throw() -> None:
     assert len(adapter.rules.strength_luck_pools) == 13
     assert len(adapter.trash_luck_pools) == 13
     assert len(adapter.rules.fish_pool) == 121
-    assert len(adapter.rules.trash_pool) == 39
-    assert resolution.outcome.strength_luck.base_fish_luck == 3
+    assert len(adapter.rules.trash_pool) == 40
+    assert resolution.outcome.strength_luck.base_fish_luck == 20
     assert resolution.torpedo_power == 5
     assert resolution.trash_luck_mapping.base_trash_luck == pytest.approx(
-        1.7370055336225123,
+        8.001552569413867,
         abs=1e-15,
         rel=0,
     )
