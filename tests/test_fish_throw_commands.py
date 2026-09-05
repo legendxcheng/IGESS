@@ -73,6 +73,52 @@ def test_generated_rows_drive_one_replayable_throw(tmp_path: Path) -> None:
     assert "reward_application" not in resolution.event_details()
 
 
+def test_generated_big_number_fish_luck_is_supported(tmp_path: Path) -> None:
+    snapshot = _snapshot(tmp_path)
+    first_pool = snapshot.table("tbfishrandompool")[0]
+    first_pool.startLuck = _big(2)
+    first_pool.endLuck = _big(6)
+
+    adapter = FishThrowDataAdapter(
+        snapshot,
+        bonus_base_luck=1,
+        max_bonus_layers=4,
+    )
+    mapping = adapter.resolve(
+        ProductionThrowRequest(
+            root_random_seed=20260722,
+            throw_id=0,
+            strength=50,
+            torpedo_id=1,
+        )
+    ).outcome.strength_luck
+
+    assert adapter.rules.strength_luck_pools[0].start_luck == 2
+    assert adapter.rules.strength_luck_pools[0].end_luck == 6
+    assert mapping.base_fish_luck == 6
+
+
+def test_generated_big_number_trash_luck_is_supported(tmp_path: Path) -> None:
+    snapshot = _snapshot(tmp_path)
+    first_pool = snapshot.table("tbtrashrandompool")[0]
+    first_pool.startLuck = _big(2)
+    first_pool.endLuck = _big(6)
+
+    adapter = FishThrowDataAdapter(
+        snapshot,
+        bonus_base_luck=1,
+        max_bonus_layers=4,
+    )
+    mapping = map_torpedo_power_to_trash_luck(
+        50,
+        adapter.trash_luck_pools,
+    )
+
+    assert adapter.trash_luck_pools[0].start_luck == 2
+    assert adapter.trash_luck_pools[0].end_luck == 6
+    assert mapping.base_trash_luck == 6
+
+
 def test_sparse_fish_insertion_and_shuffled_rows_preserve_throw_behavior(
     tmp_path: Path,
 ) -> None:
@@ -368,6 +414,62 @@ def test_trash_luck_uses_inclusive_power_upper_bound(tmp_path: Path) -> None:
     assert at_endpoint.base_trash_luck == 3
     assert above_endpoint.pool_id == 2
     assert above_endpoint.base_trash_luck == pytest.approx(5, abs=1e-12)
+
+
+@pytest.mark.external_data
+def test_current_production_snapshot_supports_big_number_fish_luck() -> None:
+    snapshot = FishDataLoader(
+        GeneratedLubanProvider("E:/fish-oasis/igess_export/python/schema.py")
+    ).load(
+        "E:/fish-oasis/igess_export/json",
+        production_data=True,
+        required_tables=FISH_REQUIRED_TABLES,
+    )
+    adapter = FishThrowDataAdapter(
+        snapshot,
+        bonus_base_luck=1,
+        max_bonus_layers=4,
+    )
+
+    first_pool = adapter.rules.strength_luck_pools[0]
+    resolution = adapter.resolve(
+        ProductionThrowRequest(
+            root_random_seed=20260626,
+            throw_id=0,
+            strength=first_pool.strength_upper_bound,
+            torpedo_id=adapter.initial_torpedo_id,
+        )
+    )
+
+    assert first_pool.start_luck == 1
+    assert first_pool.end_luck == 20
+    assert resolution.outcome.strength_luck.base_fish_luck == 20
+
+
+@pytest.mark.external_data
+def test_current_production_snapshot_supports_big_number_trash_luck() -> None:
+    snapshot = FishDataLoader(
+        GeneratedLubanProvider("E:/fish-oasis/igess_export/python/schema.py")
+    ).load(
+        "E:/fish-oasis/igess_export/json",
+        production_data=True,
+        required_tables=FISH_REQUIRED_TABLES,
+    )
+    adapter = FishThrowDataAdapter(
+        snapshot,
+        bonus_base_luck=1,
+        max_bonus_layers=4,
+    )
+
+    first_pool = adapter.trash_luck_pools[0]
+    mapping = map_torpedo_power_to_trash_luck(
+        first_pool.power_upper_bound,
+        adapter.trash_luck_pools,
+    )
+
+    assert first_pool.start_luck == 1
+    assert first_pool.end_luck == 20
+    assert mapping.base_trash_luck == 20
 
 
 @pytest.mark.external_data

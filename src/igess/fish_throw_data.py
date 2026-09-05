@@ -304,11 +304,11 @@ class FishThrowDataAdapter:
                     _field(row, "strengthUpperBound", "tbfishrandompool"),
                     "tbfishrandompool.strengthUpperBound",
                 ),
-                start_luck=_positive_number(
+                start_luck=_generated_number(
                     _field(row, "startLuck", "tbfishrandompool"),
                     "tbfishrandompool.startLuck",
                 ),
-                end_luck=_positive_number(
+                end_luck=_generated_number(
                     _field(row, "endLuck", "tbfishrandompool"),
                     "tbfishrandompool.endLuck",
                 ),
@@ -328,11 +328,11 @@ class FishThrowDataAdapter:
                     _field(row, "powerUpperBound", "tbtrashrandompool"),
                     "tbtrashrandompool.powerUpperBound",
                 ),
-                start_luck=_positive_number(
+                start_luck=_generated_number(
                     _field(row, "startLuck", "tbtrashrandompool"),
                     "tbtrashrandompool.startLuck",
                 ),
-                end_luck=_positive_number(
+                end_luck=_generated_number(
                     _field(row, "endLuck", "tbtrashrandompool"),
                     "tbtrashrandompool.endLuck",
                 ),
