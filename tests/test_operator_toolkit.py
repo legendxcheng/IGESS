@@ -4,6 +4,7 @@ from http import HTTPStatus
 from http.client import HTTPConnection
 import json
 from pathlib import Path
+import shutil
 import subprocess
 from threading import BoundedSemaphore, Thread
 from urllib.parse import urlencode
@@ -39,6 +40,53 @@ ROOT = Path(__file__).resolve().parents[1]
 CONFIG = ROOT / "examples" / "shelldiver_v0" / "economy.yaml"
 TABLES = ROOT / "examples" / "shelldiver_v0" / "luban_exports"
 PYTHON311 = ROOT / ".tmp" / "py311-venv" / "Scripts" / "python.exe"
+
+
+def test_production_report_asset_renders_current_fish_income_cards(tmp_path: Path) -> None:
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("Node is required to execute browser report assets")
+    probe = tmp_path / "report-probe.cjs"
+    probe.write_text(r'''
+const fs = require('fs');
+const vm = require('vm');
+const point = value => ({display_value: String(value), exact_value: String(value)});
+const summary = {
+  coin_spent: point(50), hall_income_gain: point(10), effective_upgrade_percent: point(100),
+  fish_sold_count: point(3), sale_material: point(200), trash_material: point(400),
+  barbell_purchases: [],
+};
+const data = {
+  scenario: {profiles: []}, overview: {}, series: {}, diagnostics: {},
+  fish_progression: {available: true, investment: {
+    scope: 'ordinary_fish_only', profiles: {default: summary},
+  }},
+};
+const cards = {innerHTML: ''};
+const purchases = {innerHTML: ''};
+const section = {hidden: true, querySelector: selector =>
+  selector === '[data-fish-investment-kpis]' ? cards : purchases};
+const document = {
+  getElementById: id => id === 'igess-report-data' ? {textContent: JSON.stringify(data)} : null,
+  querySelector: selector => selector === '[data-fish-investment-section]' ? section : null,
+};
+vm.runInNewContext(fs.readFileSync(process.argv[2], 'utf8'), {
+  document, window: {addEventListener() {}}, console,
+});
+setImmediate(() => console.log(JSON.stringify({hidden: section.hidden, cards: cards.innerHTML, purchases: purchases.innerHTML})));
+''', encoding="utf-8")
+    rendered = []
+    for name in ("report.js", "report.min.js"):
+        result = subprocess.run(
+            [node, "--unhandled-rejections=strict", str(probe), str(ROOT / "src/igess/reporting/assets" / name)],
+            capture_output=True, text=True, encoding="utf-8", check=False,
+        )
+        assert result.returncode == 0, result.stderr
+        rendered.append(json.loads(result.stdout))
+    assert rendered[0]["hidden"] is False
+    assert "卖鱼材料收入" in rendered[0]["cards"]
+    assert 'data-exact-value="200"' in rendered[0]["cards"]
+    assert rendered[1] == rendered[0], "Rebuild report.min.js before exporting the toolkit"
 
 
 def _bundle(tmp_path: Path, *, version: str = "test-1") -> OperatorBundle:
