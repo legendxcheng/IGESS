@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from copy import copy
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -159,3 +161,33 @@ def test_no_useful_barbell_removes_wait_gate(tmp_path: Path) -> None:
     deploy(hall, state, [FishInstance(1, 101, 7, 1, 100, 0)])
     profile.source_efficiency["fish_hall_money"] = SimNumber.zero()
     assert upgrade_candidate(adapter, state, profile).available
+
+
+def test_barbell_targets_skip_slower_options_and_advance_after_purchase(tmp_path: Path) -> None:
+    adapter, _, state, profile = setup_policy(tmp_path)
+    snapshot = _snapshot(tmp_path)
+    rows = []
+    for barbell_id, (strength, seconds) in enumerate([(10, 1), (10, 2), (30, 1), (40, 1)], 1):
+        row = copy(snapshot.table("tbbarbell")[0])
+        row.id, row.price = barbell_id, barbell_id * 10
+        row.strengthPerExercise, row.timeCost = strength, seconds
+        rows.append(row)
+    snapshot = replace(snapshot, tables={**snapshot.tables, "tbbarbell": tuple(rows)})
+    adapter.barbell_adapter = FishBarbellDataAdapter(snapshot)
+    profile.behavior_weights = {"synthesize_barbell": SimNumber.one()}
+    state.barbell.owned = [OwnedBarbell(1, 1)]
+    state.barbell.equipped_id = 1
+
+    def targets():
+        return [t.target_id for c in adapter.candidates(state, profile) for t in c.targets]
+
+    assert targets() == ["3"]
+    state.wallet.money = BigNumberDTO.from_value(20)
+    assert targets() == []  # Cheaper ID 2 is slower than equipped ID 1.
+    state.wallet.money = BigNumberDTO.from_value(100)
+    state.barbell.owned.append(OwnedBarbell(3, 1))
+    state.barbell.equipped_id = 3
+    assert targets() == ["4"]
+    state.barbell.owned.append(OwnedBarbell(4, 1))
+    state.barbell.equipped_id = 4
+    assert targets() == []

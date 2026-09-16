@@ -11,7 +11,7 @@
 - 复制/原地事务均验证升级中 checkpoint 恢复与连续运行的事件、状态等价。
 - 含神兽 checkpoint 拒绝恢复并保留原始输入；神兽命令失败且不改状态。
 - 全量默认测试：`1429 passed, 8 skipped, 16 deselected`（271.48 秒）。
-- 全量后补充终局无杠铃门槛和神兽 checkpoint 边界，定向文件：`17 passed`。
+- 全量后补充终局无杠铃门槛和神兽 checkpoint 边界，并验证杠铃跳过低速档与购买后目标推进；定向文件：`18 passed`。
 - 外部生产生成对象对 JSON 的逐字段契约：`1 passed, 13 deselected`；移除了过时的固定行数与标量 Luck 端点断言，保留逐字段相等验证。
 - 本次修改的九个核心 Python 文件 pyright：`0 errors, 0 warnings`。
 - `node --check src/igess/reporting/assets/report.js` 与 `git diff --check` 通过。
@@ -34,4 +34,5 @@
 
 ## 审查
 
-由 code-review 技能对上述固定点后的提交分别进行 Standards 与 Spec 审查，结果待补充。
+code-review 双轴审查完成：Standards 无硬性违规、1 项非阻塞模块边界建议；Spec 0 项发现。
+完整独立审查报告与处理见 [review.md](review.md)。

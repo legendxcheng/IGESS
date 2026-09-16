@@ -107,7 +107,7 @@ Fish 当前前台行为为 `manual_throw`、`upgrade_fish`、
 行为并在恢复时原样继续。默认画像的 `session_pattern.daily_online_seconds`
 为 `7200`，即每天从模拟日开始连续在线 2 小时、随后离线 22 小时，到下一模拟日重新
 上线。离线期间不调度前台行为，摸鱼厅金钱和废料加工按在线的 `50%` 结算，
-杠铃力量为 `0%`，垃圾佬修炼不推进。默认 `manual_throw` 与
+杠铃力量为 `0%`，垃圾佬修炼不推进。默认 `manual_throw`、
 `exercise_barbell` 与 `upgrade_fish` 使用基准权重 `1`；`synthesize_barbell` 与 `upgrade_fish_hall` 使用高优先级权重
 `100`。`purchase_torpedo`、两类重生与突破资助配置为可执行时近似硬优先级；
 突破再由 `immediate` 策略明确抢占普通候选。只要任一种重生达到下一档要求，候选池

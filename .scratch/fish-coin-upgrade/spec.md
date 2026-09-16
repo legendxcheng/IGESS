@@ -3,7 +3,7 @@
 Status: ready-for-agent
 Type: spec
 Confirmed: 2026-09-16
-Implementation: implemented; review pending
+Implementation: completed
 
 ## Problem Statement
 
@@ -205,3 +205,5 @@ Implementation: implemented; review pending
 - 2026-09-16（第三轮回答）：用户将 Q7 修正为品质前 X 条普通鱼内最低等级优先，X 为鱼厅容量减上阵神兽数，替代最高品质单鱼锁定；Q8 采用最低价且更强的未拥有杠铃为目标。
 - 2026-09-16（第四轮回答）：用户否决 Q9 的未上阵追赶例外，明确只升级当前已上阵鱼。最终建议以品质前 X 与上阵鱼的交集作为候选，不因未上阵的新鱼阻塞其他候选，杠铃资金条件保持有效。
 - 2026-09-16（整体确认与发布）：用户确认完整方案并显式调用 to-spec。保留已确认的正式工作流与领域命令测试边界，按标准模板发布为 ready-for-agent；模拟实现尚未开始。
+
+- 2026-09-16（实施完成）：实现提交 `5a1f509`；正式 smoke/1d/7d/30d、全量与定向测试已通过。双轴审查无阻塞问题，证据见 [verification.md](verification.md) 与 [review.md](review.md)。

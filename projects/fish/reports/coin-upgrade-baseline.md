@@ -14,10 +14,12 @@
 
 | 场景 | Run / Web 报告 | 升级次数 | 累计金币支出 | 有效增收升级 | 累计升级即时增收 / 秒 |
 | --- | --- | ---: | ---: | ---: | ---: |
-| smoke | [20260915T235855892487Z-smoke](../runs/20260915T235855892487Z-smoke/report/index.html) | 0 | 0 | —% | 0 |
+| smoke | [20260915T235855892487Z-smoke](../runs/20260915T235855892487Z-smoke/report/index.html) | 0 | 0 | — | 0 |
 | day_1_growth | [20260915T235914663284Z-day_1_growth](../runs/20260915T235914663284Z-day_1_growth/report/index.html) | 63 | 14278.2 | 100% | 4788.37 |
 | week_1_growth | [20260916T000042284092Z-week_1_growth](../runs/20260916T000042284092Z-week_1_growth/report/index.html) | 522 | 8.86449e8 | 100% | 7.51401e7 |
 | month_1_growth | [20260916T000137500101Z-month_1_growth](../runs/20260916T000137500101Z-month_1_growth/report/index.html) | 1988 | 1.2994e20 | 100% | 2.78952e15 |
+
+表中大数为显示值，精确值保留在各报告的 `report_data.json` 与原始事件中。
 
 有效比例为 `fish_upgrade_hall_income_delta > 0` 的升级次数占比；只衡量完成瞬间真实增收。
 累计增收为各升级发生时的在线 CPS 增量之和（含当时重生和画像倍率），不是期末总 CPS，
