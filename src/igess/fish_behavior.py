@@ -48,6 +48,9 @@ from .fish_production import (
 )
 from .fish_rewards import FishRewardMultipliers
 from .fish_state import PlayerState
+from .fish_sale import (
+    SELL_FISH_BEHAVIOR_ID, SALE_POLICY_ID, decode_sale_target, sell_fish, validate_sale,
+)
 from .fish_torpedo import FishTorpedoDataAdapter
 from .fish_trash import FishTrashDataAdapter
 from .fish_throw_data import FishThrowDataAdapter, ProductionThrowConfig
@@ -72,6 +75,7 @@ REBIRTH_BEHAVIOR_IDS = frozenset(
 )
 FISH_BEHAVIOR_IDS = frozenset(
     {
+        SELL_FISH_BEHAVIOR_ID,
         MANUAL_THROW_BEHAVIOR_ID,
         UPGRADE_FISH_BEHAVIOR_ID,
         UPGRADE_FISH_HALL_BEHAVIOR_ID,
@@ -232,9 +236,16 @@ class FishBehaviorAdapter:
                 raise FishBehaviorConfigError(
                     f"unknown Torpedo purchase target policy: {policy}"
                 )
+        if profile.behavior_weights.get(SELL_FISH_BEHAVIOR_ID, SimNumber.zero()) > 0:
+            if profile.behavior_target_policies.get(SELL_FISH_BEHAVIOR_ID) != SALE_POLICY_ID:
+                raise FishBehaviorConfigError("sell_fish requires keep_deployed_and_top_quality policy")
+            duration = self._duration(profile.behavior_durations[SELL_FISH_BEHAVIOR_ID], SELL_FISH_BEHAVIOR_ID)
+            if not isinstance(duration, FixedDuration):
+                raise FishBehaviorConfigError("sell_fish requires a fixed duration")
         extra_policies = (
             set(profile.behavior_target_policies)
             - {
+                SELL_FISH_BEHAVIOR_ID,
                 UPGRADE_FISH_BEHAVIOR_ID,
                 SYNTHESIZE_BARBELL_BEHAVIOR_ID,
                 PURCHASE_TORPEDO_BEHAVIOR_ID,
@@ -452,12 +463,17 @@ class FishBehaviorAdapter:
         next_throw_id: int,
         production_runtime: FishProductionRuntime | None = None,
         reward_multipliers: FishRewardMultipliers | None = None,
+        total_fish_sold: int = 0,
         _mutate: bool = False,
     ) -> FishBehaviorCompletion:
         if type(_mutate) is not bool:
             raise TypeError("_mutate must be a bool")
         if decision.completes_at_seconds < state.production.last_settled_at:
             raise ValueError("behavior completion precedes Fish hall settlement")
+        sale_ids = None
+        if decision.behavior_id == SELL_FISH_BEHAVIOR_ID:
+            sale_ids = decode_sale_target(decision.target_id)
+            validate_sale(state, sale_ids, self.hall_adapter)
         settlement = settle_fish_production(
             state,
             decision.completes_at_seconds,
@@ -471,11 +487,20 @@ class FishBehaviorAdapter:
                 == EXERCISE_BARBELL_BEHAVIOR_ID
             ),
             reward_multipliers=reward_multipliers,
-            _mutate=_mutate,
+            _mutate=_mutate and sale_ids is None,
         )
         committed = settlement.state
         details = self._decision_details(decision)
         details.update(settlement.event_details())
+
+        if sale_ids is not None:
+            sale = sell_fish(committed, sale_ids, hall_adapter=self.hall_adapter)
+            details.update(sale.event_details())
+            return FishBehaviorCompletion(
+                state=sale.state, production_runtime=settlement.runtime,
+                next_throw_id=next_throw_id, event_kind="fish_sold",
+                item_id=f"fish_sale:{decision.sequence_id}", details=details,
+            )
 
         if decision.behavior_id == MANUAL_THROW_BEHAVIOR_ID:
             lock_request = (
@@ -491,6 +516,7 @@ class FishBehaviorAdapter:
                 regular_luck_multiplier=(
                     self.throw_config.regular_luck_multiplier
                 ),
+                **({"total_fish_sold": total_fish_sold} if _mutate else {}),
             )
             resolution = self.throw_adapter.resolve(request)
             application = apply_throw_resolution(

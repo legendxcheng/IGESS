@@ -40,6 +40,7 @@ def trusted_lock_throw_request(
     root_random_seed: int,
     throw_id: int,
     regular_luck_multiplier: float = 1.0,
+    total_fish_sold: int = 0,
 ) -> ProductionThrowRequest:
     """Lock a throw from simulator-owned state using only O(1) invariants.
 
@@ -49,7 +50,7 @@ def trusted_lock_throw_request(
     """
 
     _validate_lock_inputs(state, adapter)
-    _validate_trusted_throw_counters(state)
+    _validate_trusted_throw_counters(state, total_fish_sold)
     return _build_throw_request(
         state,
         adapter=adapter,
@@ -69,7 +70,7 @@ def _validate_lock_inputs(
         raise FishCommandError("adapter must be a FishThrowDataAdapter")
 
 
-def _validate_trusted_throw_counters(state: PlayerState) -> None:
+def _validate_trusted_throw_counters(state: PlayerState, total_fish_sold: int = 0) -> None:
     total_throws = state.statistics.total_throws
     total_fish_caught = state.statistics.total_fish_caught
     next_instance_id = state.fish.next_instance_id
@@ -83,7 +84,9 @@ def _validate_trusted_throw_counters(state: PlayerState) -> None:
         or next_instance_id <= 0
         or type(items) is not list
         or total_fish_caught != total_throws
-        or len(items) != total_fish_caught
+        or type(total_fish_sold) is not int
+        or total_fish_sold < 0
+        or len(items) + total_fish_sold != total_fish_caught
         or next_instance_id != total_fish_caught + 1
     ):
         raise FishCommandError(

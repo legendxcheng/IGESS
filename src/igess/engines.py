@@ -199,6 +199,18 @@ class FishEngineAdapter:
         strategy_parameters["fish_simulation_scope"] = "ordinary_fish_only"
         strategy_parameters["fish_upgrade_resource"] = "money"
         strategy_parameters["barbell_saving_estimate"] = "static_online_with_action_duration"
+        if any(profile.behavior_weights.get("sell_fish", 0) > 0 for profile in model.player_profiles.values()):
+            from .fish_sale import FishSalePolicy, FISH_SELL_INCOME_SECONDS
+            sale_policy = FishSalePolicy.from_engine_settings(settings)
+            strategy_parameters["fish_sale"] = {
+                "resource": "material",
+                "formula": "baseMoneyPerSecond * incomeMultiplier * fishSellIncomeSeconds",
+                "sell_income_seconds": FISH_SELL_INCOME_SECONDS,
+                "interval_online_seconds": sale_policy.interval_online_seconds,
+                "reward_multiplier": "1",
+                "policy": "keep_deployed_and_top_quality",
+                "priority": "after_rebirth_and_immediate_breakthrough_before_other_actions",
+            }
         if "active_throw" in settings:
             strategy_parameters["active_throw"] = (
                 ProductionThrowConfig.from_mapping(

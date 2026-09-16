@@ -139,6 +139,9 @@ function renderFishInvestment(investment) {
   section.hidden = false;
   section.querySelector('[data-fish-investment-kpis]').innerHTML = Object.entries(investment.profiles || {}).map(([id, summary]) => [
     kpiCard(profileLabel(id) + ' · 升级金币支出', numericMarkup(summary.coin_spent)),
+    kpiCard(profileLabel(id) + ' · 卖出鱼数量', numericMarkup(summary.fish_sold_count)),
+    kpiCard(profileLabel(id) + ' · 卖鱼材料收入', numericMarkup(summary.sale_material)),
+    kpiCard(profileLabel(id) + ' · 加工材料收入（含离线）', numericMarkup(summary.trash_material)),
     kpiCard(profileLabel(id) + ' · 累计升级增收', numericMarkup(summary.hall_income_gain, '/秒')),
     kpiCard(profileLabel(id) + ' · 有效增收升级占比', numericMarkup(summary.effective_upgrade_percent, '%')),
   ].join('')).join('');
@@ -194,6 +197,8 @@ function renderFishAcquisitionRateChart(profiles) {
     const rows = profile.rate_rows || [];
     [
       ['资源/秒', 'resource_per_second', '#16a34a'],
+      ['卖鱼材料/秒', 'fish_sale_material_per_second', '#f59e0b'],
+      ['加工材料/秒', 'trash_material_per_second', '#14b8a6'],
       ['金钱/秒', 'money_per_second', '#2563eb'],
     ].forEach(([label, field, color]) => {
       series.push({
@@ -222,6 +227,8 @@ function renderFishCumulativeOutputChart(profiles) {
     [
       ['累计金钱', 'money_acquired_cumulative', '#2563eb'],
       ['累计资源', 'resource_acquired_cumulative', '#16a34a'],
+      ['累计卖鱼材料', 'fish_sale_material_cumulative', '#f59e0b'],
+      ['累计加工材料', 'trash_material_cumulative', '#14b8a6'],
     ].forEach(([label, field, color]) => {
       series.push({
         name: `${profileLabel(profileId)} · ${label}`,
@@ -1069,6 +1076,7 @@ function eventKindLabel(kind) {
     fish_engine_ready: '摸鱼模拟就绪',
     fish_throw_resolved: '摸鱼投掷结算',
     fish_upgraded: '鱼升级',
+    fish_sold: '卖鱼获得材料',
     fish_hall_upgraded: '摸鱼厅升级',
     fish_offline_settled: '离线收益结算',
     fish_session_online_started: '在线时段开始',

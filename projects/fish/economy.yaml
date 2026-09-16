@@ -10,6 +10,8 @@ engine:
   production_data: true
   strategy_id: production_active_throw_loop
   behavior_scheduler:
+    fish_sale:
+      interval_online_seconds: 300
     trash_man_breakthrough_policy: immediate
     manual_throw_refill:
       weight_multiplier: '10'
@@ -113,6 +115,7 @@ player_profiles:
     activity_weights:
       starter_fish_hall: '1'
     behavior_weights:
+      sell_fish: '1'
       manual_throw: '1'
       upgrade_fish: '1'
       upgrade_fish_hall: '100'
@@ -123,6 +126,9 @@ player_profiles:
       trash_man_rebirth: '1e100'
       fund_trash_man_breakthrough: '1e100'
     behavior_durations:
+      sell_fish:
+        type: fixed
+        seconds: 3
       manual_throw:
         type: fixed
         seconds: 30
@@ -151,6 +157,7 @@ player_profiles:
         type: fixed
         seconds: 10
     behavior_target_policies:
+      sell_fish: keep_deployed_and_top_quality
       upgrade_fish: deployed_quality_lowest_level
       purchase_torpedo: highest_affordable
       synthesize_barbell: cheapest_improvement
@@ -171,6 +178,7 @@ player_profiles:
     activity_weights:
       starter_fish_hall: '1'
     behavior_weights:
+      sell_fish: '1'
       manual_throw: '1'
       upgrade_fish: '1'
       upgrade_fish_hall: '100'
@@ -181,6 +189,9 @@ player_profiles:
       trash_man_rebirth: '1e100'
       fund_trash_man_breakthrough: '1e100'
     behavior_durations:
+      sell_fish:
+        type: fixed
+        seconds: 3
       manual_throw:
         type: fixed
         seconds: 30
@@ -209,6 +220,7 @@ player_profiles:
         type: fixed
         seconds: 10
     behavior_target_policies:
+      sell_fish: keep_deployed_and_top_quality
       upgrade_fish: deployed_quality_lowest_level
       purchase_torpedo: highest_affordable
       synthesize_barbell: cheapest_improvement

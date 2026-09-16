@@ -1,0 +1,512 @@
+[
+  {
+    "run_id": "20260916T014522691100Z-smoke",
+    "model_digest": "sha256:5757115633890b374eb9bc63240b28a9197763ef3adbca66098290750d5c0b4d",
+    "sale_batches": 0,
+    "fish_sold": 0,
+    "fish_remaining": 0,
+    "sale_material": "0",
+    "trash_material": "0",
+    "sale_share_percent": "0",
+    "first_sale_seconds": null,
+    "wallet": {
+      "material": {
+        "coeff": 0,
+        "exp": 0,
+        "sign": 0
+      },
+      "money": {
+        "coeff": 0,
+        "exp": 0,
+        "sign": 0
+      },
+      "strength": {
+        "coeff": 5000,
+        "exp": -2,
+        "sign": 1
+      }
+    },
+    "fish_hall": {
+      "upgradeLevel": 0
+    },
+    "torpedo": {
+      "ownedIds": [
+        1
+      ],
+      "selectedId": 1
+    },
+    "barbell": {
+      "equippedId": 0,
+      "owned": []
+    },
+    "realm": 1,
+    "rebirth": {
+      "strengthCompletedCount": 0,
+      "trashManCompletedCount": 0
+    },
+    "luck": {
+      "active_duration_seconds": 10,
+      "fish_luck_final": "20",
+      "fish_luck_initial": "20",
+      "fish_luck_net_delta": "0",
+      "fish_luck_peak": "20",
+      "longest_fish_luck_stagnation_seconds": 10,
+      "longest_trash_luck_stagnation_seconds": 10,
+      "sample_count": 2,
+      "strength_final": "50",
+      "strength_initial": "50",
+      "strength_peak": "50",
+      "strength_rebirth_count": 0,
+      "trash_luck_final": "8.001552569413867",
+      "trash_luck_initial": "8.001552569413867",
+      "trash_luck_net_delta": "0",
+      "trash_luck_peak": "8.001552569413867",
+      "trash_man_rebirth_count": 0,
+      "wall_duration_seconds": 10
+    },
+    "progression": {
+      "active_duration_seconds": 10,
+      "complete_online_sessions": 0,
+      "complete_online_sessions_without_progression": 0,
+      "complete_online_sessions_without_system_progression": 0,
+      "dominant_category_share": "0",
+      "earned_progression_count": 0,
+      "events_per_active_hour": "0",
+      "first_progression_wait_seconds": 10,
+      "interval_p50_seconds": 0,
+      "interval_p75_seconds": 0,
+      "interval_p90_seconds": 0,
+      "interval_p95_seconds": 0,
+      "max_interval_seconds": 0,
+      "progression_category_counts": {},
+      "progression_category_diversity": 0,
+      "system_events_per_active_hour": "0",
+      "system_progression_count": 0,
+      "system_progression_interval_p90_seconds": 0,
+      "system_progression_max_interval_seconds": 0,
+      "system_progression_tail_gap_seconds": 10,
+      "tail_gap_seconds": 10,
+      "total_progression_count": 0,
+      "wall_duration_seconds": 10
+    }
+  },
+  {
+    "run_id": "20260916T014533931252Z-day_1_growth",
+    "model_digest": "sha256:5757115633890b374eb9bc63240b28a9197763ef3adbca66098290750d5c0b4d",
+    "sale_batches": 22,
+    "fish_sold": 61,
+    "fish_remaining": 19,
+    "sale_material": "24095",
+    "trash_material": "22636520.5",
+    "sale_share_percent": "0.10632985675080184825518088862149397486577538019653526180698842888887991590519684",
+    "first_sale_seconds": 609,
+    "wallet": {
+      "material": {
+        "coeff": 1681,
+        "exp": 4,
+        "sign": 1
+      },
+      "money": {
+        "coeff": 2744,
+        "exp": 5,
+        "sign": 1
+      },
+      "strength": {
+        "coeff": 2760,
+        "exp": 1,
+        "sign": 1
+      }
+    },
+    "fish_hall": {
+      "upgradeLevel": 2
+    },
+    "torpedo": {
+      "ownedIds": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "selectedId": 5
+    },
+    "barbell": {
+      "equippedId": 3,
+      "owned": [
+        {
+          "barbellId": 1,
+          "count": 1
+        },
+        {
+          "barbellId": 2,
+          "count": 1
+        },
+        {
+          "barbellId": 3,
+          "count": 1
+        }
+      ]
+    },
+    "realm": 7,
+    "rebirth": {
+      "strengthCompletedCount": 2,
+      "trashManCompletedCount": 1
+    },
+    "luck": {
+      "active_duration_seconds": 7200,
+      "fish_luck_final": "1596.6571094578971",
+      "fish_luck_initial": "20",
+      "fish_luck_net_delta": "1576.6571094578971",
+      "fish_luck_peak": "1596.6571094578971",
+      "longest_fish_luck_stagnation_seconds": 333,
+      "longest_trash_luck_stagnation_seconds": 2897,
+      "sample_count": 43,
+      "strength_final": "27600",
+      "strength_initial": "50",
+      "strength_peak": "27600",
+      "strength_rebirth_count": 2,
+      "trash_luck_final": "832.24454913034765",
+      "trash_luck_initial": "8.001552569413867",
+      "trash_luck_net_delta": "824.242996560933783",
+      "trash_luck_peak": "832.24454913034765",
+      "trash_man_rebirth_count": 1,
+      "wall_duration_seconds": 86400
+    },
+    "progression": {
+      "active_duration_seconds": 7200,
+      "complete_online_sessions": 1,
+      "complete_online_sessions_without_progression": 0,
+      "complete_online_sessions_without_system_progression": 0,
+      "dominant_category_share": "0.68421052631578947368421052631578947368421052631578947368421052631578947368421053",
+      "earned_progression_count": 57,
+      "events_per_active_hour": "28.5",
+      "first_progression_wait_seconds": 30,
+      "interval_p50_seconds": 33,
+      "interval_p75_seconds": 150,
+      "interval_p90_seconds": 270,
+      "interval_p95_seconds": 561,
+      "max_interval_seconds": 1214,
+      "progression_category_counts": {
+        "barbell": 3,
+        "best_hall_fish": 39,
+        "fish_hall": 2,
+        "strength_rebirth": 2,
+        "torpedo": 4,
+        "trash_man_realm": 6,
+        "trash_man_rebirth": 1
+      },
+      "progression_category_diversity": 7,
+      "system_events_per_active_hour": "9",
+      "system_progression_count": 18,
+      "system_progression_interval_p90_seconds": 957,
+      "system_progression_max_interval_seconds": 1214,
+      "system_progression_tail_gap_seconds": 474,
+      "tail_gap_seconds": 208,
+      "total_progression_count": 57,
+      "wall_duration_seconds": 86400
+    }
+  },
+  {
+    "run_id": "20260916T014553162924Z-week_1_growth",
+    "model_digest": "sha256:5757115633890b374eb9bc63240b28a9197763ef3adbca66098290750d5c0b4d",
+    "sale_batches": 166,
+    "fish_sold": 682,
+    "fish_remaining": 35,
+    "sale_material": "16336970",
+    "trash_material": "2936060745.5",
+    "sale_share_percent": "0.55334584206698828140994746004097427977433347258664751530830806185807049002914052",
+    "first_sale_seconds": 609,
+    "wallet": {
+      "material": {
+        "coeff": 8346,
+        "exp": 4,
+        "sign": 1
+      },
+      "money": {
+        "coeff": 2478,
+        "exp": 9,
+        "sign": 1
+      },
+      "strength": {
+        "coeff": 4950,
+        "exp": 3,
+        "sign": 1
+      }
+    },
+    "fish_hall": {
+      "upgradeLevel": 10
+    },
+    "torpedo": {
+      "ownedIds": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "selectedId": 9
+    },
+    "barbell": {
+      "equippedId": 8,
+      "owned": [
+        {
+          "barbellId": 1,
+          "count": 1
+        },
+        {
+          "barbellId": 2,
+          "count": 1
+        },
+        {
+          "barbellId": 3,
+          "count": 1
+        },
+        {
+          "barbellId": 4,
+          "count": 1
+        },
+        {
+          "barbellId": 5,
+          "count": 1
+        },
+        {
+          "barbellId": 6,
+          "count": 1
+        },
+        {
+          "barbellId": 7,
+          "count": 1
+        },
+        {
+          "barbellId": 8,
+          "count": 1
+        }
+      ]
+    },
+    "realm": 15,
+    "rebirth": {
+      "strengthCompletedCount": 5,
+      "trashManCompletedCount": 3
+    },
+    "luck": {
+      "active_duration_seconds": 50400,
+      "fish_luck_final": "90322737.39029983",
+      "fish_luck_initial": "20",
+      "fish_luck_net_delta": "90322717.39029983",
+      "fish_luck_peak": "1281797723.636032",
+      "longest_fish_luck_stagnation_seconds": 333,
+      "longest_trash_luck_stagnation_seconds": 10965,
+      "sample_count": 217,
+      "strength_final": "4950000",
+      "strength_initial": "50",
+      "strength_peak": "10130000",
+      "strength_rebirth_count": 5,
+      "trash_luck_final": "23699.426383484795",
+      "trash_luck_initial": "8.001552569413867",
+      "trash_luck_net_delta": "23691.424830915381133",
+      "trash_luck_peak": "23699.426383484795",
+      "trash_man_rebirth_count": 3,
+      "wall_duration_seconds": 604800
+    },
+    "progression": {
+      "active_duration_seconds": 50400,
+      "complete_online_sessions": 7,
+      "complete_online_sessions_without_progression": 0,
+      "complete_online_sessions_without_system_progression": 0,
+      "dominant_category_share": "0.67567567567567567567567567567567567567567567567567567567567567567567567567567568",
+      "earned_progression_count": 148,
+      "events_per_active_hour": "10.571428571428571428571428571428571428571428571428571428571428571428571428571429",
+      "first_progression_wait_seconds": 30,
+      "interval_p50_seconds": 126,
+      "interval_p75_seconds": 333,
+      "interval_p90_seconds": 864,
+      "interval_p95_seconds": 1590,
+      "max_interval_seconds": 3190,
+      "progression_category_counts": {
+        "barbell": 8,
+        "best_hall_fish": 100,
+        "fish_hall": 10,
+        "strength_rebirth": 5,
+        "torpedo": 8,
+        "trash_man_realm": 14,
+        "trash_man_rebirth": 3
+      },
+      "progression_category_diversity": 7,
+      "system_events_per_active_hour": "3.4285714285714285714285714285714285714285714285714285714285714285714285714285714",
+      "system_progression_count": 48,
+      "system_progression_interval_p90_seconds": 3037,
+      "system_progression_max_interval_seconds": 6651,
+      "system_progression_tail_gap_seconds": 4025,
+      "tail_gap_seconds": 4025,
+      "total_progression_count": 148,
+      "wall_duration_seconds": 604800
+    }
+  },
+  {
+    "run_id": "20260916T014643708590Z-month_1_growth",
+    "model_digest": "sha256:5757115633890b374eb9bc63240b28a9197763ef3adbca66098290750d5c0b4d",
+    "sale_batches": 717,
+    "fish_sold": 3209,
+    "fish_remaining": 54,
+    "sale_material": "18376998070",
+    "trash_material": "528494360745.5",
+    "sale_share_percent": "3.3603877353906031439828361537303204616412250713111600815374005261146806502773143",
+    "first_sale_seconds": 609,
+    "wallet": {
+      "material": {
+        "coeff": 4397,
+        "exp": 7,
+        "sign": 1
+      },
+      "money": {
+        "coeff": 6409,
+        "exp": 16,
+        "sign": 1
+      },
+      "strength": {
+        "coeff": 3756,
+        "exp": 6,
+        "sign": 1
+      }
+    },
+    "fish_hall": {
+      "upgradeLevel": 18
+    },
+    "torpedo": {
+      "ownedIds": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16
+      ],
+      "selectedId": 16
+    },
+    "barbell": {
+      "equippedId": 12,
+      "owned": [
+        {
+          "barbellId": 1,
+          "count": 1
+        },
+        {
+          "barbellId": 2,
+          "count": 1
+        },
+        {
+          "barbellId": 3,
+          "count": 1
+        },
+        {
+          "barbellId": 4,
+          "count": 1
+        },
+        {
+          "barbellId": 5,
+          "count": 1
+        },
+        {
+          "barbellId": 6,
+          "count": 1
+        },
+        {
+          "barbellId": 7,
+          "count": 1
+        },
+        {
+          "barbellId": 8,
+          "count": 1
+        },
+        {
+          "barbellId": 9,
+          "count": 1
+        },
+        {
+          "barbellId": 10,
+          "count": 1
+        },
+        {
+          "barbellId": 11,
+          "count": 1
+        },
+        {
+          "barbellId": 12,
+          "count": 1
+        }
+      ]
+    },
+    "realm": 23,
+    "rebirth": {
+      "strengthCompletedCount": 8,
+      "trashManCompletedCount": 7
+    },
+    "luck": {
+      "active_duration_seconds": 216000,
+      "fish_luck_final": "318449628368062",
+      "fish_luck_initial": "20",
+      "fish_luck_net_delta": "318449628368042",
+      "fish_luck_peak": "318449628368062",
+      "longest_fish_luck_stagnation_seconds": 486,
+      "longest_trash_luck_stagnation_seconds": 49478,
+      "sample_count": 808,
+      "strength_final": "3756000000",
+      "strength_initial": "50",
+      "strength_peak": "3756000000",
+      "strength_rebirth_count": 8,
+      "trash_luck_final": "70542227.242155418",
+      "trash_luck_initial": "8.001552569413867",
+      "trash_luck_net_delta": "70542219.240602848586133",
+      "trash_luck_peak": "70542227.242155418",
+      "trash_man_rebirth_count": 7,
+      "wall_duration_seconds": 2592000
+    },
+    "progression": {
+      "active_duration_seconds": 216000,
+      "complete_online_sessions": 30,
+      "complete_online_sessions_without_progression": 2,
+      "complete_online_sessions_without_system_progression": 4,
+      "dominant_category_share": "0.59345794392523364485981308411214953271028037383177570093457943925233644859813084",
+      "earned_progression_count": 214,
+      "events_per_active_hour": "3.5666666666666666666666666666666666666666666666666666666666666666666666666666667",
+      "first_progression_wait_seconds": 30,
+      "interval_p50_seconds": 246,
+      "interval_p75_seconds": 949,
+      "interval_p90_seconds": 2489,
+      "interval_p95_seconds": 5072,
+      "max_interval_seconds": 14549,
+      "progression_category_counts": {
+        "barbell": 12,
+        "best_hall_fish": 127,
+        "fish_hall": 18,
+        "strength_rebirth": 8,
+        "torpedo": 15,
+        "trash_man_realm": 27,
+        "trash_man_rebirth": 7
+      },
+      "progression_category_diversity": 7,
+      "system_events_per_active_hour": "1.45",
+      "system_progression_count": 87,
+      "system_progression_interval_p90_seconds": 6058,
+      "system_progression_max_interval_seconds": 28281,
+      "system_progression_tail_gap_seconds": 6845,
+      "tail_gap_seconds": 6845,
+      "total_progression_count": 214,
+      "wall_duration_seconds": 2592000
+    }
+  }
+]

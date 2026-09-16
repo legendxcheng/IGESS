@@ -239,7 +239,7 @@ class FishDataSnapshot:
 
     def model_digest(self, source_digest: str) -> str:
         digest = hashlib.sha256()
-        digest.update(b"fish-economy:ordinary-coin-upgrades-v1\0")
+        digest.update(b"fish-economy:ordinary-material-sales-v1\0")
         digest.update(b"IGESS_FISH_MODEL_DIGEST_V2\0")
         digest.update(source_digest.encode("ascii"))
         digest.update(b"\0")

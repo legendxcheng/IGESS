@@ -75,6 +75,7 @@ def build_persistent_progression(
         "scenario_id": result.scenario_id,
         "time_basis": "cumulative_active_seconds",
         "excluded_event_kinds": [
+            "fish_sold",
             "fish_upgraded",
             "barbell_exercise_completed",
             "temporary_buff_applied",

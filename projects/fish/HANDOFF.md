@@ -8,6 +8,13 @@
 
 ## 当前结论
 
+普通鱼卖出材料已进入正式模拟，沿用当前金币升级。两个画像保留上阵鱼与品质前 X，
+每累计在线五分钟整理一次、耗时三秒；重生和立即突破先执行，其他普通行为后执行。
+不返升级金币、不乘加工或画像倍率；临近下线顺延，周期与冻结批次支持存档恢复。
+当前 smoke/1d/7d/30d 基线见 [卖鱼材料基线](reports/fish-sale-material-baseline.md)，
+测试、账本核验与已知边界见 [出售验证](../../.scratch/fish-sale-material/verification.md)。
+上一份金币升级报告保留为历史参考。
+
 普通鱼金币升级、前 X 品质与上阵交集策略、杠铃攒钱估计已迁入正式模拟。
 默认与付费画像都按最低等级培养交集鱼，单次一级、三秒、权重 1；未上阵鱼不追赶，
 选定鱼不可支付时不转投。神兽按生产分类隔离，存档含神兽时明确拒绝模拟。
@@ -58,12 +65,13 @@
 
 ## 验证证据
 
-当前 smoke、1d、7d、30d 正式运行、金币账本、购买时点和连带成长结论见
-[金币升级基线](reports/coin-upgrade-baseline.md)。四次运行使用同一生产快照与模型摘要，
-保留完整来源哈希。单鱼升级不计入系统永久进展。
+当前 smoke、1d、7d、30d 正式运行、出售账本与连带成长结论见
+[卖鱼材料基线](reports/fish-sale-material-baseline.md)。四次运行使用同一生产快照与模型摘要，
+保留完整来源哈希。单鱼升级及出售不计入系统永久进展。
 
-全量回归 1429 passed、8 skipped、16 deselected；定向新增边界、生产契约及类型检查
-记录见 [verification.md](../../.scratch/fish-coin-upgrade/verification.md)。
+卖鱼版本全量回归 1452 passed、8 skipped、16 deselected；随后扩展的出售专用测试 27 passed。
+恢复、账本、正式工作流及类型检查记录见
+[verification.md](../../.scratch/fish-sale-material/verification.md)。
 当前唯一进度与下一步仍以 [RoadMap.md](RoadMap.md) 为准。
 
 `model status` 的十 tick 通用探针尚不支持 Fish，仍报 `smoke_failed`；正式

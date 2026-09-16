@@ -24,12 +24,15 @@ from .fish_rebirth_commands import (
     apply_trash_man_rebirth,
 )
 from .fish_throw_commands import apply_throw_resolution, lock_throw_request
+from .fish_sale import AppliedFishSale, sell_fish
 from .fish_torpedo_commands import purchase_torpedo
 from .fish_trash_breakthrough_commands import (
     fund_trash_man_realm_breakthrough,
 )
 
 __all__ = [
+    "AppliedFishSale",
+    "sell_fish",
     "AppliedBarbellEquip",
     "AppliedBarbellSynthesis",
     "AppliedFishHallSettlement",

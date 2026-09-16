@@ -14,6 +14,8 @@ from .checkpoint import SimulationCheckpoint
 from .fish_barbell import FishBarbellDataAdapter
 from .fish_behavior import (
     EXERCISE_BARBELL_BEHAVIOR_ID,
+    FUND_TRASH_MAN_BREAKTHROUGH_BEHAVIOR_ID,
+    REBIRTH_BEHAVIOR_IDS,
     FishBehaviorAdapter,
     MANUAL_THROW_BEHAVIOR_ID,
 )
@@ -29,9 +31,14 @@ from .fish_behavior_simulation_support import (
 )
 from .fish_behavior_weights import (
     ManualThrowRefillRule,
+    TRASH_MAN_BREAKTHROUGH_IMMEDIATE,
     TrashManBreakthroughPolicy,
 )
 from .fish_session import FishDailySessionSchedule
+from .fish_sale import (
+    FishSalePolicy, SELL_FISH_BEHAVIOR_ID, SALE_PERIOD_COUNTER, SALE_COUNT_COUNTER,
+)
+from .numbers import SimNumber
 from .fish_data import FishDataSnapshot
 from .fish_hall import FishHallDataAdapter
 from .fish_production import (
@@ -124,6 +131,11 @@ class FishBehaviorSimulator:
         session_schedule = FishDailySessionSchedule.from_mapping(
             self.model.session_patterns[profile.session_pattern]
         )
+        sale_policy = (
+            FishSalePolicy.from_engine_settings(self.model.engine_settings)
+            if profile.behavior_weights.get(SELL_FISH_BEHAVIOR_ID, SimNumber.zero()) > 0
+            else None
+        )
         duration_seconds = int(scenario.duration_hours * 3600)
 
         if checkpoint is None:
@@ -182,6 +194,12 @@ class FishBehaviorSimulator:
                 event_counters=event_counters,
                 barbell_adapter=self.barbell_adapter,
             )
+            if sale_policy is not None:
+                checked = event_counters.get(SALE_PERIOD_COUNTER, 0)
+                if type(checked) is not int or not 0 <= checked <= (
+                    session_schedule.active_seconds_at(start_time) // sale_policy.interval_online_seconds
+                ):
+                    raise ValueError("checkpoint has invalid fish sale period")
 
         if start_time > duration_seconds:
             raise ValueError("checkpoint time exceeds the scenario duration")
@@ -446,6 +464,23 @@ class FishBehaviorSimulator:
                         remaining_online_seconds,
                     )
                 )
+                if sale_policy is not None:
+                    due = sale_policy.due_candidate(
+                        state, hall_adapter=self.hall_adapter,
+                        active_seconds=session_schedule.active_seconds_at(current_time),
+                        remaining_online_seconds=remaining_online_seconds,
+                        duration_seconds=profile.behavior_durations[SELL_FISH_BEHAVIOR_ID]["seconds"],
+                        counters=event_counters,
+                    )
+                    urgent = any(
+                        candidate.available and (
+                            candidate.behavior_id in REBIRTH_BEHAVIOR_IDS
+                            or (candidate.behavior_id == FUND_TRASH_MAN_BREAKTHROUGH_BEHAVIOR_ID
+                                and self.trash_man_breakthrough_policy.mode == TRASH_MAN_BREAKTHROUGH_IMMEDIATE)
+                        ) for candidate in candidates
+                    )
+                    if due is not None and not urgent:
+                        candidates = (due,)
                 if candidates:
                     effective_behavior_profile = (
                         self.adapter.effective_behavior_profile(
@@ -521,6 +556,7 @@ class FishBehaviorSimulator:
                     next_throw_id=next_throw_id,
                     production_runtime=production_runtime,
                     reward_multipliers=reward_multipliers,
+                    total_fish_sold=event_counters.get(SALE_COUNT_COUNTER, 0),
                     _mutate=self._mutate_state,
                 )
                 state = completion.state
@@ -530,6 +566,15 @@ class FishBehaviorSimulator:
                     next_sequence_id=runtime.next_sequence_id,
                 )
                 increment_counter(event_counters, "behavior_completed")
+                if active.behavior_id == SELL_FISH_BEHAVIOR_ID:
+                    event_counters[SALE_COUNT_COUNTER] = (
+                        event_counters.get(SALE_COUNT_COUNTER, 0)
+                        + int(completion.details["fish_sale_count"])
+                    )
+                    assert sale_policy is not None
+                    event_counters[SALE_PERIOD_COUNTER] = (
+                        session_schedule.active_seconds_at(boundary) // sale_policy.interval_online_seconds
+                    )
                 increment_counter(
                     event_counters,
                     f"{active.behavior_id}_completed",

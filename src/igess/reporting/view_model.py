@@ -245,10 +245,15 @@ def _fish_investment(data: ReportData) -> dict[str, Any]:
     for profile_id in data.profiles:
         upgrades = []
         purchases = []
+        sales = []
+        trash_material = Decimal(0)
         for event in data.events:
             if event.get("profile_id") != profile_id:
                 continue
             details = event.get("details", {})
+            trash_material += _positive_decimal(details.get("trash_material_added"))
+            if event.get("kind") == "fish_sold":
+                sales.append(details)
             if event.get("kind") == "fish_upgraded" and details.get("fish_upgrade_price_resource") == "money":
                 upgrades.append(details)
             if event.get("kind") == "barbell_synthesized":
@@ -261,6 +266,10 @@ def _fish_investment(data: ReportData) -> dict[str, Any]:
         spent = sum((_positive_decimal(row.get("fish_upgrade_price")) for row in upgrades), Decimal(0))
         profiles[profile_id] = {
             "upgrade_count": len(upgrades),
+            "sale_batch_count": len(sales),
+            "fish_sold_count": chart_point(sum(int(row["fish_sale_count"]) for row in sales)),
+            "sale_material": chart_point(sum((_positive_decimal(row.get("fish_sale_material_added")) for row in sales), Decimal(0))),
+            "trash_material": chart_point(trash_material),
             "coin_spent": chart_point(str(spent)),
             "hall_income_gain": chart_point(str(sum(gains, Decimal(0)))),
             "effective_upgrade_percent": chart_point(
@@ -424,6 +433,7 @@ def _fish_economy_rows(
     bucket_count = math.ceil(active_duration_seconds / interval_seconds)
     bucket_money = [Decimal(0) for _ in range(bucket_count)]
     bucket_material = [Decimal(0) for _ in range(bucket_count)]
+    bucket_sale = [Decimal(0) for _ in range(bucket_count)]
     for event in events:
         if str(event.get("profile_id", "")) != profile_id:
             continue
@@ -452,17 +462,20 @@ def _fish_economy_rows(
         bucket_material[bucket_index] += _positive_decimal(
             details.get("trash_material_added")
         )
+        bucket_sale[bucket_index] += _positive_decimal(details.get("fish_sale_material_added"))
 
     rate_rows: list[dict[str, Any]] = []
     cumulative_rows: list[dict[str, Any]] = []
     cumulative_money = Decimal(0)
     cumulative_material = Decimal(0)
+    cumulative_sale = Decimal(0)
     for index in range(bucket_count):
         start = index * interval_seconds
         end = min((index + 1) * interval_seconds, active_duration_seconds)
         elapsed = max(1, end - start)
         cumulative_money += bucket_money[index]
         cumulative_material += bucket_material[index]
+        cumulative_sale += bucket_sale[index]
         common = {
             "active_time_seconds": end,
             "active_time": chart_point(end),
@@ -472,12 +485,14 @@ def _fish_economy_rows(
             {
                 **common,
                 "resource_per_second": chart_point(
-                    bucket_material[index] / Decimal(elapsed)
+                    (bucket_material[index] + bucket_sale[index]) / Decimal(elapsed)
                 ),
+                "fish_sale_material_per_second": chart_point(bucket_sale[index] / Decimal(elapsed)),
+                "trash_material_per_second": chart_point(bucket_material[index] / Decimal(elapsed)),
                 "money_per_second": chart_point(
                     bucket_money[index] / Decimal(elapsed)
                 ),
-                "resource_acquired": chart_point(bucket_material[index]),
+                "resource_acquired": chart_point(bucket_material[index] + bucket_sale[index]),
                 "money_acquired": chart_point(bucket_money[index]),
             }
         )
@@ -488,8 +503,10 @@ def _fish_economy_rows(
                     cumulative_money
                 ),
                 "resource_acquired_cumulative": chart_point(
-                    cumulative_material
+                    cumulative_material + cumulative_sale
                 ),
+                "fish_sale_material_cumulative": chart_point(cumulative_sale),
+                "trash_material_cumulative": chart_point(cumulative_material),
             }
         )
     return rate_rows, cumulative_rows

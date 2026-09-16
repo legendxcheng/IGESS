@@ -5,6 +5,7 @@ from .fish_barbell import FishBarbellDataAdapter
 from .fish_state import FISH_MAX_LEVEL, FishInstance, PlayerState
 from .fish_torpedo import FishTorpedoDataAdapter
 from .fish_hall import FishHallDataAdapter
+from .fish_sale import quality_group
 from .numbers import SimNumber
 
 
@@ -35,12 +36,7 @@ def fish_upgrade_targets(
         )
     if policy != DEPLOYED_QUALITY_LOWEST_LEVEL_POLICY_ID:
         return ()
-    capacity = hall_adapter.capacity(state.fish_hall.upgrade_level)
-    capacity -= sum(item.hall_slot > 0 and hall_adapter.is_beast(item.fish_id) for item in state.fish.items)
-    ranked = sorted(
-        (item for item in state.fish.items if not hall_adapter.is_beast(item.fish_id)),
-        key=lambda item: (-hall_adapter.quality(item), -item.level, item.instance_id),
-    )[:max(0, capacity)]
+    ranked = quality_group(state, hall_adapter)
     candidates = [item for item in ranked if item.hall_slot > 0 and item.level < FISH_MAX_LEVEL]
     if not candidates:
         return ()

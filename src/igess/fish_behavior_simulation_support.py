@@ -24,12 +24,22 @@ from .fish_hall import FishHallDataAdapter
 from .fish_production import FishProductionRuntime, settle_fish_production
 from .fish_rewards import FishRewardMultipliers
 from .fish_state import PlayerState
+from .fish_sale import SELL_FISH_BEHAVIOR_ID, SALE_COUNT_COUNTER
 from .fish_trash import FishTrashDataAdapter
 from .schema import EconomyModel, TimelineRow
 
 
 _COMPACT_EVENT_DETAIL_KEYS = frozenset(
     {
+        "fish_sale_count",
+        "fish_sale_instance_ids",
+        "fish_sale_prices",
+        "fish_sale_material_added",
+        "fish_sale_resource",
+        "fish_sale_income_seconds",
+        "fish_sale_formula",
+        "material_before_fish_sale",
+        "material_after_fish_sale",
         "barbell_count_after",
         "barbell_count_before",
         "barbell_equipped_id_after_synthesis",
@@ -290,7 +300,11 @@ def validate_checkpoint(
         0,
     )
     idle = event_counters.get("idle_completed", 0)
+    sales = event_counters.get(f"{SELL_FISH_BEHAVIOR_ID}_completed", 0)
+    sold = event_counters.get(SALE_COUNT_COUNTER, 0)
     counters = (
+        sales,
+        sold,
         completed,
         started,
         manual_throws,
@@ -330,13 +344,16 @@ def validate_checkpoint(
             + trash_man_rebirths
             + trash_man_breakthrough_fundings
             + idle
+            + sales
         )
         or started != completed + int(active is not None)
         or runtime.next_sequence_id != started
         or next_throw_id != manual_throws
         or state.statistics.total_throws != manual_throws
         or state.statistics.total_fish_caught != manual_throws
-        or len(state.fish.items) != manual_throws
+        or len(state.fish.items) + sold != manual_throws
+        or sold < sales
+        or (sales == 0 and sold != 0)
         or state.fish.next_instance_id != manual_throws + 1
         or trash_count + trash_processed != manual_throws
         or state.fish_hall.upgrade_level != hall_upgrades
