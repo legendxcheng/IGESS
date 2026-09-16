@@ -114,7 +114,7 @@ player_profiles:
       starter_fish_hall: '1'
     behavior_weights:
       manual_throw: '1'
-      upgrade_fish: '0.1'
+      upgrade_fish: '1'
       upgrade_fish_hall: '100'
       purchase_torpedo: '1e100'
       synthesize_barbell: '100'
@@ -151,9 +151,9 @@ player_profiles:
         type: fixed
         seconds: 10
     behavior_target_policies:
-      upgrade_fish: cheapest_below_material_tenth
+      upgrade_fish: deployed_quality_lowest_level
       purchase_torpedo: highest_affordable
-      synthesize_barbell: random_affordable
+      synthesize_barbell: cheapest_improvement
     luck: '1'
   paid_20pct:
     source_efficiency:
@@ -172,7 +172,7 @@ player_profiles:
       starter_fish_hall: '1'
     behavior_weights:
       manual_throw: '1'
-      upgrade_fish: '0.1'
+      upgrade_fish: '1'
       upgrade_fish_hall: '100'
       purchase_torpedo: '1e100'
       synthesize_barbell: '100'
@@ -209,9 +209,9 @@ player_profiles:
         type: fixed
         seconds: 10
     behavior_target_policies:
-      upgrade_fish: cheapest_below_material_tenth
+      upgrade_fish: deployed_quality_lowest_level
       purchase_torpedo: highest_affordable
-      synthesize_barbell: random_affordable
+      synthesize_barbell: cheapest_improvement
     luck: '1'
 scenarios:
   smoke:

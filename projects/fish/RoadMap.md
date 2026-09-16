@@ -1,10 +1,23 @@
 # Fish 模拟 RoadMap
 
-更新时间：2026-08-02
+更新时间：2026-09-16
 项目范围：`projects/fish` 与 Fish 领域模拟代码
-当前总状态：**Fish 专用引擎已接入 IGESS；2026-08-02 新经济模型已迁入统一生产循环：杠铃消耗金钱，鱼雷与垃圾佬新境界突破消耗材料；力量重生提高垃圾加工材料产出，垃圾佬转世提高摸鱼厅金钱产出。历史境界追赶与已资助突破只按在线墙钟推进，离线暂停且加工不停。正式 1 天运行已通过；旧版 `9 / 23 / 36` gate 结果属于旧字段和旧资源流，不再作为当前模型结论，7 天与 30 天数值基线仍需重新建立。**
+当前总状态：**普通鱼金币升级与玩家培养策略已接入正式 Fish 引擎；smoke、1d、7d、30d 正式基线均成功。默认及付费画像选择品质前 X 与已上阵的交集，优先最低等级，保留下一把有效杠铃的资金约束。神兽获取及产出不在本轮支持范围，含神兽状态明确报错。**
 
-## 0. 2026-08-02 经济模型迁移
+## 0. 2026-09-16 金币升级迁移
+
+- [x] 普通鱼升级扣金币，品质和价格包含变异；命令失败原子性、满级及神兽保护已验证。
+- [x] 前 X / 上阵交集 / 最低等级策略、最低价有效杠铃及静态攒钱估计已接入两个画像。
+- [x] 单次一级、三秒、权重 1；保留现有作息、重生、突破与非金币系统优先规则。
+- [x] 完整及紧凑事件保留金币账本，正式报告新增升级支出、即时增收、有效比例与杠铃购买时点。
+- [x] 生产分类隔离神兽，manifest/report 标明 `ordinary_fish_only`，新摘要拒绝旧模型 checkpoint。
+- [x] smoke、1d、7d、30d 正式产物完整；运行编号与连带成长结论见
+  [金币升级基线](reports/coin-upgrade-baseline.md)。自动化证据见
+  [verification.md](../../.scratch/fish-coin-upgrade/verification.md)。
+- 当前 `model status` 十 tick 探针仍调用通用 Simulator，对 Fish 报 `smoke_failed`；
+  正式 Fish 引擎工作流已验证。自动探针接入与 compare/gate/scan 留待后续独立工作。
+
+### 历史：2026-08-02 经济模型迁移
 
 - 权威生产快照为 `E:\fish-oasis\igess_export\json` 与同批次
   `python\schema.py`。当前生成契约使用
@@ -59,8 +72,8 @@ IGESS 只关注会改变数值体验的资源、概率、时间、产出、消�
 | IGESS Fish 引擎接入 | `[x]` | 领域引擎协议、派发、Luban Python 强类型表、生产 smoke、标准产物、checkpoint 恢复和 compare 已接通 | `src/igess/engines.py`、`tests/test_fish_engine.py`、生产 run `20260722T052544104476Z-smoke` |
 | FishEconomySimulator | `[~]` | 鱼厅金钱/垃圾佬材料按在线或离线模式统一结算；杠铃力量只由互斥前台 `exercise_barbell` 在线产出。加权行为循环支持每日在线窗口、离线跳跃、两类重生和任意分段恢复 | `src/igess/fish_production.py`、`src/igess/fish_session.py`、`src/igess/fish_behavior*.py`、相关测试 |
 | 玩家类型与收益 Bonus | `[x]` | Profile 可分别配置鱼厅金钱、垃圾佬材料、杠铃力量正向收益倍率；正式命令可用 `--profile` 覆盖场景画像，选择与倍率进入 manifest/event/checkpoint | `src/igess/fish_rewards.py`、`tests/test_fish_profile_rewards.py`、正式 1d runs `20260727T050603893872Z-day_1_growth` / `20260727T050607907709Z-day_1_growth` |
-| 正式经济闭环 | `[~]` | 鱼厅/金钱、废料/材料、历史境界追赶、材料突破、材料→鱼/鱼厅/鱼雷、金钱→杠铃、两类新语义永久倍率及离线基础结算已接通；出售和未确认离线扩展尚未闭合 | Phase 4–8 |
-| 正式调参与报告 | `[~]` | 核心强度与永久养成一等报表和当前模型 24h 基线已完成；旧 7d/30d KPI 与双 Luck 调参仅作历史对照，当前长期基线、compare/gate/scan 消费仍待实现 | Phase 9 |
+| 正式经济闭环 | `[~]` | 鱼厅/金钱、废料/材料、历史境界追赶、材料突破、材料→鱼厅/鱼雷、金钱→普通鱼升级/杠铃、两类新语义永久倍率及离线基础结算已接通；出售和未确认离线扩展尚未闭合 | Phase 4–8 |
+| 正式调参与报告 | `[~]` | 核心强度与永久养成一等报表和当前模型 1d/7d/30d 基线已完成；旧 KPI 与双 Luck 调参仅作历史对照，当前长期基线见金币升级报告；compare/gate/scan 消费仍待实现 | Phase 9 |
 
 当前不能把项目描述成“完整 Fish 经济模拟器”。准确口径是：
 
@@ -69,10 +82,10 @@ IGESS 只关注会改变数值体验的资源、概率、时间、产出、消�
 + RNG 一期基线已验证
 + PlayerState / checkpoint 基础已完成
 + FishEconomySimulator 已接入生产数据驱动的投掷、鱼厅金钱、废料材料、在线历史境界追赶、付费新境界突破、摸鱼厅升级、鱼雷购买/自动装备、杠铃合成/装备/主动在线锻炼、两类重生永久倍率和可选加权行为循环
-+ 默认画像 `daily_online_seconds=7200`，每天在线 2 小时、离线 22 小时；`purchase_torpedo / strength_rebirth / trash_man_rebirth / fund_trash_man_breakthrough` 配置为可执行时近似硬优先级，突破另由 `immediate` 策略明确抢占普通候选；`synthesize_barbell / upgrade_fish_hall` 权重为 `100`，`manual_throw / exercise_barbell` 权重为 `1`，`upgrade_fish` 权重为 `0.1`；鱼升级仅选择最低价且要求价格严格低于当前材料 `1/10`，成功时扣除材料
++ 默认画像 `daily_online_seconds=7200`，每天在线 2 小时、离线 22 小时；`purchase_torpedo / strength_rebirth / trash_man_rebirth / fund_trash_man_breakthrough` 配置为可执行时近似硬优先级，突破另由 `immediate` 策略明确抢占普通候选；`synthesize_barbell / upgrade_fish_hall` 权重为 `100`，`manual_throw / exercise_barbell` 权重为 `1`，`upgrade_fish` 权重为 `1`；普通鱼金币升级选择品质前 X 与上阵交集中的最低等级鱼，并通过下一把有效杠铃的攒钱估计
 + Profile 的 `fish_hall_money / trash_material / barbell_strength` 收益倍率已进入统一结算；`default=1×`，示例 `paid_20pct=1.2×`，正式模拟可用 `--profile` 切换且不修改场景源文件
 + 两类重生均已进入生产画像，达到要求时硬优先于全部普通前台行为
-+ 24h 上限、双倍领取、临时效果、30d 正式产物压缩、第 15～60 境界和 10/11 号鱼雷的超月验证尚未完成
++ 24h 上限、双倍领取、临时效果及超月进展验证尚未完成；当前 30d 正式产物已成功输出
 ```
 
 ## 3. 已锁定的架构边界
@@ -149,16 +162,14 @@ IGESS WorkflowService
    `(root_seed, profile_id, sequence_id, domain)`；输入顺序不改变重放结果。
 5. checkpoint 保存 sequence 游标和进行中的完整行为，恢复时不得重新选择行为、
    时长或目标。纯记录边界只临时推导被动收入，不拆分领域结算事务。
-6. Fish 为单鱼升级保留 fixture 使用的 `random_affordable`，生产画像使用
-   `cheapest_below_material_tenth`：从全部未满级鱼中取升级价格最低项，同价按
-   `instanceId` 升序决胜；仅当该价格严格低于当前 `wallet.material / 10` 时
-   才可选。鱼升级价格从材料余额扣除。杠铃合成使用
-   `random_affordable`，目标池只包含当前未拥有且金钱可支付的 ID，避免重复
-   合成不提高产出的库存副本。相应行为权重大于零时必须明确配置目标策略。
-   生产 `default` 画像为高优先级 `synthesize_barbell` 和
-   `upgrade_fish_hall` 配置权重 `100`，为 `manual_throw` 和
-   `exercise_barbell` 配置权重 `1`，为低优先级 `upgrade_fish` 配置权重
-   `0.1`；两类重生均配置权重 `1`，上述七种行为均为固定 `1` 秒时长。
+6. Fish 为单鱼升级保留 fixture 使用的 `random_affordable`；生产画像使用
+   `deployed_quality_lowest_level`，具体前 X / 上阵交集 / 最低等级及杠铃资金
+   约束见 README。金币不足时不转投，未上阵鱼不追赶。
+   杠铃合成使用 `cheapest_improvement`，选择最低价的未拥有且训练更快的目标；
+   可支付该目标时禁止鱼升级先花金币。相应行为权重大于零时必须明确配置目标策略。
+   两个生产画像 `synthesize_barbell / upgrade_fish_hall` 权重为 `100`，
+   `manual_throw / exercise_barbell / upgrade_fish` 权重为 `1`；鱼升级固定三秒，
+   其余行为时长与优先规则沿用当前 economy.yaml。
    重生不依赖大权重近似优先级：只要任一重生可执行，本轮候选池就只保留
    当前可执行的重生；若两种同时可执行，则在二者之间稳定选择一种，下一轮
    立即执行仍可用的另一种。`upgrade_fish_hall` 是无目标行为，仅在未满级且当前材料足以
@@ -189,7 +200,7 @@ IGESS WorkflowService
 5. 数值读取保留原始精度。概率门槛、倍率和大数在计算层不得先按展示格式取整；只有 UI/报告展示层可以格式化。
 6. 每次正式运行的 manifest 至少记录：数据根目录、每个输入文件的内容哈希、合并后的 `model_digest`、override 列表和 `production_data=true`。
 7. 正式场景默认禁止 override；scan/调参允许 override，但必须同时保存原始值、覆盖值和字段路径，且结果不得标记为“与游戏实际数值一致”。
-8. 数据契约测试必须逐表验证生成对象与权威 export JSON 逐字段一致，并同时记录 JSON 与生成加载器哈希；不再要求与旧 `gdd/data` 副本逐文件一致。当前 12 张表、340 行已通过该生成对象契约。
+8. 数据契约测试必须逐表验证生成对象与权威 export JSON 逐字段一致，并同时记录 JSON 与生成加载器哈希；不再要求与旧 `gdd/data` 副本逐文件一致。当前生产快照的加载表逐字段契约已通过，行数以对应 run manifest 为准。
 
 #### 3.4.1 配置大数
 
@@ -256,7 +267,7 @@ FinalFishLuck = FishLuck × 2^BonusDoubleCount
 #### 3.4.6 经济、升级与持续产出
 
 1. 摸鱼厅基础每秒金钱为所有上阵鱼产出的和；鱼变异收入倍率作用于对应鱼，垃圾佬转世倍率作用于摸鱼厅整体产出，即 `摸鱼厅秒产出=sum(上阵鱼秒产出)×垃圾佬转世鱼厅总倍率`。容量只限制求和项数量，不额外作为乘数。模拟不保留手动编队策略：每次鱼库存或单鱼收益变化后，按当前单鱼每秒收益降序取容量内前 `N` 条自动上阵，其余留在背包；同收益按 `instanceId` 升序稳定决胜，并按该顺序占用 `hallSlot=1..N`。
-2. 鱼等级从 `1` 开始，最高 `100` 级。当前等级为 `n` 时，单鱼升级前的固有秒产出为 `B×变异倍率×1.25^(n-1)`。从 `n` 升到 `n+1` 的材料价格为 `B×变异倍率×1.5^(n-1)`；变异倍率属于鱼实例的 `P0`，因此高价值变异鱼的升级价格与自身收益保持同档增长。价格、产出和材料扣款统一使用 BigNumber，不额外做整数取整。
+2. 鱼等级从 `1` 开始，最高 `100` 级。当前等级为 `n` 时，单鱼升级前的固有秒产出为 `B×变异倍率×1.25^(n-1)`。从 `n` 升到 `n+1` 的金币价格为 `B×变异倍率×1.5^(n-1)`；变异倍率属于鱼实例的 `P0`，因此高价值变异鱼的升级价格与自身收益保持同档增长。价格、产出和金币扣款统一使用 BigNumber，不额外做整数取整。
 3. 摸鱼厅容量读取 `FishHallUpgrade.slotQty`；当前 JSON 有 `21` 行，容量从 `10` 到 `30`，升级消耗材料。模拟采用顺序映射：`upgradeLevel=0` 读取第一行，等级 `n` 读取第 `n+1` 行；从 `n` 升到 `n+1` 消耗当前第 `n+1` 行的 `upgradePrice`。只有存在下一行时才能升级；最后一行容量 `30`、`upgradePrice=0` 是满级哨兵，不是免费升级。升级命令先按旧容量结算后台生产，再原子扣材料、提升等级和 revision；随后按 IGESS 已锁定的 `fixed_max_income` 模拟策略重排阵容。若后续配置增加显式等级字段，再替换顺序映射。
 4. 杠铃消耗金钱，当前 `tbbarbell` 有 `15` 档，`strengthPerExercise` 从 `2` 到 `5,000,000`，生产行的 `timeCost` 当前均为 `1` 秒；主动锻炼的在线力量速度为 `strengthPerExercise / timeCost`。已装备杠铃本身不属于后台产出，只有当前互斥前台行为为 `exercise_barbell` 时才按 `equippedId` 产出力量，库存 `count` 不作为倍率；炸鱼、升级、合成、重生和 idle 期间均不产出力量。合成原子扣金钱、增加一件库存和 revision，并按固定 `highest_strength_per_second` 策略自动装备当前速度最高的已拥有杠铃；显式换装命令只允许选择已拥有 ID。离线力量固定为 `0`。
 5. 鱼雷消耗材料并提升废料 Luck；当前 `Torpedo` 表有 `25` 行、power 从
@@ -595,7 +606,7 @@ compare/gate/scan 消费仍待实现。
 正式数据缺口或冲突：
 
 - `[x]` Luban Python 表加载模块位于 `E:\fish-oasis\igess_export\python\schema.py`，配套 JSON 位于 `E:\fish-oasis\igess_export\json`；生产 Fish smoke 已验证，禁止回退到手写业务字段解析。
-- `[x]` `tbfish` 的 121/121 行均有唯一正式 `Denominator`；已确认全表就是当前可用鱼池。
+- `[x]` `tbfish` 当前 125 行含 121 条普通鱼和 4 条神兽；仅普通鱼进入本轮投掷池，按 `productionMode` 分类。
 - `[~]` FishRandomPool 的 Luck 区间在文字 GDD 与 JSON 间冲突；模拟按 JSON 原值执行，仅文字文档同步待确认。
 - `[x]` `tbtorpedo.price` 已由生成表提供并接入购买闭环；2～11 号完成首轮
   双 Luck 纯价格平衡，12 号以后保持当前生产值。
@@ -608,17 +619,14 @@ compare/gate/scan 消费仍待实现。
 
 ## 6. 当前里程碑与下一步
 
-当前里程碑：**Phase 8 离线基础、杠铃、鱼厅、鱼升级、两类重生和垃圾佬付费新境界突破的生产画像已完成。默认画像 `daily_online_seconds=7200`；突破与鱼雷/杠铃/鱼厅升级使用权重 `100`，炸鱼/锻炼权重 `1`，鱼升级权重 `0.1`，两类重生达到门槛时硬优先。离线摸鱼厅/废料加工按 50%，杠铃力量为 0，历史追赶和突破均不推进。当前 24h/7d 正式结果和 30d 领域结果已经通过系统永久进展 gate；下一步是超月价格验证、compare/gate/scan、30d 产物压缩，以及 24h 离线上限/双倍领取/临时效果。**
+当前里程碑：普通鱼金币升级策略、账本与报告已完成，正式 1d/7d/30d 系统永久
+进展为 `18 / 48 / 88`，单鱼升级排除。现有目标区间 `8..12 / 16..24 / 32..48`
+下三阶段均偏快；这是同快照新基线的观测，不能沿用旧 `9 / 23 / 36` 的通过结论。
+月内仍有 5 个在线日无系统进展，尾部 TrashLuck 停滞约 13.5 在线小时。
 
-Phase 9 当前新增里程碑：**核心强度与永久养成已经接入正式
-JSON/CSV/HTML，并完成 24h/7d 基线。“全部永久进展”的分阶段最大在线空窗
-已确认：首小时 30 秒、首日后续 1 分钟、首周后续 2 分钟、首月后续 5 分钟。
-“系统级永久进展”的累计次数目标为首日 10 次、首周 20 次、首月 40 次；
-20% 允许范围为 `8..12 / 16..24 / 32..48`，当前 `9 / 23 / 36` 全部通过。
-FishLuck 和
-TrashLuck 的分阶段停滞阈值、有效提升、重生恢复及封顶例外也已确认。下一步
-实现同 RNG 策略分叉和这些 KPI 的 compare/gate 消费，并解决 30 天正式产物
-体积问题后进入 scan 与正式参数扫描。**
+下一步：基于本轮基线研究成长密度与长期停滞；实现同 RNG 策略分叉和 KPI 的
+compare/gate/scan 消费；独立修复 Fish 自动探针；继续明确出售、神兽收益、
+24h 离线上限、双倍领取与临时效果边界。数值修改仍由人类维护并导出生产表。
 
 执行顺序：
 
@@ -638,18 +646,18 @@ Phase 0 已完成，后续顺序：
 4. `[x]` 投掷领域命令从 PlayerState 锁定力量与已选鱼雷，按生产 `tbfish.weight` 原子写入鱼、废料、统计和 `meta.revision`；图鉴等非数值字段保持不变。新档从生产 `tbtorpedo` 第一行和显式初始力量创建。
 5. `[x]` 建立主动投掷最小事件循环，并验证连续十秒与 5+5 秒 checkpoint 分段恢复等价。
 6. `[x]` 建立通用加权行为/持续时长/目标调度接口，并以 Fish fixture 验证行为中 checkpoint、手动投掷、单鱼升级、鱼厅升级、杠铃合成和 idle。
-7. `[~]` 固定 `max_income` 自动上阵、等级鱼厅收入、鱼升级材料消费、最低价/材料 `1/10` 生产升级画像、生产手动炸鱼和 24h/7d 正式长时验证已完成；等待出售口径后闭合 Phase 4。
+7. `[~]` 固定 `max_income` 自动上阵、等级鱼厅收入、普通鱼金币消费、品质前 X 上阵交集生产升级画像、生产手动炸鱼和 24h/7d 正式长时验证已完成；等待出售口径后闭合 Phase 4。
 8. `[x]` 废料聚合库存、批量加工、境界速度、材料产出、在线历史境界追赶、付费新境界突破与 checkpoint 已完成。
 9. `[~]` 交叉升级、两类重生、离线基础和材料→鱼雷→TrashLuck 已完成；
    默认画像已配置 2h/22h 作息、高优先级鱼雷购买/杠铃合成/鱼厅升级、
-   低优先级最低价鱼升级，以及“达到要求立即重生”的两类重生硬优先级。
-   24h/7d 正式调价基线与 30d 领域基线已完成，下一步验证 10、11 号鱼雷和
-   第 15～60 境界的超月价格，并接入 compare/gate/scan。
+   权重 1 的最低等级上阵鱼升级，以及“达到要求立即重生”的两类重生硬优先级。
+   1d/7d/30d 正式金币升级基线已完成，下一步研究超月节奏并接入 compare/gate/scan。
 
 ## 7. 更新记录
 
 | 日期 | 变更 |
 | --- | --- |
+| 2026-09-16 | 普通鱼升级改扣金币，前 X 品质与上阵交集优先最低等级；两个画像启用下一把有效杠铃攒钱估计。隔离神兽、扩充金币账本与报告，正式 smoke/1d/7d/30d 均通过；基线与验证见本页顶部链接。 |
 | 2026-08-31 | `FishRandomPool` 与 `TrashRandomPool` 的 `startLuck/endLuck` 从 `int` 改为 Luban `BigNumber` 后，生产适配器改为读取 `sign/digits/scale`，同时保留旧数值标量兼容；当前生产快照两类池 1 的端点均为 `1→20`。BigNumber 生产契约测试 `2 passed`、Fish 默认回归 `141 passed`；正式 smoke `20260831T052452956234Z-smoke` 成功，模型摘要 `sha256:59082524624772b0f9bdabd67f8da5e0713abe9106b00a6f30f9d1c7b01742ec`。 |
 | 2026-08-02 | 按新生产经济模型迁移 IGESS：杠铃改扣金钱，鱼雷和垃圾佬突破改扣材料；突破材料只在显式命令开始时扣一次；力量重生改读 `materialOutputMultiplier` 并作用于垃圾材料，垃圾佬转世改读 `fishHallOutputMultiplier` 并作用于摸鱼厅金钱。境界推进严格读取同批生成契约的 `breakthroughSecondsToNextRealm`，保持在线墙钟、多境界跨越、离线暂停、加工不停和 checkpoint 分段等价。新增 `immediate / weighted_delay / preserve_material` 三种突破画像策略，生产默认 `immediate`。正式 smoke `20260802T020830293437Z-smoke` 与 1 天运行 `20260802T021144403218Z-day_1_growth` 成功，模型摘要 `sha256:82d5b37fd2ce1573ad45425b1722d57420c0bf9af835d23c303aaaa3350b6301`。旧长期 gate 结果不再代表当前模型，等待同快照 7d/30d 重新基线。 |
 | 2026-07-26 | 按 GDD 的 `P0` 定义纠正鱼升级材料价格：价格现为 `tbfish.baseMoneyPerSecond×tbmutation.incomeMultiplier×1.5^(当前等级-1)`，最低价/材料 `1/10` 自动目标同步按变异后价格排序；100 级模拟上限保持不变。 |

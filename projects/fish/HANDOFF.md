@@ -1,6 +1,6 @@
 # Fish 经济模型迁移 Handoff
 
-更新时间：2026-08-02
+更新时间：2026-09-16
 
 项目范围：`projects/fish` 与 Fish 领域模拟代码
 
@@ -8,15 +8,17 @@
 
 ## 当前结论
 
-2026-08-02 的生产经济模型已经迁入 IGESS，并通过正式 smoke 与 1 天场景。
-这次是对现有 Fish 模拟器的增量迁移，没有建立第二套模拟管线，也没有修改
-人类维护的 Excel、Luban、生产 JSON 或生成 Lua。
+普通鱼金币升级、前 X 品质与上阵交集策略、杠铃攒钱估计已迁入正式模拟。
+默认与付费画像都按最低等级培养交集鱼，单次一级、三秒、权重 1；未上阵鱼不追赶，
+选定鱼不可支付时不转投。神兽按生产分类隔离，存档含神兽时明确拒绝模拟。
+具体策略见 [README.md](README.md)，确认规格见
+[spec.md](../../.scratch/fish-coin-upgrade/spec.md)。
 
 当前资源流：
 
 | 行为 | 消耗 | 权威字段 |
 | --- | --- | --- |
-| 鱼升级 | 材料 | 既有公式 |
+| 普通鱼升级 | 金币 | `P0 × 1.5^(L-1)`，P0 含变异 |
 | 摸鱼厅升级 | 材料 | `FishHallUpgrade.upgradePrice` |
 | 鱼雷购买 | 材料 | `Torpedo.price` |
 | 杠铃合成 | 金钱 | `Barbell.price` |
@@ -56,34 +58,15 @@
 
 ## 验证证据
 
-- 正式 smoke：`20260802T020830293437Z-smoke`。
-- 正式 1 天：`20260802T021144403218Z-day_1_growth`。
-- 当前模型摘要：
-  `sha256:82d5b37fd2ce1573ad45425b1722d57420c0bf9af835d23c303aaaa3350b6301`。
-- 生产数据标记：`production_data=true`、`matches_production_data=true`，
-  12 张表、340 行、无 override。
-- 1 天期末：境界 4、杠铃 6、鱼雷 3、力量重生 3 次、垃圾佬转世 2 次。
-- 旧对照：`20260727T050603893872Z-day_1_growth`，模型摘要
-  `sha256:bb73e0247023e3a78e7f121ebd476294d0bd8af4d0dda78e5fa474b1cef2e9bb`，
-  期末境界 6、杠铃 5、鱼雷 6、两类重生次数同为 `3 / 2`。
+当前 smoke、1d、7d、30d 正式运行、金币账本、购买时点和连带成长结论见
+[金币升级基线](reports/coin-upgrade-baseline.md)。四次运行使用同一生产快照与模型摘要，
+保留完整来源哈希。单鱼升级不计入系统永久进展。
 
-旧、新运行同时包含生产表与规则语义变化，不能把上述节奏差异归因给某一个
-字段。事件账本可直接确认每次消费资源、余额前后值、字段来源和倍率来源。
+全量回归 1429 passed、8 skipped、16 deselected；定向新增边界、生产契约及类型检查
+记录见 [verification.md](../../.scratch/fish-coin-upgrade/verification.md)。
+当前唯一进度与下一步仍以 [RoadMap.md](RoadMap.md) 为准。
 
-自动化回归覆盖：
+`model status` 的十 tick 通用探针尚不支持 Fish，仍报 `smoke_failed`；正式
+`model simulate` 的引擎派发、登记、标准产物与报告均正常。
 
-- 杠铃/鱼雷/突破的资源可支付判定、原子扣款和失败不改状态；
-- 两类重生的旧倍率先结算、新倍率立即生效和保留/重置字段；
-- 在线总时长一次结算与分段结算的推进等价；
-- 奖励倍率不改变修炼/突破秒数；
-- 离线暂停、加工不停、多境界跨越及 checkpoint 恢复；
-- 三种突破画像策略只改变显式命令候选，不让状态机自动资助。
-
-## 下一步
-
-1. 用当前快照重跑 `week_1_growth` 与 `month_1_growth`，重新建立长期 KPI 和
-   gate；旧版 `9 / 23 / 36` 不再代表当前模型。
-2. 由 Fish 项目维护者统一 `cultivationSecondsToNextRealm` 与
-   `breakthroughSecondsToNextRealm` 的 GDD、生成契约和游戏运行时命名，然后
-   再决定 IGESS 是否需要同步改名。
-3. 数值调整继续由人类修改并导出生产表；IGESS 只运行、比较和提出可归因建议。
+历史 2026-08-02 结果及旧字段迁移记录保留在 RoadMap，不能用其差异单独归因金币升级。

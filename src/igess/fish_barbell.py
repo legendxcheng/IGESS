@@ -76,6 +76,17 @@ class FishBarbellDataAdapter:
     def synthesis_price(self, barbell_id: int) -> SimNumber:
         return self.rule(barbell_id).price
 
+    def next_improvement(self, state: PlayerState) -> BarbellRule | None:
+        """The cheapest unowned improvement, independent of current coins."""
+        owned = {item.barbell_id for item in state.barbell.owned if item.count > 0}
+        speed = self.production_snapshot(state).strength_per_second
+        return min(
+            (rule for rule in self.rules
+             if rule.barbell_id not in owned and rule.strength_per_second > speed),
+            key=lambda rule: (rule.price, -rule.strength_per_second, rule.barbell_id),
+            default=None,
+        )
+
     def strength_per_second(self, barbell_id: int) -> SimNumber:
         return self.rule(barbell_id).strength_per_second
 

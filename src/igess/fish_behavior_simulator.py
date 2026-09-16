@@ -278,6 +278,7 @@ class FishBehaviorSimulator:
                 item_id="weighted_behavior_loop",
                 details={
                     "engine_id": "fish",
+                    "fish_simulation_scope": "ordinary_fish_only",
                     "model_digest": self.model_digest,
                     "behavior_scheduler": "weighted_duration_v1",
                     "manual_throw_refill_condition": (

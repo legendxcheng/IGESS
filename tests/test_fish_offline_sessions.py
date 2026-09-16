@@ -7,7 +7,7 @@ from igess.behavior import BehaviorRuntimeState
 from igess.builder import ModelBuilder
 from igess.fish_barbell import FishBarbellDataAdapter
 from igess.fish_behavior import (
-    CHEAPEST_BELOW_MATERIAL_TENTH_POLICY_ID,
+    DEPLOYED_QUALITY_LOWEST_LEVEL_POLICY_ID,
     EXERCISE_BARBELL_BEHAVIOR_ID,
     HIGHEST_AFFORDABLE_POLICY_ID,
     PURCHASE_TORPEDO_BEHAVIOR_ID,
@@ -61,7 +61,7 @@ def test_default_profile_prioritizes_growth_in_two_hour_session() -> None:
     )
     assert (
         profile.behavior_weights[UPGRADE_FISH_BEHAVIOR_ID]
-        == SimNumber.parse("0.1")
+        == SimNumber.one()
     )
     expected_durations = {
         "manual_throw": 30,
@@ -85,10 +85,10 @@ def test_default_profile_prioritizes_growth_in_two_hour_session() -> None:
         assert profile.behavior_weights[rebirth_id] == SimNumber.parse("1e100")
     assert profile.behavior_target_policies[
         UPGRADE_FISH_BEHAVIOR_ID
-    ] == CHEAPEST_BELOW_MATERIAL_TENTH_POLICY_ID
+    ] == DEPLOYED_QUALITY_LOWEST_LEVEL_POLICY_ID
     assert profile.behavior_target_policies[
         SYNTHESIZE_BARBELL_BEHAVIOR_ID
-    ] == "random_affordable"
+    ] == "cheapest_improvement"
     assert profile.behavior_target_policies[
         PURCHASE_TORPEDO_BEHAVIOR_ID
     ] == HIGHEST_AFFORDABLE_POLICY_ID

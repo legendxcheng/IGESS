@@ -428,7 +428,7 @@ def test_player_behavior_maps_use_exact_authoring_shapes() -> None:
             },
         },
         "behavior_target_policies": {
-            "upgrade_fish": "cheapest_below_material_tenth",
+            "upgrade_fish": "deployed_quality_lowest_level",
         },
     }
 

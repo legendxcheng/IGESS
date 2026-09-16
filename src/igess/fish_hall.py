@@ -3,7 +3,7 @@ from __future__ import annotations
 from decimal import Decimal, InvalidOperation
 from typing import Any, Sequence
 
-from .fish_data import FishDataError, FishDataSnapshot
+from .fish_data import FishDataError, FishDataSnapshot, is_ordinary_fish
 from .fish_hall_model import (
     FishHallIncomeSnapshot,
     FishIncomeTrace,
@@ -24,6 +24,10 @@ class FishHallDataAdapter:
 
     def __init__(self, snapshot: FishDataSnapshot) -> None:
         self.data = snapshot
+        self._beast_ids = frozenset(
+            fish_id for fish_id, row in snapshot.fish_by_id.items()
+            if not is_ordinary_fish(row)
+        )
         self._fish_base_income = self._fish_income_rows()
         self._mutation_income_multiplier = self._mutation_rows()
         hall_rows = tuple(self.data.table("tbfishhallupgrade"))
@@ -181,6 +185,8 @@ class FishHallDataAdapter:
         return self._income_trace(item)
 
     def upgrade_price(self, item: FishInstance) -> SimNumber:
+        if self.is_beast(item.fish_id):
+            raise FishDataError("beast fish cannot upgrade")
         self._validate_fish_level(item.level)
         if item.level >= FISH_MAX_LEVEL:
             raise FishDataError(
@@ -197,6 +203,13 @@ class FishHallDataAdapter:
             )
             self._upgrade_price_cache[key] = cached
         return cached
+
+    def is_beast(self, fish_id: int) -> bool:
+        return fish_id in self._beast_ids
+
+    def quality(self, item: FishInstance) -> SimNumber:
+        """Level-one income, including mutation, independent of current level."""
+        return self._fish_base(item.fish_id) * self._mutation_multiplier(item.mutation_id)
 
     def snapshot(
         self,
@@ -388,6 +401,8 @@ class FishHallDataAdapter:
         )
 
     def _fish_base(self, fish_id: int) -> SimNumber:
+        if self.is_beast(fish_id):
+            raise FishDataError("beast state is unsupported by ordinary-fish simulation")
         try:
             return self._fish_base_income[fish_id]
         except KeyError as exc:
@@ -414,6 +429,8 @@ class FishHallDataAdapter:
     def _fish_income_rows(self) -> dict[int, SimNumber]:
         result: dict[int, SimNumber] = {}
         for fish_id, row in self.data.fish_by_id.items():
+            if self.is_beast(fish_id):
+                continue
             result[fish_id] = _positive_sim_number(
                 _field(row, "baseMoneyPerSecond", "tbfish"),
                 f"tbfish.{fish_id}.baseMoneyPerSecond",

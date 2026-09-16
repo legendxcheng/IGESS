@@ -196,6 +196,9 @@ class FishEngineAdapter:
         if not isinstance(strategy_id, str) or not strategy_id:
             raise ValueError("engine.strategy_id must be a non-empty string")
         strategy_parameters: dict[str, Any] = {}
+        strategy_parameters["fish_simulation_scope"] = "ordinary_fish_only"
+        strategy_parameters["fish_upgrade_resource"] = "money"
+        strategy_parameters["barbell_saving_estimate"] = "static_online_with_action_duration"
         if "active_throw" in settings:
             strategy_parameters["active_throw"] = (
                 ProductionThrowConfig.from_mapping(
@@ -272,6 +275,7 @@ class FishEngineAdapter:
             }
         metadata = {
             "engine_id": self.engine_id,
+            "fish_simulation_scope": "ordinary_fish_only",
             "strategy": {
                 "id": strategy_id,
                 "parameters": strategy_parameters,

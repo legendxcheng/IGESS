@@ -77,8 +77,8 @@ class AppliedFishUpgrade:
     from_level: int
     to_level: int
     price: SimNumber
-    material_before: SimNumber
-    material_after: SimNumber
+    money_before: SimNumber
+    money_after: SimNumber
     income_before: FishIncomeTrace
     income_after: FishIncomeTrace
     fish_hall_before: FishHallIncomeSnapshot
@@ -95,7 +95,7 @@ class AppliedFishUpgrade:
                 "base_money_per_second*mutation_income_multiplier"
                 "*1.5^(current_level-1)"
             ),
-            "fish_upgrade_price_resource": "material",
+            "fish_upgrade_price_resource": "money",
             "fish_upgrade_price_uses_mutation": "true",
             "fish_income_formula": (
                 "base_money_per_second*1.25^(level-1)"
@@ -107,11 +107,11 @@ class AppliedFishUpgrade:
             "fish_income_per_second_after": (
                 self.income_after.income_per_second.to_decimal_string()
             ),
-            "material_before_fish_upgrade": (
-                self.material_before.to_decimal_string()
+            "money_before_fish_upgrade": (
+                self.money_before.to_decimal_string()
             ),
-            "material_after_fish_upgrade": (
-                self.material_after.to_decimal_string()
+            "money_after_fish_upgrade": (
+                self.money_after.to_decimal_string()
             ),
             "player_state_revision": str(self.state.meta.revision),
         }

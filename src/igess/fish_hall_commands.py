@@ -89,12 +89,12 @@ def upgrade_fish(
         price = hall_adapter.upgrade_price(source_item)
     except FishDataError as exc:
         raise FishCommandError(str(exc)) from exc
-    material_before = state.wallet.material.to_sim_number()
-    if material_before < price:
+    money_before = state.wallet.money.to_sim_number()
+    if money_before < price:
         raise FishCommandError(
-            "insufficient material for fish upgrade: "
+            "insufficient money for fish upgrade: "
             f"need {price.to_decimal_string()}, "
-            f"have {material_before.to_decimal_string()}"
+            f"have {money_before.to_decimal_string()}"
         )
 
     fish_hall_before = hall_adapter.snapshot(state, use_cache=_mutate)
@@ -107,12 +107,12 @@ def upgrade_fish(
         if item.instance_id == instance_id
     )
     committed_item.level += 1
-    calculated_material_after = material_before - price
-    committed.wallet.material = BigNumberDTO.from_value(
-        calculated_material_after,
+    calculated_money_after = money_before - price
+    committed.wallet.money = BigNumberDTO.from_value(
+        calculated_money_after,
         allow_negative=False,
     )
-    material_after = committed.wallet.material.to_sim_number()
+    money_after = committed.wallet.money.to_sim_number()
     committed.meta.revision += 1
     income_after = hall_adapter.income_trace(committed_item)
     if _mutate:
@@ -132,8 +132,8 @@ def upgrade_fish(
         from_level=from_level,
         to_level=committed_item.level,
         price=price,
-        material_before=material_before,
-        material_after=material_after,
+        money_before=money_before,
+        money_after=money_after,
         income_before=income_before,
         income_after=income_after,
         fish_hall_before=fish_hall_before,

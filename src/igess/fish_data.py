@@ -7,7 +7,7 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Mapping, Protocol, Sequence
+from typing import Any, Mapping, Protocol, Sequence, cast
 
 
 FISH_REQUIRED_TABLES = (
@@ -28,6 +28,17 @@ FISH_REQUIRED_TABLES = (
 
 class FishDataError(ValueError):
     """Raised when a Fish data snapshot or generated loader is unavailable."""
+
+
+def is_ordinary_fish(row: Any) -> bool:
+    """Match the game's production-mode default for older ordinary rows."""
+
+    mode = getattr(row, "productionMode", "base")
+    if mode not in {"base", "best_hall_fish"}:
+        raise FishDataError(
+            f"tbfish[id={getattr(row, 'id', '?')}].productionMode is invalid: {mode}"
+        )
+    return mode == "base"
 
 
 @dataclass(frozen=True)
@@ -136,7 +147,7 @@ class GeneratedLubanProvider:
                 raise FishDataError(
                     f"generated Fish table is missing getDataList: {attribute}"
                 )
-            result[table_name] = tuple(getter())
+            result[table_name] = tuple(cast(Sequence[Any], getter()))
         return result
 
     def apply_overrides(
@@ -228,6 +239,7 @@ class FishDataSnapshot:
 
     def model_digest(self, source_digest: str) -> str:
         digest = hashlib.sha256()
+        digest.update(b"fish-economy:ordinary-coin-upgrades-v1\0")
         digest.update(b"IGESS_FISH_MODEL_DIGEST_V2\0")
         digest.update(source_digest.encode("ascii"))
         digest.update(b"\0")
@@ -352,7 +364,7 @@ class FishDataLoader:
         loader_files: list[FishLoaderFile] = []
         source_files = getattr(self.provider, "source_files", None)
         if callable(source_files):
-            for path_value in source_files():
+            for path_value in cast(Sequence[str | Path], source_files()):
                 path = Path(path_value).expanduser().resolve(strict=True)
                 encoded = path.read_bytes()
                 loader_files.append(

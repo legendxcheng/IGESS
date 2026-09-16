@@ -26,8 +26,9 @@ from .fish_commands import (
 )
 from .fish_throw_commands import trusted_lock_throw_request
 from .fish_behavior_targets import (
-    CHEAPEST_BELOW_MATERIAL_TENTH_POLICY_ID,
+    DEPLOYED_QUALITY_LOWEST_LEVEL_POLICY_ID,
     HIGHEST_AFFORDABLE_POLICY_ID,
+    CHEAPEST_IMPROVEMENT_POLICY_ID,
     RANDOM_AFFORDABLE_POLICY_ID,
     barbell_synthesis_targets,
     fish_upgrade_targets,
@@ -50,7 +51,6 @@ from .fish_state import PlayerState
 from .fish_torpedo import FishTorpedoDataAdapter
 from .fish_trash import FishTrashDataAdapter
 from .fish_throw_data import FishThrowDataAdapter, ProductionThrowConfig
-from .fish_upgrade_ranking import FishUpgradeRankingCache
 from .numbers import SimNumber
 from .schema import PlayerProfile
 
@@ -152,9 +152,6 @@ class FishBehaviorAdapter:
             regular_luck_multiplier=throw_config.regular_luck_multiplier,
         )
         self._validate_state = _validate_state
-        self._upgrade_ranking = FishUpgradeRankingCache(
-            self.hall_adapter.upgrade_price
-        )
 
     def behavior_profile(self, profile: PlayerProfile) -> BehaviorProfile:
         unknown = set(profile.behavior_weights) - FISH_BEHAVIOR_IDS
@@ -194,7 +191,7 @@ class FishBehaviorAdapter:
                 )
             if policy not in {
                 RANDOM_AFFORDABLE_POLICY_ID,
-                CHEAPEST_BELOW_MATERIAL_TENTH_POLICY_ID,
+                DEPLOYED_QUALITY_LOWEST_LEVEL_POLICY_ID,
             }:
                 raise FishBehaviorConfigError(
                     f"unknown Fish upgrade target policy: {policy}"
@@ -213,7 +210,7 @@ class FishBehaviorAdapter:
                 raise FishBehaviorConfigError(
                     "synthesize_barbell requires an explicit target policy"
                 )
-            if policy != RANDOM_AFFORDABLE_POLICY_ID:
+            if policy not in {RANDOM_AFFORDABLE_POLICY_ID, CHEAPEST_IMPROVEMENT_POLICY_ID}:
                 raise FishBehaviorConfigError(
                     f"unknown Barbell synthesis target policy: {policy}"
                 )
@@ -300,9 +297,11 @@ class FishBehaviorAdapter:
                 targets = fish_upgrade_targets(
                     state,
                     profile.behavior_target_policies.get(behavior_id),
-                    upgrade_price=self.hall_adapter.upgrade_price,
-                    upgrade_ranking=self._upgrade_ranking,
-                    validate_state=self._validate_state,
+                    hall_adapter=self.hall_adapter,
+                    barbell_adapter=self.barbell_adapter,
+                    reward_multiplier=FishRewardMultipliers.from_profile(profile).fish_hall_money,
+                    duration_seconds=(duration.seconds if isinstance(duration, FixedDuration) else duration.max_seconds),
+                    use_cache=not self._validate_state,
                 )
                 candidates.append(
                     BehaviorCandidate(
@@ -527,6 +526,11 @@ class FishBehaviorAdapter:
                 _mutate=_mutate,
             )
             details.update(application.event_details())
+            income_gain = (
+                application.fish_hall_after.total_income_per_second
+                - application.fish_hall_before.total_income_per_second
+            ) * (reward_multipliers or FishRewardMultipliers()).fish_hall_money
+            details["fish_upgrade_hall_income_delta"] = income_gain.to_decimal_string()
             return FishBehaviorCompletion(
                 state=application.state,
                 production_runtime=settlement.runtime,

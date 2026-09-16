@@ -26,9 +26,9 @@ IGESS 只消费生成后的强类型表对象，并记录 JSON 与生成加载�
 `next_throw_id`，分段恢复不会重放已经结算的事件。每次投掷前先结算旧阵容
 截至当前秒的金钱，新鱼入库后按
 `baseMoneyPerSecond × 1.25^(level-1) × incomeMultiplier` 降序自动填满
-鱼厅容量；同收益按 `instanceId` 升序决胜。鱼可消耗材料升至最高 100 级，
-从等级 `n` 升到 `n+1` 的价格为 `baseMoneyPerSecond × 1.5^(n-1)`，价格
-不乘变异倍率；升级会按新收益重排阵容。timeline 输出当前金钱和鱼厅 CPS，
+鱼厅容量；同收益按 `instanceId` 升序决胜。普通鱼可消耗金币升至最高 100 级。定义品质
+`P0 = baseMoneyPerSecond × incomeMultiplier`（一级产出，含变异倍率），
+从等级 `n` 升到 `n+1` 的价格为 `P0 × 1.5^(n-1)`；升级会按新收益重排阵容。timeline 输出当前金钱和鱼厅 CPS，
 事件保存逐鱼公式 trace。
 
 摸鱼厅使用生产 `tbfishhallupgrade` 的顺序行：当前 `upgradeLevel` 对应当前
@@ -78,11 +78,20 @@ Fish 当前前台行为为 `manual_throw`、`upgrade_fish`、
 每次只允许一个前台行为；
 摸鱼厅金钱和垃圾佬加工属于后台系统，杠铃锻炼不是后台系统。
 `upgrade_fish_hall` 是无目标行为，只在未满级且当前材料可支付时进入候选。
-生产 `upgrade_fish` 使用 `cheapest_below_material_tenth` 目标策略：从全部未满级
-鱼中选择升级价格最低的一条，同价按 `instanceId` 升序决胜；只有该最低价格
-严格低于当前材料的 `1/10` 时才进入候选。鱼升级价格从材料余额扣除。
-`synthesize_barbell` 必须显式使用 `random_affordable` 目标策略，并只从当前
-未拥有且金钱可支付的杠铃中选择，避免行为模拟反复合成不提高产出的副本。
+生产 `upgrade_fish` 使用 `deployed_quality_lowest_level`：先从全背包普通鱼中按
+品质取前 X 个实例，X 为鱼厅容量减去上阵神兽数；品质相同时先保留高等级，再按
+实例 ID 升序。与当前上阵鱼取交集后，选择未满级、等级最低的一条，同等级优先
+品质。满级鱼保留组内名额，未上阵鱼不接受追赶投入；目标升不起时攒钱，不转投
+其他鱼。单次升一级、耗时三秒、权重为 1。
+`synthesize_barbell` 使用 `cheapest_improvement`，选择未拥有、训练速度严格高于
+当前装备的最低价杠铃。该杠铃可支付时禁止鱼升级抢占金币；尚不可支付时，仅在
+计入三秒旧产出、当前重生和画像倍率后，升级能严格缩短预计攒钱时间才放行。
+这是当前在线状态的静态估计，不预测未来捕获或离线切换；无更强杠铃可买后取消
+等待门槛。旧材料十分之一策略已移除，没有新增金币比例门槛。
+
+正式场景范围为 `ordinary_fish_only`：按导表 `productionMode` 排除神兽掉落，
+神兽禁止升级，含神兽的状态或 checkpoint 明确报错。未实现神兽收益联动。
+领域命令仍允许普通背包鱼升级；只升级上阵鱼是上述玩家策略的限制。
 `purchase_torpedo` 必须使用 `highest_affordable`：只从未拥有、比当前装备
 更强且材料可支付的鱼雷中选择最高档，购买后自动装备。该行为不读取当前力量
 或历史最高力量，成长时点完全由 `tbtorpedo.price` 控制。
@@ -99,16 +108,15 @@ Fish 当前前台行为为 `manual_throw`、`upgrade_fish`、
 为 `7200`，即每天从模拟日开始连续在线 2 小时、随后离线 22 小时，到下一模拟日重新
 上线。离线期间不调度前台行为，摸鱼厅金钱和废料加工按在线的 `50%` 结算，
 杠铃力量为 `0%`，垃圾佬修炼不推进。默认 `manual_throw` 与
-`exercise_barbell` 使用基准权重 `1`，低优先级 `upgrade_fish` 使用权重
-`0.1`；`synthesize_barbell` 与 `upgrade_fish_hall` 使用高优先级权重
+`exercise_barbell` 与 `upgrade_fish` 使用基准权重 `1`；`synthesize_barbell` 与 `upgrade_fish_hall` 使用高优先级权重
 `100`。`purchase_torpedo`、两类重生与突破资助配置为可执行时近似硬优先级；
 突破再由 `immediate` 策略明确抢占普通候选。只要任一种重生达到下一档要求，候选池
 就只保留当前可执行的重生，绝对优先于所有普通前台行为。若两种同时满足，则
-稳定选择一种并在下一轮立即执行另一种。杠铃合成使用 `random_affordable`，鱼升级使用
-`cheapest_below_material_tenth`；没有可执行目标时相应行为自动过滤。未拥有杠铃
-时训练行为也会自动过滤。当前经济模型的正式 `day_1_growth` 已完成，系统级
-永久进展为 `18`；旧模型的 `9 / 23 / 36` 首日/首周/首月结果仅作历史对照，
-不再代表当前 gate。当前 7d/30d 基线需要重新运行。周场景
+稳定选择一种并在下一轮立即执行另一种。没有可执行目标时相应行为自动过滤，
+未拥有杠铃时训练行为也会过滤。当前 smoke、1d、7d、30d 正式基线均已完成，
+系统级永久进展分别为 0、18、48、88；单鱼升级不计入该指标。数值与购买时点见
+[`reports/coin-upgrade-baseline.md`](reports/coin-upgrade-baseline.md)。旧 gate 结果
+仅供历史对照，不能作本轮迁移的单因素结论。周场景
 保留全部行为事件以及重生/鱼雷购买/境界突破的完整 trace，但对
 其他普通行为使用 `compact_event_details` 去除重复的大公式明细。重生直接
 产出与重置进度恢复结论见
@@ -118,7 +126,7 @@ Fish 当前前台行为为 `manual_throw`、`upgrade_fish`、
 FishLuck、TrashLuck 的当前值、历史峰值、变化速度、重生标记和停滞时间；
 后者只统计跨鱼保留或抬高长期能力上限的永久进展，并明确排除单鱼升级和临时
 效果。捕获只有在事件记录的最佳鱼厅 CPS 确实提高时才计入。静态 HTML 会显示
-双 Luck/Strength 曲线、永久进展触发密度、归一化变化幅度和事件明细。最新
+双 Luck/Strength 曲线、永久进展触发密度、归一化变化幅度和事件明细。历史
 24h/7d 报表基线与结论见
 [`reports/trash-man-breakthrough-balance.md`](reports/trash-man-breakthrough-balance.md)。
 
@@ -142,7 +150,9 @@ IGESS 只模拟会影响数值体验的资源、概率、时间、产出、消�
 
 ## Agent workflow
 
-Work with an Agent to add one rule at a time. After every rule, inspect model status and any automatic smoke result before adding the next rule. Once the model is complete, run formal simulations and tune the same attributable source state.
+通过既有正式 `model simulate` 工作流逐条验证规则，并基于同一可追溯模型调参。
+当前 `model status` 的十 tick 自动探针仍调用仅支持通用模型的 Simulator，会对
+Fish 报 `smoke_failed`；本轮正式 Fish 运行与产物验证均已通过，该探针边界尚待独立修复。
 
 ## Commands
 

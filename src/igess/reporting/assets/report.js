@@ -129,6 +129,24 @@ function renderFishProgression(report) {
   if (!fish.available) return;
   renderCoreProgression(fish.core || {}, fish.balance || {});
   renderPersistentProgression(fish.persistent || {});
+  renderFishInvestment(fish.investment || {});
+}
+
+function renderFishInvestment(investment) {
+  if (investment.scope !== 'ordinary_fish_only') return;
+  const section = document.querySelector('[data-fish-investment-section]');
+  if (!section) return;
+  section.hidden = false;
+  section.querySelector('[data-fish-investment-kpis]').innerHTML = Object.entries(investment.profiles || {}).map(([id, summary]) => [
+    kpiCard(profileLabel(id) + ' · 升级金币支出', numericMarkup(summary.coin_spent)),
+    kpiCard(profileLabel(id) + ' · 累计升级增收', numericMarkup(summary.hall_income_gain, '/秒')),
+    kpiCard(profileLabel(id) + ' · 有效增收升级占比', numericMarkup(summary.effective_upgrade_percent, '%')),
+  ].join('')).join('');
+  section.querySelector('[data-fish-investment-purchases]').innerHTML = Object.entries(investment.profiles || {}).map(([id, summary]) =>
+    '<h3>' + escapeHtml(profileLabel(id)) + ' · 杠铃购买时点（累计墙钟秒）</h3><ul>' +
+    (summary.barbell_purchases || []).map(purchase => '<li>杠铃 ' + escapeHtml(purchase.barbell_id) +
+      '：' + numericInline(purchase.wall_time, '秒') + '，金币 ' + numericInline(purchase.price) + '</li>').join('') + '</ul>'
+  ).join('');
 }
 
 function renderCoreProgression(core, balance = {}) {

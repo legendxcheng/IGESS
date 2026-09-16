@@ -206,6 +206,7 @@ def _fish_progression(data: ReportData) -> dict[str, Any]:
     )
     return {
         "available": bool(core_profiles or behavior_profiles),
+        "investment": _fish_investment(data),
         "balance": {
             "time_basis": "cumulative_active_seconds",
             "rate_definition": (
@@ -237,6 +238,37 @@ def _fish_progression(data: ReportData) -> dict[str, Any]:
             "profiles": behavior_profiles,
         },
     }
+
+
+def _fish_investment(data: ReportData) -> dict[str, Any]:
+    profiles: dict[str, Any] = {}
+    for profile_id in data.profiles:
+        upgrades = []
+        purchases = []
+        for event in data.events:
+            if event.get("profile_id") != profile_id:
+                continue
+            details = event.get("details", {})
+            if event.get("kind") == "fish_upgraded" and details.get("fish_upgrade_price_resource") == "money":
+                upgrades.append(details)
+            if event.get("kind") == "barbell_synthesized":
+                purchases.append({
+                    "barbell_id": details.get("barbell_id"),
+                    "wall_time": chart_point(event.get("time_seconds", 0)),
+                    "price": chart_point(details.get("barbell_synthesis_price", 0)),
+                })
+        gains = [_positive_decimal(row.get("fish_upgrade_hall_income_delta")) for row in upgrades]
+        spent = sum((_positive_decimal(row.get("fish_upgrade_price")) for row in upgrades), Decimal(0))
+        profiles[profile_id] = {
+            "upgrade_count": len(upgrades),
+            "coin_spent": chart_point(str(spent)),
+            "hall_income_gain": chart_point(str(sum(gains, Decimal(0)))),
+            "effective_upgrade_percent": chart_point(
+                str(Decimal(sum(gain > 0 for gain in gains)) * 100 / len(upgrades)) if upgrades else None
+            ),
+            "barbell_purchases": purchases,
+        }
+    return {"scope": data.manifest.get("fish_simulation_scope"), "profiles": profiles}
 
 
 def _progression_profiles(
@@ -349,7 +381,7 @@ def _active_duration_seconds(raw_core_profile: dict[str, Any]) -> int:
     if isinstance(summary, dict):
         value = summary.get("active_duration_seconds")
         try:
-            return max(0, int(value))
+            return max(0, int(value if value is not None else ""))
         except (TypeError, ValueError):
             pass
     rows = raw_core_profile.get("rows", [])

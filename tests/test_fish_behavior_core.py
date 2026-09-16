@@ -9,7 +9,6 @@ from igess.behavior import BehaviorScheduler
 from igess.builder import ModelBuilder
 from igess.fish_barbell import FishBarbellDataAdapter
 from igess.fish_behavior import (
-    CHEAPEST_BELOW_MATERIAL_TENTH_POLICY_ID,
     UPGRADE_FISH_BEHAVIOR_ID,
     FishBehaviorAdapter,
     FishBehaviorConfigError,
@@ -301,12 +300,11 @@ def test_upgrade_behavior_settles_old_income_before_level_change(
         == (old_income * SimNumber.parse(4)).to_decimal_string()
     )
     assert completion.state.wallet.money.to_sim_number() == (
-        SimNumber.parse(100) + old_income * SimNumber.parse(4)
+        SimNumber.parse(100) + old_income * SimNumber.parse(4) - price
     )
     assert completion.state.wallet.material.to_sim_number() == (
         SimNumber.parse(100)
         + SimNumber.parse(completion.details["trash_material_added"])
-        - price
     )
 
 
@@ -347,68 +345,3 @@ def test_upgrade_behavior_requires_explicit_known_target_policy(
     profile.behavior_target_policies = {"upgrade_fish": "highest_income"}
     with pytest.raises(FishBehaviorConfigError, match="unknown"):
         adapter.behavior_profile(profile)
-
-
-def test_low_priority_fish_upgrade_selects_cheapest_below_material_tenth(
-    tmp_path: Path,
-) -> None:
-    snapshot = _snapshot(tmp_path)
-    config = ProductionThrowConfig.from_mapping(
-        {
-            "initial_strength": "50",
-            "interval_seconds": 1,
-            "regular_luck_multiplier": "1",
-            "bonus_base_luck": "1",
-            "max_bonus_layers": 4,
-        }
-    )
-    adapter = FishBehaviorAdapter(
-        throw_adapter=FishThrowDataAdapter(
-            snapshot,
-            bonus_base_luck=1,
-            max_bonus_layers=4,
-        ),
-        hall_adapter=FishHallDataAdapter(snapshot),
-        trash_adapter=FishTrashDataAdapter(snapshot),
-        barbell_adapter=FishBarbellDataAdapter(snapshot),
-        throw_config=config,
-    )
-    profile = ConfigLoader.load_rules_only(
-        "projects/fish/economy.yaml"
-    ).rules.player_profiles["default"]
-    profile.behavior_weights = {
-        UPGRADE_FISH_BEHAVIOR_ID: SimNumber.one()
-    }
-    profile.behavior_durations = {
-        UPGRADE_FISH_BEHAVIOR_ID: {
-            "type": "fixed",
-            "seconds": 1,
-        }
-    }
-    profile.behavior_target_policies = {
-        UPGRADE_FISH_BEHAVIOR_ID: (
-            CHEAPEST_BELOW_MATERIAL_TENTH_POLICY_ID
-        )
-    }
-    state = PlayerState.new(
-        initial_torpedo_id=1,
-        initial_strength=50,
-        initial_trash_man_realm_id=1,
-    )
-    state.fish.items = [
-        FishInstance(3, 201, 7, 1, 100, 0),
-        FishInstance(1, 101, 7, 1, 100, 1),
-        FishInstance(2, 201, 2, 1, 100, 2),
-    ]
-    state.fish.next_instance_id = 4
-
-    state.wallet.money = BigNumberDTO.from_value(1_000_000)
-    state.wallet.material = BigNumberDTO.from_value(80)
-    candidate = adapter.candidates(state, profile)[0]
-    assert not candidate.available
-    assert candidate.targets == ()
-
-    state.wallet.material = BigNumberDTO.from_value(81)
-    candidate = adapter.candidates(state, profile)[0]
-    assert candidate.available
-    assert tuple(target.target_id for target in candidate.targets) == ("3",)

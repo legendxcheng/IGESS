@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from typing import Any, Mapping, Sequence
 
-from .fish_data import FishDataError, FishDataSnapshot
+from .fish_data import FishDataError, FishDataSnapshot, is_ordinary_fish
 from .fish_throw import (
     BonusResult,
     Mutation,
@@ -150,7 +150,7 @@ class ProductionThrowResolution:
             ),
             "fish_weight_gram": str(self.fish_weight_gram),
             "fish_mutation_id": str(self.fish_mutation_id),
-            "fish_pool_scope": "all_tbfish_rows",
+            "fish_pool_scope": "ordinary_fish_only",
             "torpedo_id": str(self.request.torpedo_id),
             "torpedo_name": self.torpedo_name,
             "torpedo_power": _format_float(self.torpedo_power),
@@ -413,6 +413,8 @@ class FishThrowDataAdapter:
     def _fish_weights(self) -> dict[str, int]:
         result: dict[str, int] = {}
         for fish_id, row in self.snapshot.fish_by_id.items():
+            if not is_ordinary_fish(row):
+                continue
             result[str(fish_id)] = _positive_int(
                 _field(row, "weight", "tbfish"),
                 f"tbfish.{fish_id}.weight",
@@ -434,6 +436,7 @@ class FishThrowDataAdapter:
                 ),
             )
             for row in self.snapshot.table(table_name)
+            if table_name != "tbfish" or is_ordinary_fish(row)
         )
         return tuple(sorted(parsed, key=lambda item: item.denominator))
 

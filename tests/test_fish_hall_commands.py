@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from dataclasses import replace
+from types import SimpleNamespace
 
 from fish_test_support import _BigNumber, _big, _snapshot
 from igess.fish_commands import (
@@ -121,12 +123,12 @@ def test_fish_upgrade_atomically_pays_levels_and_reorders_hall(
     assert application.from_level == 1
     assert application.to_level == 2
     assert application.price.to_decimal_string() == "10"
-    assert application.material_before.to_decimal_string() == "100"
-    assert application.material_after.to_decimal_string() == "90"
+    assert application.money_before.to_decimal_string() == "100"
+    assert application.money_after.to_decimal_string() == "90"
     assert application.income_before.income_per_second.to_decimal_string() == "10"
     assert application.income_after.income_per_second.to_decimal_string() == "12.5"
-    assert application.state.wallet.money.to_sim_number() == SimNumber.parse("100")
-    assert application.state.wallet.material.to_sim_number() == SimNumber.parse("90")
+    assert application.state.wallet.money.to_sim_number() == SimNumber.parse("90")
+    assert application.state.wallet.material.to_sim_number() == SimNumber.parse("100")
     assert application.state.fish.items[0].level == 2
     assert application.state.fish.items[0].hall_slot == 1
     assert application.state.fish.items[1].hall_slot == 2
@@ -136,28 +138,28 @@ def test_fish_upgrade_atomically_pays_levels_and_reorders_hall(
         "base_money_per_second*mutation_income_multiplier"
         "*1.5^(current_level-1)"
     )
-    assert details["fish_upgrade_price_resource"] == "material"
+    assert details["fish_upgrade_price_resource"] == "money"
     assert details["fish_upgrade_price_uses_mutation"] == "true"
-    assert details["material_before_fish_upgrade"] == "100"
-    assert details["material_after_fish_upgrade"] == "90"
+    assert details["money_before_fish_upgrade"] == "100"
+    assert details["money_after_fish_upgrade"] == "90"
     assert details["fish_income_formula"] == (
         "base_money_per_second*1.25^(level-1)*mutation_income_multiplier"
     )
     assert details["fish_hall_deployed_instance_ids_after_upgrade"] == "[1,2]"
 
 
-def test_fish_upgrade_rejects_insufficient_material_without_mutation(
+def test_fish_upgrade_rejects_insufficient_money_without_mutation(
     tmp_path: Path,
 ) -> None:
     hall_adapter = FishHallDataAdapter(_snapshot(tmp_path))
     state = PlayerState.new(initial_torpedo_id=1)
-    state.wallet.money = state.wallet.money.from_value("100")
-    state.wallet.material = state.wallet.material.from_value("9")
+    state.wallet.money = state.wallet.money.from_value("9")
+    state.wallet.material = state.wallet.material.from_value("100")
     state.fish.items = [FishInstance(1, 101, 7, 1, 100, 1)]
     state.fish.next_instance_id = 2
     original = state.to_dict(context=hall_adapter.validation_context())
 
-    with pytest.raises(FishCommandError, match="insufficient material"):
+    with pytest.raises(FishCommandError, match="insufficient money"):
         upgrade_fish(state, 1, hall_adapter=hall_adapter)
 
     assert state.to_dict(context=hall_adapter.validation_context()) == original
@@ -398,3 +400,20 @@ def test_fish_hall_upgrade_failure_does_not_mutate_state(
         apply_fish_hall_upgrade(state, hall_adapter=hall_adapter)
 
     assert state.to_dict(context=hall_adapter.validation_context()) == original
+
+
+def test_beast_cannot_upgrade_or_produce_as_ordinary_fish(tmp_path: Path) -> None:
+    snapshot = _snapshot(tmp_path)
+    beast = SimpleNamespace(id=2009, rarityId=20, productionMode="best_hall_fish")
+    snapshot = replace(snapshot, tables={**snapshot.tables, "tbfish": (*snapshot.table("tbfish"), beast)})
+    hall = FishHallDataAdapter(snapshot)
+    state = PlayerState.new(initial_torpedo_id=1)
+    state.wallet.money = BigNumberDTO.from_value("1e50")
+    state.fish.items = [FishInstance(1, 2009, 7, 1, 100, 1)]
+    state.fish.next_instance_id = 2
+    original = state.to_dict(context=hall.validation_context())
+    with pytest.raises(FishCommandError, match="beast"):
+        upgrade_fish(state, 1, hall_adapter=hall)
+    assert state.to_dict(context=hall.validation_context()) == original
+    with pytest.raises(FishDataError, match="beast"):
+        hall.snapshot(state)
