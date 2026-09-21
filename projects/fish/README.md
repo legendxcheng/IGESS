@@ -59,11 +59,20 @@ IGESS 只消费生成后的强类型表对象，并记录 JSON 与生成加载�
 
 杠铃使用生产 `tbbarbell`：`price` 严格消耗金钱，
 `strengthPerExercise / timeCost` 是主动锻炼时的在线每秒力量。当前生产 15 档
-`timeCost` 均为 1 秒。只有当前前台行为为 `exercise_barbell` 时，正在装备的
+`timeCost` 均为 0.5 秒，读取时保留毫秒精度的小数秒。每段 `exercise_barbell`
+仍持续 60 秒，按 `60 / timeCost × strengthPerExercise` 累计收益：当前相当于
+120 次锻炼，再乘画像的力量收益倍率。只有当前前台行为为 `exercise_barbell` 时，正在装备的
 杠铃才产出力量；库存 `count` 只表示持有数量，不放大产出。合成原子扣金钱、
 增加库存和 `meta.revision`，再按固定 `highest_strength_per_second` 策略自动
 装备当前每秒力量最高的已拥有杠铃；合成、炸鱼等其他前台行为不同时产出力量，
 领域层也保留显式换装命令。离线期间杠铃力量固定为零。
+
+全局行为调度、记录和 checkpoint 时间仍为整数秒；本次支持半秒周期的收益累计，
+不增加逐次举起事件，也不在每个半秒点重新选择行为。当前 0.5 秒周期能整除所有
+整数秒结算区间，因此按速度积分与完整次数累计一致；对于不能整除结算区间的
+其他周期，既有模型仍是连续收益近似。若将来需要逐次动作或亚秒级策略切换，
+需另行扩展时钟和剩余周期进度。验证见
+[半秒杠铃验证](../../.scratch/fish-barbell-subsecond/verification.md)。
 
 力量重生使用生产 `tbstrengthrebirth` 的一基 ID：`completedCount=0` 时垃圾加工
 使用表外默认 `1×`，下一次重生读取 `id=completedCount+1` 的力量门槛，完成

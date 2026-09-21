@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from decimal import Decimal
 from typing import Any, Mapping
 
 from .fish_barbell import (
@@ -204,7 +205,7 @@ def settle_fish_production(
             equipped_id=0,
             equipped_count=0,
             strength_per_exercise=SimNumber.zero(),
-            time_cost_seconds=0,
+            time_cost_seconds=Decimal(0),
             strength_per_second=SimNumber.zero(),
         )
         if barbell_adapter is None

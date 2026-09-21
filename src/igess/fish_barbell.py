@@ -16,7 +16,7 @@ class BarbellRule:
     strength_per_exercise: SimNumber
     price: SimNumber
     rarity_id: int
-    time_cost_seconds: int
+    time_cost_seconds: Decimal
 
     @property
     def strength_per_second(self) -> SimNumber:
@@ -30,7 +30,7 @@ class BarbellProductionSnapshot:
     equipped_id: int
     equipped_count: int
     strength_per_exercise: SimNumber
-    time_cost_seconds: int
+    time_cost_seconds: Decimal
     strength_per_second: SimNumber
 
     def event_details(self, *, suffix: str = "") -> dict[str, str]:
@@ -118,7 +118,7 @@ class FishBarbellDataAdapter:
                 equipped_id=0,
                 equipped_count=0,
                 strength_per_exercise=SimNumber.zero(),
-                time_cost_seconds=0,
+                time_cost_seconds=Decimal(0),
                 strength_per_second=SimNumber.zero(),
             )
         try:
@@ -173,7 +173,7 @@ class FishBarbellDataAdapter:
                     _field(row, "rarityId", "tbbarbell"),
                     f"tbbarbell.{row_id}.rarityId",
                 ),
-                time_cost_seconds=_positive_int(
+                time_cost_seconds=_exercise_duration(
                     _field(row, "timeCost", "tbbarbell"),
                     f"tbbarbell.{row_id}.timeCost",
                 ),
@@ -210,6 +210,25 @@ def _positive_int(value: Any, field: str) -> int:
     if type(value) is not int or value <= 0:
         raise FishDataError(f"{field} must be a positive integer")
     return value
+
+
+def _exercise_duration(value: Any, field: str) -> Decimal:
+    """Keep table seconds exact, with the game's millisecond precision.
+
+    A repetition's duration is independent of the integer-second foreground
+    behavior clock. Production integrates strengthPerExercise / timeCost over
+    that behavior, so a 0.5-second repetition contributes twice per second.
+    """
+    message = f"{field} must be positive seconds with millisecond precision"
+    if isinstance(value, bool) or not isinstance(value, (int, float, Decimal)):
+        raise FishDataError(message)
+    seconds = Decimal(str(value))
+    if not seconds.is_finite() or not Decimal("0.001") <= seconds <= 9007199254740:
+        raise FishDataError(message)
+    milliseconds = seconds * 1000
+    if milliseconds != milliseconds.to_integral_value():
+        raise FishDataError(message)
+    return seconds.normalize()
 
 
 def _positive_sim_number(value: Any, field: str) -> SimNumber:

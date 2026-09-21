@@ -1,0 +1,103 @@
+{
+  "run_id": "20260921T085635814804Z-day_1_growth",
+  "model_digest": "sha256:d7ad83f893ae66c855317c16e822e32c54df8da0d408e6a093e734f514c9ffdb",
+  "training_behaviors": 75,
+  "training_repetitions": 9000,
+  "barbells_exercised": {
+    "1": {
+      "cycles_per_60s": 120,
+      "strength_per_exercise": 1,
+      "strength_added_per_60s": "1.2E+2"
+    },
+    "2": {
+      "cycles_per_60s": 120,
+      "strength_per_exercise": 2,
+      "strength_added_per_60s": "2.4E+2"
+    },
+    "3": {
+      "cycles_per_60s": 120,
+      "strength_per_exercise": 5,
+      "strength_added_per_60s": "6.0E+2"
+    },
+    "4": {
+      "cycles_per_60s": 120,
+      "strength_per_exercise": 25,
+      "strength_added_per_60s": "3.00E+3"
+    },
+    "5": {
+      "cycles_per_60s": 120,
+      "strength_per_exercise": 75,
+      "strength_added_per_60s": "9.00E+3"
+    }
+  },
+  "final_wallet": {
+    "material": {
+      "coeff": 2150,
+      "exp": 4,
+      "sign": 1
+    },
+    "money": {
+      "coeff": 1081,
+      "exp": 6,
+      "sign": 1
+    },
+    "strength": {
+      "coeff": 2880,
+      "exp": 2,
+      "sign": 1
+    }
+  },
+  "luck": {
+    "active_duration_seconds": 7200,
+    "fish_luck_final": "200160.21478058852",
+    "fish_luck_initial": "20",
+    "fish_luck_net_delta": "200140.21478058852",
+    "fish_luck_peak": "200160.21478058852",
+    "longest_fish_luck_stagnation_seconds": 283,
+    "longest_trash_luck_stagnation_seconds": 2585,
+    "sample_count": 49,
+    "strength_final": "288000",
+    "strength_initial": "50",
+    "strength_peak": "288000",
+    "strength_rebirth_count": 3,
+    "trash_luck_final": "832.24454913034765",
+    "trash_luck_initial": "2.578087997951765",
+    "trash_luck_net_delta": "829.666461132395885",
+    "trash_luck_peak": "832.24454913034765",
+    "trash_man_rebirth_count": 2,
+    "wall_duration_seconds": 86400
+  },
+  "progression": {
+    "active_duration_seconds": 7200,
+    "complete_online_sessions": 1,
+    "complete_online_sessions_without_progression": 0,
+    "complete_online_sessions_without_system_progression": 0,
+    "dominant_category_share": "0.7037037037037037037037037037037037037037037037037037037037037037037037037037037",
+    "earned_progression_count": 81,
+    "events_per_active_hour": "40.5",
+    "first_progression_wait_seconds": 30,
+    "interval_p50_seconds": 65,
+    "interval_p75_seconds": 93,
+    "interval_p90_seconds": 186,
+    "interval_p95_seconds": 216,
+    "max_interval_seconds": 555,
+    "progression_category_counts": {
+      "barbell": 5,
+      "best_hall_fish": 57,
+      "fish_hall": 3,
+      "strength_rebirth": 3,
+      "torpedo": 4,
+      "trash_man_realm": 7,
+      "trash_man_rebirth": 2
+    },
+    "progression_category_diversity": 7,
+    "system_events_per_active_hour": "12",
+    "system_progression_count": 24,
+    "system_progression_interval_p90_seconds": 658,
+    "system_progression_max_interval_seconds": 1040,
+    "system_progression_tail_gap_seconds": 309,
+    "tail_gap_seconds": 159,
+    "total_progression_count": 81,
+    "wall_duration_seconds": 86400
+  }
+}

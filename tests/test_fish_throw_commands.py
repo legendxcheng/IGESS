@@ -583,8 +583,13 @@ def test_current_production_snapshot_resolves_one_throw() -> None:
 
     barbell_adapter = FishBarbellDataAdapter(snapshot)
     assert len(barbell_adapter.rules) == 15
-    assert barbell_adapter.rule(1).strength_per_exercise == SimNumber.parse(2)
-    assert barbell_adapter.rule(1).time_cost_seconds == 1
+    first_barbell = snapshot.table("tbbarbell")[0]
+    assert barbell_adapter.rule(first_barbell.id).strength_per_exercise == (
+        SimNumber.parse(first_barbell.strengthPerExercise)
+    )
+    assert barbell_adapter.rule(first_barbell.id).time_cost_seconds == (
+        SimNumber.parse(first_barbell.timeCost).decimal
+    )
     assert barbell_adapter.rule(1).price == SimNumber.parse(20)
     assert barbell_adapter.rule(3).price == SimNumber.parse(75000)
     assert all(
