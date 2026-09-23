@@ -227,8 +227,6 @@ function renderFishCumulativeOutputChart(profiles) {
     [
       ['累计金钱', 'money_acquired_cumulative', '#2563eb'],
       ['累计资源', 'resource_acquired_cumulative', '#16a34a'],
-      ['累计卖鱼材料', 'fish_sale_material_cumulative', '#f59e0b'],
-      ['累计加工材料', 'trash_material_cumulative', '#14b8a6'],
     ].forEach(([label, field, color]) => {
       series.push({
         name: `${profileLabel(profileId)} · ${label}`,
