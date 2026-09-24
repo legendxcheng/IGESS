@@ -9,6 +9,7 @@
 - IGESS 已接入独立 `fish_source` 后端和正式 `model simulate`/`RunRegistry`/Web 报告。可运行项目为 [`projects/fish_source`](../fish_source/README.md)，旧 `projects/fish` 继续保留 Python 后端供历史诊断；两个后端不共用数值比较基线。
 - 同源后端输出钱包、已领取、待领取、累计可核算鱼厅产出、力量、双 Luck、永久进展与命令回执。源游戏力量为零时双 Luck 明确缺失。修正“先资助突破、再由源服务计时训练”的策略后，同一最终指纹的 1/7/30 天正式运行成功，早期错误策略的成长产物不作为新基线。当前 1 天同源快速模式适配器约 20 秒，明显慢于历史 Python 正式运行约 1.6 秒，且策略语义不同，尚不宣布整体提速或切换旧项目默认后端。运行编号、指纹、测试与限制见 [实施验证](../../.scratch/fish-source-runtime/verification.md)。
 - 下文未另行注明的 `FishEconomySimulator`、Python 存档与加权策略描述均是**历史 Python 后端现状**，不能作为同源 Lua 后端的实现说明。新后端的路径、画像和限制见上面的 README；规格见 [同源执行器规格](../../.scratch/fish-source-runtime/spec.md)。
+- 同源 Web 报告的可读性回归已修复：加载新产物、按源回执统计、恢复按日／周成长操作与投资面板，长回执不再全量内嵌；最终 1/7/30 天报告已重生成。旧记录缺少 5 分钟采样等指标时明确显示未记录，见 [修复验证](../../.scratch/fish-source-report-readability/verification.md)。
 
 当前总状态：**普通鱼金币升级与卖鱼材料收入均已接入正式 Fish 引擎；卖鱼版本 smoke、1d、7d、30d 正式基线成功。培养策略保留，两个画像按已确认周期清理非上阵、非品质前 X 的普通鱼。神兽仍不支持。**
 

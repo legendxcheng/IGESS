@@ -22,6 +22,8 @@ class ReportData:
     missing_artifacts: list[str]
     luck_progression: dict[str, Any] = field(default_factory=dict)
     behavior_progression: dict[str, Any] = field(default_factory=dict)
+    source_progression: dict[str, Any] = field(default_factory=dict)
+    source_behavior: dict[str, Any] = field(default_factory=dict)
 
     @property
     def scenario_id(self) -> str:
@@ -50,6 +52,11 @@ def load_report_data(run_dir: str | Path) -> ReportData:
     behavior_progression = _read_optional_json_dict(
         run_dir / "behavior_progression.json"
     )
+    source_progression = {}
+    source_behavior = {}
+    if manifest.get("engine_id") == "fish_source":
+        source_progression = _read_optional_json(run_dir / "source_progression.json", missing, {})
+        source_behavior = _read_optional_json(run_dir / "source_behavior.json", missing, {})
     return ReportData(
         run_dir=run_dir,
         manifest=manifest,
@@ -60,6 +67,8 @@ def load_report_data(run_dir: str | Path) -> ReportData:
         missing_artifacts=missing,
         luck_progression=luck_progression,
         behavior_progression=behavior_progression,
+        source_progression=source_progression,
+        source_behavior=source_behavior,
     )
 
 

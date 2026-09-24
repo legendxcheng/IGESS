@@ -42,7 +42,7 @@
 
 - 新后端由独立 `projects/fish_source` 显式选择；未将旧 `projects/fish` 默认切换。旧画像目标选择不等于新策略，付费倍率不支持。此状态不标记为已完成默认迁移。
 - 现有 authoring 通用 `Datas/` 与 `luban_exports/` 是结构输入，真正 Fish 数值来自 `engine.source_runtime.data_root`；修改通用工作簿不会改变 Fish 源数值。
-- Web 总览和资源曲线展示源观察的 Strength、双 Luck、鱼厅待领/已领与钱包余额，另有 `source_progression.json`、`source_behavior.json`；旧 Python 专用 Fish 细分面板没有直接移植，尚无等价的新面板。
+- Web 报告现已接入同源产物，恢复力量、双 Luck、投资、钱包/待领、按日和按周的成长操作面板；旧长场景只有按天状态采样，完整 5 分钟在线毛产出和精确停滞仍缺失。修复证据见 [报表可读性回归](../fish-source-report-readability/verification.md)。
 - `week_1_growth` 和 `month_1_growth` 配置中的 `compact_event_details` 尚未应用于同源后端；运行保留完整命令回执，长期场景的事件文件较大。
 - 最终 checkpoint 可重放并恢复活动中状态，但正式运行尚未周期性落盘中途 checkpoint。当前导表摘要覆盖选定目录全部 JSON，因此无关 JSON 改动也会拒绝旧 checkpoint。
 - 7 天最终 checkpoint 已跨进程恢复；30 天仅验证生成和指纹，尚未对该大历史 checkpoint 执行完整恢复。

@@ -2,14 +2,13 @@ from __future__ import annotations
 
 import html
 import json
-import shutil
+import os
 from importlib.resources import files
 from pathlib import Path
 from typing import Any
 
 from .loader import load_report_data
 from .view_model import build_report_view_model
-
 
 _SCENARIO_LABELS = {
     "smoke": "冒烟验证",
@@ -30,6 +29,10 @@ def generate_static_report(
     assets_dir.mkdir(parents=True, exist_ok=True)
     _copy_assets(assets_dir)
     report_payload = build_report_view_model(data)
+    report_payload["downloads"] = {
+        key: _download_link(Path(path), output_dir)
+        for key, path in report_payload["artifacts"].items() if Path(path).is_file()
+    }
     payload_json = json.dumps(report_payload, ensure_ascii=False, indent=2, sort_keys=True)
     inline_payload = _json_script_payload(report_payload)
     (output_dir / "report_data.json").write_text(
@@ -47,10 +50,17 @@ def generate_static_report(
     return index
 
 
+def _download_link(path: Path, output_dir: Path) -> str:
+    try:
+        return Path(os.path.relpath(path, output_dir)).as_posix()
+    except ValueError:  # Windows paths on different drives cannot be relative.
+        return path.resolve().as_uri()
+
+
 def _copy_assets(assets_dir: Path) -> None:
     package_assets = files("igess.reporting").joinpath("assets")
     for name in ("report.css", "report.js", "echarts.min.js"):
-        shutil.copyfile(package_assets.joinpath(name), assets_dir / name)
+        (assets_dir / name).write_bytes(package_assets.joinpath(name).read_bytes())
 
 
 def _html(inline_payload: str, title: str) -> str:
@@ -79,12 +89,24 @@ def _html(inline_payload: str, title: str) -> str:
             '      <div id="fish-acquisition-rate-chart" class="chart chart-primary"></div>',
             '      <div id="fish-cumulative-output-chart" class="chart chart-primary"></div>',
             '      <div id="luck-progression-chart" class="chart"></div>',
+            '      <div id="core-strength-chart" class="chart" hidden></div>',
+            "    </section>",
+            '    <section class="band" data-source-liquidity-section hidden>',
+            "      <h2>钱包与鱼厅收入</h2>",
+            '      <p class="section-note"></p>',
+            '      <div id="source-wallet-chart" class="chart"></div>',
+            '      <div id="source-collection-chart" class="chart"></div>',
             "    </section>",
             '    <section class="band" data-fish-investment-section hidden>',
             "      <h2>普通鱼金币投资</h2>",
             '      <p class="section-note">本场景只模拟普通鱼，不含神兽获取与收益联动。只培养品质前 X 条中已上阵的最低等级鱼；杠铃攒钱时间按当前在线收入估计，不预测后续掉落或离线变化。</p>',
             '      <div data-fish-investment-kpis class="kpi-grid"></div>',
             '      <div data-fish-investment-purchases></div>',
+            "    </section>",
+            '    <section class="band" data-source-actions-section hidden>',
+            "      <h2>玩家操作汇总</h2>",
+            '      <p class="section-note">统计源服务已接受的操作。投掷生命周期合并为完整投掷；完整回执保留在原始事件文件中。</p>',
+            '      <div data-source-actions class="table-wrap"></div>',
             "    </section>",
             '    <section class="band" data-fish-persistent-section hidden>',
             "      <h2>有效成长时间点</h2>",

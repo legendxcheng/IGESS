@@ -8,12 +8,14 @@ from igess.human_numbers import human_number
 
 from .kpis import build_overview
 from .loader import ReportData
+from .source_fish import build_source_projection, display_events
 
 _SECONDS_PER_DAY = 24 * 60 * 60
 _DEFAULT_FISH_RATE_SAMPLE_SECONDS = 5 * 60
 
 
 def build_report_view_model(data: ReportData) -> dict[str, Any]:
+    source = build_source_projection(data) if data.manifest.get("engine_id") == "fish_source" else None
     resource_ids = sorted(
         {
             str(resource_id)
@@ -28,15 +30,16 @@ def build_report_view_model(data: ReportData) -> dict[str, Any]:
             "model_id": data.manifest.get("model_id"),
             "model_digest": data.manifest.get("model_digest"),
             "profiles": data.profiles,
+            "engine_id": data.manifest.get("engine_id"),
         },
-        "overview": _overview(data, resource_ids),
+        "overview": _overview(data, resource_ids, source),
         "series": {
             "resources": _resource_series(data.timeline, resource_ids),
             "total_cps": _total_cps_series(data.timeline),
-            "events": _event_series(data.events),
+            "events": _event_series(display_events(data.events) if source is not None else data.events),
         },
         "diagnostics": _diagnostics(data),
-        "fish_progression": _fish_progression(data),
+        "fish_progression": _source_fish_progression(source) if source is not None else _fish_progression(data),
         "evidence": _evidence(data),
         "artifacts": _artifacts(data),
     }
@@ -92,8 +95,13 @@ def chart_point(value: Any) -> dict[str, Any]:
     }
 
 
-def _overview(data: ReportData, resource_ids: list[str]) -> dict[str, Any]:
+def _overview(data: ReportData, resource_ids: list[str], source: dict[str, Any] | None = None) -> dict[str, Any]:
     exact = build_overview(data)
+    if source is not None:
+        exact.update({"purchase_count": source["purchase_count"],
+                      "prestige_reset_count": source["rebirth_count"],
+                      "never_purchased_count": None, "never_unlocked_count": None,
+                      "warning_category_count": None})
     first_key_unlock = _numeric_record(exact.get("first_key_unlock"), ("time_seconds",))
     worst_payback = _numeric_record(
         exact.get("worst_payback"),
@@ -106,7 +114,7 @@ def _overview(data: ReportData, resource_ids: list[str]) -> dict[str, Any]:
         }
         for profile_id, resources in exact["final_resources"].items()
     }
-    return {
+    result = {
         "timeline_rows": chart_point(len(data.timeline)),
         "event_count": chart_point(len(data.events)),
         "missing_artifacts": list(data.missing_artifacts),
@@ -122,6 +130,14 @@ def _overview(data: ReportData, resource_ids: list[str]) -> dict[str, Any]:
         "never_unlocked_count": chart_point(exact["never_unlocked_count"]),
         "warning_category_count": chart_point(exact["warning_category_count"]),
     }
+    if source is not None:
+        result.update({key: chart_point(source[key]) for key in
+                       ("throw_count", "rejection_count", "milestone_count")})
+        result["active_duration_seconds"] = chart_point(sum(
+            profile["summary"]["active_duration_seconds"]
+            for profile in source["persistent"]["profiles"].values()
+        ))
+    return result
 
 
 def _numeric_record(
@@ -246,6 +262,70 @@ def _fish_progression(data: ReportData) -> dict[str, Any]:
             "profiles": behavior_profiles,
         },
     }
+
+
+def _source_fish_progression(source: dict[str, Any]) -> dict[str, Any]:
+    core = _progression_profiles(source["core"], numeric_fields=(
+        "strength_current", "strength_peak", "fish_luck_current", "fish_luck_peak",
+        "trash_luck_current", "trash_luck_peak", "strength_rebirth_count", "trash_man_rebirth_count",
+    ))
+    persistent = _behavior_progression_profiles(source["persistent"])
+    for profile_id, profile in persistent.items():
+        sessions = source["persistent"]["profiles"][profile_id]["sessions"]
+        days, weeks = _source_periods(profile["rows"], sessions)
+        profile.update({"days": days, "weeks": weeks})
+    investment = {}
+    for profile_id, values in source["investment"].items():
+        investment[profile_id] = {
+            **{key: chart_point(value) for key, value in values.items() if key != "barbell_purchases"},
+            "barbell_purchases": [{"barbell_id": row["barbell_id"],
+                                    "wall_time": chart_point(row["wall_time"]),
+                                    "active_time": chart_point(row["active_time"]),
+                                    "price": chart_point(row["price"])} for row in values["barbell_purchases"]],
+        }
+    liquidity = {}
+    for profile_id, rows in source["liquidity"].items():
+        liquidity[profile_id] = [{
+            "active_time_seconds": row["active_time_seconds"],
+            "active_time": chart_point(row["active_time_seconds"]),
+            "wall_time": chart_point(row["time_seconds"]),
+            **{key: chart_point(row.get(key)) for key in
+               ("spendable_money", "unclaimed_money", "collected_money", "generated_money", "material")},
+        } for row in rows]
+    return {"available": bool(core or persistent), "mode": "source_observations",
+            "notes": source["notes"], "actions": source["actions"],
+            "core": {"profiles": core, "peak_basis": "observed_samples"},
+            "persistent": {"profiles": persistent, "event_noun": "成长操作"},
+            "investment": {"scope": "source_receipts", "profiles": investment},
+            "liquidity": {"profiles": liquidity}, "balance": {"profiles": {}}}
+
+
+def _source_periods(rows: list[dict[str, Any]], sessions: list[dict[str, Any]]) -> tuple[list, list]:
+    days = []
+    elapsed = 0
+    for session in sessions:
+        duration = session["end"] - session["start"]
+        day_rows = [{**row, "day_active_time_seconds": row["active_time_seconds"] - elapsed,
+                     "day_active_time": chart_point(row["active_time_seconds"] - elapsed)}
+                    for row in rows if session["start"] <= row["wall_time_seconds"] <= session["end"]]
+        days.append({"day_index": session["start"] // _SECONDS_PER_DAY + 1,
+                     "duration_seconds": chart_point(duration), "event_count": chart_point(len(day_rows)),
+                     "event_noun": "成长操作", "rows": day_rows})
+        elapsed += duration
+    weeks = []
+    for offset in range(0, len(days), 7):
+        week_rows = []
+        duration = 0
+        for day in days[offset:offset + 7]:
+            week_rows.extend({**row,
+                              "week_active_time_seconds": duration + row["day_active_time_seconds"],
+                              "week_active_time": chart_point(duration + row["day_active_time_seconds"])}
+                             for row in day["rows"])
+            duration += int(day["duration_seconds"]["exact_value"])
+        weeks.append({"week_index": offset // 7 + 1, "duration_seconds": chart_point(duration),
+                      "event_count": chart_point(len(week_rows)), "rows": week_rows,
+                      "event_noun": "成长操作"})
+    return days, weeks
 
 
 def _fish_investment(data: ReportData) -> dict[str, Any]:

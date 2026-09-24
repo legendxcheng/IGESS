@@ -9,6 +9,14 @@ async function bootstrapReport() {
   renderPaybackChart(report);
   renderDiagnostics(report);
   renderEvidence(report);
+  if (report.scenario.engine_id === 'fish_source') {
+    ['payback-chart'].forEach(id => {
+      const element = document.getElementById(id);
+      if (element) element.closest('section').hidden = true;
+    });
+    const diagnostics = document.querySelector('[data-diagnostics]');
+    if (diagnostics) diagnostics.closest('section').hidden = true;
+  }
   window.addEventListener('resize', resizeCharts);
 }
 
@@ -39,6 +47,22 @@ function renderOverview(report) {
   const firstUnlock = overview.first_key_unlock;
   const worstPayback = overview.worst_payback;
   const profiles = overview.profiles || [];
+  if (report.scenario.engine_id === 'fish_source') {
+    container.innerHTML = [
+      kpiCard('模拟时长', durationMarkup(overview.duration_seconds, true)),
+      kpiCard('累计在线', durationMarkup(overview.active_duration_seconds)),
+      kpiCard('完整投掷', numericMarkup(overview.throw_count)),
+      kpiCard('鱼雷与杠铃购买', numericMarkup(overview.purchase_count)),
+      kpiCard('两类重生', numericMarkup(overview.prestige_reset_count)),
+      kpiCard('源规则拒绝', numericMarkup(overview.rejection_count)),
+      ...Object.entries(overview.final_resources || {}).flatMap(([id, resources]) =>
+        ['money', 'unclaimed_money', 'material', 'trash_realm'].map(key =>
+          kpiCard(`${profileLabel(id)} · ${resourceLabel(key)}`, numericMarkup(resources[key]))
+        )
+      ),
+    ].join('');
+    return;
+  }
   container.innerHTML = [
     kpiCard('模拟时长', numericMarkup(overview.duration_seconds, '秒')),
     kpiCard(
@@ -93,6 +117,17 @@ function numericMarkup(point, suffix = '') {
     `${escapeHtml(display)}${escapeHtml(suffix)}</span>${exactDetails}`;
 }
 
+function durationMarkup(point, calendar = false) {
+  if (!point || !Number.isFinite(point.chart_value)) return numericMarkup(point);
+  const seconds = point.chart_value;
+  const days = Math.floor(seconds / 86400);
+  const remainder = seconds % 86400;
+  const label = calendar && days > 0
+    ? `${days}天${remainder ? ' ' + formatDurationCompact(remainder) : ''}`
+    : formatDurationCompact(seconds);
+  return `<span class="kpi-value" title="${escapeHtml(point.exact_value)}秒">${escapeHtml(label)}</span>`;
+}
+
 function identityMarkup(row) {
   const identity = [
     profileLabel(row.profile_id || ''),
@@ -127,16 +162,84 @@ function finalResourcesCard(finalResources) {
 function renderFishProgression(report) {
   const fish = report.fish_progression || {};
   if (!fish.available) return;
-  renderCoreProgression(fish.core || {}, fish.balance || {});
+  const source = fish.mode === 'source_observations';
+  renderCoreProgression(fish.core || {}, fish.balance || {}, source);
   renderPersistentProgression(fish.persistent || {});
   renderFishInvestment(fish.investment || {});
+  if (source) renderSourceFish(fish);
+}
+
+function renderSourceFish(fish) {
+  const notes = fish.notes || {};
+  const core = document.querySelector('[data-fish-core-section]');
+  if (core) {
+    core.querySelector('h2').textContent = '力量与幸运值';
+    core.querySelector('.section-note').textContent = notes.core || '';
+  }
+  ['fish-acquisition-rate-chart', 'fish-cumulative-output-chart'].forEach(id => {
+    const element = document.getElementById(id);
+    if (element) element.hidden = true;
+  });
+  const strength = document.getElementById('core-strength-chart');
+  if (strength) strength.hidden = false;
+  renderCoreStrengthChart((fish.core || {}).profiles || {}, true);
+  const investment = document.querySelector('[data-fish-investment-section]');
+  if (investment) investment.querySelector('.section-note').textContent = notes.investment || '';
+  const persistent = document.querySelector('[data-fish-persistent-section]');
+  if (persistent) {
+    persistent.querySelector('h2').textContent = '系统成长与突破资助时间点';
+    persistent.querySelector('.section-note').textContent = notes.persistent || '';
+  }
+  const liquidity = document.querySelector('[data-source-liquidity-section]');
+  if (liquidity) {
+    liquidity.hidden = false;
+    liquidity.querySelector('.section-note').textContent = notes.liquidity || '';
+    const profiles = (fish.liquidity || {}).profiles || {};
+    const render = (id, title, fields) => {
+      const series = Object.entries(profiles).flatMap(([profileId, rows]) => fields.map(field => ({
+        name: `${profileLabel(profileId)} · ${resourceLabel(field)}`,
+        type: 'line', showSymbol: true, connectNulls: false,
+        data: fishEconomyLineData(rows, field, { positiveOnly: true }),
+      })));
+      replaceChart(id, fishBalanceLineOption(title, series, '金额 · 对数轴', { logarithmic: true }));
+    };
+    render('source-wallet-chart', '可花费与待领取金额', ['spendable_money', 'unclaimed_money']);
+    render('source-collection-chart', '已领取与可核算鱼厅收入', ['collected_money', 'generated_money']);
+  }
+  const actions = document.querySelector('[data-source-actions-section]');
+  if (actions) {
+    actions.hidden = false;
+    const routine = new Set(['prepare_throw', 'begin_throw_flight', 'select_throw_landing', 'finalize_throw_landing']);
+    const rows = Object.entries(fish.actions || {}).flatMap(([id, profile]) => [
+      ...Object.entries(profile.accepted_commands || {}).filter(([kind]) => !routine.has(kind))
+        .map(([kind, count]) => [profileLabel(id), eventKindLabel(kind), count]),
+      ...Object.entries(profile.rejected_commands || {}).map(([code, count]) => [profileLabel(id), `拒绝：${code}`, count]),
+    ]);
+    actions.querySelector('[data-source-actions]').innerHTML = '<table class="data-table"><thead><tr><th>玩家</th><th>操作</th><th>次数</th></tr></thead><tbody>' +
+      rows.map(row => '<tr>' + row.map(value => `<td>${escapeHtml(value)}</td>`).join('') + '</tr>').join('') + '</tbody></table>';
+  }
 }
 
 function renderFishInvestment(investment) {
-  if (investment.scope !== 'ordinary_fish_only') return;
+  if (!['ordinary_fish_only', 'source_receipts'].includes(investment.scope)) return;
   const section = document.querySelector('[data-fish-investment-section]');
   if (!section) return;
   section.hidden = false;
+  if (investment.scope === 'source_receipts') {
+    section.querySelector('[data-fish-investment-kpis]').innerHTML = Object.entries(investment.profiles || {}).map(([id, summary]) => [
+      kpiCard(profileLabel(id) + ' · 鱼升级次数', numericMarkup(summary.upgrade_count)),
+      kpiCard(profileLabel(id) + ' · 升级金币支出', numericMarkup(summary.coin_spent)),
+      kpiCard(profileLabel(id) + ' · 卖出鱼数量', numericMarkup(summary.fish_sold_count)),
+      kpiCard(profileLabel(id) + ' · 卖鱼材料收入', numericMarkup(summary.sale_material)),
+    ].join('')).join('');
+    section.querySelector('[data-fish-investment-purchases]').innerHTML = Object.entries(investment.profiles || {}).map(([id, summary]) =>
+      '<h3>' + escapeHtml(profileLabel(id)) + ' · 杠铃购买时点</h3><ul>' +
+      (summary.barbell_purchases || []).map(purchase => '<li>杠铃 ' + escapeHtml(purchase.barbell_id) +
+        '：第 ' + (Math.floor(purchase.wall_time.chart_value / 86400) + 1) + ' 天，累计在线 ' +
+        formatDurationClock(purchase.active_time.chart_value) + '，金币 ' + numericInline(purchase.price) + '</li>').join('') + '</ul>'
+    ).join('');
+    return;
+  }
   section.querySelector('[data-fish-investment-kpis]').innerHTML = Object.entries(investment.profiles || {}).map(([id, summary]) => [
     kpiCard(profileLabel(id) + ' · 升级金币支出', numericMarkup(summary.coin_spent)),
     kpiCard(profileLabel(id) + ' · 卖出鱼数量', numericMarkup(summary.fish_sold_count)),
@@ -152,7 +255,7 @@ function renderFishInvestment(investment) {
   ).join('');
 }
 
-function renderCoreProgression(core, balance = {}) {
+function renderCoreProgression(core, balance = {}, source = false) {
   const section = document.querySelector('[data-fish-core-section]');
   const profiles = core.profiles || {};
   const entries = Object.entries(profiles);
@@ -166,20 +269,20 @@ function renderCoreProgression(core, balance = {}) {
         kpiCard(
           `${profileLabel(profileId)} · 摸鱼幸运值`,
           numericMarkup(summary.fish_luck_final),
-          `<p class="kpi-detail">峰值 ${numericInline(summary.fish_luck_peak)}</p>`
+          `<p class="kpi-detail">${source ? '采样峰值' : '峰值'} ${numericInline(summary.fish_luck_peak)}</p>`
         ),
         kpiCard(
           `${profileLabel(profileId)} · 垃圾幸运值`,
           numericMarkup(summary.trash_luck_final),
-          `<p class="kpi-detail">峰值 ${numericInline(summary.trash_luck_peak)}</p>`
+          `<p class="kpi-detail">${source ? '采样峰值' : '峰值'} ${numericInline(summary.trash_luck_peak)}</p>`
         ),
         kpiCard(
           `${profileLabel(profileId)} · 力量`,
           numericMarkup(summary.strength_final),
-          `<p class="kpi-detail">峰值 ${numericInline(summary.strength_peak)}</p>`
+          `<p class="kpi-detail">${source ? '采样峰值' : '峰值'} ${numericInline(summary.strength_peak)}</p>`
         ),
         kpiCard(
-          `${profileLabel(profileId)} · 幸运值最长停滞`,
+          `${profileLabel(profileId)} · 幸运值最长停滞${source ? '（未记录）' : ''}`,
           `<div class="kpi-pair"><div><span>摸鱼</span>${numericMarkup(summary.longest_fish_luck_stagnation_seconds, '秒')}</div>` +
             `<div><span>垃圾</span>${numericMarkup(summary.longest_trash_luck_stagnation_seconds, '秒')}</div></div>`
         ),
@@ -188,7 +291,7 @@ function renderCoreProgression(core, balance = {}) {
   }
   renderFishAcquisitionRateChart(balance.profiles || {});
   renderFishCumulativeOutputChart(balance.profiles || {});
-  renderLuckProgressionChart(profiles);
+  renderLuckProgressionChart(profiles, source);
 }
 
 function renderFishAcquisitionRateChart(profiles) {
@@ -301,13 +404,13 @@ function fishBalanceLineOption(title, series, yAxisName, { logarithmic = false }
   };
 }
 
-function renderCoreStrengthChart(profiles) {
+function renderCoreStrengthChart(profiles, sampled = false) {
   const series = [];
   Object.entries(profiles).forEach(([profileId, profile]) => {
     const rows = profile.rows || [];
     [
       ['当前值', 'strength_current', 'solid'],
-      ['历史峰值', 'strength_peak', 'dashed'],
+      [sampled ? '采样峰值' : '历史峰值', 'strength_peak', 'dashed'],
     ].forEach(([label, field, lineType]) => {
       series.push({
         name: `${profileLabel(profileId)} · ${label}`,
@@ -319,21 +422,21 @@ function renderCoreStrengthChart(profiles) {
     });
   });
   replaceChart('core-strength-chart', progressionLineOption(
-    '力量当前值与历史峰值',
+    sampled ? '力量当前值与采样峰值' : '力量当前值与历史峰值',
     series,
     '力量'
   ));
 }
 
-function renderLuckProgressionChart(profiles) {
+function renderLuckProgressionChart(profiles, sampled = false) {
   const series = [];
   Object.entries(profiles).forEach(([profileId, profile]) => {
     const rows = profile.rows || [];
     [
       ['摸鱼幸运值（当前）', 'fish_luck_current', 'solid'],
-      ['摸鱼幸运值（峰值）', 'fish_luck_peak', 'dashed'],
+      [sampled ? '摸鱼幸运值（采样峰值）' : '摸鱼幸运值（峰值）', 'fish_luck_peak', 'dashed'],
       ['垃圾幸运值（当前）', 'trash_luck_current', 'solid'],
-      ['垃圾幸运值（峰值）', 'trash_luck_peak', 'dashed'],
+      [sampled ? '垃圾幸运值（采样峰值）' : '垃圾幸运值（峰值）', 'trash_luck_peak', 'dashed'],
     ].forEach(([label, field, lineType]) => {
       series.push({
         name: `${profileLabel(profileId)} · ${label}`,
@@ -353,11 +456,10 @@ function renderLuckProgressionChart(profiles) {
 
 function progressionLineData(rows, field) {
   return rows
-    .filter(row => Number.isFinite(row[field] && row[field].chart_value))
     .map(row => ({
       value: [
         Number(row.active_time_seconds || 0),
-        row[field].chart_value,
+        row[field] && Number.isFinite(row[field].chart_value) ? row[field].chart_value : null,
       ],
       row,
       field,
@@ -401,23 +503,34 @@ function renderPersistentProgression(persistent) {
   if (target) {
     target.innerHTML = entries.map(([profileId, profile]) => {
       const summary = profile.summary || {};
+      if (persistent.event_noun) {
+        return [
+          kpiCard(`${profileLabel(profileId)} · 成长操作次数`, numericMarkup(summary.total_progression_count),
+            `<p class="kpi-detail">每在线小时 ${numericInline(summary.events_per_active_hour)} 次</p>`),
+          kpiCard('首次成长操作等待', durationMarkup(summary.first_progression_wait_seconds)),
+          kpiCard('最长操作间隔', durationMarkup(summary.max_interval_seconds)),
+          kpiCard('末次成长操作后等待', durationMarkup(summary.tail_gap_seconds)),
+          kpiCard('无成长操作在线时段', numericMarkup(summary.complete_online_sessions_without_progression),
+            `<p class="kpi-detail">共 ${numericInline(summary.complete_online_sessions)} 个完整在线时段</p>`),
+        ].join('');
+      }
       return [
         kpiCard(
-          `${profileLabel(profileId)} · 永久成长次数`,
+          `${profileLabel(profileId)} · ${persistent.event_noun ? '成长操作次数' : '永久成长次数'}`,
           numericMarkup(summary.total_progression_count),
           `<p class="kpi-detail">每在线小时 ${numericInline(summary.events_per_active_hour)} 次</p>`
         ),
         kpiCard(
-          `${profileLabel(profileId)} · 最长成长空窗`,
+          `${profileLabel(profileId)} · ${persistent.event_noun ? '最长操作间隔' : '最长成长空窗'}`,
           `<div class="kpi-pair"><div><span>全部成长</span>${numericMarkup(summary.max_interval_seconds, '秒')}</div>` +
             `<div><span>系统成长</span>${numericMarkup(summary.system_progression_max_interval_seconds, '秒')}</div></div>`
         ),
         kpiCard(
-          `${profileLabel(profileId)} · 尾部成长空窗`,
+          `${profileLabel(profileId)} · ${persistent.event_noun ? '末次成长操作后等待' : '尾部成长空窗'}`,
           numericMarkup(summary.tail_gap_seconds, '秒')
         ),
         kpiCard(
-          `${profileLabel(profileId)} · 无成长在线时段`,
+          `${profileLabel(profileId)} · ${persistent.event_noun ? '无成长操作在线时段' : '无成长在线时段'}`,
           `<div class="kpi-pair"><div><span>全部成长</span>${numericMarkup(summary.complete_online_sessions_without_progression)}</div>` +
             `<div><span>系统成长</span>${numericMarkup(summary.complete_online_sessions_without_system_progression)}</div></div>`,
           `<p class="kpi-detail">共 ${numericInline(summary.complete_online_sessions)} 个完整在线时段</p>`
@@ -450,7 +563,7 @@ function renderWeeklyProgressionCharts(profiles) {
       : (week.rows || []).length;
     return [
       '<article class="weekly-chart-card">',
-      `<h3>第 ${escapeHtml(week.week_index)} 周 · ${escapeHtml(profileLabel(profileId))} · ${escapeHtml(count)} 次有效成长</h3>`,
+      `<h3>第 ${escapeHtml(week.week_index)} 周 · ${escapeHtml(profileLabel(profileId))} · ${escapeHtml(count)} 次${escapeHtml(week.event_noun || '有效成长')}</h3>`,
       progressionCategoryCountsMarkup(week.rows || []),
       `<div id="weekly-progression-chart-${index}" class="chart weekly-chart"></div>`,
       '</article>',
@@ -523,7 +636,7 @@ function renderDailyProgressionCharts(profiles) {
       : (day.rows || []).length;
     return [
       '<article class="daily-chart-card">',
-      `<h3>第 ${escapeHtml(day.day_index)} 天 · ${escapeHtml(profileLabel(profileId))} · ${escapeHtml(count)} 次有效成长</h3>`,
+      `<h3>第 ${escapeHtml(day.day_index)} 天 · ${escapeHtml(profileLabel(profileId))} · ${escapeHtml(count)} 次${escapeHtml(day.event_noun || '有效成长')}</h3>`,
       progressionCategoryCountsMarkup(day.rows || []),
       `<div id="daily-progression-chart-${index}" class="chart daily-chart"></div>`,
       '</article>',
@@ -584,6 +697,7 @@ function progressionCategoryLabel(category) {
     strength_rebirth: '力量转生',
     torpedo: '鱼雷 / 垃圾幸运值',
     trash_man_realm: '垃圾佬境界',
+    breakthrough_funding: '突破资助（非完成）',
     trash_man_rebirth: '垃圾佬转生',
     permanent_unlock: '永久解锁',
     other: '其他',
@@ -624,6 +738,7 @@ function progressionCategoryRank(category) {
     'strength_rebirth',
     'torpedo',
     'trash_man_realm',
+    'breakthrough_funding',
     'trash_man_rebirth',
     'permanent_unlock',
     'other',
@@ -640,6 +755,7 @@ function progressionCategoryColor(category) {
     strength_rebirth: '#ee6666',
     torpedo: '#73c0de',
     trash_man_realm: '#3ba272',
+    breakthrough_funding: '#8b5cf6',
     trash_man_rebirth: '#fc8452',
     permanent_unlock: '#9a60b4',
     other: '#6b7280',
@@ -751,7 +867,7 @@ function renderProgressionEventsTable(profiles) {
     '</tr>',
   ].join('')).join('');
   const truncated = rows.length > 500
-    ? `<p class="section-note">共 ${escapeHtml(rows.length)} 条事件，当前显示前 500 条；完整数据请查看 behavior_progression.csv。</p>`
+    ? `<p class="section-note">共 ${escapeHtml(rows.length)} 条事件，当前显示前 500 条；完整数据请查看原始事件文件。</p>`
     : '';
   target.innerHTML = [
     truncated,
@@ -959,6 +1075,15 @@ function diagnosticHtmlBlock(title, safeRows) {
 function renderEvidence(report) {
   const target = document.querySelector('[data-evidence]');
   if (!target) return;
+  if (report.scenario.engine_id === 'fish_source') {
+    const labels = {source_progression: '源状态采样', source_behavior: '操作计数',
+      events: '完整命令回执', manifest: '运行指纹', timeline: '资源时间线'};
+    target.innerHTML = '<p class="section-note">本页直接汇总已保存的源状态与命令回执。回本与完整毛收入未记录，不能据此判断为零。</p>' +
+      '<p>模型摘要：<code>' + escapeHtml(report.scenario.model_digest || '') + '</code></p><ul>' +
+      Object.entries(labels).filter(([key]) => report.downloads && report.downloads[key])
+        .map(([key, label]) => `<li><a href="${escapeHtml(report.downloads[key])}">${escapeHtml(label)}</a></li>`).join('') + '</ul>';
+    return;
+  }
   const evidence = report.evidence || {};
   const traces = evidence.traces || [];
   const refs = evidence.source_refs || [];
@@ -1020,6 +1145,16 @@ function resourceLabel(resourceId) {
     money: '金钱',
     material: '材料',
     strength: '力量',
+    spendable_money: '钱包可花费',
+    unclaimed_money: '鱼厅待领取',
+    collected_money: '累计已领取',
+    generated_money: '已领取＋当前待领',
+    fish_luck: '摸鱼幸运值',
+    trash_luck: '垃圾幸运值',
+    trash_realm: '垃圾佬境界',
+    total_throws: '累计投掷',
+    strength_rebirth_count: '力量重生次数',
+    trash_man_rebirth_count: '垃圾佬重生次数',
     shell: '贝壳',
     shells: '贝壳',
     prestige_point: '转生点',
@@ -1092,6 +1227,27 @@ function eventKindLabel(kind) {
     trash_man_reborn: '垃圾佬转生',
     trash_man_breakthrough_funded: '垃圾佬突破筹资完成',
     trash_man_realm_broken_through: '垃圾佬境界突破',
+    prepare_throw: '准备投掷',
+    begin_throw_flight: '开始飞行',
+    select_throw_landing: '选择落点',
+    finalize_throw_landing: '确定落点',
+    complete_throw: '完整投掷',
+    deploy_fish: '摆放鱼',
+    collect_slot: '领取鱼厅收入',
+    upgrade_fish: '鱼升级',
+    sell_fish: '卖鱼',
+    purchase_torpedo: '购买鱼雷',
+    synthesize_barbell: '合成杠铃',
+    upgrade_hall: '鱼厅扩容',
+    rebirth_strength: '力量重生',
+    rebirth_trash_man: '垃圾佬重生',
+    start_breakthrough: '资助突破',
+    start_exercise: '开始锻炼',
+    stop_exercise: '停止锻炼',
+    go_online: '上线',
+    go_offline: '下线',
+    claim_offline_reward: '领取离线奖励',
+    source_rejected: '源规则拒绝',
   };
   return labels[kind] || kind || '';
 }
@@ -1106,6 +1262,11 @@ function metricLabel(metricId) {
     trash_luck: '垃圾幸运值',
     trash_man_realm_id: '垃圾佬境界',
     unlock_state: '解锁状态',
+    owned_torpedo_count: '已拥有鱼雷数量',
+    owned_barbell_count: '该杠铃数量',
+    strength_rebirth_count: '力量重生次数',
+    trash_man_rebirth_count: '垃圾佬重生次数',
+    target_realm_id: '资助的目标境界',
   };
   return labels[metricId] || metricId || '';
 }
@@ -1124,7 +1285,7 @@ function numericText(point) {
 
 function numericTooltip(point, suffix = '') {
   if (!point || typeof point !== 'object') return '';
-  const display = numericText(point);
+  const display = numericText(point) || '—';
   const exact = point.exact_value == null ? '' : String(point.exact_value);
   return `<span title="精确值：${escapeHtml(exact)}">${escapeHtml(display)}${escapeHtml(suffix)}</span>`;
 }

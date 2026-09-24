@@ -83,6 +83,9 @@ def test_formal_source_smoke_uses_lua_receipts_and_writes_report(tmp_path: Path)
     assert "source_progression" in report_data["artifacts"]
     assert "source_behavior" in report_data["artifacts"]
     assert "luck_progression" not in report_data["artifacts"]
+    assert report_data["fish_progression"]["available"] is True
+    assert report_data["fish_progression"]["core"]["profiles"]["default"]["rows"]
+    assert report_data["overview"]["throw_count"]["exact_value"] == "1"
 
 
 def test_formal_source_checkpoint_resumes_and_data_change_invalidates_it(tmp_path: Path) -> None:
