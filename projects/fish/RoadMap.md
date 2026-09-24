@@ -3,11 +3,12 @@
 更新时间：2026-09-24
 项目范围：`projects/fish` 与 Fish 领域模拟代码
 
-## 2026-09-24 同源 Lua 数值执行器（实施中）
+## 2026-09-24 同源 Lua 数值执行器（可选后端已验证）
 
-- 源项目已建立独立 Lua 会话宿主，使用原鱼厅、生产和杠铃服务执行摆鱼、槽位产出/领取、合成/装备和锻炼；本地跨进程接口可读取选定导表 JSON 并保持运行内存快照。
-- IGESS 已建立源运行进程客户端；目前尚未接入正式 `model simulate`，投掷、离线、突破/重生、checkpoint、完整行为策略和正式报告仍待实施。现有正式 Fish 基线继续使用 Python 后端。
-- 规格见 [同源执行器规格](../../.scratch/fish-source-runtime/spec.md)。源码真实性与范围判断见 [研究报告](reports/source-runtime-refactor-research.md)。
+- 源项目的独立 Lua 会话宿主复用原鱼厅、生产、投掷、背包、鱼雷、杠铃、离线奖励、突破和重生服务；支持选定 JSON 导表、虚拟时间、确定性种子及跨进程活动中 replay checkpoint。游戏业务状态只由 Lua 修改。
+- IGESS 已接入独立 `fish_source` 后端和正式 `model simulate`/`RunRegistry`/Web 报告。可运行项目为 [`projects/fish_source`](../fish_source/README.md)，旧 `projects/fish` 继续保留 Python 后端供历史诊断；两个后端不共用数值比较基线。
+- 同源后端输出钱包、已领取、待领取、累计可核算鱼厅产出、力量、双 Luck、永久进展与命令回执。源游戏力量为零时双 Luck 明确缺失。修正“先资助突破、再由源服务计时训练”的策略后，同一最终指纹的 1/7/30 天正式运行成功，早期错误策略的成长产物不作为新基线。当前 1 天同源快速模式适配器约 20 秒，明显慢于历史 Python 正式运行约 1.6 秒，且策略语义不同，尚不宣布整体提速或切换旧项目默认后端。运行编号、指纹、测试与限制见 [实施验证](../../.scratch/fish-source-runtime/verification.md)。
+- 下文未另行注明的 `FishEconomySimulator`、Python 存档与加权策略描述均是**历史 Python 后端现状**，不能作为同源 Lua 后端的实现说明。新后端的路径、画像和限制见上面的 README；规格见 [同源执行器规格](../../.scratch/fish-source-runtime/spec.md)。
 
 当前总状态：**普通鱼金币升级与卖鱼材料收入均已接入正式 Fish 引擎；卖鱼版本 smoke、1d、7d、30d 正式基线成功。培养策略保留，两个画像按已确认周期清理非上阵、非品质前 X 的普通鱼。神兽仍不支持。**
 

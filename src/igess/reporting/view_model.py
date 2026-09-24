@@ -9,7 +9,6 @@ from igess.human_numbers import human_number
 from .kpis import build_overview
 from .loader import ReportData
 
-
 _SECONDS_PER_DAY = 24 * 60 * 60
 _DEFAULT_FISH_RATE_SAMPLE_SECONDS = 5 * 60
 
@@ -39,20 +38,29 @@ def build_report_view_model(data: ReportData) -> dict[str, Any]:
         "diagnostics": _diagnostics(data),
         "fish_progression": _fish_progression(data),
         "evidence": _evidence(data),
-        "artifacts": {
-            "timeline": (data.run_dir / "timeline.json").as_posix(),
-            "events": (data.run_dir / "events.json").as_posix(),
-            "analysis": (data.run_dir / "analysis.json").as_posix(),
-            "payback": (data.run_dir / "payback.csv").as_posix(),
-            "manifest": (data.run_dir / "run_manifest.json").as_posix(),
-            "luck_progression": (
-                data.run_dir / "luck_progression.json"
-            ).as_posix(),
-            "behavior_progression": (
-                data.run_dir / "behavior_progression.json"
-            ).as_posix(),
-        },
+        "artifacts": _artifacts(data),
     }
+
+
+def _artifacts(data: ReportData) -> dict[str, str]:
+    names = {
+        "timeline": "timeline.json",
+        "events": "events.json",
+        "analysis": "analysis.json",
+        "payback": "payback.csv",
+        "manifest": "run_manifest.json",
+    }
+    if data.manifest.get("engine_id") == "fish_source":
+        names.update({
+            "source_progression": "source_progression.json",
+            "source_behavior": "source_behavior.json",
+        })
+    else:
+        names.update({
+            "luck_progression": "luck_progression.json",
+            "behavior_progression": "behavior_progression.json",
+        })
+    return {key: (data.run_dir / name).as_posix() for key, name in names.items()}
 
 
 def chart_value(value: Any) -> float | None:
@@ -134,7 +142,7 @@ def _resource_series(timeline: list[dict[str, Any]], resource_ids: list[str]) ->
     for row in timeline:
         resources = dict(row.get("resources", {}))
         for resource_id in resource_ids:
-            point = chart_point(resources.get(resource_id, 0))
+            point = chart_point(resources.get(resource_id))
             rows.append(
                 {
                     "time_seconds": row.get("time_seconds", 0),

@@ -12,7 +12,10 @@ class ConfigError(ValueError):
 
 class ConfigLinter:
     ALLOWED_BACKENDS = {"bignum_log"}
-    ALLOWED_POLICY_TYPES = {"cheap_unlock_first", "fastest_payback", "new_content_bias"}
+    ALLOWED_POLICY_TYPES = {
+        "cheap_unlock_first", "fastest_payback", "new_content_bias",
+        "source_priority_v1",
+    }
     ALLOWED_PRESTIGE_POLICIES = {"conservative", "efficient_reset", "milestone_based"}
     ALLOWED_RNG_ALGORITHMS = {"rarity_score"}
     FORMULA_CONTEXT_ARGS = {

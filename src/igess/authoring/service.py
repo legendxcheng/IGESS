@@ -933,6 +933,7 @@ class AuthoringService:
                     source_digest=source_digest,
                     base_dir=project.root,
                     overrides=overrides,
+                    selected_data_root=exported.export_root,
                 )
                 if profile_id is not None:
                     prepared = replace(

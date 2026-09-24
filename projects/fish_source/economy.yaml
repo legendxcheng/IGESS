@@ -1,0 +1,254 @@
+model:
+  id: fish
+  engine_id: fish_source
+  tick_seconds: 1
+  number_backend: bignum_log
+  random_seed: 20260626
+engine:
+  source_runtime:
+    project_root: ../../../fish-oasis
+    data_root: ../../../fish-oasis/igess_export/json
+    lua_executable: lua55
+    in_fishing_area: true
+    landing_distance_cm: 100
+    collect_interval_seconds: 300
+    idle_seconds: 30
+    advance_mode: equivalent_batch_v1
+formulas:
+  exponential_cost:
+    args:
+    - base_cost
+    - growth
+    - owned
+    expr: base_cost * pow(growth, owned)
+  generator_output:
+    args:
+    - base_output
+    - owned
+    - multiplier
+    expr: base_output * owned * multiplier
+  prestige_gain:
+    args:
+    - progress
+    - divisor
+    - exponent
+    expr: floor(pow(progress / divisor, exponent))
+generator_types:
+  building:
+    cost_formula: exponential_cost
+    production_formula: generator_output
+source_types:
+  active:
+    description: Active player actions
+  barbell_strength:
+    description: Fish barbell-training strength reward
+  fish_hall_money:
+    description: Fish hall money reward
+  generator:
+    description: Automatic generator output
+  offline:
+    description: Offline reward
+  milestone:
+    description: Milestone reward
+  prestige:
+    description: Prestige reward
+  trash_material:
+    description: Fish trash-processing material reward
+modifier_pipeline:
+  order:
+  - base
+  - flat
+  - add_pct
+  - mult
+  - exp
+modifier_types:
+  flat:
+    stage: flat
+  add_pct:
+    stage: add_pct
+  multiply:
+    stage: mult
+  exponent:
+    stage: exp
+behavior_policies:
+  cheap_unlock_first:
+    type: cheap_unlock_first
+  source_priority_v1:
+    type: source_priority_v1
+session_patterns:
+  authoring_default:
+    offline_every_seconds: 60
+    offline_duration_seconds: 0
+    daily_online_seconds: 7200
+player_profiles:
+  default:
+    source_efficiency:
+      active: '1'
+      barbell_strength: '1'
+      fish_hall_money: '1'
+      generator: '1'
+      offline: '1'
+      milestone: '1'
+      prestige: '1'
+      trash_material: '1'
+    behavior_policy: source_priority_v1
+    session_pattern: authoring_default
+    prestige_policy: conservative
+    activity_weights:
+      starter_fish_hall: '1'
+    behavior_weights:
+      sell_fish: '1'
+      manual_throw: '1'
+      upgrade_fish: '1'
+      upgrade_fish_hall: '100'
+      purchase_torpedo: 1e100
+      synthesize_barbell: '100'
+      exercise_barbell: '1'
+      strength_rebirth: 1e100
+      trash_man_rebirth: 1e100
+      fund_trash_man_breakthrough: 1e100
+    behavior_durations:
+      sell_fish:
+        type: fixed
+        seconds: 3
+      manual_throw:
+        type: fixed
+        seconds: 30
+      upgrade_fish:
+        type: fixed
+        seconds: 3
+      upgrade_fish_hall:
+        type: fixed
+        seconds: 10
+      purchase_torpedo:
+        type: fixed
+        seconds: 10
+      synthesize_barbell:
+        type: fixed
+        seconds: 10
+      exercise_barbell:
+        type: fixed
+        seconds: 60
+      strength_rebirth:
+        type: fixed
+        seconds: 5
+      trash_man_rebirth:
+        type: fixed
+        seconds: 10
+      fund_trash_man_breakthrough:
+        type: fixed
+        seconds: 10
+    luck: '1'
+  paid_20pct:
+    source_efficiency:
+      active: '1'
+      barbell_strength: '1.2'
+      fish_hall_money: '1.2'
+      generator: '1'
+      offline: '1'
+      milestone: '1'
+      prestige: '1'
+      trash_material: '1.2'
+    behavior_policy: source_priority_v1
+    session_pattern: authoring_default
+    prestige_policy: conservative
+    activity_weights:
+      starter_fish_hall: '1'
+    behavior_weights:
+      sell_fish: '1'
+      manual_throw: '1'
+      upgrade_fish: '1'
+      upgrade_fish_hall: '100'
+      purchase_torpedo: 1e100
+      synthesize_barbell: '100'
+      exercise_barbell: '1'
+      strength_rebirth: 1e100
+      trash_man_rebirth: 1e100
+      fund_trash_man_breakthrough: 1e100
+    behavior_durations:
+      sell_fish:
+        type: fixed
+        seconds: 3
+      manual_throw:
+        type: fixed
+        seconds: 30
+      upgrade_fish:
+        type: fixed
+        seconds: 3
+      upgrade_fish_hall:
+        type: fixed
+        seconds: 10
+      purchase_torpedo:
+        type: fixed
+        seconds: 10
+      synthesize_barbell:
+        type: fixed
+        seconds: 10
+      exercise_barbell:
+        type: fixed
+        seconds: 60
+      strength_rebirth:
+        type: fixed
+        seconds: 5
+      trash_man_rebirth:
+        type: fixed
+        seconds: 10
+      fund_trash_man_breakthrough:
+        type: fixed
+        seconds: 10
+    luck: '1'
+scenarios:
+  smoke:
+    duration_hours: '0.002777777777777778'
+    time_mode: tick
+    profiles:
+    - default
+    start_state: new_player
+    record_interval_seconds: 1
+    outputs:
+    - resource_curve
+    - purchase_timeline
+    - unlock_timeline
+    - prestige_timeline
+    - bottleneck_report
+  day_1_growth:
+    duration_hours: '24'
+    time_mode: tick
+    profiles:
+    - default
+    start_state: new_player
+    record_interval_seconds: 3600
+    outputs:
+    - resource_curve
+    - purchase_timeline
+    - unlock_timeline
+    - prestige_timeline
+    - bottleneck_report
+  week_1_growth:
+    duration_hours: '168'
+    time_mode: tick
+    profiles:
+    - default
+    start_state: new_player
+    record_interval_seconds: 86400
+    outputs:
+    - resource_curve
+    - purchase_timeline
+    - unlock_timeline
+    - prestige_timeline
+    - bottleneck_report
+    - compact_event_details
+  month_1_growth:
+    duration_hours: '720'
+    time_mode: tick
+    profiles:
+    - default
+    start_state: new_player
+    record_interval_seconds: 86400
+    outputs:
+    - resource_curve
+    - purchase_timeline
+    - unlock_timeline
+    - prestige_timeline
+    - bottleneck_report
+    - compact_event_details

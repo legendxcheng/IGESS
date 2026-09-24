@@ -167,4 +167,4 @@ IGESS 启动该执行器，决定玩家何时上线、选择什么操作、何�
 - [ADR-0001](../../docs/adr/0001-distribute-execution-toolkit-from-separate-repository.md)、[ADR-0002](../../docs/adr/0002-distribute-igess-without-python-source-files.md)：离线、源码隔离、执行工具包与发布边界。
 - [源项目](E:/fish-oasis/proj)、[现有服务测试](E:/fish-oasis/tests)。
 
-本次仅发布规格到本地 Markdown issue tracker，未实施功能或更新任何正式运行基线。
+实施状态（2026-09-24）：源会话与 IGESS 可选后端已接入，同一最终指纹的 1 天、7 天和 30 天正式场景均已成功，产物、Web 报告和最终 checkpoint 齐全。默认后端迁移、周期性中途 checkpoint 和整体性能优化尚未完成，实际边界及证据见 [实施验证](verification.md) 与 [实施票据](issues/04-long-run-migration-and-performance.md)。

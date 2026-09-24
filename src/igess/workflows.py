@@ -194,6 +194,7 @@ class WorkflowService:
                 ),
                 base_dir=resolved_config.parent,
                 overrides=overrides,
+                selected_data_root=resolved_tables,
             )
         except Exception as exc:  # noqa: BLE001 - failure is persisted for dashboard history.
             failure = RunFailure(phase, exc)

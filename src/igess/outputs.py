@@ -9,6 +9,7 @@ from typing import Any
 from .analyzer import Analyzer
 from .fish_data import FishDataSnapshot
 from .fish_progression_reports import write_fish_progression_artifacts
+from .fish_source_reports import write_source_progression_artifacts
 from .schema import EconomyModel, SimulationResult
 
 
@@ -49,6 +50,8 @@ class OutputWriter:
                 domain_model,
                 output_dir,
             )
+        elif model is not None and model.config.engine_id == "fish_source":
+            domain_artifacts = write_source_progression_artifacts(result, output_dir)
         cls.write_manifest(
             result,
             model,

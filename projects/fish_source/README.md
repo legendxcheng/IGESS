@@ -1,0 +1,18 @@
+# Fish 同源 Lua 模拟项目
+
+此项目通过 IGESS 正式入口运行 Fish 源项目的 Lua 业务服务，无需 DS。与历史 `projects/fish` Python 后端分开登记运行和基线。
+
+```powershell
+uv run igess model simulate --project projects/fish_source --scenario smoke
+uv run igess model simulate --project projects/fish_source --scenario day_1_growth
+```
+
+`economy.yaml` 的 `engine.source_runtime.project_root` 默认指向同盘兄弟目录 `E:\fish-oasis`，`data_root` 指向该源项目的 `igess_export/json`。运行需要本机 `lua55`。修改目录布局时更新这两个路径。每次运行会冻结 Lua 模块和所选 JSON 导表，记录二者内容摘要、IGESS 适配器摘要、Lua 版本、策略、种子和模型摘要。标准 timeline、events、analysis、Web 报告、同源成长/行为产物和 checkpoint 位于本项目 `runs/`。
+
+本项目的 `Datas/` 与 `luban_exports/` 仅满足 IGESS 当前 authoring 项目的通用配置结构；Fish 数值实际来自 `engine.source_runtime.data_root`。编辑这些通用工作簿不会改变同源 Fish 数值。要测试新的 Fish 数值，应更新所选 Fish JSON 导表，并在运行产物中核对 `selected_export_sha256`。不应把两个后端的运行当成单因素数值改动比较。
+
+`source_priority_v1` 使用画像权重在当前可执行操作中选择玩家意图，并按配置的操作耗时、每日在线窗口、领取周期和显式落点假设推进。价格、合法性、扣款、奖励、重生和生产由源 Lua 决定；源规则拒绝会记入事件。力量为零等无法计算当前幸运值的状态在成长产物中记为缺失，不填零。付费倍率等没有源服务支撑的假设画像会在运行前拒绝。
+
+该画像是新策略，不沿用旧 Python 后端的选鱼、出售保护、最高鱼雷等目标策略。当前同权候选按固定轮转选择，单项行为选择第一个满足源报价的目标，背包满时尝试出售第一条未上阵鱼；不合法目标由源服务拒绝。若配置旧 `behavior_target_policies`，运行会在预检中拒绝，避免误以为它生效。
+
+这套宿主覆盖普通鱼数值链，不模拟 UE 世界碰撞、网络复制、真实玩家路线和 DS。`advance_mode: equivalent_batch_v1` 只在区间内没有定时任务和活动 buff 时合并生产事务，保留逐秒模式的最终回执、revision 与状态；`accurate` 可作为逐秒对照。1 天同源正式运行中快速模式约 20 秒、逐秒模式约 53 秒，四份核心业务产物逐字节一致；旧 Python 正式运行约 1.6 秒，但策略语义不同，不能把耗时比当成严格同工作量比值。目前没有整体提速结论。7 天和 30 天配置中沿用的 `compact_event_details` 标记目前不压缩同源回执。

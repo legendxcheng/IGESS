@@ -61,6 +61,7 @@ class DomainEngineAdapter(Protocol):
         source_digest: str,
         base_dir: Path,
         overrides: Sequence[str] = (),
+        selected_data_root: Path | None = None,
     ) -> PreparedEngine: ...
 
     def run_scenario(
@@ -96,8 +97,9 @@ class GenericEngineAdapter:
         source_digest: str,
         base_dir: Path,
         overrides: Sequence[str] = (),
+        selected_data_root: Path | None = None,
     ) -> PreparedEngine:
-        del base_dir
+        del base_dir, selected_data_root
         if overrides:
             raise ValueError("generic workflow overrides must be applied before model build")
         return PreparedEngine(
@@ -142,7 +144,9 @@ class FishEngineAdapter:
         source_digest: str,
         base_dir: Path,
         overrides: Sequence[str] = (),
+        selected_data_root: Path | None = None,
     ) -> PreparedEngine:
+        del selected_data_root
         settings = model.engine_settings
         data_root_value = settings.get("data_root")
         if not isinstance(data_root_value, str) or not data_root_value:
@@ -354,10 +358,13 @@ class EngineRegistry:
         simulator_factory: Callable[[EconomyModel], Any] = Simulator,
         fish_luban_provider: FishLubanProvider | None = None,
     ) -> "EngineRegistry":
+        from .fish_source_engine import FishSourceEngineAdapter
+
         return cls(
             (
                 GenericEngineAdapter(simulator_factory),
                 FishEngineAdapter(fish_luban_provider),
+                FishSourceEngineAdapter(),
             )
         )
 

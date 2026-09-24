@@ -1,0 +1,13 @@
+[
+  {
+    "id": "starter_fish_hall",
+    "name": "初始鱼摸鱼厅产出",
+    "source_type": "active",
+    "unlock_condition": "always",
+    "_source": {
+      "table": "activities",
+      "workbook": "activities.xlsx",
+      "row": 4
+    }
+  }
+]
