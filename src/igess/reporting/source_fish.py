@@ -258,6 +258,11 @@ def _investment(
 
 
 def build_source_projection(data: ReportData) -> dict[str, Any]:
+    sampling = data.manifest.get("source_runtime", {})
+    sampling_note = "旧长场景主要按天采样。"
+    if sampling.get("sampling_time_basis") == "online":
+        interval = sampling.get("record_interval_seconds")
+        sampling_note = f"每累计在线 {interval} 秒采样，另保存上下线、离线领取及重生前后状态。"
     core, growth, investment, liquidity = {}, {}, {}, {}
     counts: Counter[str] = Counter()
     actions = {}
@@ -310,7 +315,7 @@ def build_source_projection(data: ReportData) -> dict[str, Any]:
         "rejection_count": counts["source_rejected"],
         "milestone_count": sum(len(profile["rows"]) for profile in growth.values()),
         "notes": {
-            "core": "力量与双 Luck 来自已保存的源状态采样；峰值仅为采样点峰值。旧长场景主要按天采样，无法还原 5 分钟在线毛收入、真实峰值或最长停滞，未记录的指标不填零。",
+            "core": "力量与双 Luck 来自已保存的源状态采样；峰值仅为采样点峰值。" + sampling_note + "这些状态不等于完整在线毛收入、真实峰值或精确最长停滞，未记录的指标不填零。",
             "persistent": "按实际上线/下线记录累计在线时间，离线等待不计入间隔。图中统计鱼雷、杠铃、鱼厅、两类重生及突破资助操作；“突破资助”仅表示支付材料，不代表训练已完成。单鱼升级不计入。",
             "investment": "支出与卖鱼收入直接汇总成功命令回执。原记录没有单次升级带来的产出变化、完整加工材料收入，因此对应指标显示为未记录；选鱼采用本次同源策略。",
             "liquidity": "钱包可花费与鱼厅待领取分开展示；累计已领取来自领取回执。累计已领取＋当前待领为本次可核算金额，不等于完整在线毛产出。",

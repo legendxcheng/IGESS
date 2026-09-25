@@ -102,6 +102,7 @@ class _SourceInputs:
     collect_interval_seconds: int
     idle_seconds: int
     fast_advance: bool
+    sampling_time_basis: str
 
 
 class FishSourceEngineAdapter:
@@ -165,6 +166,7 @@ class FishSourceEngineAdapter:
         collect_interval = source_settings.get("collect_interval_seconds", 300)
         idle_seconds = source_settings.get("idle_seconds", 30)
         advance_mode = source_settings.get("advance_mode", "accurate")
+        sampling_time_basis = source_settings.get("sampling_time_basis", "wall")
         if type(fishing_area) is not bool or any(
             type(value) is not int or value <= 0
             for value in (landing_distance, collect_interval, idle_seconds)
@@ -172,6 +174,8 @@ class FishSourceEngineAdapter:
             raise EngineAdapterError("fish_source_policy_invalid", "Invalid source player policy setting")
         if advance_mode not in ("accurate", "equivalent_batch_v1"):
             raise EngineAdapterError("fish_source_advance_mode_invalid", str(advance_mode))
+        if sampling_time_basis not in ("wall", "online"):
+            raise EngineAdapterError("fish_source_sampling_invalid", str(sampling_time_basis))
         if model.behavior_policies.get(_SOURCE_POLICY, {}).get("type") != _SOURCE_POLICY:
             raise EngineAdapterError("fish_source_policy_invalid", "Source player policy definition is missing")
         for scenario in model.scenarios.values():
@@ -244,6 +248,7 @@ class FishSourceEngineAdapter:
             lua_executable, fishing_area, landing_distance,
             collect_interval, idle_seconds,
             advance_mode == "equivalent_batch_v1",
+            sampling_time_basis,
         )
         metadata = {
             "engine_id": self.engine_id,
@@ -260,6 +265,7 @@ class FishSourceEngineAdapter:
                 "collect_interval_seconds": collect_interval,
                 "idle_seconds": idle_seconds,
                 "advance_mode": advance_mode,
+                "sampling_time_basis": sampling_time_basis,
                 "generated_money_definition": "source_collected_slot_receipts_plus_current_unclaimed",
             },
         }
@@ -286,6 +292,7 @@ class FishSourceEngineAdapter:
         if _integration_code_digest() != inputs.integration_digest:
             raise EngineAdapterError("fish_source_integration_changed", "IGESS source adapter changed after preparation")
         scenario = prepared.model.scenarios[scenario_id]
+        prepared.manifest_metadata["source_runtime"]["record_interval_seconds"] = scenario.record_interval_seconds
         if checkpoint_input is not None and len(scenario.profiles) != 1:
             raise EngineAdapterError(
                 "fish_source_checkpoint_profiles_unsupported",
@@ -383,6 +390,7 @@ class _ProfileRun:
         self.record_interval = self.scenario.record_interval_seconds
         self.request_number = 0
         self.behavior_turn = 0
+        self.active_time_seconds = 0
         self.last_collect = -inputs.collect_interval_seconds
         self.blocked: dict[str, int] = {}
         if existing is None:
@@ -397,7 +405,9 @@ class _ProfileRun:
             self.behavior_turn = int(existing.behavior_state["behavior_turn"])
             self.last_collect = int(existing.behavior_state["last_collect"])
             self.blocked = dict(existing.behavior_state.get("blocked", {}))
-        self.next_record = (self.state["time"] // self.record_interval + 1) * self.record_interval
+            self.active_time_seconds = int(existing.behavior_state.get("active_time_seconds", 0))
+        sample_time = self.active_time_seconds if inputs.sampling_time_basis == "online" else self.state["time"]
+        self.next_record = (sample_time // self.record_interval + 1) * self.record_interval
         self._record()
 
     def _record(self) -> None:
@@ -422,7 +432,7 @@ class _ProfileRun:
             resources["fish_luck"] = _number(state["luck"]["fishLuck"])
             resources["trash_luck"] = str(state["luck"]["trashLuck"])
         hall_level = state["hall"]["currentLevel"]["upgradeLevel"]
-        self.timeline.append(TimelineRow(
+        row = TimelineRow(
             self.scenario.id, self.profile.id, int(state["time"]),
             resources,
             {"deployed_fish": sum(item.get("hallSlot", 0) > 0 for item in inventory)},
@@ -432,19 +442,40 @@ class _ProfileRun:
                 "strength": state["rebirth"]["strength"]["completedCount"],
                 "trash_man": state["rebirth"]["trashMan"]["completedCount"],
             },
-        ))
+        )
+        if not self.timeline or self.timeline[-1] != row:
+            self.timeline.append(row)
 
     def _advance(self, target: int) -> None:
-        while self.next_record <= target:
-            self.runtime.request({"op": "advance", "time": self.next_record})
-            self.state = self.runtime.request({"op": "query"})
+        online_sampling = self.inputs.sampling_time_basis == "online"
+        if online_sampling and not self.state["online"]:
+            self._advance_to(target)
+            self._record()
+            return
+        sample_time = self.active_time_seconds if online_sampling else self.state["time"]
+        next_at = self.state["time"] + self.next_record - sample_time
+        while next_at <= target:
+            self._advance_to(next_at, include_luck=True)
             self._record()
             self.next_record += self.record_interval
+            next_at += self.record_interval
         if target != self.state["time"]:
-            self.runtime.request({"op": "advance", "time": target})
-            self.state = self.runtime.request({"op": "query", "includeLuck": False})
+            self._advance_to(target)
+
+    def _advance_to(self, target: int, *, include_luck: bool = False) -> None:
+        elapsed = target - self.state["time"]
+        online = self.state["online"]
+        self.runtime.request({"op": "advance", "time": target})
+        self.state = self.runtime.request({"op": "query", "includeLuck": include_luck})
+        if online:
+            self.active_time_seconds += elapsed
 
     def _command(self, op: str, *, target: str = "", **arguments: Any) -> bool:
+        observe_boundary = self.inputs.sampling_time_basis == "online" and op in {
+            "rebirth_strength", "rebirth_trash_man", "claim_offline_reward",
+        }
+        if observe_boundary:
+            self._record()
         self.request_number += 1
         command = {
             "op": op,
@@ -466,6 +497,8 @@ class _ProfileRun:
             op, target, {"receipt": json.dumps(receipt, ensure_ascii=False, sort_keys=True)},
         ))
         self.state = self.runtime.request({"op": "query", "includeLuck": False})
+        if observe_boundary or (self.inputs.sampling_time_basis == "online" and op in {"go_online", "go_offline"}):
+            self._record()
         return True
 
     def _allowed(self, op: str, target: str = "") -> bool:
@@ -623,8 +656,7 @@ class _ProfileRun:
                 if self.state["online"] and now < self.end and not self._command("go_offline"):
                     raise EngineAdapterError("fish_source_session_failed", "Source rejected go_offline")
                 self._advance(day_end)
-        if self.timeline[-1].time_seconds != self.end:
-            self._record()
+        self._record()
 
     def checkpoint(self, model_digest: str) -> SimulationCheckpoint:
         session = self.runtime.checkpoint()
@@ -640,6 +672,7 @@ class _ProfileRun:
             behavior_state={
                 "request_number": self.request_number,
                 "behavior_turn": self.behavior_turn,
+                "active_time_seconds": self.active_time_seconds,
                 "last_collect": self.last_collect,
                 "blocked": self.blocked,
             },

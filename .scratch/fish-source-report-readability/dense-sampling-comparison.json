@@ -1,0 +1,169 @@
+{
+  "run_id": "20260925T025501064040Z-month_1_growth",
+  "model_digest": "sha256:afdd609e06359042c17936368f142075f3a826fd5f5548a83b1b8deac869335c",
+  "source_code_unchanged": false,
+  "production_export_unchanged": true,
+  "old_samples": 31,
+  "new_samples": 837,
+  "periodic_samples": 720,
+  "start_and_boundary_samples": 117,
+  "business_events_identical": true,
+  "behavior_counts_identical": true,
+  "final_observation_identical": true,
+  "old_daily_observations_preserved": true,
+  "rejections": 0,
+  "rebirths_with_before_after_samples": 13,
+  "timings": {
+    "artifacts_seconds": 0.497,
+    "report_seconds": 0.541,
+    "formal_workflow_seconds": 598.696,
+    "adapter_total": 597.342,
+    "checkpoint": 0.982,
+    "input_check": 0.078,
+    "process_close": 0.136,
+    "process_start": 4.758,
+    "source_execution": 591.387
+  },
+  "old_core_summary": {
+    "active_duration_seconds": {
+      "chart_value": 216000.0,
+      "display_value": "216000",
+      "exact_value": "216000"
+    },
+    "fish_luck_final": {
+      "chart_value": 3821143498.123647,
+      "display_value": "3.82114e9",
+      "exact_value": "3821143498.1236472192"
+    },
+    "fish_luck_peak": {
+      "chart_value": 776033624210.7488,
+      "display_value": "7.76034e11",
+      "exact_value": "776033624210.74883072"
+    },
+    "longest_fish_luck_stagnation_seconds": null,
+    "longest_trash_luck_stagnation_seconds": null,
+    "observation_count": {
+      "chart_value": 31.0,
+      "display_value": "31",
+      "exact_value": "31"
+    },
+    "strength_final": {
+      "chart_value": 18732000.0,
+      "display_value": "1.8732e7",
+      "exact_value": "1.8732E+7"
+    },
+    "strength_peak": {
+      "chart_value": 97918000.0,
+      "display_value": "9.7918e7",
+      "exact_value": "9.7918E+7"
+    },
+    "trash_luck_final": {
+      "chart_value": 4887553117.438026,
+      "display_value": "4.88755e9",
+      "exact_value": "4887553117.438026"
+    },
+    "trash_luck_peak": {
+      "chart_value": 4887553117.438026,
+      "display_value": "4.88755e9",
+      "exact_value": "4887553117.438026"
+    }
+  },
+  "new_core_summary": {
+    "active_duration_seconds": {
+      "chart_value": 216000.0,
+      "display_value": "216000",
+      "exact_value": "216000"
+    },
+    "fish_luck_final": {
+      "chart_value": 3821143498.123647,
+      "display_value": "3.82114e9",
+      "exact_value": "3821143498.1236472192"
+    },
+    "fish_luck_peak": {
+      "chart_value": 806450512763.544,
+      "display_value": "8.06451e11",
+      "exact_value": "806450512763.54398208"
+    },
+    "longest_fish_luck_stagnation_seconds": null,
+    "longest_trash_luck_stagnation_seconds": null,
+    "observation_count": {
+      "chart_value": 837.0,
+      "display_value": "837",
+      "exact_value": "837"
+    },
+    "strength_final": {
+      "chart_value": 18732000.0,
+      "display_value": "1.8732e7",
+      "exact_value": "1.8732E+7"
+    },
+    "strength_peak": {
+      "chart_value": 100018000.0,
+      "display_value": "1.00018e8",
+      "exact_value": "1.00018E+8"
+    },
+    "trash_luck_final": {
+      "chart_value": 4887553117.438026,
+      "display_value": "4.88755e9",
+      "exact_value": "4887553117.438026"
+    },
+    "trash_luck_peak": {
+      "chart_value": 4887553117.438026,
+      "display_value": "4.88755e9",
+      "exact_value": "4887553117.438026"
+    }
+  },
+  "growth_summary": {
+    "active_duration_seconds": {
+      "chart_value": 216000.0,
+      "display_value": "216000",
+      "exact_value": "216000"
+    },
+    "complete_online_sessions": {
+      "chart_value": 30.0,
+      "display_value": "30",
+      "exact_value": "30"
+    },
+    "complete_online_sessions_without_progression": {
+      "chart_value": 9.0,
+      "display_value": "9",
+      "exact_value": "9"
+    },
+    "complete_online_sessions_without_system_progression": {
+      "chart_value": 9.0,
+      "display_value": "9",
+      "exact_value": "9"
+    },
+    "events_per_active_hour": {
+      "chart_value": 1.4166666666666667,
+      "display_value": "1.41667",
+      "exact_value": "1.4166666666666666666666666666666666666666666666666666666666666666666666666666667"
+    },
+    "first_progression_wait_seconds": {
+      "chart_value": 31.0,
+      "display_value": "31",
+      "exact_value": "31"
+    },
+    "max_interval_seconds": {
+      "chart_value": 45592.0,
+      "display_value": "45592",
+      "exact_value": "45592"
+    },
+    "system_progression_max_interval_seconds": {
+      "chart_value": 45592.0,
+      "display_value": "45592",
+      "exact_value": "45592"
+    },
+    "tail_gap_seconds": {
+      "chart_value": 7199.0,
+      "display_value": "7199",
+      "exact_value": "7199"
+    },
+    "total_progression_count": {
+      "chart_value": 85.0,
+      "display_value": "85",
+      "exact_value": "85"
+    }
+  },
+  "html_bytes": 5235038,
+  "report_index": "E:\\IGESS\\projects\\fish_source\\runs\\20260925T025501064040Z-month_1_growth\\report\\index.html"
+}

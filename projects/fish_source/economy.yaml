@@ -14,6 +14,7 @@ engine:
     collect_interval_seconds: 300
     idle_seconds: 30
     advance_mode: equivalent_batch_v1
+    sampling_time_basis: online
 formulas:
   exponential_cost:
     args:
@@ -101,12 +102,12 @@ player_profiles:
       manual_throw: '1'
       upgrade_fish: '1'
       upgrade_fish_hall: '100'
-      purchase_torpedo: 1e100
+      purchase_torpedo: "1e100"
       synthesize_barbell: '100'
       exercise_barbell: '1'
-      strength_rebirth: 1e100
-      trash_man_rebirth: 1e100
-      fund_trash_man_breakthrough: 1e100
+      strength_rebirth: "1e100"
+      trash_man_rebirth: "1e100"
+      fund_trash_man_breakthrough: "1e100"
     behavior_durations:
       sell_fish:
         type: fixed
@@ -159,12 +160,12 @@ player_profiles:
       manual_throw: '1'
       upgrade_fish: '1'
       upgrade_fish_hall: '100'
-      purchase_torpedo: 1e100
+      purchase_torpedo: "1e100"
       synthesize_barbell: '100'
       exercise_barbell: '1'
-      strength_rebirth: 1e100
-      trash_man_rebirth: 1e100
-      fund_trash_man_breakthrough: 1e100
+      strength_rebirth: "1e100"
+      trash_man_rebirth: "1e100"
+      fund_trash_man_breakthrough: "1e100"
     behavior_durations:
       sell_fish:
         type: fixed
@@ -217,7 +218,7 @@ scenarios:
     profiles:
     - default
     start_state: new_player
-    record_interval_seconds: 3600
+    record_interval_seconds: 300
     outputs:
     - resource_curve
     - purchase_timeline
@@ -230,7 +231,7 @@ scenarios:
     profiles:
     - default
     start_state: new_player
-    record_interval_seconds: 86400
+    record_interval_seconds: 300
     outputs:
     - resource_curve
     - purchase_timeline
@@ -244,7 +245,7 @@ scenarios:
     profiles:
     - default
     start_state: new_player
-    record_interval_seconds: 86400
+    record_interval_seconds: 300
     outputs:
     - resource_curve
     - purchase_timeline

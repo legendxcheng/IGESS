@@ -184,3 +184,39 @@ def test_formal_source_funds_breakthrough_before_source_training(tmp_path: Path)
         (Path(response.result["output_dir"]) / "source_behavior.json").read_text(encoding="utf-8")
     )
     assert behavior["profiles"]["default"]["accepted_commands"]["start_breakthrough"] >= 2
+
+
+def test_formal_source_online_sampling_preserves_gameplay_and_crosses_sessions(tmp_path: Path) -> None:
+    project = _project(tmp_path)
+    config_path = project / "economy.yaml"
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config["engine"]["source_runtime"]["advance_mode"] = "equivalent_batch_v1"
+    config["scenarios"]["smoke"]["duration_hours"] = "48"
+    config["scenarios"]["smoke"]["record_interval_seconds"] = 86400
+    profile = config["player_profiles"]["default"]
+    config["session_patterns"][profile["session_pattern"]]["daily_online_seconds"] = 350
+    config_path.write_text(yaml.safe_dump(config, allow_unicode=True), encoding="utf-8")
+    sparse = AuthoringService(project).simulate("smoke")
+    assert sparse.ok, sparse.details
+
+    config["engine"]["source_runtime"]["sampling_time_basis"] = "online"
+    config["scenarios"]["smoke"]["record_interval_seconds"] = 300
+    config_path.write_text(yaml.safe_dump(config, allow_unicode=True), encoding="utf-8")
+    dense = AuthoringService(project).simulate("smoke")
+    assert dense.ok, dense.details
+    sparse_output, dense_output = (Path(run.result["output_dir"]) for run in (sparse, dense))
+
+    def read(output: Path, name: str):
+        return json.loads((output / name).read_text(encoding="utf-8"))
+
+    rows = read(dense_output, "timeline.json")
+    times = {row["time_seconds"] for row in rows}
+    assert {0, 300, 350, 86400, 86650, 86750, 172800} <= times
+    assert not any(350 < time < 86400 or 86750 < time < 172800 for time in times)
+    assert rows[-1] == read(sparse_output, "timeline.json")[-1]
+    for name in ("events.json", "source_behavior.json"):
+        assert read(dense_output, name) == read(sparse_output, name), name
+    checkpoint = read(dense_output, "final_checkpoint.json")
+    assert checkpoint["behavior_state"]["active_time_seconds"] == 700
+    report = read(Path(dense.result["report_index"]).parent, "report_data.json")
+    assert "300 秒采样" in report["fish_progression"]["notes"]["core"]
