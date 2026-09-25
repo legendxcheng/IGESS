@@ -2,6 +2,8 @@
 
 日期：2026-09-24。源工程 `E:\fish-oasis`；IGESS 项目 `projects/fish_source`。测试边界采用用户确认的源执行器统一会话接口和 IGESS 正式 `model simulate` 入口，无 DS / PIE。
 
+后续性能结果见 [2026-09-25 性能验证](../fish-source-performance/verification.md)：在不改变密集采样和业务轨迹的前提下优化源查询与输入冻结。下文保留首次实施时的历史耗时，不代表当前版本。
+
 ## 已交付
 
 - 源项目 `simulation/` 装配原 Lua Application/Domain 服务，提供会话创建、查询、动作、虚拟时间、在线/离线、投掷生命周期、事件回执及跨进程 replay checkpoint。投掷服务与种子提供器增加隔离实例装配；正式玩法命令仍调用原服务。

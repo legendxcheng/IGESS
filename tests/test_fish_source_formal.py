@@ -10,6 +10,11 @@ import pytest
 import yaml
 
 from igess.authoring.service import AuthoringService
+from igess.fish_source_runtime import (
+    FishSourceRuntime,
+    data_snapshot_digest,
+    source_code_digest,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 FISH_SOURCE = Path("E:/fish-oasis")
@@ -49,8 +54,21 @@ def _project(tmp_path: Path) -> Path:
     return project
 
 
-def test_formal_source_smoke_uses_lua_receipts_and_writes_report(tmp_path: Path) -> None:
+def test_formal_source_smoke_uses_lua_receipts_and_writes_report(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
     project = _project(tmp_path)
+    freeze_source = FishSourceRuntime._freeze_source
+
+    def checked_freeze(runtime: FishSourceRuntime) -> Path:
+        frozen = freeze_source(runtime)
+        # Independently read the files consumed by Lua: in-memory hashing must
+        # preserve the existing fingerprint format and match the actual copy.
+        assert source_code_digest(frozen) == runtime.source_digest
+        assert data_snapshot_digest(frozen / "selected_data") == runtime.data_digest
+        return frozen
+
+    monkeypatch.setattr(FishSourceRuntime, "_freeze_source", checked_freeze)
     response = AuthoringService(project).simulate("smoke")
 
     assert response.ok, response.details

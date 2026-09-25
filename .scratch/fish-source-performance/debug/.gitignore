@@ -1,0 +1,3 @@
+*.prof
+reference-host.lua.txt
+comparison.stdout.txt

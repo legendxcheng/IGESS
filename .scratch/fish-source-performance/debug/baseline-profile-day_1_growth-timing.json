@@ -1,0 +1,126 @@
+{
+  "started_at": "2026-09-25T09:04:58.430528+00:00",
+  "finished_at": "2026-09-25T09:05:14.044129+00:00",
+  "timings": {
+    "artifacts_seconds": 0.025,
+    "report_seconds": 0.06,
+    "formal_workflow_seconds": 15.614
+  },
+  "requests": {
+    "capabilities": {
+      "count": 1,
+      "seconds": 0.0033779999939724803
+    },
+    "create": {
+      "count": 1,
+      "seconds": 0.6871967000188306
+    },
+    "query_actions": {
+      "count": 245,
+      "seconds": 0.4865407004253939
+    },
+    "prepare_throw": {
+      "count": 64,
+      "seconds": 0.3984535997733474
+    },
+    "query": {
+      "count": 985,
+      "seconds": 6.169419000740163
+    },
+    "begin_throw_flight": {
+      "count": 64,
+      "seconds": 0.09436260000802577
+    },
+    "advance": {
+      "count": 356,
+      "seconds": 1.8690219997661188
+    },
+    "select_throw_landing": {
+      "count": 64,
+      "seconds": 0.3187202999833971
+    },
+    "finalize_throw_landing": {
+      "count": 64,
+      "seconds": 0.014573899563401937
+    },
+    "complete_throw": {
+      "count": 64,
+      "seconds": 0.04298539983574301
+    },
+    "deploy_fish": {
+      "count": 13,
+      "seconds": 0.004108999855816364
+    },
+    "collect_slot": {
+      "count": 22,
+      "seconds": 0.012553599663078785
+    },
+    "start_breakthrough": {
+      "count": 8,
+      "seconds": 0.004980699974112213
+    },
+    "start_exercise": {
+      "count": 81,
+      "seconds": 0.04309260006994009
+    },
+    "stop_exercise": {
+      "count": 80,
+      "seconds": 0.18191930034663528
+    },
+    "upgrade_fish": {
+      "count": 62,
+      "seconds": 0.031173700001090765
+    },
+    "purchase_torpedo": {
+      "count": 4,
+      "seconds": 0.002117499941959977
+    },
+    "upgrade_hall": {
+      "count": 3,
+      "seconds": 0.0014307000674307346
+    },
+    "rebirth_strength": {
+      "count": 3,
+      "seconds": 0.002327800029888749
+    },
+    "rebirth_trash_man": {
+      "count": 2,
+      "seconds": 0.0013894999865442514
+    },
+    "synthesize_barbell": {
+      "count": 4,
+      "seconds": 0.0030179000459611416
+    },
+    "sell_fish": {
+      "count": 14,
+      "seconds": 0.0083190998993814
+    },
+    "go_offline": {
+      "count": 1,
+      "seconds": 0.003777700010687113
+    },
+    "checkpoint": {
+      "count": 1,
+      "seconds": 0.02095879998523742
+    }
+  },
+  "response": {
+    "schema_version": 1,
+    "command": "model.simulate",
+    "ok": true,
+    "code": "simulated",
+    "message": "Simulation complete: day_1_growth",
+    "details": {},
+    "result": {
+      "change_id": null,
+      "engine_id": "fish_source",
+      "kind": "formal",
+      "model_digest": "sha256:afdd609e06359042c17936368f142075f3a826fd5f5548a83b1b8deac869335c",
+      "output_dir": "E:\\IGESS\\projects\\fish_source\\runs\\20260925T090458770349Z-day_1_growth\\output",
+      "report_index": "E:\\IGESS\\projects\\fish_source\\runs\\20260925T090458770349Z-day_1_growth\\report\\index.html",
+      "run_id": "20260925T090458770349Z-day_1_growth",
+      "scenario_id": "day_1_growth",
+      "status": "success"
+    }
+  }
+}

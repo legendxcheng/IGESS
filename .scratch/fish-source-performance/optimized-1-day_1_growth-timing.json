@@ -1,0 +1,29 @@
+{
+  "started_at": "2026-09-25T09:15:06.253816+00:00",
+  "finished_at": "2026-09-25T09:15:16.684936+00:00",
+  "timings": {
+    "artifacts_seconds": 0.015,
+    "report_seconds": 0.042,
+    "formal_workflow_seconds": 10.431
+  },
+  "requests": {},
+  "response": {
+    "schema_version": 1,
+    "command": "model.simulate",
+    "ok": true,
+    "code": "simulated",
+    "message": "Simulation complete: day_1_growth",
+    "details": {},
+    "result": {
+      "change_id": null,
+      "engine_id": "fish_source",
+      "kind": "formal",
+      "model_digest": "sha256:51bb4de1cf8552b754ce7b3cc47088cbce0a8a9907d773fc8ed6d4c526bcada0",
+      "output_dir": "E:\\IGESS\\projects\\fish_source\\runs\\20260925T091506460499Z-day_1_growth\\output",
+      "report_index": "E:\\IGESS\\projects\\fish_source\\runs\\20260925T091506460499Z-day_1_growth\\report\\index.html",
+      "run_id": "20260925T091506460499Z-day_1_growth",
+      "scenario_id": "day_1_growth",
+      "status": "success"
+    }
+  }
+}

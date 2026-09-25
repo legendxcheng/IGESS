@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import tempfile
 import threading
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any, Self
 
@@ -24,14 +25,10 @@ class FishSourceRejection(FishSourceRuntimeError):
     """A valid game/session command refused by the source-owned host."""
 
 
-def source_code_digest(project_root: str | Path) -> str:
-    root = Path(project_root)
+def _source_digest(entries: Iterable[tuple[str, bytes]]) -> str:
     digest = hashlib.sha256()
-    paths = sorted((root / "proj" / "Script").rglob("*.lua"))
-    paths += sorted((root / "simulation").rglob("*.lua"))
-    for path in paths:
-        contents = path.read_bytes()
-        relative = path.relative_to(root).as_posix().encode("utf-8")
+    for name, contents in entries:
+        relative = name.encode("utf-8")
         digest.update(len(relative).to_bytes(4, "big"))
         digest.update(relative)
         digest.update(len(contents).to_bytes(8, "big"))
@@ -39,17 +36,31 @@ def source_code_digest(project_root: str | Path) -> str:
     return digest.hexdigest()
 
 
-def data_snapshot_digest(data_root: str | Path) -> str:
-    root = Path(data_root)
+def source_code_digest(project_root: str | Path) -> str:
+    root = Path(project_root)
+    paths = sorted((root / "proj" / "Script").rglob("*.lua"))
+    paths += sorted((root / "simulation").rglob("*.lua"))
+    return _source_digest(
+        (path.relative_to(root).as_posix(), path.read_bytes()) for path in paths
+    )
+
+
+def _data_digest(entries: Iterable[tuple[str, bytes]]) -> str:
     digest = hashlib.sha256()
-    for path in sorted(root.glob("*.json")):
-        name = path.name.encode("utf-8")
-        contents = path.read_bytes()
+    for filename, contents in entries:
+        name = filename.encode("utf-8")
         digest.update(len(name).to_bytes(4, "big"))
         digest.update(name)
         digest.update(len(contents).to_bytes(8, "big"))
         digest.update(contents)
     return digest.hexdigest()
+
+
+def data_snapshot_digest(data_root: str | Path) -> str:
+    root = Path(data_root)
+    return _data_digest(
+        (path.name, path.read_bytes()) for path in sorted(root.glob("*.json"))
+    )
 
 
 class FishSourceRuntime:
@@ -81,19 +92,38 @@ class FishSourceRuntime:
     def _freeze_source(self) -> Path:
         snapshot = tempfile.TemporaryDirectory(prefix="igess-fish-lua-")
         frozen_root = Path(snapshot.name)
+        copied: dict[Path, bytes] = {}
+
+        def copy_snapshot(source: str, destination: str) -> str:
+            # Hash the bytes we write, without reopening every new file. On
+            # Windows the immediate reread can wait on per-file virus scans.
+            contents = Path(source).read_bytes()
+            target = Path(destination)
+            target.write_bytes(contents)
+            copied[target] = contents
+            return destination
+
         try:
             shutil.copytree(
                 self.project_root / "proj" / "Script",
                 frozen_root / "proj" / "Script",
+                copy_function=copy_snapshot,
             )
             shutil.copytree(
                 self.project_root / "simulation",
                 frozen_root / "simulation",
+                copy_function=copy_snapshot,
             )
             frozen_data_root = frozen_root / "selected_data"
-            shutil.copytree(self.data_root, frozen_data_root)
-            self.source_digest = source_code_digest(frozen_root)
-            self.data_digest = data_snapshot_digest(frozen_data_root)
+            shutil.copytree(self.data_root, frozen_data_root, copy_function=copy_snapshot)
+            paths = sorted((frozen_root / "proj" / "Script").rglob("*.lua"))
+            paths += sorted((frozen_root / "simulation").rglob("*.lua"))
+            self.source_digest = _source_digest(
+                (path.relative_to(frozen_root).as_posix(), copied[path]) for path in paths
+            )
+            self.data_digest = _data_digest(
+                (path.name, copied[path]) for path in sorted(frozen_data_root.glob("*.json"))
+            )
             self._frozen_data_root = frozen_data_root
             self._source_snapshot = snapshot
             return frozen_root
