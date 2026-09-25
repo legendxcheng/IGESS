@@ -1,6 +1,6 @@
 # GameBalancer 同源 Lua 交付
 
-Status: ready-for-agent
+Status: resolved
 
 2026-09-25：用户明确选择将同源 Lua 后端接入 GameBalancer 后发布，目标版本 0.5.15；已关闭工作台，并授权提交及推送源码与分发仓库。
 
