@@ -170,6 +170,7 @@ function renderFishProgression(report) {
 }
 
 function renderSourceFish(fish) {
+  renderSourceMaterial(fish);
   const notes = fish.notes || {};
   const core = document.querySelector('[data-fish-core-section]');
   if (core) {
@@ -348,6 +349,35 @@ function renderFishCumulativeOutputChart(profiles) {
     '累计毛产出 · 对数同轴',
     { logarithmic: true }
   ));
+}
+
+function renderSourceMaterial(fish) {
+  const section = document.querySelector('[data-source-material-section]');
+  if (!section) return;
+  section.hidden = false;
+  const profiles = (fish.liquidity || {}).profiles || {};
+  const render = logarithmic => {
+    const series = Object.entries(profiles).map(([profileId, rows]) => ({
+      name: `${profileLabel(profileId)} · 资源（材料）余额`,
+      type: 'line', showSymbol: true, connectNulls: false,
+      data: progressionLineData(rows, 'material').map(point => ({
+        ...point,
+        value: [point.value[0], logarithmic && point.value[1] <= 0 ? null : point.value[1]],
+      })),
+    }));
+    const option = fishBalanceLineOption(
+      '资源（材料）可用余额', series,
+      logarithmic ? '资源数量 · 对数轴' : '资源数量', { logarithmic }
+    );
+    if (option) option.title.subtext = logarithmic ? '仅显示大于 0 的余额；零值请切换线性视图' : '包含零值；余额已扣除消耗';
+    replaceChart('source-material-chart', option);
+  };
+  const buttons = section.querySelectorAll('[data-source-material-scale]');
+  buttons.forEach(button => button.addEventListener('click', () => {
+    buttons.forEach(item => item.classList.toggle('active', item === button));
+    render(button.dataset.sourceMaterialScale === 'log');
+  }));
+  render(false);
 }
 
 function fishEconomyLineData(rows, field, { positiveOnly = false } = {}) {
@@ -1143,7 +1173,7 @@ function resourceLabel(resourceId) {
   const labels = {
     gold: '金币',
     money: '金钱',
-    material: '材料',
+    material: '资源（材料）',
     strength: '力量',
     spendable_money: '钱包可花费',
     unclaimed_money: '鱼厅待领取',

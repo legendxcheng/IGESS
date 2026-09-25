@@ -36,7 +36,7 @@ def _source_run(tmp_path: Path) -> Path:
             "unclaimed_money": "20",
             "collected_money": "30",
             "generated_money": "50",
-            "material": "4",
+            "material": "4" if time == 60 else "0",
             "trash_realm": "2",
             "total_throws": "1",
             "strength_rebirth_count": "1",
@@ -95,6 +95,7 @@ def _source_run(tmp_path: Path) -> Path:
                 "time_seconds": row["time_seconds"],
                 "resources": {
                     "money": row["spendable_money"],
+                    "material": row["material"],
                     "strength": row["strength"],
                 },
                 "total_cps": "2",
@@ -173,12 +174,19 @@ const vm = require('vm');
 const data = JSON.parse(fs.readFileSync(process.argv[1], 'utf8'));
 const elements = {};
 const options = {};
+const handlers = {};
 const element = key => elements[key] || (elements[key] = {
   id: key, hidden: true, innerHTML: '', textContent: '',
+  dataset: {}, classList: {toggle() {}},
+  addEventListener(kind, fn) { handlers[key + ':' + kind] = fn; },
   querySelector(selector) { return element(key + ' ' + selector); },
-  querySelectorAll() { return []; },
+  querySelectorAll(selector) {
+    return selector === '[data-source-material-scale]' ? [element('material-linear'), element('material-log')] : [];
+  },
   closest() { return element(key + ' section'); },
 });
+element('material-linear').dataset.sourceMaterialScale = 'linear';
+element('material-log').dataset.sourceMaterialScale = 'log';
 vm.runInNewContext(fs.readFileSync(process.argv[2], 'utf8'), {
   document: {
     querySelector: element,
@@ -187,7 +195,11 @@ vm.runInNewContext(fs.readFileSync(process.argv[2], 'utf8'), {
   window: {addEventListener() {}}, console,
   echarts: {init: target => ({setOption: option => {options[target.id] = option;}, dispose() {}, resize() {}})},
 });
-setImmediate(() => console.log(JSON.stringify({elements, options})));
+setImmediate(() => {
+  const linearOptions = JSON.parse(JSON.stringify(options));
+  if (handlers['material-log:click']) handlers['material-log:click']();
+  console.log(JSON.stringify({elements, options: linearOptions, materialLog: options['source-material-chart']}));
+});
 """
     result = subprocess.run(
         [
@@ -230,3 +242,12 @@ setImmediate(() => console.log(JSON.stringify({elements, options})));
         is None
     )
     assert "采样峰值" in rendered["options"]["core-strength-chart"]["title"]["text"]
+    assert elements["[data-source-material-section]"]["hidden"] is False
+    material = rendered["options"]["source-material-chart"]
+    assert "资源" in material["title"]["text"]
+    assert [point["value"][1] for point in material["series"][0]["data"]] == [0, 4, 0]
+    assert material["yAxis"]["type"] == "value"
+    assert rendered["materialLog"]["yAxis"]["type"] == "log"
+    assert [point["value"][1] for point in rendered["materialLog"]["series"][0]["data"]] == [None, 4, None]
+    assert 'id="source-material-chart"' in index.read_text(encoding="utf-8")
+    assert "资源（材料）" in elements["[data-resource-controls]"]["innerHTML"]
