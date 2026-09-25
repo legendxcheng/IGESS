@@ -560,6 +560,16 @@ def _write_runtime_config(
         if bundle.schema_path is None:
             raise OperatorError("bundle_schema_missing", "Fish 工具包缺少数据加载器。")
         engine["python_schema"] = str(bundle.schema_path)
+    elif bundle.engine_id == "fish_source":
+        source_settings = engine.get("source_runtime")
+        if not isinstance(source_settings, dict):
+            raise OperatorError("bundle_config_invalid", "工具包缺少同源运行配置。")
+        runtime_root = bundle.root / "bundle" / "fish-runtime"
+        if not (runtime_root / "runtime.luac").is_file():
+            raise OperatorError("bundle_runtime_missing", "同源运行包缺失，请重新更新工具。")
+        source_settings["project_root"] = str(runtime_root)
+        source_settings["data_root"] = str(snapshot)
+        source_settings["lua_executable"] = str(runtime_root / "lua55.exe")
     destination.write_text(
         yaml.safe_dump(payload, allow_unicode=True, sort_keys=False),
         encoding="utf-8",

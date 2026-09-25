@@ -8,6 +8,8 @@ param(
     [string]$DistributionRoot = 'E:\GameBalancer',
     [string]$JsonRoot = 'E:\fish-oasis\igess_export\json',
     [string]$Scenario = 'smoke',
+    [ValidateSet('fish', 'fish_source')]
+    [string]$Project = 'fish_source',
     [string]$PythonPath = '',
     [string]$ExpectedRemote = 'https://codeup.aliyun.com/691876b8876b90de1aac524d/GameBalancer.git',
     [switch]$AllowDirtyDistribution
@@ -120,6 +122,7 @@ if ($requestedVersion -le $currentVersion) {
     throw "Version $Version must be greater than current version $($currentManifest.tool_version)."
 }
 
+$inputBefore = @(Get-InputFingerprint -Root $JsonRoot)
 Push-Location $SourceRoot
 try {
     $fishTests = @(
@@ -127,12 +130,13 @@ try {
             Select-Object -ExpandProperty FullName
     )
     $operatorTest = Join-Path $SourceRoot 'tests\test_operator_toolkit.py'
+    $reportTest = Join-Path $SourceRoot 'tests\test_source_fish_reporting.py'
     Invoke-Checked 'running Fish and operator-toolkit regressions' {
-        & $PythonPath -m pytest @fishTests $operatorTest -q
+        & $PythonPath -m pytest @fishTests $operatorTest $reportTest -q
     }
     Invoke-Checked "exporting GameBalancer $Version" {
         & $PythonPath -m igess.cli export-operator-toolkit `
-            --project (Join-Path $SourceRoot 'projects\fish') `
+            --project (Join-Path $SourceRoot "projects\$Project") `
             --out $DistributionRoot `
             --version $Version `
             --python $PythonPath
@@ -145,7 +149,7 @@ $forbidden = @(
     Get-ChildItem -LiteralPath $DistributionRoot -Recurse -Force -File |
         Where-Object {
             $_.FullName -notmatch '[\\/]\.git[\\/]' -and (
-                $_.Extension.ToLowerInvariant() -in @('.py', '.pyi', '.map') -or
+                $_.Extension.ToLowerInvariant() -in @('.py', '.pyi', '.lua', '.map') -or
                 $_.FullName -match '[\\/]tests?([\\/]|$)'
             )
         }
@@ -162,7 +166,6 @@ if ($exportedManifest.tool_version -ne $Version) {
     throw "Exported version mismatch: $($exportedManifest.tool_version)"
 }
 
-$inputBefore = @(Get-InputFingerprint -Root $JsonRoot)
 $historyRoot = Join-Path $env:LOCALAPPDATA 'IGESS Operator\fish\runs'
 $runsBefore = if (Test-Path -LiteralPath $historyRoot) {
     @(Get-ChildItem -LiteralPath $historyRoot -Directory | Select-Object -ExpandProperty Name)
@@ -181,6 +184,7 @@ $serverProcess = Start-Process -FilePath $PythonPath `
     -RedirectStandardError $stderrPath `
     -PassThru
 
+$smokeSucceeded = $false
 try {
     $url = $null
     for ($attempt = 0; $attempt -lt 40; $attempt++) {
@@ -213,6 +217,9 @@ try {
 
     $session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
     $homeResponse = Invoke-WebRequest -Uri $url -WebSession $session -UseBasicParsing -TimeoutSec 10
+    if (-not $homeResponse.Content.Contains($Version)) {
+        throw 'Workbench home page did not display the requested version.'
+    }
     $csrfMatch = [regex]::Match($homeResponse.Content, 'name="_csrf" value="([^"]+)"')
     if (-not $csrfMatch.Success) {
         throw 'Workbench home page did not contain a CSRF token.'
@@ -256,7 +263,19 @@ try {
     }
     $runManifest = Get-Content -LiteralPath (Join-Path $runDirectory 'output\run_manifest.json') -Raw |
         ConvertFrom-Json
-    if ($runManifest.production_data -ne $true -or $runManifest.matches_production_data -ne $true) {
+    if ($Project -eq 'fish_source') {
+        if ($runManifest.engine_id -ne 'fish_source') {
+            throw 'Workbench did not execute the source-owned Lua backend.'
+        }
+        $inputDigest = & $PythonPath -c 'from igess.fish_source_runtime import data_snapshot_digest; import sys; print(data_snapshot_digest(sys.argv[1]))' $JsonRoot
+        if ($LASTEXITCODE -ne 0 -or $runManifest.source_runtime.selected_export_sha256 -ne $inputDigest.Trim()) {
+            throw 'Lua run did not use the selected production JSON snapshot.'
+        }
+        $luaManifest = Get-Content -LiteralPath (Join-Path $DistributionRoot 'bundle\fish-runtime\runtime.json') -Raw | ConvertFrom-Json
+        if ($runManifest.source_runtime.packaged_source_code_sha256 -ne $luaManifest.source_code_sha256) {
+            throw 'Lua run source digest does not match the shipped runtime.'
+        }
+    } elseif ($runManifest.production_data -ne $true -or $runManifest.matches_production_data -ne $true) {
         throw 'Smoke run was not marked as matching production data.'
     }
     $reportResponse = Invoke-WebRequest `
@@ -279,9 +298,14 @@ try {
     Write-Host "[GameBalancer] E2E run succeeded: $runId"
     Write-Host "[GameBalancer] Report HTTP: $($reportResponse.StatusCode)"
     Write-Host '[GameBalancer] Production JSON unchanged: true'
+    $smokeSucceeded = $true
 } finally {
     Stop-ProcessTree -Process $serverProcess
-    Remove-Item -LiteralPath $stdoutPath, $stderrPath -Force -ErrorAction SilentlyContinue
+    if ($smokeSucceeded) {
+        Remove-Item -LiteralPath $stdoutPath, $stderrPath -Force -ErrorAction SilentlyContinue
+    } else {
+        Write-Warning "Workbench logs retained: $stdoutPath ; $stderrPath"
+    }
 }
 
 Write-Host '[GameBalancer] Candidate prepared; review before committing or pushing.'

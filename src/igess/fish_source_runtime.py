@@ -36,12 +36,25 @@ def _source_digest(entries: Iterable[tuple[str, bytes]]) -> str:
     return digest.hexdigest()
 
 
-def source_code_digest(project_root: str | Path) -> str:
-    root = Path(project_root)
+def source_runtime_entry(root: Path) -> Path:
+    packaged = root / "runtime.luac"
+    return packaged if packaged.is_file() else root / "simulation" / "cli.lua"
+
+
+def _source_paths(root: Path) -> list[Path]:
+    if (root / "runtime.luac").is_file():
+        return [root / name for name in (
+            "runtime.luac", "runtime.json", "lua55.exe", "lua55.dll", "LUA-LICENSE.txt",
+        )]
     paths = sorted((root / "proj" / "Script").rglob("*.lua"))
     paths += sorted((root / "simulation").rglob("*.lua"))
+    return paths
+
+
+def source_code_digest(project_root: str | Path) -> str:
+    root = Path(project_root)
     return _source_digest(
-        (path.relative_to(root).as_posix(), path.read_bytes()) for path in paths
+        (path.relative_to(root).as_posix(), path.read_bytes()) for path in _source_paths(root)
     )
 
 
@@ -104,22 +117,24 @@ class FishSourceRuntime:
             return destination
 
         try:
-            shutil.copytree(
-                self.project_root / "proj" / "Script",
-                frozen_root / "proj" / "Script",
-                copy_function=copy_snapshot,
-            )
-            shutil.copytree(
-                self.project_root / "simulation",
-                frozen_root / "simulation",
-                copy_function=copy_snapshot,
-            )
+            if (self.project_root / "runtime.luac").is_file():
+                for path in _source_paths(self.project_root):
+                    copy_snapshot(str(path), str(frozen_root / path.name))
+            else:
+                shutil.copytree(
+                    self.project_root / "proj" / "Script",
+                    frozen_root / "proj" / "Script",
+                    copy_function=copy_snapshot,
+                )
+                shutil.copytree(
+                    self.project_root / "simulation",
+                    frozen_root / "simulation",
+                    copy_function=copy_snapshot,
+                )
             frozen_data_root = frozen_root / "selected_data"
             shutil.copytree(self.data_root, frozen_data_root, copy_function=copy_snapshot)
-            paths = sorted((frozen_root / "proj" / "Script").rglob("*.lua"))
-            paths += sorted((frozen_root / "simulation").rglob("*.lua"))
             self.source_digest = _source_digest(
-                (path.relative_to(frozen_root).as_posix(), copied[path]) for path in paths
+                (path.relative_to(frozen_root).as_posix(), copied[path]) for path in _source_paths(frozen_root)
             )
             self.data_digest = _data_digest(
                 (path.name, copied[path]) for path in sorted(frozen_data_root.glob("*.json"))
@@ -137,11 +152,13 @@ class FishSourceRuntime:
         executable = shutil.which(self.lua_executable)
         if executable is None:
             raise FishSourceRuntimeError("simulation_lua_unavailable")
-        entry = self.project_root / "simulation" / "cli.lua"
+        entry = source_runtime_entry(self.project_root)
         if not entry.is_file():
             raise FishSourceRuntimeError("simulation_host_unavailable")
         frozen_root = self._freeze_source()
-        entry = frozen_root / "simulation" / "cli.lua"
+        entry = source_runtime_entry(frozen_root)
+        if entry.name == "runtime.luac":
+            executable = str(frozen_root / "lua55.exe")
         self._stderr = tempfile.TemporaryFile(mode="w+b")
         try:
             self._process = subprocess.Popen(

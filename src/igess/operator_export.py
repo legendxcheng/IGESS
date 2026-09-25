@@ -3,19 +3,25 @@
 from __future__ import annotations
 
 import ast
-from dataclasses import dataclass
 import hashlib
 import json
 import os
-from pathlib import Path, PurePosixPath
 import shutil
 import subprocess
 import sys
 import tempfile
-from typing import Any, Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from pathlib import Path, PurePosixPath
+from typing import Any
 
 import yaml
 
+from .fish_source_package import (
+    LUA_BYTECODE_HEADER,
+    RUNTIME_FILES,
+    build_fish_source_package,
+)
 
 _DELIVERY_MANIFEST = ".igess-delivery-manifest.json"
 _OPERATOR_MANIFEST = "operator-manifest.json"
@@ -36,7 +42,7 @@ _ALLOWED_ASSETS = frozenset(
         "igess/reporting/assets/report.js",
     }
 )
-_FORBIDDEN_SUFFIXES = frozenset({".py", ".pyi", ".map", ".pem", ".key"})
+_FORBIDDEN_SUFFIXES = frozenset({".py", ".pyi", ".lua", ".map", ".pem", ".key"})
 _FORBIDDEN_PARTS = frozenset(
     {".git", ".github", ".pytest_cache", "__pycache__", "tests", "test"}
 )
@@ -86,6 +92,7 @@ def export_operator_toolkit(
         raise ToolkitExportError("economy.yaml 未定义可发布场景。")
     scenarios = tuple(sorted(str(item) for item in scenarios_value))
     schema_path = _configured_schema(project, config, engine_id)
+    lua_source_root = None
 
     with tempfile.TemporaryDirectory(prefix="igess-operator-export-") as temporary:
         staging = Path(temporary) / "candidate"
@@ -94,6 +101,18 @@ def export_operator_toolkit(
         _stage_reporting_assets(source_package, staging / "igess")
         bundle = staging / "bundle"
         bundle.mkdir()
+        if engine_id == "fish_source":
+            settings = config.get("engine", {}).get("source_runtime", {})
+            root_value = settings.get("project_root")
+            if not isinstance(root_value, str) or not root_value:
+                raise ToolkitExportError("同源 Fish 项目缺少 source_runtime.project_root。")
+            lua_source_root = (project / root_value).resolve(strict=True)
+            try:
+                build_fish_source_package(
+                    lua_source_root, bundle / "fish-runtime", settings.get("lua_executable", "lua55"),
+                )
+            except (OSError, ValueError, subprocess.SubprocessError) as error:
+                raise ToolkitExportError(f"同源 Lua 运行包构建失败：{error}") from error
         bundled_config = _distribution_config(config, engine_id)
         (bundle / "economy.yaml").write_text(
             yaml.safe_dump(bundled_config, allow_unicode=True, sort_keys=False),
@@ -137,7 +156,7 @@ def export_operator_toolkit(
         _scan_candidate(
             staging,
             managed,
-            forbidden_roots=(repository, project, schema_path.parent if schema_path else None),
+            forbidden_roots=(repository, project, schema_path.parent if schema_path else None, lua_source_root),
         )
         old_managed = _read_old_managed_files(output)
         removed = _synchronize(staging, output, managed, old_managed)
@@ -357,6 +376,11 @@ def _write_root_files(
         encoding="utf-8-sig",
         newline="",
     )
+    engine_note = (
+        "\n本版本使用 Fish 同源模拟规则，已附带 Lua 运行环境，无需另行安装 Lua 或获取游戏源码。\n"
+        "升级后请重新运行所需场景；旧版本历史保留，不支持跨工具版本比较。\n"
+        if engine_id == "fish_source" else ""
+    )
     (staging / "使用说明.md").write_text(
         "# IGESS 数值调优工作台\n\n"
         "## 首次使用\n\n"
@@ -368,7 +392,8 @@ def _write_root_files(
         "2. 在工作台填写 JSON 目录，选择预设场景并运行。\n"
         "3. 在历史中查看报表、对比和固定回归结果。\n"
         "4. 工具更新时先关闭工作台，再执行 `git pull`。\n\n"
-        "工具完全离线，导表目录只读；本地历史位于 `%LOCALAPPDATA%\\IGESS Operator`，不会自动删除。\n",
+        "工具完全离线，导表目录只读；本地历史位于 `%LOCALAPPDATA%\\IGESS Operator`，不会自动删除。\n"
+        + engine_note,
         encoding="utf-8",
         newline="\n",
     )
@@ -401,6 +426,8 @@ def _scan_candidate(
         if not _allowed_delivery_path(relative):
             raise ToolkitExportError(f"发布候选包含未获准文件：{relative}")
         encoded = path.read_bytes()
+        if relative == "bundle/fish-runtime/runtime.luac" and not encoded.startswith(LUA_BYTECODE_HEADER):
+            raise ToolkitExportError("同源运行包必须是 Lua 5.5 字节码，不能包含 Lua 源码。")
         if any(marker and marker in encoded for marker in forbidden_bytes):
             raise ToolkitExportError(f"发布候选泄露源码或构建绝对路径：{relative}")
 
@@ -410,6 +437,8 @@ def _allowed_delivery_path(relative: str) -> bool:
         return True
     path = PurePosixPath(relative)
     if relative == "bundle/economy.yaml" or relative == "bundle/schema.pyc":
+        return True
+    if path.parent == PurePosixPath("bundle/fish-runtime") and path.name in RUNTIME_FILES:
         return True
     return len(path.parts) >= 2 and path.parts[0] == "igess" and path.suffix == ".pyc"
 
@@ -526,6 +555,11 @@ def _distribution_config(config: Mapping[str, Any], engine_id: str) -> dict[str,
         engine = copied.setdefault("engine", {})
         engine["data_root"] = "__SELECTED_JSON_DIRECTORY__"
         engine["python_schema"] = "bundle/schema.pyc"
+    elif engine_id == "fish_source":
+        source_settings = copied.setdefault("engine", {}).setdefault("source_runtime", {})
+        source_settings["project_root"] = "bundle/fish-runtime"
+        source_settings["data_root"] = "__SELECTED_JSON_DIRECTORY__"
+        source_settings["lua_executable"] = "bundle/fish-runtime/lua55.exe"
     return copied
 
 

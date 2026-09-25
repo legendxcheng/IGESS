@@ -21,6 +21,7 @@ from .fish_source_runtime import (
     FishSourceRuntime,
     data_snapshot_digest,
     source_code_digest,
+    source_runtime_entry,
 )
 from .schema import EconomyModel, Event, SimulationResult, TimelineRow
 
@@ -82,7 +83,10 @@ def _affords(wallet: Mapping[str, Any], quote: Mapping[str, Any]) -> bool:
 def _integration_code_digest() -> str:
     digest = hashlib.sha256()
     for name in ("fish_source_engine.py", "fish_source_runtime.py", "fish_source_reports.py"):
-        contents = (Path(__file__).parent / name).read_bytes()
+        path = Path(__file__).parent / name
+        if not path.is_file():
+            path = path.with_suffix(".pyc")
+        contents = path.read_bytes()
         digest.update(name.encode("utf-8"))
         digest.update(len(contents).to_bytes(8, "big"))
         digest.update(contents)
@@ -154,7 +158,7 @@ class FishSourceEngineAdapter:
         if not data_root.is_dir():
             raise EngineAdapterError("fish_source_data_missing", str(data_root))
         data_root = data_root.resolve(strict=True)
-        if not (project_root / "simulation" / "cli.lua").is_file():
+        if not source_runtime_entry(project_root).is_file():
             raise EngineAdapterError("fish_source_host_missing", str(project_root))
         if not (data_root / "tbfish.json").is_file():
             raise EngineAdapterError("fish_source_data_missing", str(data_root))
@@ -269,6 +273,10 @@ class FishSourceEngineAdapter:
                 "generated_money_definition": "source_collected_slot_receipts_plus_current_unclaimed",
             },
         }
+        package_manifest = project_root / "runtime.json"
+        if (project_root / "runtime.luac").is_file():
+            packaged = json.loads(package_manifest.read_text(encoding="utf-8"))
+            metadata["source_runtime"]["packaged_source_code_sha256"] = packaged["source_code_sha256"]
         return PreparedEngine(
             self.engine_id, model, f"sha256:{fingerprint}",
             metadata, inputs,
