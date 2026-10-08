@@ -39,6 +39,25 @@ git diff
 
 确认没有意外交付内容后，再由所有者自行提交和推送。
 
+### 同源 Fish Lua 工具包
+
+导出 `projects/fish_source` 时需要 Lua 5.5 x64。首次检出或更新 Fish 源项目后，
+先在 Fish 源项目根目录用官方脚本生成并校验客户端配置指纹：
+
+```powershell
+lua55 scripts/generate_client_config_identity.lua
+lua55 scripts/generate_client_config_identity.lua --check
+```
+
+该步骤读取已导出的 Lua 表，仅生成被 Git 忽略的
+`proj/Script/Config/Generated/client_config_identity.lua`，不修改生产 JSON。
+缺少该文件会阻止依赖闭包打包，即使本次模拟没有执行客户端分支。
+
+Lua 打包器递归收集静态依赖；对于 `require("Script.Application." .. moduleName)`
+这样的字面量前缀动态引用，会保守纳入该前缀下所有本地模块及其依赖，
+不把前缀本身当作完整模块名。它不会执行这些额外模块，也不会打包
+`Script.Table.*` 数值表；实际数值仍来自工作台所选 JSON。缺失依赖继续阻止导出。
+
 ## 更新报表前端
 
 编辑 `src/igess/reporting/assets/report.js` 后，必须重新生成提交到源码仓库的生产资产：
@@ -70,4 +89,3 @@ pytest tests/test_operator_toolkit.py -q
 ```
 
 建议再用实际分发产物与 Fish 生产 JSON 运行一次 `smoke`。
-

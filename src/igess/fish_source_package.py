@@ -59,10 +59,19 @@ def _modules(root: Path) -> dict[str, Path]:
         if path is None:
             raise ValueError(f"Lua runtime dependency unavailable: {name}")
         included[name] = path
-        pending.extend(
-            "".join(re.findall(r'''["']([\w.]+)["']''', expression))
-            for expression in _REQUIRE.findall(path.read_text(encoding="utf-8-sig"))
-        )
+        text = path.read_text(encoding="utf-8-sig")
+        for match in _REQUIRE.finditer(text):
+            dependency = "".join(re.findall(r'''["']([\w.]+)["']''', match[1]))
+            if re.match(r"\s*\.\.", text[match.end():]):
+                # A literal prefix followed by a runtime expression is not a
+                # complete module name. Ship every possible local candidate and
+                # recursively validate its dependencies, including lazy ones.
+                candidates = sorted(name for name in available if name.startswith(dependency))
+                if not candidates:
+                    raise ValueError(f"Lua runtime dependency unavailable: {dependency}*")
+                pending.extend(candidates)
+            else:
+                pending.append(dependency)
     return included
 
 
