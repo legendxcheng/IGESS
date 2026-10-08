@@ -441,6 +441,12 @@ def _fish_balance_profiles(
             "daily_online_seconds": chart_point(daily_online_seconds),
             "rate_rows": rate_rows,
             "cumulative_rows": cumulative_rows,
+            "remaining_rows": _fish_remaining_rows(
+                data.timeline,
+                data.events,
+                profile_id=profile_id,
+                daily_online_seconds=daily_online_seconds,
+            ),
         }
         behavior_profile = behavior_profiles.get(profile_id)
         if isinstance(behavior_profile, dict):
@@ -598,6 +604,64 @@ def _fish_economy_rows(
             }
         )
     return rate_rows, cumulative_rows
+
+
+def _fish_remaining_rows(
+    timeline: list[dict[str, Any]],
+    events: list[dict[str, Any]],
+    *,
+    profile_id: str,
+    daily_online_seconds: int,
+) -> list[dict[str, Any]]:
+    balance_fields = {
+        "money": ("money_after_fish_upgrade", "money_after_barbell_synthesis"),
+        "material": (
+            "material_after_fish_sale", "material_after_fish_hall_upgrade",
+            "material_after_torpedo_purchase", "material_after_trash_man_breakthrough",
+        ),
+    }
+    observations = []
+    for event in events:
+        if str(event.get("profile_id", "")) != profile_id:
+            continue
+        details = event.get("details", {})
+        if not isinstance(details, dict):
+            continue
+        resources = {}
+        for currency, fields in balance_fields.items():
+            for field in fields:
+                if field in details:
+                    resources[currency] = details[field]
+                    break
+        if resources:
+            observations.append({
+                "time_seconds": event.get("time_seconds", 0),
+                "resources": resources,
+                "source_event_kind": event.get("kind"),
+            })
+    # Timeline records hold both balances after all events at that timestamp.
+    observations.extend(
+        snapshot for snapshot in timeline
+        if str(snapshot.get("profile_id", "")) == profile_id
+    )
+    rows = []
+    for snapshot in observations:
+        wall_time = int(snapshot.get("time_seconds", 0))
+        active_time = _active_seconds_at(
+            wall_time, daily_online_seconds=daily_online_seconds
+        )
+        resources = snapshot.get("resources", {})
+        rows.append({
+            "profile_id": profile_id,
+            "wall_time_seconds": wall_time,
+            "wall_time": chart_point(wall_time),
+            "active_time_seconds": active_time,
+            "active_time": chart_point(active_time),
+            "source_event_kind": snapshot.get("source_event_kind"),
+            "money_remaining": chart_point(resources.get("money")),
+            "resource_remaining": chart_point(resources.get("material")),
+        })
+    return sorted(rows, key=lambda row: row["wall_time_seconds"])
 
 
 def _active_seconds_at(

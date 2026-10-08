@@ -193,9 +193,41 @@ def test_fish_balance_curves_use_online_gross_output_and_daily_growth(
                 "time_seconds": 0,
                 "resources": {"money": "0", "material": "0"},
                 "total_cps": "0",
-            }
+            },
+            {
+                "profile_id": "default",
+                "time_seconds": 500,
+                "resources": {"money": "1000099", "material": "1000014"},
+            },
+            {
+                "profile_id": "default",
+                "time_seconds": 300,
+                "resources": {"money": "100", "material": "15"},
+            },
+            {
+                "profile_id": "default",
+                "time_seconds": 86460,
+                "resources": {"money": "1000799", "material": "1000114"},
+            },
+            {
+                "profile_id": "other",
+                "time_seconds": 100,
+                "resources": {"money": "999", "material": "999"},
+            },
         ],
         events=[
+            {
+                "profile_id": "default",
+                "time_seconds": 200,
+                "kind": "fish_upgraded",
+                "details": {"money_after_fish_upgrade": "50"},
+            },
+            {
+                "profile_id": "other",
+                "time_seconds": 200,
+                "kind": "fish_upgraded",
+                "details": {"money_after_fish_upgrade": "999"},
+            },
             {
                 "profile_id": "default",
                 "time_seconds": 60,
@@ -318,6 +350,16 @@ def test_fish_balance_curves_use_online_gross_output_and_daily_growth(
     assert balance["cumulative_rows"][-1]["resource_acquired_cumulative"][
         "exact_value"
     ] == "330"
+    remaining = balance["remaining_rows"]
+    assert [row["wall_time_seconds"] for row in remaining] == [0, 200, 300, 500, 86460]
+    assert [row["active_time_seconds"] for row in remaining] == [0, 200, 300, 300, 360]
+    assert [row["money_remaining"]["exact_value"] for row in remaining] == [
+        "0", "50", "100", "1000099", "1000799",
+    ]
+    assert [row["resource_remaining"]["exact_value"] for row in remaining] == [
+        "0", None, "15", "1000014", "1000114",
+    ]
+    assert remaining[1]["source_event_kind"] == "fish_upgraded"
 
     days = fish["persistent"]["profiles"]["default"]["days"]
     assert [day["day_index"] for day in days] == [1, 2]

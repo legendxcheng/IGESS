@@ -76,6 +76,8 @@ def test_generate_static_report_writes_html_and_assets(tmp_path):
     assert "摸鱼经济对称性总览" in html
     assert "fish-acquisition-rate-chart" in html
     assert "fish-cumulative-output-chart" in html
+    assert "fish-remaining-chart" in html
+    assert "data-fish-economy-scale" in html
     assert "data-weekly-progression-charts" in html
     assert "data-daily-progression-charts" in html
     assert "事件时间线" in html
@@ -111,7 +113,8 @@ def test_generate_static_report_writes_chart_rendering_asset(tmp_path):
     assert "renderOverview" in script
     assert "renderFishAcquisitionRateChart" in script
     assert "renderFishCumulativeOutputChart" in script
-    assert "每秒获得的资源量与金钱量（5分钟窗口）" in script
+    assert "renderFishRemainingChart" in script
+    assert "资源和金币每秒产出" in script
     assert "resource_per_second" in script
     assert "trash_per_second" not in script
     assert "renderDailyProgressionCharts" in script
@@ -122,6 +125,84 @@ def test_generate_static_report_writes_chart_rendering_asset(tmp_path):
     assert "exact_value" in script
     assert "exact-value" in script
     assert "escapeHtml" in script
+
+
+@pytest.mark.skipif(NODE is None, reason="Node.js is required to execute the report renderer")
+@pytest.mark.parametrize("asset_name", ["report.js", "report.min.js"])
+def test_fish_economy_charts_render_zero_balances_and_switch_all_three_axes(asset_name):
+    harness = r"""
+const fs = require('fs');
+const vm = require('vm');
+const point = value => ({exact_value: String(value), display_value: String(value), chart_value: value});
+const row = (time, fields) => ({active_time_seconds: time, active_time: point(time),
+  ...Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, point(value)]))});
+const balance = {rate_sample_interval_active_seconds: point(300), profiles: {default: {
+  rate_rows: [row(300, {resource_per_second: 0, money_per_second: 2}),
+              row(600, {resource_per_second: 1, money_per_second: 4})],
+  cumulative_rows: [row(300, {resource_acquired_cumulative: 0, money_acquired_cumulative: 600}),
+                    row(600, {resource_acquired_cumulative: 300, money_acquired_cumulative: 1800})],
+  remaining_rows: [row(0, {resource_remaining: 0, money_remaining: 0}),
+                   row(300, {resource_remaining: 30, money_remaining: 500}),
+                   {...row(450, {money_remaining: 25}),
+                     resource_remaining: {exact_value: null, chart_value: null}},
+                   {...row(600, {resource_remaining: 0, money_remaining: 100}),
+                     wall_time_seconds: 86400, wall_time: point(86400)}],
+}}};
+const report = {scenario: {id: 'fixture', profiles: ['default']}, overview: {}, series: {},
+  diagnostics: {}, evidence: {}, fish_progression: {
+    available: true, core: {profiles: {default: {rows: [], summary: {}}}}, balance,
+  }};
+const elements = {};
+const options = {};
+const handlers = {};
+const element = key => elements[key] || (elements[key] = {
+  hidden: false, innerHTML: '', textContent: '', dataset: {}, classList: {toggle() {}},
+  addEventListener(kind, handler) { handlers[key + ':' + kind] = handler; },
+  querySelectorAll(selector) { return selector === '[data-fish-economy-scale]'
+    ? [element('linear'), element('log')] : []; },
+});
+element('linear').dataset.fishEconomyScale = 'linear';
+element('log').dataset.fishEconomyScale = 'log';
+vm.runInNewContext(fs.readFileSync(process.argv[1], 'utf8'), {
+  document: {
+    getElementById: id => id === 'igess-report-data' ? {textContent: JSON.stringify(report)} : element(id),
+    querySelector: element,
+  },
+  window: {addEventListener() {}}, console,
+  echarts: {init: target => ({setOption: option => {
+    const id = Object.keys(elements).find(key => elements[key] === target);
+    options[id] = option;
+  }, dispose() {}, resize() {}})},
+});
+setImmediate(() => {
+  const snapshot = () => JSON.parse(JSON.stringify(options));
+  const linear = snapshot();
+  const remaining = options['fish-remaining-chart'];
+  const tooltip = remaining.tooltip.formatter([{seriesName: remaining.series[0].name,
+    data: remaining.series[0].data[2]}]);
+  handlers['log:click']();
+  const logarithmic = snapshot();
+  handlers['linear:click']();
+  process.stdout.write(JSON.stringify({linear, logarithmic, restored: snapshot(), tooltip}));
+});
+"""
+    completed = subprocess.run(
+        [NODE, "--unhandled-rejections=strict", "-e", harness,
+         str(Path("src/igess/reporting/assets", asset_name).resolve())],
+        capture_output=True, text=True, encoding="utf-8", check=True,
+    )
+    rendered = json.loads(completed.stdout)
+    for chart_id in ("fish-acquisition-rate-chart", "fish-cumulative-output-chart", "fish-remaining-chart"):
+        assert rendered["linear"][chart_id]["yAxis"]["type"] == "value"
+        assert rendered["logarithmic"][chart_id]["yAxis"]["type"] == "log"
+        assert rendered["restored"][chart_id] == rendered["linear"][chart_id]
+    series = rendered["linear"]["fish-remaining-chart"]["series"]
+    assert [item["name"] for item in series] == ["默认玩家 · 剩余资源", "默认玩家 · 剩余金币"]
+    assert [item["value"][1] for item in series[0]["data"]] == [0, 30, 0]
+    assert [item["value"][1] for item in series[1]["data"]] == [0, 500, 25, 100]
+    log_series = rendered["logarithmic"]["fish-remaining-chart"]["series"]
+    assert [item["value"][1] for item in log_series[0]["data"]] == [None, 30, None]
+    assert "模拟时间" in rendered["tooltip"]
 
 
 @pytest.mark.parametrize("asset_name", ["report.js", "report.min.js"])

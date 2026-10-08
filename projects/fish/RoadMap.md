@@ -1,7 +1,14 @@
 # Fish 模拟 RoadMap
 
-更新时间：2026-09-25
+更新时间：2026-10-08
 项目范围：`projects/fish` 与 Fish 领域模拟代码
+
+## 2026-10-08 资源与金币三类经济折线图
+
+- Python 后端 `projects/fish` 报表集中展示资源和金币的每秒产出、累计产出、当前剩余，统一使用累计在线时间，支持线性（含零）与对数坐标切换。每秒速率沿用默认 5 分钟在线窗口平均；累计值为在线毛产出，资源包含加工和卖鱼。
+- 当前剩余使用钱包采样及升级、购买、突破资助、卖鱼回执中的实际余额，包含离线入账并已扣消费；未记录另一种货币的回执不推算其余额。
+- 使用既有模拟产物重生成最新 smoke、1／7／30 天报表。余额记录分别为 11／126／722／2826 条；逐条核对钱包及回执数值一致。30 天旧 timeline 仅有 31 条记录，现补入 2795 条实际操作后余额。
+- 报表、前端原始／压缩资产、同源后端兼容性、实时报告及 dashboard 相关检查 61 passed；代码见 [`view_model.py`](../../src/igess/reporting/view_model.py)、[`report.js`](../../src/igess/reporting/assets/report.js)，验证见 [`test_reporting.py`](../../tests/test_reporting.py) 和 [`test_reporting_view_model.py`](../../tests/test_reporting_view_model.py)。
 
 ## 2026-09-25 同源在线采样恢复
 

@@ -177,10 +177,12 @@ function renderSourceFish(fish) {
     core.querySelector('h2').textContent = '力量与幸运值';
     core.querySelector('.section-note').textContent = notes.core || '';
   }
-  ['fish-acquisition-rate-chart', 'fish-cumulative-output-chart'].forEach(id => {
+  ['fish-acquisition-rate-chart', 'fish-cumulative-output-chart', 'fish-remaining-chart'].forEach(id => {
     const element = document.getElementById(id);
     if (element) element.hidden = true;
   });
+  const economyControls = document.querySelector('[data-fish-economy-controls]');
+  if (economyControls) economyControls.hidden = true;
   const strength = document.getElementById('core-strength-chart');
   if (strength) strength.hidden = false;
   renderCoreStrengthChart((fish.core || {}).profiles || {}, true);
@@ -290,12 +292,30 @@ function renderCoreProgression(core, balance = {}, source = false) {
       ].join('');
     }).join('');
   }
-  renderFishAcquisitionRateChart(balance.profiles || {});
-  renderFishCumulativeOutputChart(balance.profiles || {});
+  if (!source) renderFishEconomyCharts(balance);
   renderLuckProgressionChart(profiles, source);
 }
 
-function renderFishAcquisitionRateChart(profiles) {
+function renderFishEconomyCharts(balance) {
+  const profiles = balance.profiles || {};
+  const interval = balance.rate_sample_interval_active_seconds;
+  const render = logarithmic => {
+    renderFishAcquisitionRateChart(profiles, logarithmic, interval);
+    renderFishCumulativeOutputChart(profiles, logarithmic);
+    renderFishRemainingChart(profiles, logarithmic);
+  };
+  const controls = document.querySelector('[data-fish-economy-controls]');
+  if (controls) {
+    const buttons = controls.querySelectorAll('[data-fish-economy-scale]');
+    buttons.forEach(button => button.addEventListener('click', () => {
+      buttons.forEach(item => item.classList.toggle('active', item === button));
+      render(button.dataset.fishEconomyScale === 'log');
+    }));
+  }
+  render(false);
+}
+
+function renderFishAcquisitionRateChart(profiles, logarithmic = false, interval = null) {
   const series = [];
   Object.entries(profiles).forEach(([profileId, profile]) => {
     const rows = profile.rate_rows || [];
@@ -303,7 +323,7 @@ function renderFishAcquisitionRateChart(profiles) {
       ['资源/秒', 'resource_per_second', '#16a34a'],
       ['卖鱼材料/秒', 'fish_sale_material_per_second', '#f59e0b'],
       ['加工材料/秒', 'trash_material_per_second', '#14b8a6'],
-      ['金钱/秒', 'money_per_second', '#2563eb'],
+      ['金币/秒', 'money_per_second', '#2563eb'],
     ].forEach(([label, field, color]) => {
       series.push({
         name: `${profileLabel(profileId)} · ${label}`,
@@ -312,24 +332,24 @@ function renderFishAcquisitionRateChart(profiles) {
         connectNulls: false,
         lineStyle: { width: 2 },
         itemStyle: { color },
-        data: fishEconomyLineData(rows, field, { positiveOnly: true }),
+        data: fishEconomyLineData(rows, field, { positiveOnly: logarithmic }),
       });
     });
   });
   replaceChart('fish-acquisition-rate-chart', fishBalanceLineOption(
-    '每秒获得的资源量与金钱量（5分钟窗口）',
+    `资源和金币每秒产出${interval && Number.isFinite(interval.chart_value) ? '（' + formatDurationCompact(interval.chart_value) + '在线窗口）' : ''}`,
     series,
-    '每秒获得量 · 对数同轴',
-    { logarithmic: true }
+    logarithmic ? '每秒产出 · 对数同轴' : '每秒产出',
+    { logarithmic }
   ));
 }
 
-function renderFishCumulativeOutputChart(profiles) {
+function renderFishCumulativeOutputChart(profiles, logarithmic = false) {
   const series = [];
   Object.entries(profiles).forEach(([profileId, profile]) => {
     const rows = profile.cumulative_rows || [];
     [
-      ['累计金钱', 'money_acquired_cumulative', '#2563eb'],
+      ['累计金币', 'money_acquired_cumulative', '#2563eb'],
       ['累计资源', 'resource_acquired_cumulative', '#16a34a'],
     ].forEach(([label, field, color]) => {
       series.push({
@@ -339,15 +359,33 @@ function renderFishCumulativeOutputChart(profiles) {
         connectNulls: false,
         lineStyle: { width: 2 },
         itemStyle: { color },
-        data: fishEconomyLineData(rows, field, { positiveOnly: true }),
+        data: fishEconomyLineData(rows, field, { positiveOnly: logarithmic }),
       });
     });
   });
   replaceChart('fish-cumulative-output-chart', fishBalanceLineOption(
-    '累计获得的金钱量与资源量',
+    '资源和金币累计产出',
     series,
-    '累计毛产出 · 对数同轴',
-    { logarithmic: true }
+    logarithmic ? '累计毛产出 · 对数同轴' : '累计毛产出',
+    { logarithmic }
+  ));
+}
+
+function renderFishRemainingChart(profiles, logarithmic = false) {
+  const series = Object.entries(profiles).flatMap(([profileId, profile]) => [
+    ['剩余资源', 'resource_remaining', '#16a34a'],
+    ['剩余金币', 'money_remaining', '#2563eb'],
+  ].map(([label, field, color]) => ({
+    name: `${profileLabel(profileId)} · ${label}`,
+    type: 'line', showSymbol: false, connectNulls: false,
+    lineStyle: { width: 2 }, itemStyle: { color },
+    data: fishEconomyLineData((profile.remaining_rows || []).filter(row =>
+      row[field] && row[field].exact_value != null
+    ), field, { positiveOnly: logarithmic }),
+  })));
+  replaceChart('fish-remaining-chart', fishBalanceLineOption(
+    '资源和金币当前剩余', series,
+    logarithmic ? '可用余额 · 对数同轴' : '可用余额', { logarithmic }
   ));
 }
 
@@ -381,18 +419,18 @@ function renderSourceMaterial(fish) {
 }
 
 function fishEconomyLineData(rows, field, { positiveOnly = false } = {}) {
-  return rows
-    .filter(row => Number.isFinite(row[field] && row[field].chart_value))
-    .map(row => ({
+  return rows.map(row => {
+    const point = row[field];
+    const value = point && point.chart_value;
+    return {
       value: [
         Number(row.active_time_seconds || 0),
-        positiveOnly && row[field].chart_value <= 0
-          ? null
-          : row[field].chart_value,
+        Number.isFinite(value) && (!positiveOnly || value > 0) ? value : null,
       ],
       row,
       field,
-    }));
+    };
+  });
 }
 
 function fishBalanceLineOption(title, series, yAxisName, { logarithmic = false } = {}) {
@@ -403,7 +441,7 @@ function fishBalanceLineOption(title, series, yAxisName, { logarithmic = false }
   return {
     title: {
       text: title,
-      subtext: logarithmic ? '同一纵轴比较数量级；仅显示大于 0 的窗口' : '',
+      subtext: logarithmic ? '同一纵轴比较数量级；零值请切换线性视图' : '线性视图包含零值',
       left: 'center',
       textStyle: { fontSize: 15 },
       subtextStyle: { fontSize: 11, color: '#64748b' },
@@ -416,6 +454,7 @@ function fishBalanceLineOption(title, series, yAxisName, { logarithmic = false }
         return [
           `<strong>${escapeHtml(param.seriesName)}</strong>：${numericTooltip(row[datum.field])}`,
           `累计在线：${formatDurationClock(row.active_time_seconds)}（${numericTooltip(row.active_time, '秒')}）`,
+          ...(row.wall_time ? [`模拟时间：${formatDurationClock(row.wall_time_seconds)}（${numericTooltip(row.wall_time, '秒')}）`] : []),
         ].join('<br>');
       }).join('<br><br>'),
     },
