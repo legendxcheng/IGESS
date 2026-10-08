@@ -14,7 +14,7 @@ def _dto(value: str) -> dict:
     return {"sign": 1, "coeff": value, "exp": 0}
 
 
-def _source_run(tmp_path: Path) -> Path:
+def _source_run(tmp_path: Path, *, record_income: bool = False) -> Path:
     def event(time, kind, receipt):
         return {
             "profile_id": "default",
@@ -44,6 +44,11 @@ def _source_run(tmp_path: Path) -> Path:
         }
         for time, strength, luck in [(0, "2", "1"), (60, "0", None), (86460, "5", "2")]
     ]
+    if record_income:
+        for sample, money, material, sale in zip(samples, ("0", "120", "420"), ("0", "60", "160"), ("0", "10", "20")):
+            sample.update({"online_money_acquired_cumulative": money,
+                           "online_resource_acquired_cumulative": material,
+                           "online_fish_sale_material_cumulative": sale})
     events = [
         event(1, "prepare_throw", {"fishRollPower": _dto("9" * 200)}),
         event(2, "complete_throw", {"newFishInstanceIds": [1]}),
@@ -148,6 +153,23 @@ def test_source_report_restores_readable_panels_without_inventing_metrics(tmp_pa
     assert all("receipt" not in row["details"] for row in report["series"]["events"])
     assert "source_progression" in report["artifacts"]
     assert "采样" in fish["notes"]["core"]
+    balance = fish["balance"]["profiles"]["default"]
+    assert balance["rate_rows"] == []
+    assert balance["cumulative_rows"] == []
+    assert [row["resource_remaining"]["exact_value"] for row in balance["remaining_rows"]] == ["0", "4", "0"]
+
+
+def test_source_report_uses_recorded_online_counters_for_all_three_economy_charts(tmp_path):
+    run = _source_run(tmp_path, record_income=True)
+    index = generate_static_report(run, tmp_path / "report")
+    report = json.loads((index.parent / "report_data.json").read_text(encoding="utf-8"))
+    balance = report["fish_progression"]["balance"]["profiles"]["default"]
+    assert [row["active_time_seconds"] for row in balance["rate_rows"]] == [60, 120]
+    assert [row["money_per_second"]["chart_value"] for row in balance["rate_rows"]] == [2, 5]
+    assert balance["cumulative_rows"][-1]["resource_acquired_cumulative"]["exact_value"] == "160"
+    assert balance["cumulative_rows"][-1]["trash_material_cumulative"]["exact_value"] == "140"
+    assert balance["remaining_rows"][-1]["resource_remaining"]["exact_value"] == "0"
+    assert "排除离线奖励" in report["fish_progression"]["notes"]["economy"]
 
 
 def test_source_report_does_not_turn_missing_artifacts_into_zero_metrics(tmp_path):
@@ -161,13 +183,14 @@ def test_source_report_does_not_turn_missing_artifacts_into_zero_metrics(tmp_pat
 
 
 @pytest.mark.parametrize("asset", ["report.js", "report.min.js"])
+@pytest.mark.parametrize("record_income", [False, True])
 def test_source_report_browser_renderer_shows_charts_and_chinese_summary(
-    tmp_path, asset
+    tmp_path, asset, record_income
 ):
     node = shutil.which("node")
     if node is None:
         pytest.skip("Node is required for the report frontend")
-    index = generate_static_report(_source_run(tmp_path), tmp_path / "report")
+    index = generate_static_report(_source_run(tmp_path, record_income=record_income), tmp_path / "report")
     harness = r"""
 const fs = require('fs');
 const vm = require('vm');
@@ -247,6 +270,16 @@ setImmediate(() => {
     assert "资源" in material["title"]["text"]
     assert [point["value"][1] for point in material["series"][0]["data"]] == [0, 4, 0]
     assert material["yAxis"]["type"] == "value"
+    remaining = rendered["options"]["fish-remaining-chart"]
+    assert [point["value"][1] for point in remaining["series"][0]["data"]] == [0, 4, 0]
+    assert [point["value"][1] for point in remaining["series"][1]["data"]] == [10, 10, 10]
+    if record_income:
+        rate = rendered["options"]["fish-acquisition-rate-chart"]
+        coins = next(series for series in rate["series"] if "金币/秒" in series["name"])
+        assert [point["value"][1] for point in coins["data"]] == [2, 5]
+        cumulative = rendered["options"]["fish-cumulative-output-chart"]
+        coins = next(series for series in cumulative["series"] if "累计金币" in series["name"])
+        assert [point["value"][1] for point in coins["data"]] == [0, 120, 420]
     assert rendered["materialLog"]["yAxis"]["type"] == "log"
     assert [point["value"][1] for point in rendered["materialLog"]["series"][0]["data"]] == [None, 4, None]
     assert 'id="source-material-chart"' in index.read_text(encoding="utf-8")

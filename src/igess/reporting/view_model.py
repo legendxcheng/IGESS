@@ -292,12 +292,25 @@ def _source_fish_progression(source: dict[str, Any]) -> dict[str, Any]:
             **{key: chart_point(row.get(key)) for key in
                ("spendable_money", "unclaimed_money", "collected_money", "generated_money", "material")},
         } for row in rows]
+    balance = {}
+    for profile_id, profile in source["balance"].items():
+        balance[profile_id] = {}
+        for section, rows in profile.items():
+            balance[profile_id][section] = [{
+                **row, "active_time": chart_point(row["active_time_seconds"]),
+                **({"wall_time": chart_point(row["wall_time_seconds"])} if "wall_time_seconds" in row else {}),
+                **{key: chart_point(value) for key, value in row.items()
+                   if key.endswith(("_per_second", "_cumulative", "_remaining"))},
+            } for row in rows]
     return {"available": bool(core or persistent), "mode": "source_observations",
             "notes": source["notes"], "actions": source["actions"],
             "core": {"profiles": core, "peak_basis": "observed_samples"},
             "persistent": {"profiles": persistent, "event_noun": "成长操作"},
             "investment": {"scope": "source_receipts", "profiles": investment},
-            "liquidity": {"profiles": liquidity}, "balance": {"profiles": {}}}
+            "liquidity": {"profiles": liquidity}, "balance": {
+                "profiles": balance,
+                "rate_sample_interval_active_seconds": chart_point(source["rate_sample_interval_active_seconds"]),
+            }}
 
 
 def _source_periods(rows: list[dict[str, Any]], sessions: list[dict[str, Any]]) -> tuple[list, list]:

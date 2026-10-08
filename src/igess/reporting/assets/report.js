@@ -174,15 +174,10 @@ function renderSourceFish(fish) {
   const notes = fish.notes || {};
   const core = document.querySelector('[data-fish-core-section]');
   if (core) {
-    core.querySelector('h2').textContent = '力量与幸运值';
-    core.querySelector('.section-note').textContent = notes.core || '';
+    core.querySelector('h2').textContent = '资源、金币与力量成长';
+    core.querySelector('.section-note').textContent = (notes.economy || '') + (notes.core || '');
   }
-  ['fish-acquisition-rate-chart', 'fish-cumulative-output-chart', 'fish-remaining-chart'].forEach(id => {
-    const element = document.getElementById(id);
-    if (element) element.hidden = true;
-  });
-  const economyControls = document.querySelector('[data-fish-economy-controls]');
-  if (economyControls) economyControls.hidden = true;
+  renderFishEconomyCharts(fish.balance || {});
   const strength = document.getElementById('core-strength-chart');
   if (strength) strength.hidden = false;
   renderCoreStrengthChart((fish.core || {}).profiles || {}, true);
@@ -454,6 +449,7 @@ function fishBalanceLineOption(title, series, yAxisName, { logarithmic = false }
         return [
           `<strong>${escapeHtml(param.seriesName)}</strong>：${numericTooltip(row[datum.field])}`,
           `累计在线：${formatDurationClock(row.active_time_seconds)}（${numericTooltip(row.active_time, '秒')}）`,
+          ...(row.sample_window_seconds ? [`采样窗口：${formatDurationCompact(row.sample_window_seconds)}`] : []),
           ...(row.wall_time ? [`模拟时间：${formatDurationClock(row.wall_time_seconds)}（${numericTooltip(row.wall_time, '秒')}）`] : []),
         ].join('<br>');
       }).join('<br><br>'),

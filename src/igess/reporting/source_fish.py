@@ -257,13 +257,69 @@ def _investment(
     }
 
 
+def _economy(
+    samples: list[dict[str, Any]], events: list[dict[str, Any]],
+    sessions: list[dict[str, Any]],
+) -> dict[str, Any]:
+    cumulative, remaining = [], []
+    for sample in samples:
+        common = {
+            "active_time_seconds": _active_at(int(sample["time_seconds"]), sessions),
+            "wall_time_seconds": sample["time_seconds"],
+        }
+        remaining.append({
+            **common, "money_remaining": _text(sample.get("spendable_money")),
+            "resource_remaining": _text(sample.get("material")),
+        })
+        money = _text(sample.get("online_money_acquired_cumulative"))
+        material = _text(sample.get("online_resource_acquired_cumulative"))
+        sale = _text(sample.get("online_fish_sale_material_cumulative"))
+        if money is not None and material is not None and sale is not None:
+            cumulative.append({
+                **common, "money_acquired_cumulative": money,
+                "resource_acquired_cumulative": material,
+                "fish_sale_material_cumulative": sale,
+                "trash_material_cumulative": _sum([material, _decimal(sale).copy_negate()]),
+            })
+    for event in events:
+        receipt = event["receipt"]
+        if "moneyBalance" in receipt or "materialBalance" in receipt:
+            remaining.append({
+                "wall_time_seconds": event["time_seconds"],
+                "active_time_seconds": _active_at(int(event["time_seconds"]), sessions),
+                "money_remaining": _text(receipt.get("moneyBalance")),
+                "resource_remaining": _text(receipt.get("materialBalance")),
+            })
+    # Rebirth and offline boundaries may have several observations at the same active time.
+    by_active_time = {row["active_time_seconds"]: row for row in cumulative}
+    rates = []
+    for before, after in pairwise(by_active_time.values()):
+        elapsed = after["active_time_seconds"] - before["active_time_seconds"]
+        if elapsed <= 0:
+            continue
+        row = {"active_time_seconds": after["active_time_seconds"], "sample_window_seconds": elapsed}
+        for output, field in (
+            ("money_per_second", "money_acquired_cumulative"),
+            ("resource_per_second", "resource_acquired_cumulative"),
+            ("fish_sale_material_per_second", "fish_sale_material_cumulative"),
+            ("trash_material_per_second", "trash_material_cumulative"),
+        ):
+            delta = _decimal(_sum([after[field], _decimal(before[field]).copy_negate()]))
+            with localcontext() as context:
+                context.prec = max(80, len(delta.as_tuple().digits) + 40)
+                row[output] = str(delta / elapsed)
+        rates.append(row)
+    return {"rate_rows": rates, "cumulative_rows": cumulative,
+            "remaining_rows": sorted(remaining, key=lambda row: row["wall_time_seconds"])}
+
+
 def build_source_projection(data: ReportData) -> dict[str, Any]:
     sampling = data.manifest.get("source_runtime", {})
     sampling_note = "旧长场景主要按天采样。"
     if sampling.get("sampling_time_basis") == "online":
         interval = sampling.get("record_interval_seconds")
         sampling_note = f"每累计在线 {interval} 秒采样，另保存上下线、离线领取及重生前后状态。"
-    core, growth, investment, liquidity = {}, {}, {}, {}
+    core, growth, investment, liquidity, balance = {}, {}, {}, {}, {}
     counts: Counter[str] = Counter()
     actions = {}
     for profile in data.profiles:
@@ -279,6 +335,7 @@ def build_source_projection(data: ReportData) -> dict[str, Any]:
             key=lambda row: row["time_seconds"],
         )
         if samples:
+            balance[profile] = _economy(samples, events, sessions)
             core[profile] = _core(samples, sessions)
             liquidity[profile] = [
                 {
@@ -308,6 +365,8 @@ def build_source_projection(data: ReportData) -> dict[str, Any]:
         "persistent": {"profiles": growth},
         "investment": investment,
         "liquidity": liquidity,
+        "balance": balance,
+        "rate_sample_interval_active_seconds": sampling.get("record_interval_seconds") if sampling.get("sampling_time_basis") == "online" else None,
         "actions": actions,
         "purchase_count": counts["purchase_torpedo"] + counts["synthesize_barbell"],
         "rebirth_count": counts["rebirth_strength"] + counts["rebirth_trash_man"],
@@ -315,6 +374,7 @@ def build_source_projection(data: ReportData) -> dict[str, Any]:
         "rejection_count": counts["source_rejected"],
         "milestone_count": sum(len(profile["rows"]) for profile in growth.values()),
         "notes": {
+            "economy": "资源即材料，金币即金钱。每秒速率按相邻在线采样点的实际在线秒数平均，累计产出统计在线生产与卖鱼，排除离线奖励，不扣消费。领取鱼厅收入只转移金额，不重复计入产出。当前剩余为可花费的钱包余额，包含离线入账；待领金币单独展示。旧记录缺少在线累计产出时不补算，产出图显示未记录。",
             "core": "力量与双 Luck 来自已保存的源状态采样；峰值仅为采样点峰值。" + sampling_note + "这些状态不等于完整在线毛收入、真实峰值或精确最长停滞，未记录的指标不填零。",
             "persistent": "按实际上线/下线记录累计在线时间，离线等待不计入间隔。图中统计鱼雷、杠铃、鱼厅、两类重生及突破资助操作；“突破资助”仅表示支付材料，不代表训练已完成。单鱼升级不计入。",
             "investment": "支出与卖鱼收入直接汇总成功命令回执。原记录没有单次升级带来的产出变化、完整加工材料收入，因此对应指标显示为未记录；选鱼采用本次同源策略。",

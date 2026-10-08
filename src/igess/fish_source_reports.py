@@ -30,6 +30,10 @@ def write_source_progression_artifacts(
             "collected_money": resources["collected_money"],
             "generated_money": resources["generated_money"],
             "material": resources["material"],
+            **{field: resources.get(field) for field in (
+                "online_money_acquired_cumulative", "online_resource_acquired_cumulative",
+                "online_fish_sale_material_cumulative",
+            )},
             "strength": resources["strength"],
             "fish_luck": resources.get("fish_luck"),
             "trash_luck": resources.get("trash_luck"),

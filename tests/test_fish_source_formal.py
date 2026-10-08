@@ -80,6 +80,7 @@ def test_formal_source_smoke_uses_lua_receipts_and_writes_report(
     assert rows[-1]["resources"]["money"] == "0"
     assert rows[-1]["resources"]["unclaimed_money"] != "0"
     assert rows[-1]["resources"]["generated_money"] == rows[-1]["resources"]["unclaimed_money"]
+    assert rows[-1]["resources"]["online_money_acquired_cumulative"] == rows[-1]["resources"]["unclaimed_money"]
     assert rows[-1]["generators_owned"]["deployed_fish"] == 1
     assert any(event["kind"] == "complete_throw" for event in events)
     assert all("receipt" in event["details"] for event in events)
@@ -104,6 +105,9 @@ def test_formal_source_smoke_uses_lua_receipts_and_writes_report(
     assert report_data["fish_progression"]["available"] is True
     assert report_data["fish_progression"]["core"]["profiles"]["default"]["rows"]
     assert report_data["overview"]["throw_count"]["exact_value"] == "1"
+    balance = report_data["fish_progression"]["balance"]["profiles"]["default"]
+    assert balance["rate_rows"]
+    assert balance["cumulative_rows"][-1]["money_acquired_cumulative"]["chart_value"] > 0
 
 
 def test_formal_source_checkpoint_resumes_and_data_change_invalidates_it(tmp_path: Path) -> None:
@@ -236,5 +240,6 @@ def test_formal_source_online_sampling_preserves_gameplay_and_crosses_sessions(t
         assert read(dense_output, name) == read(sparse_output, name), name
     checkpoint = read(dense_output, "final_checkpoint.json")
     assert checkpoint["behavior_state"]["active_time_seconds"] == 700
+    assert checkpoint["behavior_state"]["online_acquisition"]["money"] == rows[-1]["resources"]["online_money_acquired_cumulative"]
     report = read(Path(dense.result["report_index"]).parent, "report_data.json")
     assert "300 秒采样" in report["fish_progression"]["notes"]["core"]

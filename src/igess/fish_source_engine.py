@@ -23,6 +23,7 @@ from .fish_source_runtime import (
     source_code_digest,
     source_runtime_entry,
 )
+from .fish_source_income import SourceIncome
 from .schema import EconomyModel, Event, SimulationResult, TimelineRow
 
 _BEHAVIORS = frozenset({
@@ -82,7 +83,7 @@ def _affords(wallet: Mapping[str, Any], quote: Mapping[str, Any]) -> bool:
 
 def _integration_code_digest() -> str:
     digest = hashlib.sha256()
-    for name in ("fish_source_engine.py", "fish_source_runtime.py", "fish_source_reports.py"):
+    for name in ("fish_source_engine.py", "fish_source_runtime.py", "fish_source_reports.py", "fish_source_income.py"):
         path = Path(__file__).parent / name
         if not path.is_file():
             path = path.with_suffix(".pyc")
@@ -271,6 +272,7 @@ class FishSourceEngineAdapter:
                 "advance_mode": advance_mode,
                 "sampling_time_basis": sampling_time_basis,
                 "generated_money_definition": "source_collected_slot_receipts_plus_current_unclaimed",
+                "online_acquisition_definition": "observed_balance_increases_plus_receipt_spending_excludes_offline_claims",
             },
         }
         package_manifest = project_root / "runtime.json"
@@ -401,6 +403,9 @@ class _ProfileRun:
         self.active_time_seconds = 0
         self.last_collect = -inputs.collect_interval_seconds
         self.blocked: dict[str, int] = {}
+        self.income = SourceIncome(
+            dict(existing.behavior_state.get("online_acquisition", {})) if existing else None
+        )
         if existing is None:
             self.state = runtime.create(
                 start_at=0, random_seed=seed,
@@ -431,6 +436,9 @@ class _ProfileRun:
             "unclaimed_money": _number(state["unclaimedMoney"]),
             "collected_money": _number(state["collectedMoney"]),
             "generated_money": _number(state["generatedMoney"]),
+            "online_money_acquired_cumulative": str(self.income.totals["money"]),
+            "online_resource_acquired_cumulative": str(self.income.totals["material"]),
+            "online_fish_sale_material_cumulative": str(self.income.totals["fish_sale_material"]),
             "total_throws": str(state["totalThrows"]),
             "trash_realm": str(state["trashMan"]["realmId"]),
             "strength_rebirth_count": str(state["rebirth"]["strength"]["completedCount"]),
@@ -471,14 +479,17 @@ class _ProfileRun:
             self._advance_to(target)
 
     def _advance_to(self, target: int, *, include_luck: bool = False) -> None:
+        before = self.state
         elapsed = target - self.state["time"]
         online = self.state["online"]
         self.runtime.request({"op": "advance", "time": target})
         self.state = self.runtime.request({"op": "query", "includeLuck": include_luck})
+        self.income.observe(before, self.state)
         if online:
             self.active_time_seconds += elapsed
 
     def _command(self, op: str, *, target: str = "", **arguments: Any) -> bool:
+        before = self.state
         observe_boundary = self.inputs.sampling_time_basis == "online" and op in {
             "rebirth_strength", "rebirth_trash_man", "claim_offline_reward",
         }
@@ -505,6 +516,7 @@ class _ProfileRun:
             op, target, {"receipt": json.dumps(receipt, ensure_ascii=False, sort_keys=True)},
         ))
         self.state = self.runtime.request({"op": "query", "includeLuck": False})
+        self.income.observe(before, self.state, op=op, receipt=receipt)
         if observe_boundary or (self.inputs.sampling_time_basis == "online" and op in {"go_online", "go_offline"}):
             self._record()
         return True
@@ -683,5 +695,6 @@ class _ProfileRun:
                 "active_time_seconds": self.active_time_seconds,
                 "last_collect": self.last_collect,
                 "blocked": self.blocked,
+                "online_acquisition": self.income.save(),
             },
         )
