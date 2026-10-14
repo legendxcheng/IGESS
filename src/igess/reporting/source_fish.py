@@ -14,6 +14,7 @@ from typing import Any
 from .loader import ReportData, ReportLoadError
 
 _MILESTONES = {
+    "treasure_beast_unlocked": ("treasure_beast", "treasure_beast_unlocked"),
     "purchase_torpedo": ("torpedo", "owned_torpedo_count"),
     "synthesize_barbell": ("barbell", "owned_barbell_count"),
     "upgrade_hall": ("fish_hall", "fish_hall_level"),
@@ -161,7 +162,11 @@ def _milestone(
     category, metric = _MILESTONES[kind]
     before = after = None
     item = event.get("item_id", "")
-    if kind == "upgrade_hall":
+    if kind == "treasure_beast_unlocked":
+        before, after = int(receipt["unlockedBefore"]), int(receipt["unlockedAfter"])
+        active = int(receipt["activeTimeSeconds"])
+        item = f"treasure_beast:第{receipt['areaIndex']}水域"
+    elif kind == "upgrade_hall":
         before, after = (
             receipt.get("previousUpgradeLevel"),
             receipt.get("currentUpgradeLevel"),
@@ -200,6 +205,8 @@ def _milestone(
         if left is not None and right is not None
         else None,
         "relative_delta": None,
+        **({"area_index": receipt.get("areaIndex"), "distance_cm": receipt.get("distanceCm")}
+           if kind == "treasure_beast_unlocked" else {}),
         "gap_from_previous_progression_seconds": active - previous,
     }
 
@@ -360,7 +367,7 @@ def build_source_projection(data: ReportData) -> dict[str, Any]:
         growth[profile] = _growth(events, sessions)
         investment[profile] = _investment(events, sessions)
         accepted = Counter(
-            row["kind"] for row in events if row["kind"] not in {"source_rejected", "gun_milestone"}
+            row["kind"] for row in events if row["kind"] not in {"source_rejected", "gun_milestone", "treasure_beast_unlocked"}
         )
         rejected = Counter(
             row.get("details", {}).get("code", "unknown")
