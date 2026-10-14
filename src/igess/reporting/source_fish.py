@@ -382,7 +382,13 @@ def build_source_projection(data: ReportData) -> dict[str, Any]:
         )
         counts.update(accepted)
         counts["source_rejected"] += sum(rejected.values())
+        tide_rounds = {}
+        for row in events:
+            if row["kind"] == "tide_observed":
+                fact = json.loads(row["details"]["receipt"])
+                tide_rounds[fact["roundId"]] = fact
         actions[profile] = {
+            "tide_rounds": list(tide_rounds.values()),
             "egg_events": [
                 {"time_seconds": row["time_seconds"], "kind": row["kind"], **row["details"]}
                 for row in events if row["kind"] in {"egg_admitted", "egg_hatched"}
