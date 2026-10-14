@@ -40,6 +40,7 @@ def write_source_progression_artifacts(
             "fish_luck": resources.get("fish_luck"),
             "trash_luck": resources.get("trash_luck"),
             "trash_realm": resources["trash_realm"],
+            "treasure_beast_unlocked": resources.get("treasure_beast_unlocked"),
             "total_throws": resources["total_throws"],
             "strength_rebirth_count": resources["strength_rebirth_count"],
             "trash_man_rebirth_count": resources["trash_man_rebirth_count"],
@@ -59,6 +60,8 @@ def write_source_progression_artifacts(
     for event in result.events:
         if event.kind == "gun_milestone":
             gun_milestones[event.profile_id].append({"time_seconds": event.time_seconds, **event.details})
+            continue
+        if event.kind == "treasure_beast_unlocked":
             continue
         if event.kind == "source_rejected":
             rejections[event.profile_id][event.details["code"]] += 1

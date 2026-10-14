@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately)
 
-Status: claimed
+Status: resolved
 
 本票执行《Fish 同源模拟：图鉴奖励、寻宝兽开放与鱼潮》规格；范围与边界以父规格为准。实现前在独立工作树确认基于当前集成分支，使用 tdd 技能；测试边界已获用户确认，无需再次询问。
 
@@ -26,3 +26,12 @@ Status: claimed
 - Lua 验证：simulation_guns_test、simulation_host_test、gun_progression_service_test 通过。覆盖未满拒绝、完成与领取／装备分离、重复领取、强化先于拥有、非图鉴拥有、装备失败、离线与换弹单价不变。
 - Python：新公开会话跨进程恢复、正式运行和 Web 产物、同场景 checkpoint 不重复记进展，以及既有源报告／收入测试共 12 项通过。测试使用受控历史图鉴 fixture，正式基线不注入付费资源。
 - 本票未运行 Editor／DS；鱼潮参与和完整长周期基线交由后续票。
+
+## Answer
+
+已在两个仓库的集成分支合并。图鉴枪领取、装备、强化与鱼潮开放通过公开会话接入正式策略和报告，永久事件及跨进程恢复已验证。
+
+- 源项目合并：55d1c2fe93cb7d3594f73ad36477a4b2aff95837。
+- IGESS 合并：49026b7b4e6264872edd33c2dafd6d4742d9e385。
+- 集成后验证：simulation_guns_test、simulation_host_test、gun_progression_service_test 全部通过；test_fish_source_guns 2 项及既有 source_fish_reporting / fish_source_income 10 项通过（共 12 项）。
+- 使用同源 Lua 会话及正式工作流测试；未启动 Editor / DS，未修改生产表。
