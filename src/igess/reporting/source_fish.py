@@ -367,7 +367,7 @@ def build_source_projection(data: ReportData) -> dict[str, Any]:
         growth[profile] = _growth(events, sessions)
         investment[profile] = _investment(events, sessions)
         accepted = Counter(
-            row["kind"] for row in events if row["kind"] not in {"source_rejected", "gun_milestone"}
+            row["kind"] for row in events if row["kind"] not in {"source_rejected", "gun_milestone", "treasure_beast_unlocked"}
         )
         rejected = Counter(
             row.get("details", {}).get("code", "unknown")

@@ -59,6 +59,8 @@ def write_source_progression_artifacts(
         if event.kind == "gun_milestone":
             gun_milestones[event.profile_id].append({"time_seconds": event.time_seconds, **event.details})
             continue
+        if event.kind == "treasure_beast_unlocked":
+            continue
         if event.kind == "source_rejected":
             rejections[event.profile_id][event.details["code"]] += 1
         else:
