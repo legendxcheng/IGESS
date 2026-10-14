@@ -34,7 +34,7 @@ def write_source_progression_artifacts(
                 "online_money_acquired_cumulative", "online_resource_acquired_cumulative",
                 "online_fish_sale_material_cumulative",
                 "egg_inventory_count", "egg_hatched_count", "egg_capacity_blocked",
-                "online_codex_money_cumulative", "online_codex_material_cumulative",
+                "online_tide_reload_material_cumulative", "online_codex_money_cumulative", "online_codex_material_cumulative",
                 "codex_unlocked_count", "codex_claimed_count",
             )},
             "strength": resources["strength"],
@@ -58,8 +58,13 @@ def write_source_progression_artifacts(
     counts: dict[str, Counter[str]] = defaultdict(Counter)
     rejections: dict[str, Counter[str]] = defaultdict(Counter)
     gun_milestones: dict[str, list[dict]] = defaultdict(list)
+    tide_rounds: dict[str, dict[str, dict]] = defaultdict(dict)
     egg_events: dict[str, list[dict]] = defaultdict(list)
     for event in result.events:
+        if event.kind == "tide_observed":
+            row = json.loads(event.details["receipt"])
+            tide_rounds[event.profile_id][row["roundId"]] = row
+            continue
         if event.kind in {"egg_admitted", "egg_hatched"}:
             egg_events[event.profile_id].append({"time_seconds": event.time_seconds, "kind": event.kind, **event.details})
             continue
@@ -80,6 +85,7 @@ def write_source_progression_artifacts(
             profile_id: {
                 "gun_milestones": gun_milestones[profile_id],
                 "egg_events": egg_events[profile_id],
+                "tide_rounds": list(tide_rounds[profile_id].values()),
                 "accepted_commands": dict(sorted(counts[profile_id].items())),
                 "rejected_commands": dict(sorted(rejections[profile_id].items())),
             }

@@ -215,6 +215,14 @@ function renderSourceFish(fish) {
     ]);
     actions.querySelector('[data-source-actions]').innerHTML = '<table class="data-table"><thead><tr><th>玩家</th><th>操作</th><th>次数</th></tr></thead><tbody>' +
       rows.map(row => '<tr>' + row.map(value => `<td>${escapeHtml(value)}</td>`).join('') + '</tr>').join('') + '</tbody></table>';
+    const tidePhases = { participating: '参与中', paying: '换弹待结算', granting: '发蛋待完成', completed: '已完成', skipped: '跳过', failed: '失败' };
+    const tideAmount = value => value ? (value.sign === 0 ? '0' : `${value.coeff}e${value.exp}`) : '—';
+    const tideRows = Object.entries(fish.actions || {}).flatMap(([id, profile]) =>
+      (profile.tide_rounds || []).map(row => [profileLabel(id), row.roundId, tidePhases[row.phase] || row.phase,
+        row.reason || '—', row.gunId, row.occupied_seconds, (row.eggs || []).filter(egg => egg.admitted).length,
+        (row.reloads || []).map(reload => tideAmount(reload.cost)).join(' / '), tideAmount(row.totalMaterialSpent)]));
+    if (tideRows.length) actions.querySelector('[data-source-actions]').innerHTML += '<h3>鱼潮参与</h3><p>数值近似：每场 5 颗随机蛋、120 秒、6 次换弹；不模拟逐发命中与多人竞争，枪伤害不改变固定收益。蛋入包不等于已孵化。</p><table class="data-table"><thead><tr><th>玩家</th><th>场次</th><th>阶段</th><th>原因</th><th>枪</th><th>占用秒</th><th>入包蛋</th><th>各次换弹费用</th><th>实际材料支出</th></tr></thead><tbody>' +
+      tideRows.map(row => '<tr>' + row.map(value => `<td>${escapeHtml(value)}</td>`).join('') + '</tr>').join('') + '</tbody></table>';
     const eggRows = Object.entries(fish.actions || {}).flatMap(([id, profile]) =>
       (profile.egg_events || []).map(row => [profileLabel(id), row.kind === 'egg_admitted' ? '鱼蛋入包' : '鱼蛋孵化',
         row.egg_id, row.fish_id || '—', row.time_seconds, row.online_time_seconds]));
