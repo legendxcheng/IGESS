@@ -13,7 +13,9 @@
   --out .tmp/paid-generic
 ```
 
-Fish 演示（需要本机已配置 `projects/fish/production_snapshot`）：
+历史 Fish 演示（2026-10-14 起停用，仅保留说明）：
+
+以下示例针对旧 Python 后端。当前 Fish 统一使用 `projects/fish_source`，该后端尚未接入此处的假设商品与倍率购买方案，不能直接替换项目路径使用；后续付费模拟需复用源游戏商品发放能力。
 
 ```powershell
 .\.venv\Scripts\python.exe -m igess.cli paid-run `

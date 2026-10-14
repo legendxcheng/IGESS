@@ -9,6 +9,8 @@ The current implementation is v0.5 and includes Web reports, a local dashboard,
 run comparison, parameter scanning, regression gates, project ergonomics
 commands, and Agent Analyst advice artifacts.
 
+Fish simulation now uses [projects/fish_source](projects/fish_source/README.md) exclusively. Current progress is tracked in its [RoadMap](projects/fish_source/RoadMap.md); the Python project `projects/fish` is retired and retained for historical reference.
+
 ## Agent-first Incremental Authoring
 
 The primary authoring workflow is Agent-assisted and incremental: Agent 一次协助填写一条规则，
@@ -64,10 +66,11 @@ weighted behavior engine produce registered formal runs plus a Chinese HTML,
 JSON, and CSV comparison of spending, progression, and time saved.
 
 ```powershell
-.\.venv\Scripts\python.exe -m igess.cli paid-run --project projects/fish --experiment examples/paid/fish-example.yaml --out .tmp/paid-fish
+.\.venv\Scripts\python.exe -m igess.cli paid-run --project examples/shelldiver_v0 --experiment examples/paid/generic-example.yaml --out .tmp/paid-generic
 ```
 
 The supplied products are explicitly marked examples, not production prices.
+The legacy Fish paid-run example targets the retired Python engine; it is not a supported purchase simulation for `fish_source`.
 See [Paid-player simulation](docs/paid-player-simulation.md) for the schema,
 timing and stacking rules, generic example, and report interpretation.
 
@@ -130,7 +133,7 @@ needs local JSON-driven simulation and reports without access to IGESS `.py`
 sources:
 
 ```powershell
-python -m igess.cli export-operator-toolkit --project projects/fish --out E:\path\to\igess-operator --python C:\Path\To\Python311\python.exe
+python -m igess.cli export-operator-toolkit --project projects/fish_source --out E:\path\to\igess-operator --python C:\Path\To\Python311\python.exe
 ```
 
 The export is a fail-closed, allowlisted sourceless `.pyc` distribution. It

@@ -1,10 +1,12 @@
 # Fish 同源 Lua 模拟项目
 
-此项目通过 IGESS 正式入口运行 Fish 源项目的 Lua 业务服务，无需 DS。与历史 `projects/fish` Python 后端分开登记运行和基线。
+此项目通过 IGESS 正式入口运行 Fish 源项目的 Lua 业务服务，无需 DS。自 2026-10-14 起，这是 Fish 唯一在用的模拟项目；新规则、调优、正式运行与报告均在此维护。`projects/fish` Python 后端停用，保留历史代码与报告，不再作为新运行或比较基线。当前进度与待办见 [RoadMap.md](RoadMap.md)。
 
 ```powershell
 uv run igess model simulate --project projects/fish_source --scenario smoke
 uv run igess model simulate --project projects/fish_source --scenario day_1_growth
+uv run igess model simulate --project projects/fish_source --scenario week_1_growth
+uv run igess model simulate --project projects/fish_source --scenario month_1_growth
 ```
 
 `economy.yaml` 的 `engine.source_runtime.project_root` 默认指向同盘兄弟目录 `E:\fish-oasis`，`data_root` 指向该源项目的 `igess_export/json`。运行需要本机 `lua55`。修改目录布局时更新这两个路径。每次运行会冻结 Lua 模块和所选 JSON 导表，记录二者内容摘要、IGESS 适配器摘要、Lua 版本、策略、种子和模型摘要。标准 timeline、events、analysis、Web 报告、同源成长/行为产物和 checkpoint 位于本项目 `runs/`。

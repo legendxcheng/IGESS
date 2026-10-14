@@ -8,7 +8,7 @@
 
 ```powershell
 python -m igess.cli export-operator-toolkit `
-  --project projects/fish `
+  --project projects/fish_source `
   --out E:\path\to\igess-operator
 ```
 
@@ -16,7 +16,7 @@ python -m igess.cli export-operator-toolkit `
 
 ```powershell
 python -m igess.cli export-operator-toolkit `
-  --project projects/fish `
+  --project projects/fish_source `
   --out E:\path\to\igess-operator `
   --python C:\Path\To\Python311\python.exe
 ```
@@ -24,7 +24,7 @@ python -m igess.cli export-operator-toolkit `
 导出器会：
 
 1. 解析 `operator_cli` 的 IGESS 内部依赖闭包，只复制工作台与正式模拟/报表所需模块。
-2. 将 IGESS 与 Fish 生成 schema 编译为 Python 3.11 optimized sourceless `.pyc`。
+2. 将 IGESS 编译为 Python 3.11 optimized sourceless `.pyc`；同源 Fish 另打包去除源码的 Lua 5.5 运行时，准备步骤见下文。
 3. 将 `report.min.js` 作为分发版 `report.js`，不携带第一方未压缩 JS 或 source map。
 4. 生成 `operator-manifest.json`、`.igess-delivery-manifest.json`、`start.bat`、依赖清单和执行策划说明。
 5. 对临时候选执行不可绕过的白名单和源码路径检查。

@@ -1,5 +1,7 @@
 # Fish 经济模型迁移 Handoff
 
+> 2026-10-14 起仅使用 `projects/fish_source`。请从 [同源 README](../fish_source/README.md) 和 [同源 RoadMap](../fish_source/RoadMap.md) 继续工作；本文仅供历史查证。
+
 更新时间：2026-09-21
 
 项目范围：`projects/fish` 与 Fish 领域模拟代码

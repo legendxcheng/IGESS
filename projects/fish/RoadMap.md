@@ -1,5 +1,7 @@
 # Fish 模拟 RoadMap
 
+> 2026-10-14：本项目停用，后续仅使用 `projects/fish_source`。当前进度已转至 [同源 RoadMap](../fish_source/RoadMap.md)；下文保留历史记录，其中“当前”“唯一进度源”等描述仅适用于当时版本。
+
 更新时间：2026-10-08
 项目范围：`projects/fish` 与 Fish 领域模拟代码
 

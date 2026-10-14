@@ -1,12 +1,14 @@
 # IGESS Incremental Authoring Project
 
+> 2026-10-14 起已停用。后续 Fish 模拟、规则接入和调优统一使用 [fish_source](../fish_source/README.md)，当前进度见 [同源 RoadMap](../fish_source/RoadMap.md)。下文及本目录脚本仅保留为历史参考，不再用于新运行。
+
 `economy.yaml` and `Datas/` describe this IGESS project's authoring shell and
 the runtime input for a production-data active-throw smoke. They are not the
 authority for Fish production values.
 `luban_exports/` is generated from those local sources; do not edit generated
 exports by hand.
 
-Fish 的经济建模、RNG、玩家存档、专用模拟器接入与正式调参进度统一记录在 [RoadMap.md](RoadMap.md)。该文件是唯一进度源。
+本目录历史经济建模、RNG、玩家存档和正式调参进度记录在 [RoadMap.md](RoadMap.md)。
 
 Fish 正式数值的唯一权威生产快照是 `E:\fish-oasis\igess_export`。项目通过
 `production_snapshot` 这个项目内固定入口链接整份快照；正式表使用
