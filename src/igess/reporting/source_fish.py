@@ -143,6 +143,19 @@ def _milestone(
     event: dict[str, Any], active: int, previous: int
 ) -> dict[str, Any] | None:
     kind, receipt = event["kind"], event["receipt"]
+    if kind == "gun_milestone":
+        details = event["details"]
+        if details["kind"] not in {"gun_upgraded", "fish_tide_unlocked"}:
+            return None
+        active = int(details["online_time_seconds"])
+        return {
+            "wall_time_seconds": event["time_seconds"], "active_time_seconds": active,
+            "stage_id": f"online_day_{int(event['time_seconds']) // 86400 + 1}",
+            "source_event_kind": kind, "progression_category": details["kind"],
+            "item_id": details["identity"], "metric_id": details["kind"],
+            "metric_before": "0", "metric_after": "1", "metric_delta": "1",
+            "relative_delta": None, "gap_from_previous_progression_seconds": active - previous,
+        }
     if kind not in _MILESTONES:
         return None
     category, metric = _MILESTONES[kind]
@@ -347,7 +360,7 @@ def build_source_projection(data: ReportData) -> dict[str, Any]:
         growth[profile] = _growth(events, sessions)
         investment[profile] = _investment(events, sessions)
         accepted = Counter(
-            row["kind"] for row in events if row["kind"] != "source_rejected"
+            row["kind"] for row in events if row["kind"] not in {"source_rejected", "gun_milestone"}
         )
         rejected = Counter(
             row.get("details", {}).get("code", "unknown")
@@ -357,6 +370,10 @@ def build_source_projection(data: ReportData) -> dict[str, Any]:
         counts.update(accepted)
         counts["source_rejected"] += sum(rejected.values())
         actions[profile] = {
+            "gun_milestones": [
+                {"time_seconds": row["time_seconds"], **row["details"]}
+                for row in events if row["kind"] == "gun_milestone"
+            ],
             "accepted_commands": dict(accepted),
             "rejected_commands": dict(rejected),
         }
