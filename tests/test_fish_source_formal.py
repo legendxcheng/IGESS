@@ -43,6 +43,19 @@ def _project(tmp_path: Path) -> Path:
     return project
 
 
+def test_source_model_status_accepts_the_current_source_policy(tmp_path: Path) -> None:
+    project = _project(tmp_path)
+    # Preserve the shipped exact-decimal quoting through the authoring seam.
+    config = (ROOT / "projects/fish_source/economy.yaml").read_text(encoding="utf-8")
+    (project / "economy.yaml").write_text(
+        config.replace("../../../fish-oasis", FISH_SOURCE.as_posix()), encoding="utf-8",
+    )
+    response = AuthoringService(project).status()
+    assert response.ok, response.result
+    assert response.result["state"] == "ready"
+    assert not (project / "runs").exists()
+
+
 def test_formal_source_smoke_uses_lua_receipts_and_writes_report(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:

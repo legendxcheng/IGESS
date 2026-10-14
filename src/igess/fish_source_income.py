@@ -5,12 +5,7 @@ from __future__ import annotations
 from decimal import Decimal, localcontext
 from typing import Any
 
-
-def _number(dto: dict[str, Any]) -> Decimal:
-    if dto["sign"] == 0:
-        return Decimal(0)
-    parts = Decimal(str(dto["coeff"])).as_tuple()
-    return Decimal((int(dto["sign"] < 0), parts.digits, parts.exponent + int(dto["exp"])))
+from .fish_source_numbers import source_decimal
 
 
 def _sum(*values: Decimal) -> Decimal:
@@ -39,34 +34,34 @@ class SourceIncome:
         receipt = receipt or {}
         for currency in ("money", "material"):
             values = [
-                _number(after["wallet"][currency]),
-                _number(before["wallet"][currency]).copy_negate(),
+                source_decimal(after["wallet"][currency]),
+                source_decimal(before["wallet"][currency]).copy_negate(),
             ]
             # Collecting slot money transfers it to the wallet; it is not new income.
             if currency == "money":
                 values.extend([
-                    _number(after["unclaimedMoney"]),
-                    _number(before["unclaimedMoney"]).copy_negate(),
+                    source_decimal(after["unclaimedMoney"]),
+                    source_decimal(before["unclaimedMoney"]).copy_negate(),
                 ])
             if currency + "Spent" in receipt:
-                values.append(_number(receipt[currency + "Spent"]))
+                values.append(source_decimal(receipt[currency + "Spent"]))
             if currency + "Refunded" in receipt:
-                values.append(_number(receipt[currency + "Refunded"]).copy_negate())
+                values.append(source_decimal(receipt[currency + "Refunded"]).copy_negate())
             gained = max(Decimal(0), _sum(*values))
             self.totals[currency] = _sum(self.totals[currency], gained)
         if (op == "claim_fish_reward" and receipt.get("committed")
                 and receipt["rewardId"] not in before.get("codex", {}).get("claimedRewardIds", [])):
             for grant in receipt["grants"]:
                 key = "codex_" + grant["type"]
-                self.totals[key] = _sum(self.totals[key], _number(grant["amount"]))
+                self.totals[key] = _sum(self.totals[key], source_decimal(grant["amount"]))
         if op == "start_tide" and "materialSpent" in receipt:
-            refund = _number(receipt["materialRefunded"]) if "materialRefunded" in receipt else Decimal(0)
+            refund = source_decimal(receipt["materialRefunded"]) if "materialRefunded" in receipt else Decimal(0)
             self.totals["tide_reload_material"] = _sum(
-                self.totals["tide_reload_material"], _number(receipt["materialSpent"]), refund.copy_negate(),
+                self.totals["tide_reload_material"], source_decimal(receipt["materialSpent"]), refund.copy_negate(),
             )
         if op == "sell_fish" and "materialAdded" in receipt:
             self.totals["fish_sale_material"] = _sum(
-                self.totals["fish_sale_material"], _number(receipt["materialAdded"]),
+                self.totals["fish_sale_material"], source_decimal(receipt["materialAdded"]),
             )
 
     def save(self) -> dict[str, str]:

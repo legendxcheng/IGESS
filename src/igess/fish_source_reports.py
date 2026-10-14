@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 from collections import Counter, defaultdict
+from collections.abc import Iterable, Mapping
+from typing import Any
 from pathlib import Path
 
 from .schema import SimulationResult
@@ -57,43 +59,20 @@ def write_source_progression_artifacts(
         encoding="utf-8", newline="\n",
     )
 
-    counts: dict[str, Counter[str]] = defaultdict(Counter)
-    rejections: dict[str, Counter[str]] = defaultdict(Counter)
-    gun_milestones: dict[str, list[dict]] = defaultdict(list)
-    tide_rounds: dict[str, dict[str, dict]] = defaultdict(dict)
-    egg_events: dict[str, list[dict]] = defaultdict(list)
+    profile_events = defaultdict(list)
     for event in result.events:
-        if event.kind == "tide_observed":
-            row = json.loads(event.details["receipt"])
-            tide_rounds[event.profile_id][row["roundId"]] = row
-            continue
-        if event.kind in {"egg_admitted", "egg_hatched"}:
-            egg_events[event.profile_id].append({"time_seconds": event.time_seconds, "kind": event.kind, **event.details})
-            continue
-        if event.kind == "gun_milestone":
-            gun_milestones[event.profile_id].append({"time_seconds": event.time_seconds, **event.details})
-            continue
-        if event.kind == "treasure_beast_unlocked":
-            continue
-        if event.kind == "source_rejected":
-            rejections[event.profile_id][event.details["code"]] += 1
-        elif event.details.get("source") != "observation":
-            counts[event.profile_id][event.kind] += 1
+        profile_events[event.profile_id].append({
+            "kind": event.kind, "time_seconds": event.time_seconds, "details": event.details,
+        })
     behavior = {
         "schema_version": 1,
         "scenario_id": result.scenario_id,
         "source": "lua_command_receipts",
         "profiles": {
-            profile_id: {
-                "first_times": (source_profiles or {}).get(profile_id, {}).get("first_times", {}),
-                "lifecycle_gun_milestones": (source_profiles or {}).get(profile_id, {}).get("lifecycle_gun_milestones", []),
-                "gun_milestones": gun_milestones[profile_id],
-                "egg_events": egg_events[profile_id],
-                "tide_rounds": tide_report_rows(tide_rounds[profile_id].values(), egg_events[profile_id]),
-                "accepted_commands": dict(sorted(counts[profile_id].items())),
-                "rejected_commands": dict(sorted(rejections[profile_id].items())),
-            }
-            for profile_id in sorted(set(counts) | set(rejections) | set(profile_rows))
+            profile_id: project_source_behavior(
+                profile_events[profile_id], (source_profiles or {}).get(profile_id, {}),
+            )
+            for profile_id in sorted(set(profile_events) | set(profile_rows))
         },
     }
     (output_dir / "source_behavior.json").write_text(
@@ -101,3 +80,33 @@ def write_source_progression_artifacts(
         encoding="utf-8", newline="\n",
     )
     return "source_progression.json", "source_behavior.json"
+
+
+def project_source_behavior(
+    events: Iterable[Mapping[str, Any]], scope: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Project one profile's segment receipts and saved lifecycle observations."""
+    accepted, rejected = Counter(), Counter()
+    gun_milestones, egg_events, tide_rounds = [], [], {}
+    for event in events:
+        kind, details = event["kind"], event.get("details", {})
+        if kind == "tide_observed":
+            row = json.loads(details["receipt"])
+            tide_rounds[row["roundId"]] = row
+        elif kind in {"egg_admitted", "egg_hatched"}:
+            egg_events.append({"time_seconds": event["time_seconds"], "kind": kind, **details})
+        elif kind == "gun_milestone":
+            gun_milestones.append({"time_seconds": event["time_seconds"], **details})
+        elif kind == "source_rejected":
+            rejected[details.get("code", "unknown")] += 1
+        elif kind != "treasure_beast_unlocked" and details.get("source") != "observation":
+            accepted[kind] += 1
+    return {
+        "first_times": scope.get("first_times", {}),
+        "lifecycle_gun_milestones": scope.get("lifecycle_gun_milestones", []),
+        "gun_milestones": gun_milestones,
+        "egg_events": egg_events,
+        "tide_rounds": tide_report_rows(tide_rounds.values(), egg_events),
+        "accepted_commands": dict(sorted(accepted.items())),
+        "rejected_commands": dict(sorted(rejected.items())),
+    }

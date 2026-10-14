@@ -141,18 +141,37 @@ def run_ten_tick_probe(
     model: EconomyModel,
     scenario: str = "smoke",
     artifact_root: str | Path | None = None,
+    *,
+    base_dir: Path | None = None,
+    source_digest: str = "readiness-probe",
 ) -> TenTickProbeResult:
     """Run exactly ten fixed ticks without mutating the caller's model."""
 
     scenario_id = scenario
     try:
         probe_model = _build_probe_model(model, scenario_id)
-        simulator = Simulator(probe_model)
+        if model.config.engine_id == "fish_source":
+            from ..engines import EngineRegistry
+
+            if base_dir is None:
+                raise ValueError("Source readiness probe requires its project directory")
+            # Sample every tick even when the actual profile spends time offline.
+            source_settings = dict(probe_model.engine_settings["source_runtime"])
+            source_settings["sampling_time_basis"] = "wall"
+            probe_model = replace(probe_model, engine_settings={
+                **probe_model.engine_settings, "source_runtime": source_settings,
+            })
+            adapter = EngineRegistry.standard().resolve(model.config.engine_id)
+            prepared = adapter.prepare(probe_model, source_digest=source_digest, base_dir=base_dir)
+        else:
+            simulator = Simulator(probe_model)
     except Exception as exc:
         _raise_smoke_failed("build", exc)
 
     try:
-        result = simulator.run_scenario(scenario_id)
+        result = (adapter.run_scenario(prepared, scenario_id).result
+                  if model.config.engine_id == "fish_source"
+                  else simulator.run_scenario(scenario_id))
         observable = _probe_has_observable_change(result, probe_model, scenario_id)
     except Exception as exc:
         _raise_smoke_failed("execution", exc)
