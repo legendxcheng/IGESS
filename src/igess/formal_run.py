@@ -7,7 +7,7 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
-from .engines import DomainEngineAdapter, PreparedEngine
+from .engines import DomainEngineAdapter, EngineAdapterError, PreparedEngine
 from .outputs import OutputWriter
 from .reporting.static import generate_static_report
 from .run_registry import RunRecord, RunRegistry
@@ -80,6 +80,7 @@ class PreparedRun:
     overrides: tuple[str, ...] = ()
     success_message: str = "Run complete"
     source_context: Mapping[str, Any] = field(default_factory=dict)
+    until_seconds: int | None = None
 
     def diagnostic_context(self) -> dict[str, Any]:
         model = self.prepared.model
@@ -93,6 +94,7 @@ class PreparedRun:
             "profiles": list(scenario.profiles) if scenario is not None else [],
             "random_seed": model.config.random_seed,
             "checkpoint_input": str(self.checkpoint_input) if self.checkpoint_input is not None else None,
+            "until_seconds": self.until_seconds,
             "overrides": list(self.overrides),
             "manifest_metadata": dict(self.prepared.manifest_metadata),
             "output_dir": str(self.record.output_dir),
@@ -128,10 +130,16 @@ class FormalRunExecutor:
     def execute(self, run: PreparedRun) -> RunOutcome:
         stage = "simulate"
         try:
+            options = {}
+            if run.until_seconds is not None:
+                if run.prepared.engine_id != "fish_source":
+                    raise EngineAdapterError("execution_window_unsupported", "until_seconds requires fish_source")
+                options["until_seconds"] = run.until_seconds
             execution = run.adapter.run_scenario(
                 run.prepared,
                 run.record.scenario_id,
                 checkpoint_input=run.checkpoint_input,
+                **options,
             )
             stage = "checkpoint"
             checkpoint_name = "final_checkpoint.json"

@@ -98,6 +98,7 @@ def test_model_help_owns_exact_nested_arguments_defaults_examples_and_exit_codes
         "scenario",
         "profile",
         "checkpoint_in",
+        "until_seconds",
         "override",
         "json",
     }
@@ -752,3 +753,13 @@ def test_model_simulate_domain_failure_has_no_traceback(tmp_path: Path):
     assert result.returncode == 1
     assert payload["ok"] is False
     assert "Traceback" not in result.stderr + result.stdout
+
+
+def test_model_simulate_cutoff_rejects_unsupported_backend(tmp_path: Path):
+    root = tmp_path / "model"
+    assert run_cli("model", "init", "--out", str(root)).returncode == 0
+    result = run_cli("model", "simulate", "--project", str(root), "--until-seconds", "1", "--json")
+    payload = json_result(result)
+    assert result.returncode == 1
+    assert payload["code"] == "execution_window_unsupported"
+    assert not list((root / "runs").glob("*"))

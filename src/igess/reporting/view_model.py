@@ -302,7 +302,9 @@ def _source_fish_progression(source: dict[str, Any]) -> dict[str, Any]:
                 **{key: chart_point(value) for key, value in row.items()
                    if key.endswith(("_per_second", "_cumulative", "_remaining"))},
             } for row in rows]
-    return {"available": bool(core or persistent), "mode": "source_observations",
+    return {
+        "execution_window": source.get("execution_window"),
+            "available": bool(core or persistent), "mode": "source_observations",
             "notes": source["notes"], "actions": source["actions"],
             "core": {"profiles": core, "peak_basis": "observed_samples"},
             "persistent": {"profiles": persistent, "event_noun": "成长操作"},
