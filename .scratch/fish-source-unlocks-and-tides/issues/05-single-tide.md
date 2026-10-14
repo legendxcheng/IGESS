@@ -36,3 +36,5 @@ Status: claimed
 后续 ticket 06 必须移除临时受控 `single_tide_at_seconds` 配置并用短周期 fixture 迁移正式测试，统一为源绝对场次调度；可以复用 `_start_tide`／`_continue_tide` 与 pending_tide。查询 `tides.config` 提供源 intervalSeconds／spawnWindowSeconds，导表依赖指纹已包含 tbfishtideconfig。
 
 供 ticket 07 性能审计：鱼潮查询已限制为当前／最近一场；既有蛋 Query 中 grants／hatched 历史仍随运行增长，应观察长期 IPC 成本并保留全量报告事实，不能靠采样漏掉孵化事件。
+
+最终格式整理后：单场 Lua 全部通过，公开鱼潮／正式报告／跨进程恢复／零费与非法报价 5 项再次通过（28.85 秒）；两仓库 diff --check 通过。
