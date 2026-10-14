@@ -34,7 +34,7 @@ _BEHAVIORS = frozenset({
 _SOURCE_POLICY = "source_priority_v1"
 _MAX_REPLAY_BYTES = 256 * 1024 * 1024
 _REQUIRED_OPERATIONS = frozenset({
-    "query", "query_actions", "advance", "checkpoint", "restore",
+    "query", "query_actions", "query_codex", "claim_fish_reward", "advance", "checkpoint", "restore",
     "go_online", "go_offline", "claim_offline_reward", "collect_slot",
     "deploy_fish", "prepare_throw", "begin_throw_flight",
     "select_throw_landing", "finalize_throw_landing", "complete_throw",
@@ -272,6 +272,7 @@ class FishSourceEngineAdapter:
                 "advance_mode": advance_mode,
                 "sampling_time_basis": sampling_time_basis,
                 "generated_money_definition": "source_collected_slot_receipts_plus_current_unclaimed",
+                "codex_claim_policy": "stable_reward_id_one_second_v1",
                 "online_acquisition_definition": "observed_balance_increases_plus_receipt_spending_excludes_offline_claims",
             },
         }
@@ -439,6 +440,10 @@ class _ProfileRun:
             "online_money_acquired_cumulative": str(self.income.totals["money"]),
             "online_resource_acquired_cumulative": str(self.income.totals["material"]),
             "online_fish_sale_material_cumulative": str(self.income.totals["fish_sale_material"]),
+            "online_codex_money_cumulative": str(self.income.totals["codex_money"]),
+            "online_codex_material_cumulative": str(self.income.totals["codex_material"]),
+            "codex_unlocked_count": str(len(state["codex"]["unlockedEntries"])),
+            "codex_claimed_count": str(len(state["codex"]["claimedRewardIds"])),
             "total_throws": str(state["totalThrows"]),
             "trash_realm": str(state["trashMan"]["realmId"]),
             "strength_rebirth_count": str(state["rebirth"]["strength"]["completedCount"]),
@@ -485,6 +490,7 @@ class _ProfileRun:
         self.runtime.request({"op": "advance", "time": target})
         self.state = self.runtime.request({"op": "query", "includeLuck": include_luck})
         self.income.observe(before, self.state)
+        self._observe_codex(before)
         if online:
             self.active_time_seconds += elapsed
 
@@ -517,9 +523,21 @@ class _ProfileRun:
         ))
         self.state = self.runtime.request({"op": "query", "includeLuck": False})
         self.income.observe(before, self.state, op=op, receipt=receipt)
+        self._observe_codex(before)
         if observe_boundary or (self.inputs.sampling_time_basis == "online" and op in {"go_online", "go_offline"}):
             self._record()
         return True
+
+    def _observe_codex(self, before: dict[str, Any]) -> None:
+        previous = {entry["collectionKey"] for entry in before["codex"]["unlockedEntries"]}
+        for entry in self.state["codex"]["unlockedEntries"]:
+            if entry["collectionKey"] not in previous:
+                self.events.append(Event(
+                    self.scenario.id, self.profile.id, int(self.state["time"]),
+                    "codex_fish_unlocked", entry["collectionKey"],
+                    {"receipt": json.dumps(entry, ensure_ascii=False, sort_keys=True),
+                     "source": "observation"},
+                ))
 
     def _allowed(self, op: str, target: str = "") -> bool:
         return self.blocked.get(f"{op}:{target}", -1) <= self.state["time"]
@@ -530,6 +548,10 @@ class _ProfileRun:
 
     def _choose(self) -> tuple[str, str, dict[str, Any]] | None:
         state = self.state
+        for reward in state["codex"]["claimableRewards"]:
+            target = str(reward["rewardId"])
+            if self._allowed("claim_fish_reward", target):
+                return "claim_fish_reward", target, {"op": "claim_fish_reward", "rewardId": reward["rewardId"]}
         wallet = state["wallet"]
         inventory = state["inventory"]["items"]
         slots = state["hall"]["slotBalances"]
@@ -607,7 +629,7 @@ class _ProfileRun:
 
     def _act(self, behavior: str, target: str, payload: dict[str, Any], limit: int) -> None:
         start = int(self.state["time"])
-        duration = 1 if behavior in ("collect_slot", "deploy_fish") else self._duration(behavior)
+        duration = 1 if behavior in ("collect_slot", "deploy_fish", "claim_fish_reward") else self._duration(behavior)
         end = min(start + duration, limit)
         if behavior == "manual_throw":
             self.request_number += 1

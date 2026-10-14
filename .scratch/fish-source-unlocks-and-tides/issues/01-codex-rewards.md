@@ -18,3 +18,15 @@ Status: claimed
 
 ## Comments
 
+
+### 实施与验证（ticket 01，待集成关闭）
+
+- 配对工作树从两个仓库 `feature/fish-source-unlocks-and-tides` 建立，分支均为 `work/fish-ticket-01`。
+- 源端新增 `query_codex` / `claim_fish_reward`；查询按源目录和公开领取资格过滤，奖励调用现有 CollectionService，保持 BigNumber 回执、历史身份与请求防重。默认 Query 同时附带 codex 投影；projection cache 只跟随历史解锁／领取事实失效。
+- IGESS 在空闲决策点优先按稳定 rewardId 领取，耗时一秒；图鉴解锁观察与实际领取分别记录，观察不混入接受命令或系统里程碑。金币与材料奖励各自累计并持久化，正式报告累计图单列一次性奖励，加工材料排除卖鱼及图鉴材料。
+- TDD 红阶段：Lua 宿主测试因缺 QueryCodex 失败；正式 90 秒场景因没有 claim_fish_reward 失败。实现后均通过。
+- Lua 宿主新增测试通过；源 CLI 新增 3 项通过，覆盖历史补领无需先查询、大于浮点精度金额、材料奖励、跨进程 checkpoint、同请求回放与新请求防重、未解锁失败、关闭条目排除、出售／重生保留、非法奖励与缺依赖拒绝。
+- 既有 simulation_host_test 与 codex_fish_reward_recovery_test 通过，后者包含预提交失败回滚及保存／通知故障后防重（预期注入错误日志保留）。
+- IGESS 新增 2 项通过：正式运行与报告／checkpoint，一套源码与隔离 Lua 运行包真实会话的捕获、查询和领奖等价。
+- IGESS 收入／source 报告／通用报告／打包依赖／工具包回归共 43 passed、2 skipped；跳过项是既有环境相关测试，本票新增隔离包测试实际通过。
+- 保留测试边界：现有会话 CLI 和正式运行；未启动 Editor／DS，未改生产导表，未发布运行包。完整 1／7／30 天交付属于 ticket 07。

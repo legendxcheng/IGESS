@@ -27,7 +27,7 @@ class SourceIncome:
     def __init__(self, saved: dict[str, str] | None = None) -> None:
         self.totals = {
             key: Decimal((saved or {}).get(key, "0"))
-            for key in ("money", "material", "fish_sale_material")
+            for key in ("money", "material", "fish_sale_material", "codex_money", "codex_material")
         }
 
     def observe(
@@ -52,6 +52,11 @@ class SourceIncome:
                 values.append(_number(receipt[currency + "Spent"]))
             gained = max(Decimal(0), _sum(*values))
             self.totals[currency] = _sum(self.totals[currency], gained)
+        if (op == "claim_fish_reward" and receipt.get("committed")
+                and receipt["rewardId"] not in before.get("codex", {}).get("claimedRewardIds", [])):
+            for grant in receipt["grants"]:
+                key = "codex_" + grant["type"]
+                self.totals[key] = _sum(self.totals[key], _number(grant["amount"]))
         if op == "sell_fish" and "materialAdded" in receipt:
             self.totals["fish_sale_material"] = _sum(
                 self.totals["fish_sale_material"], _number(receipt["materialAdded"]),
