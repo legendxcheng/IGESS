@@ -360,7 +360,7 @@ def build_source_projection(data: ReportData) -> dict[str, Any]:
         growth[profile] = _growth(events, sessions)
         investment[profile] = _investment(events, sessions)
         accepted = Counter(
-            row["kind"] for row in events if row["kind"] not in {"source_rejected", "gun_milestone"}
+            row["kind"] for row in events if row["kind"] not in {"source_rejected", "gun_milestone", "egg_admitted", "egg_hatched"}
         )
         rejected = Counter(
             row.get("details", {}).get("code", "unknown")
@@ -370,6 +370,10 @@ def build_source_projection(data: ReportData) -> dict[str, Any]:
         counts.update(accepted)
         counts["source_rejected"] += sum(rejected.values())
         actions[profile] = {
+            "egg_events": [
+                {"time_seconds": row["time_seconds"], "kind": row["kind"], **row["details"]}
+                for row in events if row["kind"] in {"egg_admitted", "egg_hatched"}
+            ],
             "gun_milestones": [
                 {"time_seconds": row["time_seconds"], **row["details"]}
                 for row in events if row["kind"] == "gun_milestone"

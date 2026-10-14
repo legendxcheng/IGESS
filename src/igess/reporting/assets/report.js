@@ -215,6 +215,11 @@ function renderSourceFish(fish) {
     ]);
     actions.querySelector('[data-source-actions]').innerHTML = '<table class="data-table"><thead><tr><th>玩家</th><th>操作</th><th>次数</th></tr></thead><tbody>' +
       rows.map(row => '<tr>' + row.map(value => `<td>${escapeHtml(value)}</td>`).join('') + '</tr>').join('') + '</tbody></table>';
+    const eggRows = Object.entries(fish.actions || {}).flatMap(([id, profile]) =>
+      (profile.egg_events || []).map(row => [profileLabel(id), row.kind === 'egg_admitted' ? '鱼蛋入包' : '鱼蛋孵化',
+        row.egg_id, row.fish_id || '—', row.time_seconds, row.online_time_seconds]));
+    if (eggRows.length) actions.querySelector('[data-source-actions]').innerHTML += '<h3>鱼蛋入包与孵化</h3><table class="data-table"><thead><tr><th>玩家</th><th>事件</th><th>蛋配置</th><th>鱼配置</th><th>房间秒</th><th>在线秒</th></tr></thead><tbody>' +
+      eggRows.map(row => '<tr>' + row.map(value => `<td>${escapeHtml(value)}</td>`).join('') + '</tr>').join('') + '</tbody></table>';
     const gunLabels = {
       normal_codex_completed: '正常图鉴完成', gun_claimed: '领取图鉴枪',
       gun_owned: '永久拥有枪', gun_equipped: '首次装备枪',
