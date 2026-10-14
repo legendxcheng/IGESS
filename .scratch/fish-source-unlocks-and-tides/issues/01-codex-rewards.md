@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately)
 
-Status: claimed
+Status: resolved
 
 本票执行《Fish 同源模拟：图鉴奖励、寻宝兽开放与鱼潮》规格；范围与边界以父规格为准。实现前在独立工作树确认基于当前集成分支，使用 tdd 技能；测试边界已获用户确认，无需再次询问。
 
@@ -40,3 +40,12 @@ Status: claimed
 - 源提交：`409001c4`（单鱼闭环）、`a667f27d`（合并 03）、`a4d29694`（恢复输入校验）；IGESS 功能提交 `9ba05da`，合并 `87f1abe`，本条证据与组合测试随后提交。最终关闭由集成合并者处理。
 
 - 交付前再次同步已集成 ticket 02（IGESS `ad8cfb61` / 源 `67319822`），组合合并提交为 IGESS `8b428e8` / 源 `44eebc08`。最终复验：图鉴＋枪＋报告 12 passed，自然落点正式回归 5 passed，源图鉴 CLI 6 passed，自然落点 Lua 通过；工作树干净，未修改生产输入。局部测试期间误写的测试文件名命令未执行用例，已按实际文件名重新完成上述复验。
+
+## Answer
+
+已合并单鱼图鉴解锁、稳定顺序领取、一次性收入观察和恢复防重闭环；与图鉴枪队列、自然落点和寻宝兽开放组合验证通过。
+
+- 源项目集成合并：0cd7ea2d2531fb0424f0363dc163fd69870b96f2。
+- IGESS 集成合并：872c87fd8b469c13b39e2a91da4447197c2d7ba3。
+- 集成后验证：simulation_codex_test、simulation_natural_landing_test、simulation_guns_test、simulation_host_test 全部通过；图鉴 CLI pytest 6 项通过；IGESS 图鉴／枪／自然落点／报告／收入回归 20 项通过（78.01 秒）。
+- 保留枪及图鉴输入摘要依赖、已领取历史和真实混合队列 fixture；未改生产表或原有无关未提交内容，未启动 Editor / DS。
