@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately)
 
-Status: claimed
+Status: resolved
 
 本票执行《Fish 同源模拟：图鉴奖励、寻宝兽开放与鱼潮》规格；范围与边界以父规格为准。实现前在独立工作树确认基于当前集成分支，使用 tdd 技能；测试边界已获用户确认，无需再次询问。
 
@@ -28,3 +28,13 @@ Status: claimed
 - Integration observation: inventory query `limit=50` is page size, while `total` reflects up to source fish capacity200. Existing ordinary-fish scheduler treats page length as full; coordinator notified for final integration review. This ticket honors source capacity in hatch and tests inventory.total.
 
 - After merging current integration (01/02/03), combined IGESS egg/codex/natural-landing/gun/package suite: **17 passed in 96.89s**. Source host/codex/natural/gun and new egg lifecycle scripts pass. Both worktree tips include their current integration branch; status intentionally stays claimed until merger resolves.
+
+## Answer
+
+已合并确定性随机蛋入包、按源时序孵化、容量阻塞重试和正式报告；跨进程恢复与已有图鉴／枪／落点流程组合验证通过。
+
+- 源项目集成合并：8e05cff3ee814f0d8865d14c0353b84a38098391。
+- IGESS 集成合并：69044c1bbe780c17e435da5bad8e32b77ec0fc35。
+- 集成后验证：鱼蛋生命周期、图鉴、自然落点、枪及宿主 Lua 五套通过；IGESS 蛋／图鉴／枪／落点／源报告组合 20 项通过（99.96 秒）。
+- 按工具包文档使用 bun build 重新生成生产 report.min.js；通用及源报告回归 23 项通过，含未压缩和生产资产测试。
+- 源生产默认随机语义保留，未改生产导表或原有无关未提交内容，未启动 Editor / DS。
