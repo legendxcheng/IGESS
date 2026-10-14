@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately)
 
-Status: claimed
+Status: resolved
 
 本票执行《Fish 同源模拟：图鉴奖励、寻宝兽开放与鱼潮》规格；范围与边界以父规格为准。实现前在独立工作树确认基于当前集成分支，使用 tdd 技能；测试边界已获用户确认，无需再次询问。
 
@@ -29,3 +29,11 @@ Status: claimed
 - 验证：合并后同源 Lua 自然落点、宿主、枪械 3 套件通过；CLI 跨进程回归 8 项通过；正式运行与源报告回归合计 12 项通过（44.24 秒）。覆盖 21000/21001cm 边界、足够力量/选点/实际入水区别、首投废料、重复完成、重生后跨进程恢复、近投无废料但卖鱼材料可用、飞行中截断与报告。
 - 双仓实现提交：IGESS `ef1fa90`，源游戏 `986b701a`；合并提交：IGESS `c2b3472`，源游戏 `3c20944e`。未修改生产导表，未启动编辑器/DS。
 - 本票保持 claimed，交由集成合并代理核实并按本地 tracker 规则 resolve。
+## Answer
+
+已合并自然落点、寻宝兽永久开放及正式报告；源服务决定可达水域、实际入水时序与首投废料，保留飞行中 checkpoint 和枪械进展组合。
+
+- 源项目集成合并：6731982288c3e6dab8150e0585fd329b88bc7a2d。
+- IGESS 集成合并：0a05f27ce7042a3c54c32f6d6e19c18ff92fea1a。
+- 集成后验证：simulation_natural_landing_test、simulation_host_test、simulation_guns_test 全部通过；simulation_cli_test 跨进程回归 8 项通过；自然落点、图鉴枪与源报告 Python 回归 14 项通过（54.89 秒）。
+- 无合并冲突，未修改生产表、未启动 Editor / DS；原有无关未提交内容保持不动。
