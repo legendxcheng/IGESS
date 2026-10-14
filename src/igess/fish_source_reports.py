@@ -34,11 +34,14 @@ def write_source_progression_artifacts(
                 "online_money_acquired_cumulative", "online_resource_acquired_cumulative",
                 "online_fish_sale_material_cumulative",
                 "egg_inventory_count", "egg_hatched_count", "egg_capacity_blocked",
+                "online_codex_money_cumulative", "online_codex_material_cumulative",
+                "codex_unlocked_count", "codex_claimed_count",
             )},
             "strength": resources["strength"],
             "fish_luck": resources.get("fish_luck"),
             "trash_luck": resources.get("trash_luck"),
             "trash_realm": resources["trash_realm"],
+            "treasure_beast_unlocked": resources.get("treasure_beast_unlocked"),
             "total_throws": resources["total_throws"],
             "strength_rebirth_count": resources["strength_rebirth_count"],
             "trash_man_rebirth_count": resources["trash_man_rebirth_count"],
@@ -63,9 +66,11 @@ def write_source_progression_artifacts(
         if event.kind == "gun_milestone":
             gun_milestones[event.profile_id].append({"time_seconds": event.time_seconds, **event.details})
             continue
+        if event.kind == "treasure_beast_unlocked":
+            continue
         if event.kind == "source_rejected":
             rejections[event.profile_id][event.details["code"]] += 1
-        else:
+        elif event.details.get("source") != "observation":
             counts[event.profile_id][event.kind] += 1
     behavior = {
         "schema_version": 1,

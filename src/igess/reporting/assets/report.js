@@ -364,6 +364,8 @@ function renderFishCumulativeOutputChart(profiles, logarithmic = false) {
     [
       ['累计金币', 'money_acquired_cumulative', '#2563eb'],
       ['累计资源', 'resource_acquired_cumulative', '#16a34a'],
+      ['图鉴一次性金币', 'codex_money_cumulative', '#a855f7'],
+      ['图鉴一次性材料', 'codex_material_cumulative', '#f97316'],
     ].forEach(([label, field, color]) => {
       series.push({
         name: `${profileLabel(profileId)} · ${label}`,
@@ -676,6 +678,7 @@ function renderWeeklyProgressionCharts(profiles) {
           return [
             `<strong>${escapeHtml(progressionCategoryLabel(row.progression_category))}</strong>`,
             `本周在线：${formatDurationClock(row.week_active_time_seconds)}`,
+            `墙钟时间：${formatDurationClock(row.wall_time_seconds)}`,
             `累计在线：${formatDurationClock(row.active_time_seconds)}`,
             `事件：${escapeHtml(eventKindLabel(row.source_event_kind))} · ${escapeHtml(itemIdentityLabel(row.item_id))}`,
             `指标：${escapeHtml(metricLabel(row.metric_id))}`,
@@ -749,6 +752,7 @@ function renderDailyProgressionCharts(profiles) {
           return [
             `<strong>${escapeHtml(progressionCategoryLabel(row.progression_category))}</strong>`,
             `当日在线：${formatDurationClock(row.day_active_time_seconds)}`,
+            `墙钟时间：${formatDurationClock(row.wall_time_seconds)}`,
             `累计在线：${formatDurationClock(row.active_time_seconds)}`,
             `事件：${escapeHtml(eventKindLabel(row.source_event_kind))} · ${escapeHtml(itemIdentityLabel(row.item_id))}`,
             `指标：${escapeHtml(metricLabel(row.metric_id))}`,
@@ -774,6 +778,7 @@ function renderDailyProgressionCharts(profiles) {
 
 function progressionCategoryLabel(category) {
   const labels = {
+    treasure_beast: '寻宝兽开放',
     best_hall_fish: '摸鱼厅最优鱼',
     barbell: '杠铃',
     fish_hall: '摸鱼厅容量',
@@ -834,6 +839,7 @@ function progressionCategoryRank(category) {
 
 function progressionCategoryColor(category) {
   const colors = {
+    treasure_beast: '#06b6d4',
     best_hall_fish: '#5470c6',
     barbell: '#91cc75',
     fish_hall: '#fac858',
@@ -1272,6 +1278,7 @@ function itemIdentityLabel(itemId) {
     throw: '投掷',
     fish_hall: '摸鱼厅',
     fish_hall_upgrade: '摸鱼厅升级',
+    treasure_beast: '寻宝兽开放',
     barbell: '杠铃',
     torpedo: '鱼雷',
     strength_rebirth: '力量转生',
@@ -1284,6 +1291,7 @@ function itemIdentityLabel(itemId) {
 
 function eventKindLabel(kind) {
   const labels = {
+    treasure_beast_unlocked: '寻宝兽开放',
     event: '事件',
     buy_generator: '购买生产器',
     buy_upgrade: '购买升级',
@@ -1332,6 +1340,8 @@ function eventKindLabel(kind) {
     go_online: '上线',
     go_offline: '下线',
     claim_offline_reward: '领取离线奖励',
+    claim_fish_reward: '领取单鱼图鉴奖励',
+    codex_fish_unlocked: '单鱼图鉴解锁',
     source_rejected: '源规则拒绝',
   };
   return labels[kind] || kind || '';
@@ -1339,6 +1349,7 @@ function eventKindLabel(kind) {
 
 function metricLabel(metricId) {
   const labels = {
+    treasure_beast_unlocked: '寻宝兽开放状态',
     fish_hall_cps: '摸鱼厅每秒产出',
     barbell_strength_per_second: '杠铃每秒力量',
     fish_hall_level: '摸鱼厅等级',

@@ -14,6 +14,7 @@ from typing import Any
 from .loader import ReportData, ReportLoadError
 
 _MILESTONES = {
+    "treasure_beast_unlocked": ("treasure_beast", "treasure_beast_unlocked"),
     "purchase_torpedo": ("torpedo", "owned_torpedo_count"),
     "synthesize_barbell": ("barbell", "owned_barbell_count"),
     "upgrade_hall": ("fish_hall", "fish_hall_level"),
@@ -161,7 +162,11 @@ def _milestone(
     category, metric = _MILESTONES[kind]
     before = after = None
     item = event.get("item_id", "")
-    if kind == "upgrade_hall":
+    if kind == "treasure_beast_unlocked":
+        before, after = int(receipt["unlockedBefore"]), int(receipt["unlockedAfter"])
+        active = int(receipt["activeTimeSeconds"])
+        item = f"treasure_beast:第{receipt['areaIndex']}水域"
+    elif kind == "upgrade_hall":
         before, after = (
             receipt.get("previousUpgradeLevel"),
             receipt.get("currentUpgradeLevel"),
@@ -200,6 +205,8 @@ def _milestone(
         if left is not None and right is not None
         else None,
         "relative_delta": None,
+        **({"area_index": receipt.get("areaIndex"), "distance_cm": receipt.get("distanceCm")}
+           if kind == "treasure_beast_unlocked" else {}),
         "gap_from_previous_progression_seconds": active - previous,
     }
 
@@ -287,12 +294,17 @@ def _economy(
         money = _text(sample.get("online_money_acquired_cumulative"))
         material = _text(sample.get("online_resource_acquired_cumulative"))
         sale = _text(sample.get("online_fish_sale_material_cumulative"))
+        codex_money = _text(sample.get("online_codex_money_cumulative", "0"))
+        codex_material = _text(sample.get("online_codex_material_cumulative", "0"))
         if money is not None and material is not None and sale is not None:
             cumulative.append({
                 **common, "money_acquired_cumulative": money,
                 "resource_acquired_cumulative": material,
                 "fish_sale_material_cumulative": sale,
-                "trash_material_cumulative": _sum([material, _decimal(sale).copy_negate()]),
+                "codex_money_cumulative": codex_money,
+                "codex_material_cumulative": codex_material,
+                "hall_money_cumulative": _sum([money, _decimal(codex_money).copy_negate()]),
+                "trash_material_cumulative": _sum([material, _decimal(sale).copy_negate(), _decimal(codex_material).copy_negate()]),
             })
     for event in events:
         receipt = event["receipt"]
@@ -360,7 +372,8 @@ def build_source_projection(data: ReportData) -> dict[str, Any]:
         growth[profile] = _growth(events, sessions)
         investment[profile] = _investment(events, sessions)
         accepted = Counter(
-            row["kind"] for row in events if row["kind"] not in {"source_rejected", "gun_milestone", "egg_admitted", "egg_hatched"}
+            row["kind"] for row in events if row["kind"] not in {"source_rejected", "gun_milestone", "treasure_beast_unlocked", "egg_admitted", "egg_hatched"}
+            and row.get("details", {}).get("source") != "observation"
         )
         rejected = Counter(
             row.get("details", {}).get("code", "unknown")
@@ -395,7 +408,7 @@ def build_source_projection(data: ReportData) -> dict[str, Any]:
         "rejection_count": counts["source_rejected"],
         "milestone_count": sum(len(profile["rows"]) for profile in growth.values()),
         "notes": {
-            "economy": "资源即材料，金币即金钱。每秒速率按相邻在线采样点的实际在线秒数平均，累计产出统计在线生产与卖鱼，排除离线奖励，不扣消费。领取鱼厅收入只转移金额，不重复计入产出。当前剩余为可花费的钱包余额，包含离线入账；待领金币单独展示。旧记录缺少在线累计产出时不补算，产出图显示未记录。",
+            "economy": "资源即材料，金币即金钱。每秒速率按相邻在线采样点的实际在线秒数平均，累计获取包含在线生产、卖鱼与一次性图鉴奖励；图鉴奖励单列，不代表稳定生产能力，排除离线奖励，不扣消费。领取鱼厅收入只转移金额，不重复计入产出。当前剩余为可花费的钱包余额，包含离线入账；待领金币单独展示。旧记录缺少在线累计产出时不补算，产出图显示未记录。",
             "core": "力量与双 Luck 来自已保存的源状态采样；峰值仅为采样点峰值。" + sampling_note + "这些状态不等于完整在线毛收入、真实峰值或精确最长停滞，未记录的指标不填零。",
             "persistent": "按实际上线/下线记录累计在线时间，离线等待不计入间隔。图中统计鱼雷、杠铃、鱼厅、两类重生及突破资助操作；“突破资助”仅表示支付材料，不代表训练已完成。单鱼升级不计入。",
             "investment": "支出与卖鱼收入直接汇总成功命令回执。原记录没有单次升级带来的产出变化、完整加工材料收入，因此对应指标显示为未记录；选鱼采用本次同源策略。",

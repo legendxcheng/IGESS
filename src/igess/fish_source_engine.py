@@ -6,6 +6,7 @@ import base64
 import binascii
 import hashlib
 import json
+import math
 import time
 import zlib
 from collections.abc import Mapping, Sequence
@@ -36,7 +37,7 @@ _BEHAVIORS = frozenset({
 _SOURCE_POLICY = "source_priority_v1"
 _MAX_REPLAY_BYTES = 256 * 1024 * 1024
 _REQUIRED_OPERATIONS = frozenset({
-    "query", "query_actions", "advance", "checkpoint", "restore",
+    "query", "query_actions", "query_codex", "claim_fish_reward", "advance", "checkpoint", "restore",
     "claim_gun_reward", "equip_gun", "grant_random_egg", "settle_eggs",
     "go_online", "go_offline", "claim_offline_reward", "collect_slot",
     "deploy_fish", "prepare_throw", "begin_throw_flight",
@@ -106,7 +107,7 @@ class _SourceInputs:
     integration_digest: str
     lua_executable: str
     fishing_area: bool
-    landing_distance_cm: int
+    landing_distance_cm: int | None
     collect_interval_seconds: int
     idle_seconds: int
     fast_advance: bool
@@ -170,15 +171,15 @@ class FishSourceEngineAdapter:
         if not isinstance(lua_executable, str) or not lua_executable:
             raise EngineAdapterError("fish_source_lua_invalid", "Invalid Lua executable")
         fishing_area = source_settings.get("in_fishing_area", True)
-        landing_distance = source_settings.get("landing_distance_cm", 100)
+        landing_distance = source_settings.get("landing_distance_cm")
         collect_interval = source_settings.get("collect_interval_seconds", 300)
         idle_seconds = source_settings.get("idle_seconds", 30)
         advance_mode = source_settings.get("advance_mode", "accurate")
         sampling_time_basis = source_settings.get("sampling_time_basis", "wall")
         if type(fishing_area) is not bool or any(
             type(value) is not int or value <= 0
-            for value in (landing_distance, collect_interval, idle_seconds)
-        ):
+            for value in (collect_interval, idle_seconds)
+        ) or (landing_distance is not None and (type(landing_distance) is not int or landing_distance <= 0)):
             raise EngineAdapterError("fish_source_policy_invalid", "Invalid source player policy setting")
         if advance_mode not in ("accurate", "equivalent_batch_v1"):
             raise EngineAdapterError("fish_source_advance_mode_invalid", str(advance_mode))
@@ -273,11 +274,13 @@ class FishSourceEngineAdapter:
                 "gun_equip_seconds": 1,
                 "in_fishing_area": fishing_area,
                 "landing_distance_cm": landing_distance,
+                "landing_policy": "source_natural_v1" if landing_distance is None else "explicit_distance_v1",
                 "collect_interval_seconds": collect_interval,
                 "idle_seconds": idle_seconds,
                 "advance_mode": advance_mode,
                 "sampling_time_basis": sampling_time_basis,
                 "generated_money_definition": "source_collected_slot_receipts_plus_current_unclaimed",
+                "codex_claim_policy": "stable_reward_id_one_second_v1",
                 "online_acquisition_definition": "observed_balance_increases_plus_receipt_spending_excludes_offline_claims",
             },
         }
@@ -345,6 +348,8 @@ class FishSourceEngineAdapter:
                 if runtime.data_digest != inputs.data_digest:
                     raise EngineAdapterError("fish_source_data_changed", "Frozen export differs from preparation")
                 available = set((runtime.capabilities or {}).get("actions", []))
+                if (runtime.capabilities or {}).get("naturalLandingVersion") != 1:
+                    raise EngineAdapterError("fish_source_capability_missing", "naturalLandingVersion=1")
                 missing = sorted(_REQUIRED_OPERATIONS - available)
                 if missing:
                     raise EngineAdapterError(
@@ -410,6 +415,8 @@ class _ProfileRun:
         self.last_collect = -inputs.collect_interval_seconds
         self.blocked: dict[str, int] = {}
         self.egg_observations = EggObservations(existing.behavior_state.get("egg_observations") if existing else None)
+        self.pending_throw: dict[str, Any] | None = None
+        self.last_receipt: dict[str, Any] = {}
         self.gun_milestones = GunMilestones(existing.behavior_state.get("gun_milestones") if existing else None)
         self.income = SourceIncome(
             dict(existing.behavior_state.get("online_acquisition", {})) if existing else None
@@ -427,6 +434,7 @@ class _ProfileRun:
             self.last_collect = int(existing.behavior_state["last_collect"])
             self.blocked = dict(existing.behavior_state.get("blocked", {}))
             self.active_time_seconds = int(existing.behavior_state.get("active_time_seconds", 0))
+            self.pending_throw = existing.behavior_state.get("pending_throw")
         sample_time = self.active_time_seconds if inputs.sampling_time_basis == "online" else self.state["time"]
         self.next_record = (sample_time // self.record_interval + 1) * self.record_interval
         self._record()
@@ -455,8 +463,13 @@ class _ProfileRun:
             "egg_inventory_count": str(len(state["eggs"]["items"])),
             "egg_hatched_count": str(len(state["eggs"]["hatched"])),
             "egg_capacity_blocked": str(int(state["eggs"]["capacityBlocked"])),
+            "online_codex_money_cumulative": str(self.income.totals["codex_money"]),
+            "online_codex_material_cumulative": str(self.income.totals["codex_material"]),
+            "codex_unlocked_count": str(len(state["codex"]["unlockedEntries"])),
+            "codex_claimed_count": str(len(state["codex"]["claimedRewardIds"])),
             "total_throws": str(state["totalThrows"]),
             "trash_realm": str(state["trashMan"]["realmId"]),
+            "treasure_beast_unlocked": "1" if state["trashMan"]["unlocked"] else "0",
             "strength_rebirth_count": str(state["rebirth"]["strength"]["completedCount"]),
             "trash_man_rebirth_count": str(state["rebirth"]["trashMan"]["completedCount"]),
         })
@@ -501,6 +514,7 @@ class _ProfileRun:
         self.runtime.request({"op": "advance", "time": target})
         self.state = self.runtime.request({"op": "query", "includeLuck": include_luck})
         self.income.observe(before, self.state)
+        self._observe_codex(before)
         if online:
             self.active_time_seconds += elapsed
         self._observe_guns()
@@ -533,11 +547,34 @@ class _ProfileRun:
             op, target, {"receipt": json.dumps(receipt, ensure_ascii=False, sort_keys=True)},
         ))
         self.state = self.runtime.request({"op": "query", "includeLuck": False})
+        self.last_receipt = receipt
         self.income.observe(before, self.state, op=op, receipt=receipt)
+        self._observe_codex(before)
+        if not before["trashMan"]["unlocked"] and self.state["trashMan"]["unlocked"]:
+            self.events.append(Event(
+                self.scenario.id, self.profile.id, int(self.state["time"]),
+                "treasure_beast_unlocked", "treasure_beast", {"receipt": json.dumps({
+                    **receipt.get("landing", {}),
+                    "distanceCm": receipt.get("targetDistanceCm"),
+                    "activeTimeSeconds": self.active_time_seconds,
+                }, sort_keys=True)},
+            ))
+            self._record()
         self._observe_guns()
         if observe_boundary or (self.inputs.sampling_time_basis == "online" and op in {"go_online", "go_offline"}):
             self._record()
         return True
+
+    def _observe_codex(self, before: dict[str, Any]) -> None:
+        previous = {entry["collectionKey"] for entry in before["codex"]["unlockedEntries"]}
+        for entry in self.state["codex"]["unlockedEntries"]:
+            if entry["collectionKey"] not in previous:
+                self.events.append(Event(
+                    self.scenario.id, self.profile.id, int(self.state["time"]),
+                    "codex_fish_unlocked", entry["collectionKey"],
+                    {"receipt": json.dumps(entry, ensure_ascii=False, sort_keys=True),
+                     "source": "observation"},
+                ))
 
     def _allowed(self, op: str, target: str = "") -> bool:
         return self.blocked.get(f"{op}:{target}", -1) <= self.state["time"]
@@ -549,6 +586,16 @@ class _ProfileRun:
     def _choose(self) -> tuple[str, str, dict[str, Any]] | None:
         state = self.state
         gun_action = choose_gun_action(state, self._allowed)
+        claims = []
+        if gun_action is not None and gun_action[0] == "claim_gun_reward":
+            claims.append(gun_action)
+        for reward in state["codex"]["claimableRewards"]:
+            target = str(reward["rewardId"])
+            if self._allowed("claim_fish_reward", target):
+                claims.append(("claim_fish_reward", target, {"op": "claim_fish_reward", "rewardId": reward["rewardId"]}))
+                break
+        if claims:
+            return min(claims, key=lambda action: (int(action[1]), action[0]))
         if gun_action is not None:
             return gun_action
         wallet = state["wallet"]
@@ -580,11 +627,12 @@ class _ProfileRun:
 
         if state["rebirth"]["strength"]["eligible"]:
             add("strength_rebirth", "rebirth_strength")
-        if state["rebirth"]["trashMan"]["eligible"]:
+        if state["trashMan"]["unlocked"] and state["rebirth"]["trashMan"]["eligible"]:
             add("trash_man_rebirth", "rebirth_trash_man")
         realm = state["trashMan"]["currentRealm"]
         if (
-            not state["trashMan"]["breakthrough"]["active"]
+            state["trashMan"]["unlocked"]
+            and not state["trashMan"]["breakthrough"]["active"]
             and not realm["isMax"]
             and state["trashMan"]["realmId"] == state["trashMan"]["highestRealmId"]
             and _decimal(wallet["material"]) >= _decimal(realm["breakthroughMaterialCost"])
@@ -628,26 +676,22 @@ class _ProfileRun:
 
     def _act(self, behavior: str, target: str, payload: dict[str, Any], limit: int) -> None:
         start = int(self.state["time"])
-        duration = 1 if behavior in ("collect_slot", "deploy_fish", "claim_gun_reward", "equip_gun") else self._duration(behavior)
+        duration = 1 if behavior in ("collect_slot", "deploy_fish", "claim_fish_reward", "claim_gun_reward", "equip_gun") else self._duration(behavior)
         end = min(start + duration, limit)
         if behavior == "manual_throw":
             self.request_number += 1
             throw_id = f"throw:{self.profile.id}:{self.request_number}"
-            if (
-                self._command("prepare_throw", target=throw_id, requestId=throw_id)
-                and self._command("begin_throw_flight", target=throw_id, requestId=throw_id)
-            ):
-                landing = min(start + 1, end)
-                self._advance(landing)
-                if (
-                    self._command(
-                        "select_throw_landing", target=throw_id,
-                        requestId=throw_id, distanceCm=self.inputs.landing_distance_cm,
-                    )
-                    and self._command("finalize_throw_landing", target=throw_id, requestId=throw_id)
-                    and self._command("complete_throw", target=throw_id, requestId=throw_id)
-                ):
-                    self._deploy_new_fish()
+            if self._command("prepare_throw", target=throw_id, requestId=throw_id):
+                plan = self.last_receipt["naturalLanding"]
+                if self._command("begin_throw_flight", target=throw_id, requestId=throw_id):
+                    landing_at = start + max(1, math.ceil(plan["flightSeconds"]))
+                    self.pending_throw = {
+                        "request_id": throw_id, "landing_at": landing_at,
+                        "end_at": max(start + duration, landing_at),
+                        "distance_cm": self.inputs.landing_distance_cm or plan["distanceCm"],
+                    }
+                    self._continue_throw(limit)
+                    return
             self._advance(end)
         elif behavior == "exercise_barbell":
             if self._command("start_exercise"):
@@ -661,6 +705,23 @@ class _ProfileRun:
             if behavior == "collect_slot":
                 self.last_collect = start
             self._advance(end)
+
+    def _continue_throw(self, limit: int) -> None:
+        pending = self.pending_throw
+        assert pending is not None
+        self._advance(min(pending["landing_at"], limit))
+        if self.state["time"] < pending["landing_at"]:
+            return
+        throw_id = pending["request_id"]
+        if (
+            self._command("select_throw_landing", target=throw_id, requestId=throw_id,
+                          distanceCm=pending["distance_cm"])
+            and self._command("finalize_throw_landing", target=throw_id, requestId=throw_id)
+            and self._command("complete_throw", target=throw_id, requestId=throw_id)
+        ):
+            self._deploy_new_fish()
+        self.pending_throw = None
+        self._advance(min(max(self.state["time"], pending["end_at"]), limit))
 
     def _deploy_new_fish(self) -> None:
         inventory = self.state["inventory"]["items"]
@@ -688,6 +749,9 @@ class _ProfileRun:
                     if pending:
                         self._command("claim_offline_reward", target=pending["settlementId"],
                                       settlementId=pending["settlementId"], mode="normal")
+                if self.pending_throw is not None:
+                    self._continue_throw(online_end)
+                    continue
                 selected = self._choose()
                 if selected is None:
                     self._advance(min(now + self.inputs.idle_seconds, online_end))
@@ -696,6 +760,8 @@ class _ProfileRun:
             else:
                 if self.state["online"] and now < self.end and not self._command("go_offline"):
                     raise EngineAdapterError("fish_source_session_failed", "Source rejected go_offline")
+                if not self.state["online"]:
+                    self.pending_throw = None
                 self._advance(day_end)
         self._record()
 
@@ -716,6 +782,7 @@ class _ProfileRun:
                 "active_time_seconds": self.active_time_seconds,
                 "last_collect": self.last_collect,
                 "blocked": self.blocked,
+                "pending_throw": self.pending_throw,
                 "online_acquisition": self.income.save(),
                 "gun_milestones": self.gun_milestones.save(),
                 "egg_observations": self.egg_observations.save(),

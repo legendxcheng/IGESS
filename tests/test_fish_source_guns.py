@@ -49,7 +49,8 @@ def test_gun_claim_equipment_and_mutation_restore_across_processes():
             restored.request({'op':'claim_gun_reward','rewardId':101,'requestId':'new'})
 
 
-def test_formal_run_claims_then_equips_and_reports_permanent_milestones(tmp_path, monkeypatch):
+@pytest.mark.parametrize("pending_fish_rewards", [False, True])
+def test_formal_run_claims_then_equips_and_reports_permanent_milestones(tmp_path, monkeypatch, pending_fish_rewards):
     project = tmp_path / 'fish_source'
     shutil.copytree(ROOT / 'projects/fish_source', project, ignore=shutil.ignore_patterns('runs'))
     config_path = project / 'economy.yaml'
@@ -58,6 +59,18 @@ def test_formal_run_claims_then_equips_and_reports_permanent_milestones(tmp_path
     config['engine']['source_runtime']['data_root'] = str(SOURCE / 'igess_export/json')
     config_path.write_text(yaml.safe_dump(config, allow_unicode=True), encoding='utf-8')
     fixture = initial_state()
+    # This slice starts after historical single-fish claims, so its short window
+    # isolates the separate gun claim/equip actions rather than the reward queue.
+    unlocked = set(fixture['collection']['unlockedKeys'])
+    reward_rows = json.loads((SOURCE / 'igess_export/json/tbcodexfishunlockreward.json').read_text(encoding='utf-8'))
+    eligible_fish_rewards = sorted(
+        row['id'] for row in reward_rows if f"{row['fishId']}:{row['mutationId']}" in unlocked
+    )
+    if not pending_fish_rewards:
+        fixture['collection']['claimedFishUnlockRewardIds'] = eligible_fish_rewards
+    else:
+        config['scenarios']['smoke']['duration_hours'] = str((len(eligible_fish_rewards) + 4) / 3600)
+        config_path.write_text(yaml.safe_dump(config, allow_unicode=True), encoding='utf-8')
     create = FishSourceRuntime.create
     def create_with_codex(self, **kwargs):
         kwargs['initial_state'] = fixture
@@ -69,7 +82,11 @@ def test_formal_run_claims_then_equips_and_reports_permanent_milestones(tmp_path
     events = json.loads((output / 'events.json').read_text(encoding='utf-8'))
     claim = next(e for e in events if e['kind'] == 'claim_gun_reward')
     equip = next(e for e in events if e['kind'] == 'equip_gun')
-    assert claim['time_seconds'] == 0 and equip['time_seconds'] == 1
+    fish_claims = [e for e in events if e['kind'] == 'claim_fish_reward']
+    expected_claims = eligible_fish_rewards if pending_fish_rewards else []
+    assert [json.loads(e['details']['receipt'])['rewardId'] for e in fish_claims] == expected_claims
+    assert [e['time_seconds'] for e in fish_claims] == list(range(1, len(expected_claims) + 1))
+    assert claim['time_seconds'] == 0 and equip['time_seconds'] == len(expected_claims) + 1
     behavior = json.loads((output / 'source_behavior.json').read_text(encoding='utf-8'))['profiles']['default']
     milestones = behavior['gun_milestones']
     assert {m['kind'] for m in milestones} >= {'normal_codex_completed','gun_claimed','gun_equipped','gun_upgraded','fish_tide_unlocked'}
