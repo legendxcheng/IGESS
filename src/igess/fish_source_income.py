@@ -50,6 +50,8 @@ class SourceIncome:
                 ])
             if currency + "Spent" in receipt:
                 values.append(_number(receipt[currency + "Spent"]))
+            if currency + "Refunded" in receipt:
+                values.append(_number(receipt[currency + "Refunded"]).copy_negate())
             gained = max(Decimal(0), _sum(*values))
             self.totals[currency] = _sum(self.totals[currency], gained)
         if (op == "claim_fish_reward" and receipt.get("committed")
@@ -58,7 +60,10 @@ class SourceIncome:
                 key = "codex_" + grant["type"]
                 self.totals[key] = _sum(self.totals[key], _number(grant["amount"]))
         if op == "start_tide" and "materialSpent" in receipt:
-            self.totals["tide_reload_material"] = _sum(self.totals["tide_reload_material"], _number(receipt["materialSpent"]))
+            refund = _number(receipt["materialRefunded"]) if "materialRefunded" in receipt else Decimal(0)
+            self.totals["tide_reload_material"] = _sum(
+                self.totals["tide_reload_material"], _number(receipt["materialSpent"]), refund.copy_negate(),
+            )
         if op == "sell_fish" and "materialAdded" in receipt:
             self.totals["fish_sale_material"] = _sum(
                 self.totals["fish_sale_material"], _number(receipt["materialAdded"]),

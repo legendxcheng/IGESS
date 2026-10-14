@@ -36,3 +36,5 @@ Status: claimed
 
 - 组合验证：IGESS 同源 formal、natural_landing、codex、guns、eggs、tides、joint、income、package、source_fish_reporting、formal_run 共 76 项通过（525.07 秒）；补充库存投影能力版本的预检拒绝用例通过，共 77 个不同用例。额外免费链四段恢复及两项通用交付审计 3 项通过。源 7 个 Lua suite 和 23 个 CLI pytest 通过；加入 `inventoryProjectionVersion=1` 后相关 CLI 11 项再次通过。双仓提交前 merge 当前 integration 均 Already up to date。
 - 最终能力版本的源码隔离 toolkit 三项实际执行全部通过（48.97 秒、无 skip）；源提交 `5a88711f827213b7478b76b67e286ee61c005cb6`。代码与测试只修改宿主/适配器/报告及受控 fixture，生产导表未修改。
+
+- 根协调复核发现并补充红绿：原生回执先未知、下次确认零装弹时，先前已扣50被退款，旧代码把负DTO转换失败字符串放进materialSpent；改为非负本次扣款/退款字段与累计净支出/退款字段。收入统计排除退款并回冲净鱼潮支出。公开Lua及跨CLI进程验证原operationId、退款50、重复退款0；源提交 `8e034b46abb4f44211a78dcc5db5b2817401d49f`。受影响收入/源中场恢复/免费链四段正式恢复6项通过（40.96秒）；最终退款版本toolkit三项再次实际执行通过（49.99秒、无skip）。
