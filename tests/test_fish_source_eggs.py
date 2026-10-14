@@ -53,6 +53,42 @@ def test_random_egg_instances_and_hatch_replay_across_processes():
         assert len(expected['eggs']['hatched'])==5
 
 
+def test_blocked_eggs_batch_and_cross_process_restore_keep_receipts_and_hatch_identity():
+    state = egg_state()
+    state['fish']['items'] = [dict(instanceId=i, fishId=101, mutationId=1,
+                                 weightGram=1000, level=1, hallSlot=1 if i == 1 else 0)
+                              for i in range(1, 201)]
+    state['fish']['nextInstanceId'] = 201
+    state['eggs']['items'][0]['hatchAt'] = 0
+    outcomes = []
+    for fast in (False, True):
+        with FishSourceRuntime(SOURCE, SOURCE/'igess_export/json') as original:
+            original.create(start_at=0, random_seed=37, initial_state=state, fast_advance=fast)
+            original.request({'op': 'advance', 'time': 300})
+            checkpoint = original.checkpoint()
+            before = original.request({'op': 'query'})
+            advanced = original.request({'op': 'advance', 'time': 600})
+            blocked = original.request({'op': 'query'})
+            assert blocked['eggs']['capacityBlocked'] and not blocked['eggs']['hatched']
+            sale = original.request({'op': 'sell_fish', 'instanceId': 2,
+                                     'requestId': 'release', 'revision': blocked['revision']})
+            hatch = original.request({'op': 'advance', 'time': 601})
+            final = original.request({'op': 'query'})
+        with FishSourceRuntime(SOURCE, SOURCE/'igess_export/json') as restored:
+            assert restored.restore(checkpoint) == before
+            assert restored.request({'op': 'advance', 'time': 600}) == advanced
+            assert restored.request({'op': 'query'}) == blocked
+            assert restored.request({'op': 'sell_fish', 'instanceId': 2,
+                                     'requestId': 'release', 'revision': blocked['revision']}) == sale
+            assert restored.request({'op': 'advance', 'time': 601}) == hatch
+            assert restored.request({'op': 'query'}) == final
+        assert final['inventory']['total'] == 200 and not final['eggs']['items']
+        assert final['eggs']['hatched'][0]['eggInstanceId'] == 1
+        assert final['eggs']['hatched'][0]['time'] == 601
+        outcomes.append((advanced, blocked, sale, hatch, final))
+    assert outcomes[0] == outcomes[1]
+
+
 def test_formal_egg_observations_are_reported_without_free_player_grants(tmp_path,monkeypatch):
     project=tmp_path/'fish_source'
     project.mkdir()
