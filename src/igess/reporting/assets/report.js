@@ -215,6 +215,19 @@ function renderSourceFish(fish) {
     ]);
     actions.querySelector('[data-source-actions]').innerHTML = '<table class="data-table"><thead><tr><th>玩家</th><th>操作</th><th>次数</th></tr></thead><tbody>' +
       rows.map(row => '<tr>' + row.map(value => `<td>${escapeHtml(value)}</td>`).join('') + '</tr>').join('') + '</tbody></table>';
+    const gunLabels = {
+      normal_codex_completed: '正常图鉴完成', gun_claimed: '领取图鉴枪',
+      gun_owned: '永久拥有枪', gun_equipped: '首次装备枪',
+      gun_upgraded: '图鉴枪强化', fish_tide_unlocked: '鱼潮开放',
+    };
+    const gunRows = Object.entries(fish.actions || {}).flatMap(([id, profile]) =>
+      (profile.gun_milestones || []).map(row => [profileLabel(id), gunLabels[row.kind] || row.kind,
+        row.identity, row.online_time_seconds, row.time_seconds]));
+    actions.querySelector('[data-source-actions]').innerHTML +=
+      '<h3>图鉴枪与鱼潮资格</h3><p>完成、领取、拥有、装备分别记录；枪伤害不改变固定五蛋收益。</p>' +
+      '<table class="data-table"><thead><tr><th>玩家</th><th>进展</th><th>身份</th><th>累计在线秒</th><th>房间时间秒</th></tr></thead><tbody>' +
+      gunRows.map(row => '<tr>' + row.map(value => `<td>${escapeHtml(value)}</td>`).join('') + '</tr>').join('') + '</tbody></table>';
+
   }
 }
 
@@ -767,6 +780,8 @@ function progressionCategoryLabel(category) {
     breakthrough_funding: '突破资助（非完成）',
     trash_man_rebirth: '垃圾佬转生',
     permanent_unlock: '永久解锁',
+    gun_upgraded: '图鉴枪强化',
+    fish_tide_unlocked: '鱼潮开放',
     other: '其他',
   };
   return labels[category] || category || labels.other;

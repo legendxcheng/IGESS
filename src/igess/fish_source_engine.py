@@ -16,6 +16,7 @@ from typing import Any
 
 from .checkpoint import CheckpointCodec, SimulationCheckpoint
 from .engines import EngineAdapterError, EngineExecution, PreparedEngine
+from .fish_source_guns import GunMilestones, choose_gun_action
 from .fish_source_runtime import (
     FishSourceRejection,
     FishSourceRuntime,
@@ -35,6 +36,7 @@ _SOURCE_POLICY = "source_priority_v1"
 _MAX_REPLAY_BYTES = 256 * 1024 * 1024
 _REQUIRED_OPERATIONS = frozenset({
     "query", "query_actions", "query_codex", "claim_fish_reward", "advance", "checkpoint", "restore",
+    "claim_gun_reward", "equip_gun",
     "go_online", "go_offline", "claim_offline_reward", "collect_slot",
     "deploy_fish", "prepare_throw", "begin_throw_flight",
     "select_throw_landing", "finalize_throw_landing", "complete_throw",
@@ -83,7 +85,7 @@ def _affords(wallet: Mapping[str, Any], quote: Mapping[str, Any]) -> bool:
 
 def _integration_code_digest() -> str:
     digest = hashlib.sha256()
-    for name in ("fish_source_engine.py", "fish_source_runtime.py", "fish_source_reports.py", "fish_source_income.py"):
+    for name in ("fish_source_engine.py", "fish_source_runtime.py", "fish_source_reports.py", "fish_source_income.py", "fish_source_guns.py"):
         path = Path(__file__).parent / name
         if not path.is_file():
             path = path.with_suffix(".pyc")
@@ -265,6 +267,9 @@ class FishSourceEngineAdapter:
                 "lua_version": "Lua 5.5",
                 "lua_executable": lua_executable,
                 "policy": _SOURCE_POLICY,
+                "gun_policy": "claim_stable_reward_id_then_highest_source_attack_v1",
+                "gun_claim_seconds": 1,
+                "gun_equip_seconds": 1,
                 "in_fishing_area": fishing_area,
                 "landing_distance_cm": landing_distance,
                 "collect_interval_seconds": collect_interval,
@@ -404,6 +409,7 @@ class _ProfileRun:
         self.active_time_seconds = 0
         self.last_collect = -inputs.collect_interval_seconds
         self.blocked: dict[str, int] = {}
+        self.gun_milestones = GunMilestones(existing.behavior_state.get("gun_milestones") if existing else None)
         self.income = SourceIncome(
             dict(existing.behavior_state.get("online_acquisition", {})) if existing else None
         )
@@ -424,7 +430,11 @@ class _ProfileRun:
         self.next_record = (sample_time // self.record_interval + 1) * self.record_interval
         self._record()
 
+    def _observe_guns(self) -> None:
+        self.gun_milestones.observe(self.state, self.active_time_seconds, self.scenario.id, self.profile.id, self.events)
+
     def _record(self) -> None:
+        self._observe_guns()
         if "luck" not in self.state:
             self.state = self.runtime.request({"op": "query"})
         state = self.state
@@ -493,6 +503,7 @@ class _ProfileRun:
         self._observe_codex(before)
         if online:
             self.active_time_seconds += elapsed
+        self._observe_guns()
 
     def _command(self, op: str, *, target: str = "", **arguments: Any) -> bool:
         before = self.state
@@ -524,6 +535,7 @@ class _ProfileRun:
         self.state = self.runtime.request({"op": "query", "includeLuck": False})
         self.income.observe(before, self.state, op=op, receipt=receipt)
         self._observe_codex(before)
+        self._observe_guns()
         if observe_boundary or (self.inputs.sampling_time_basis == "online" and op in {"go_online", "go_offline"}):
             self._record()
         return True
@@ -548,10 +560,19 @@ class _ProfileRun:
 
     def _choose(self) -> tuple[str, str, dict[str, Any]] | None:
         state = self.state
+        gun_action = choose_gun_action(state, self._allowed)
+        claims = []
+        if gun_action is not None and gun_action[0] == "claim_gun_reward":
+            claims.append(gun_action)
         for reward in state["codex"]["claimableRewards"]:
             target = str(reward["rewardId"])
             if self._allowed("claim_fish_reward", target):
-                return "claim_fish_reward", target, {"op": "claim_fish_reward", "rewardId": reward["rewardId"]}
+                claims.append(("claim_fish_reward", target, {"op": "claim_fish_reward", "rewardId": reward["rewardId"]}))
+                break
+        if claims:
+            return min(claims, key=lambda action: (int(action[1]), action[0]))
+        if gun_action is not None:
+            return gun_action
         wallet = state["wallet"]
         inventory = state["inventory"]["items"]
         slots = state["hall"]["slotBalances"]
@@ -629,7 +650,7 @@ class _ProfileRun:
 
     def _act(self, behavior: str, target: str, payload: dict[str, Any], limit: int) -> None:
         start = int(self.state["time"])
-        duration = 1 if behavior in ("collect_slot", "deploy_fish", "claim_fish_reward") else self._duration(behavior)
+        duration = 1 if behavior in ("collect_slot", "deploy_fish", "claim_fish_reward", "claim_gun_reward", "equip_gun") else self._duration(behavior)
         end = min(start + duration, limit)
         if behavior == "manual_throw":
             self.request_number += 1
@@ -718,5 +739,6 @@ class _ProfileRun:
                 "last_collect": self.last_collect,
                 "blocked": self.blocked,
                 "online_acquisition": self.income.save(),
+                "gun_milestones": self.gun_milestones.save(),
             },
         )

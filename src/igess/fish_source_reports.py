@@ -55,7 +55,11 @@ def write_source_progression_artifacts(
 
     counts: dict[str, Counter[str]] = defaultdict(Counter)
     rejections: dict[str, Counter[str]] = defaultdict(Counter)
+    gun_milestones: dict[str, list[dict]] = defaultdict(list)
     for event in result.events:
+        if event.kind == "gun_milestone":
+            gun_milestones[event.profile_id].append({"time_seconds": event.time_seconds, **event.details})
+            continue
         if event.kind == "source_rejected":
             rejections[event.profile_id][event.details["code"]] += 1
         elif event.details.get("source") != "observation":
@@ -66,6 +70,7 @@ def write_source_progression_artifacts(
         "source": "lua_command_receipts",
         "profiles": {
             profile_id: {
+                "gun_milestones": gun_milestones[profile_id],
                 "accepted_commands": dict(sorted(counts[profile_id].items())),
                 "rejected_commands": dict(sorted(rejections[profile_id].items())),
             }
