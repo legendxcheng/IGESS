@@ -38,3 +38,5 @@ Status: claimed
 - 集成发现宿主输入摘要未涵盖 `tbgun.json`、`tbcodexgunreward.json`；新增 CLI checkpoint 用例先复现错误接受变更快照，再补齐依赖清单后通过。图鉴侧 `tbcodexprogressreward.json` 同样纳入实际依赖。
 - 源 CLI 最终 6 passed（含重复捕获、两个新枪表变更恢复拒绝）；源 simulation_codex_test、simulation_guns_test、simulation_host_test 均通过。IGESS 新增图鉴正式/隔离包测试 2 passed，图鉴枪组合正式/恢复测试 3 passed。
 - 源提交：`409001c4`（单鱼闭环）、`a667f27d`（合并 03）、`a4d29694`（恢复输入校验）；IGESS 功能提交 `9ba05da`，合并 `87f1abe`，本条证据与组合测试随后提交。最终关闭由集成合并者处理。
+
+- 交付前再次同步已集成 ticket 02（IGESS `ad8cfb61` / 源 `67319822`），组合合并提交为 IGESS `8b428e8` / 源 `44eebc08`。最终复验：图鉴＋枪＋报告 12 passed，自然落点正式回归 5 passed，源图鉴 CLI 6 passed，自然落点 Lua 通过；工作树干净，未修改生产输入。局部测试期间误写的测试文件名命令未执行用例，已按实际文件名重新完成上述复验。
