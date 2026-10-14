@@ -58,4 +58,6 @@ uv run igess model simulate --project projects/fish_source --scenario day_1_grow
 uv run igess model simulate --project projects/fish_source --scenario day_1_growth --checkpoint-in <运行目录>/output/final_checkpoint.json --json
 ```
 
-运行清单 `execution_window` 记录本段起止、请求截止与原场景总长。恢复报告的事件、accepted_commands 与孵化计数只覆盖本段；钱包、在线收入累计、active_time_seconds 和源 totalThrows 延续存档。此前首次开放时点须查看前段报告，不能把本段首事件当作生命周期首次。中途鱼潮、已落地但尚未结束的投掷占用、普通动作耗时与锻炼均可恢复；采样只观察阶段，孵化截止独立于报告间隔。
+运行清单 `execution_window` 记录本段起止、请求截止与原场景总长。恢复报告的事件、accepted_commands 与孵化计数只覆盖本段；钱包、在线收入累计、active_time_seconds 和源 totalThrows 延续存档。生命周期 `first_times` 和 `lifecycle_gun_milestones` 随 checkpoint 保留，分别记录墙钟与累计在线时点；恢复报告的在线耗时仅算本段，横轴累计在线坐标延续此前进度，不能把本段首事件当作生命周期首次。中途鱼潮、已落地但尚未结束的投掷占用、普通动作耗时与锻炼均可恢复；采样只观察阶段，孵化截止独立于报告间隔。
+
+宿主库存投影聚合源分页并返回真实 `capacity`，不将每页 50 条当成总容量；`source_progression` 保存期末鱼库存、蛋库存与满鱼包孵化阻塞。金额 DTO 在策略报价比较、timeline、收入与报告保留源 BigNumber 精度，包括超过 80 位的系数。受控联合回归覆盖免费图鉴枪链、实际第四区落点后的资助、换弹与逐蛋通知待完成的跨进程恢复；最终生产基线与审查证据见 [实施票 07](../../.scratch/fish-source-unlocks-and-tides/issues/07-formal-baselines.md)。

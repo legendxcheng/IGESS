@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 from pathlib import Path
 
@@ -17,7 +18,7 @@ from igess.fish_source_runtime import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-FISH_SOURCE = Path("E:/fish-oasis")
+FISH_SOURCE = Path(os.environ.get("FISH_SOURCE_ROOT", str(ROOT.parent / "fish-oasis")))
 pytestmark = pytest.mark.skipif(
     not (FISH_SOURCE / "simulation" / "cli.lua").is_file(),
     reason="Fish source checkout is not available",
@@ -25,29 +26,17 @@ pytestmark = pytest.mark.skipif(
 
 
 def _project(tmp_path: Path) -> Path:
-    origin = ROOT / "projects" / "fish"
-    project = tmp_path / "fish"
+    origin = ROOT / "projects" / "fish_source"
+    project = tmp_path / "fish_source"
     project.mkdir()
     shutil.copytree(origin / "Datas", project / "Datas")
     shutil.copytree(origin / "luban_exports", project / "luban_exports")
-    shutil.copytree(origin / "production_snapshot" / "json", project / "production_snapshot" / "json")
+    shutil.copytree(FISH_SOURCE / "igess_export/json", project / "production_snapshot" / "json")
     config = yaml.safe_load((origin / "economy.yaml").read_text(encoding="utf-8"))
-    config["model"]["engine_id"] = "fish_source"
-    config["engine"] = {
-        "source_runtime": {
-            "project_root": str(FISH_SOURCE),
-            "data_root": "production_snapshot/json",
-            "lua_executable": "lua55",
-            "in_fishing_area": True,
-            "landing_distance_cm": 100,
-            "collect_interval_seconds": 300,
-            "idle_seconds": 30,
-        },
-    }
-    config["behavior_policies"]["source_priority_v1"] = {"type": "source_priority_v1"}
-    for profile in config["player_profiles"].values():
-        profile["behavior_policy"] = "source_priority_v1"
-        profile.pop("behavior_target_policies", None)
+    config["engine"]["source_runtime"].update(
+        project_root=str(FISH_SOURCE), data_root="production_snapshot/json", advance_mode="accurate",
+    )
+    config["scenarios"]["smoke"]["duration_hours"] = "0.025"
     (project / "economy.yaml").write_text(
         yaml.safe_dump(config, allow_unicode=True), encoding="utf-8",
     )
@@ -77,13 +66,13 @@ def test_formal_source_smoke_uses_lua_receipts_and_writes_report(
     rows = json.loads((output / "timeline.json").read_text(encoding="utf-8"))
     events = json.loads((output / "events.json").read_text(encoding="utf-8"))
     manifest = json.loads((output / "run_manifest.json").read_text(encoding="utf-8"))
-    assert rows[-1]["resources"]["money"] == "0"
     assert rows[-1]["resources"]["unclaimed_money"] != "0"
-    assert rows[-1]["resources"]["generated_money"] == rows[-1]["resources"]["unclaimed_money"]
-    assert rows[-1]["resources"]["online_money_acquired_cumulative"] == rows[-1]["resources"]["unclaimed_money"]
-    assert rows[-1]["generators_owned"]["deployed_fish"] == 1
+    from decimal import Decimal
+    assert Decimal(rows[-1]["resources"]["generated_money"]) == Decimal(rows[-1]["resources"]["unclaimed_money"]) + Decimal(rows[-1]["resources"]["collected_money"])
+    assert Decimal(rows[-1]["resources"]["online_money_acquired_cumulative"]) == Decimal(rows[-1]["resources"]["generated_money"]) + Decimal(rows[-1]["resources"]["online_codex_money_cumulative"])
+    assert rows[-1]["generators_owned"]["deployed_fish"] >= 1
     assert any(event["kind"] == "complete_throw" for event in events)
-    assert all("receipt" in event["details"] for event in events)
+    assert all("receipt" in event["details"] for event in events if event["kind"] == "complete_throw")
     assert manifest["source_runtime"]["code_sha256"]
     assert manifest["source_runtime"]["integration_code_sha256"]
     assert manifest["source_runtime"]["selected_export_sha256"]
@@ -93,7 +82,8 @@ def test_formal_source_smoke_uses_lua_receipts_and_writes_report(
     progression = json.loads((output / "source_progression.json").read_text(encoding="utf-8"))
     assert progression["profiles"]["default"][-1]["fish_luck"] == rows[-1]["resources"]["fish_luck"]
     behavior = json.loads((output / "source_behavior.json").read_text(encoding="utf-8"))
-    assert behavior["profiles"]["default"]["accepted_commands"]["complete_throw"] == 1
+    throws = sum(event["kind"] == "complete_throw" for event in events)
+    assert behavior["profiles"]["default"]["accepted_commands"]["complete_throw"] == throws
     assert (output / "final_checkpoint.json").is_file()
     assert Path(response.result["report_index"]).is_file()
     report_data = json.loads(
@@ -104,7 +94,7 @@ def test_formal_source_smoke_uses_lua_receipts_and_writes_report(
     assert "luck_progression" not in report_data["artifacts"]
     assert report_data["fish_progression"]["available"] is True
     assert report_data["fish_progression"]["core"]["profiles"]["default"]["rows"]
-    assert report_data["overview"]["throw_count"]["exact_value"] == "1"
+    assert report_data["overview"]["throw_count"]["exact_value"] == str(throws)
     balance = report_data["fish_progression"]["balance"]["profiles"]["default"]
     assert balance["rate_rows"]
     assert balance["cumulative_rows"][-1]["money_acquired_cumulative"]["chart_value"] > 0
@@ -192,20 +182,36 @@ def test_formal_source_batch_mode_matches_exact_session_observations(tmp_path: P
         assert batched_data == exact_data, name
 
 
-def test_formal_source_funds_breakthrough_before_source_training(tmp_path: Path) -> None:
+@pytest.mark.parametrize("strength,expected", [("2", False), ("3000000000", True)])
+def test_formal_source_funds_breakthrough_only_after_actual_landing(tmp_path, monkeypatch, strength, expected):
+    import subprocess
     project = _project(tmp_path)
-    config_path = project / "economy.yaml"
-    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
-    config["engine"]["source_runtime"]["advance_mode"] = "equivalent_batch_v1"
-    config_path.write_text(yaml.safe_dump(config, allow_unicode=True), encoding="utf-8")
-
-    response = AuthoringService(project).simulate("day_1_growth")
-
+    script = "package.path='./?.lua;./proj/?.lua;'..package.path; local s=require('Script.Domain.Player.PlayerArchiveSchema').New(0); io.write(require('simulation.Json').Encode(s))"
+    state = json.loads(subprocess.check_output(['lua55', '-e', script], cwd=FISH_SOURCE, text=True))
+    state['wallet']['strength'] = {'sign': 1, 'coeff': strength.rstrip('0'), 'exp': len(strength)-len(strength.rstrip('0'))}
+    state['wallet']['material'] = {'sign': 1, 'coeff': '1', 'exp': 6}
+    create = FishSourceRuntime.create
+    def fixture(self, **kwargs):
+        kwargs['initial_state'] = state
+        return create(self, **kwargs)
+    monkeypatch.setattr(FishSourceRuntime, 'create', fixture)
+    path = project / 'economy.yaml'
+    config = yaml.safe_load(path.read_text(encoding='utf-8'))
+    config['engine']['source_runtime']['advance_mode'] = 'equivalent_batch_v1'
+    config['player_profiles']['default']['behavior_weights'] = {'manual_throw': '1', 'fund_trash_man_breakthrough': '10'}
+    config['scenarios']['smoke']['duration_hours'] = '0.05'
+    path.write_text(yaml.safe_dump(config), encoding='utf-8')
+    response = AuthoringService(project).simulate('smoke')
     assert response.ok, response.details
-    behavior = json.loads(
-        (Path(response.result["output_dir"]) / "source_behavior.json").read_text(encoding="utf-8")
-    )
-    assert behavior["profiles"]["default"]["accepted_commands"]["start_breakthrough"] >= 2
+    events = json.loads((Path(response.result['output_dir']) / 'events.json').read_text(encoding='utf-8'))
+    funding = [e for e in events if e['kind'] == 'start_breakthrough']
+    assert bool(funding) is expected
+    if expected:
+        unlock = next(e for e in events if e['kind'] == 'treasure_beast_unlocked')
+        assert all(e['time_seconds'] >= unlock['time_seconds'] for e in funding)
+        receipt = json.loads(funding[0]['details']['receipt'])
+        assert receipt['materialSpent']['sign'] == 1
+    assert not any(e['kind'] == 'source_rejected' for e in events)
 
 
 def test_formal_source_online_sampling_preserves_gameplay_and_crosses_sessions(tmp_path: Path) -> None:

@@ -76,7 +76,9 @@ def _unpack_session(payload: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _decimal(dto: Mapping[str, Any]) -> Decimal:
-    return Decimal(str(dto["coeff"])).scaleb(int(dto["exp"])) * int(dto["sign"])
+    if dto["sign"] == 0:
+        return Decimal(0)
+    return Decimal((int(dto["sign"] < 0), Decimal(str(dto["coeff"])).as_tuple().digits, int(dto["exp"])))
 
 
 def _number(dto: Mapping[str, Any]) -> str:
@@ -251,9 +253,11 @@ class FishSourceEngineAdapter:
             with FishSourceRuntime(project_root, data_root, lua_executable=lua_executable) as probe:
                 capabilities = probe.capabilities or {}
                 missing = sorted(_REQUIRED_OPERATIONS - set(capabilities.get("actions", [])))
-                if missing or capabilities.get("tideScheduleVersion") != 1 or capabilities.get("naturalLandingVersion") != 1:
+                versions = ("tideScheduleVersion", "naturalLandingVersion", "inventoryProjectionVersion")
+                missing.extend(name + "=1" for name in versions if capabilities.get(name) != 1)
+                if missing:
                     raise EngineAdapterError(
-                        "fish_source_capability_missing", ", ".join(missing) or "tideScheduleVersion=1 and naturalLandingVersion=1",
+                        "fish_source_capability_missing", ", ".join(missing),
                     )
                 probe.create(start_at=0, in_fishing_area=fishing_area, fast_advance=advance_mode == "equivalent_batch_v1")
         except FishSourceRuntimeError as error:
@@ -403,6 +407,12 @@ class FishSourceEngineAdapter:
                     "spawn_window_seconds": runner.state["tides"]["config"]["spawnWindowSeconds"],
                 })
                 runner.execute()
+                prepared.manifest_metadata.setdefault("source_profiles", {})[profile_id] = {
+                    "initial_online": runner.initial_online,
+                    "initial_active_time_seconds": runner.initial_active_time_seconds,
+                    "first_times": runner.first_times,
+                    "lifecycle_gun_milestones": runner.gun_milestones.records,
+                }
                 executed = time.perf_counter()
                 timings["source_execution"] += executed - entered
                 if len(scenario.profiles) == 1:
@@ -464,6 +474,7 @@ class _ProfileRun:
         self.pending_action: dict[str, Any] | None = None
         self.last_receipt: dict[str, Any] = {}
         self.gun_milestones = GunMilestones(existing.behavior_state.get("gun_milestones") if existing else None)
+        self.first_times = dict(existing.behavior_state.get("first_times", {})) if existing else {}
         self.income = SourceIncome(
             dict(existing.behavior_state.get("online_acquisition", {})) if existing else None
         )
@@ -485,6 +496,8 @@ class _ProfileRun:
             self.pending_tide = existing.behavior_state.get("pending_tide")
             self.next_tide_at = existing.behavior_state["next_tide_at"]
         self.tide_interval = int(self.state["tides"]["config"]["intervalSeconds"])
+        self.initial_online = self.state["online"]
+        self.initial_active_time_seconds = self.active_time_seconds
         sample_time = self.active_time_seconds if inputs.sampling_time_basis == "online" else self.state["time"]
         self.next_record = (sample_time // self.record_interval + 1) * self.record_interval
         self._record()
@@ -493,6 +506,8 @@ class _ProfileRun:
         self.tide_observations.observe(self.state, self.active_time_seconds, self.scenario.id, self.profile.id, self.events)
         self.egg_observations.observe(self.state, self.active_time_seconds, self.scenario.id, self.profile.id, self.events)
         self.gun_milestones.observe(self.state, self.active_time_seconds, self.scenario.id, self.profile.id, self.events)
+        for record in self.gun_milestones.records:
+            self.first_times.setdefault(record["kind"], dict(record))
 
     def _record(self) -> None:
         self._observe_guns()
@@ -512,6 +527,8 @@ class _ProfileRun:
             "online_resource_acquired_cumulative": str(self.income.totals["material"]),
             "online_fish_sale_material_cumulative": str(self.income.totals["fish_sale_material"]),
             "egg_inventory_count": str(len(state["eggs"]["items"])),
+            "fish_inventory_count": str(state["inventory"]["total"]),
+            "fish_inventory_capacity": str(state["inventory"]["capacity"]),
             "egg_hatched_count": str(len(state["eggs"]["hatched"])),
             "egg_capacity_blocked": str(int(state["eggs"]["capacityBlocked"])),
             "online_tide_reload_material_cumulative": str(self.income.totals["tide_reload_material"]),
@@ -611,6 +628,9 @@ class _ProfileRun:
         self.income.observe(before, self.state, op=op, receipt=receipt)
         self._observe_codex(before)
         if not before["trashMan"]["unlocked"] and self.state["trashMan"]["unlocked"]:
+            self.first_times.setdefault("treasure_beast_unlocked", {
+                "time_seconds": int(self.state["time"]), "online_time_seconds": str(self.active_time_seconds),
+            })
             self.events.append(Event(
                 self.scenario.id, self.profile.id, int(self.state["time"]),
                 "treasure_beast_unlocked", "treasure_beast", {"receipt": json.dumps({
@@ -621,6 +641,11 @@ class _ProfileRun:
             ))
             self._record()
         self._observe_guns()
+        if op == "start_tide" and receipt.get("phase") == "participating":
+            self.first_times.setdefault("fish_tide_participated", {
+                "time_seconds": int(self.state["time"]), "online_time_seconds": str(self.active_time_seconds),
+                "round_id": receipt["roundId"],
+            })
         if observe_boundary or (self.inputs.sampling_time_basis == "online" and op in {"go_online", "go_offline"}):
             self._record()
         if op in {"start_tide", "complete_tide"} and not receipt.get("success"):
@@ -715,10 +740,10 @@ class _ProfileRun:
             if quote["barbellId"] not in owned_barbells and _affords(wallet, quote):
                 add("synthesize_barbell", "synthesize_barbell", str(quote["barbellId"]), barbellId=quote["barbellId"])
         undeployed = [item for item in inventory if item.get("hallSlot", 0) == 0]
-        if len(inventory) >= state["inventory"]["limit"] and undeployed:
+        if state["inventory"]["total"] >= state["inventory"]["capacity"] and undeployed:
             item = undeployed[0]
             add("sell_fish", "sell_fish", str(item["instanceId"]), instanceId=item["instanceId"])
-        if len(inventory) < state["inventory"]["limit"] and self.inputs.fishing_area:
+        if state["inventory"]["total"] < state["inventory"]["capacity"] and self.inputs.fishing_area:
             add("manual_throw", "manual_throw")
         add("exercise_barbell", "exercise_barbell")
         if not candidates:
@@ -925,6 +950,7 @@ class _ProfileRun:
                 "tide_observations": self.tide_observations.save(),
                 "online_acquisition": self.income.save(),
                 "gun_milestones": self.gun_milestones.save(),
+                "first_times": self.first_times,
                 "egg_observations": self.egg_observations.save(),
             },
         )

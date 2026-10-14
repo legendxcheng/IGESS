@@ -217,7 +217,7 @@ function renderSourceFish(fish) {
       rows.map(row => '<tr>' + row.map(value => `<td>${escapeHtml(value)}</td>`).join('') + '</tr>').join('') + '</tbody></table>';
     const executionWindow = fish.execution_window;
     if (executionWindow && executionWindow.start_seconds > 0) {
-      actions.querySelector('[data-source-actions]').innerHTML += `<p>本报告从第 ${escapeHtml(executionWindow.start_seconds)} 秒续跑至第 ${escapeHtml(executionWindow.end_seconds)} 秒。操作、首次事件与孵化计数仅覆盖本段；钱包、累计在线获取、在线耗时及源投掷总数延续存档。此前首次开放时点请查看前段报告。</p>`;
+      actions.querySelector('[data-source-actions]').innerHTML += `<p>本报告从第 ${escapeHtml(executionWindow.start_seconds)} 秒续跑至第 ${escapeHtml(executionWindow.end_seconds)} 秒。操作、事件与孵化计数仅覆盖本段；钱包、累计在线获取、累计在线坐标及源投掷总数延续存档。生命周期首次时点单独保留，本段在线耗时仅统计本段。</p>`;
     }
     const tidePhases = { participating: '参与中', paying: '换弹待结算', granting: '发蛋待完成', completed: '已完成', skipped: '跳过', failed: '失败' };
     const tideAmount = value => value ? (value.sign === 0 ? '0' : `${value.coeff}e${value.exp}`) : '—';
@@ -237,14 +237,20 @@ function renderSourceFish(fish) {
       normal_codex_completed: '正常图鉴完成', gun_claimed: '领取图鉴枪',
       gun_owned: '永久拥有枪', gun_equipped: '首次装备枪',
       gun_upgraded: '图鉴枪强化', fish_tide_unlocked: '鱼潮开放',
+      fish_tide_participated: '首次参与鱼潮', treasure_beast_unlocked: '寻宝兽开放',
     };
     const gunRows = Object.entries(fish.actions || {}).flatMap(([id, profile]) =>
-      (profile.gun_milestones || []).map(row => [profileLabel(id), gunLabels[row.kind] || row.kind,
+      (profile.lifecycle_gun_milestones || profile.gun_milestones || []).map(row => [profileLabel(id), gunLabels[row.kind] || row.kind,
         row.identity, row.online_time_seconds, row.time_seconds]));
     actions.querySelector('[data-source-actions]').innerHTML +=
       '<h3>图鉴枪与鱼潮资格</h3><p>完成、领取、拥有、装备分别记录；枪伤害不改变固定五蛋收益。</p>' +
       '<table class="data-table"><thead><tr><th>玩家</th><th>进展</th><th>身份</th><th>累计在线秒</th><th>房间时间秒</th></tr></thead><tbody>' +
       gunRows.map(row => '<tr>' + row.map(value => `<td>${escapeHtml(value)}</td>`).join('') + '</tr>').join('') + '</tbody></table>';
+    const firstRows = Object.entries(fish.actions || {}).flatMap(([id, profile]) =>
+      Object.entries(profile.first_times || {}).filter(([kind]) => ['normal_codex_completed', 'gun_claimed', 'fish_tide_participated', 'treasure_beast_unlocked'].includes(kind))
+        .map(([kind, row]) => [profileLabel(id), gunLabels[kind], row.online_time_seconds, row.time_seconds]));
+    if (firstRows.length) actions.querySelector('[data-source-actions]').innerHTML += '<h3>生命周期首次时点</h3><table class="data-table"><thead><tr><th>玩家</th><th>进展</th><th>累计在线秒</th><th>房间秒</th></tr></thead><tbody>' +
+      firstRows.map(row => '<tr>' + row.map(value => `<td>${escapeHtml(value)}</td>`).join('') + '</tr>').join('') + '</tbody></table>';
 
   }
 }

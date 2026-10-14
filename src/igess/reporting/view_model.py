@@ -320,6 +320,7 @@ def _source_periods(rows: list[dict[str, Any]], sessions: list[dict[str, Any]]) 
     elapsed = 0
     for session in sessions:
         duration = session["end"] - session["start"]
+        elapsed = session.get("active_start", elapsed)
         day_rows = [{**row, "day_active_time_seconds": row["active_time_seconds"] - elapsed,
                      "day_active_time": chart_point(row["active_time_seconds"] - elapsed)}
                     for row in rows if session["start"] <= row["wall_time_seconds"] <= session["end"]]

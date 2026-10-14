@@ -32,9 +32,10 @@ def choose_gun_action(state: dict[str, Any], allowed: Any):
 class GunMilestones:
     def __init__(self, saved: dict[str, Any] | None = None):
         self.seen = set((saved or {}).get('seen', []))
+        self.records = list((saved or {}).get('records', []))
 
     def save(self) -> dict[str, Any]:
-        return {'seen': sorted(self.seen)}
+        return {'seen': sorted(self.seen), 'records': list(self.records)}
 
     def observe(self, state, online_seconds, scenario_id, profile_id, events):
         guns = state['guns']
@@ -58,6 +59,8 @@ class GunMilestones:
             if identity in self.seen:
                 continue
             self.seen.add(identity)
+            self.records.append({'time_seconds': int(state['time']), 'kind': kind,
+                                 'identity': identity, 'online_time_seconds': str(online_seconds)})
             events.append(Event(scenario_id, profile_id, int(state['time']), 'gun_milestone', target, {
                 'kind': kind, 'identity': identity, 'online_time_seconds': str(online_seconds),
             }))
