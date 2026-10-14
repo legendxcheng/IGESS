@@ -359,6 +359,8 @@ function renderFishCumulativeOutputChart(profiles, logarithmic = false) {
     [
       ['累计金币', 'money_acquired_cumulative', '#2563eb'],
       ['累计资源', 'resource_acquired_cumulative', '#16a34a'],
+      ['图鉴一次性金币', 'codex_money_cumulative', '#a855f7'],
+      ['图鉴一次性材料', 'codex_material_cumulative', '#f97316'],
     ].forEach(([label, field, color]) => {
       series.push({
         name: `${profileLabel(profileId)} · ${label}`,
@@ -1333,6 +1335,8 @@ function eventKindLabel(kind) {
     go_online: '上线',
     go_offline: '下线',
     claim_offline_reward: '领取离线奖励',
+    claim_fish_reward: '领取单鱼图鉴奖励',
+    codex_fish_unlocked: '单鱼图鉴解锁',
     source_rejected: '源规则拒绝',
   };
   return labels[kind] || kind || '';

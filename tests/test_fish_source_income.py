@@ -26,10 +26,10 @@ def test_source_income_counts_production_and_sale_without_counting_transfers_or_
     })
     sold = _state(money="75", material="37")
     income.observe(spent, sold, op="sell_fish", receipt={"materialAdded": _dto("7")})
-    assert income.save() == {"money": "100", "material": "47", "fish_sale_material": "7"}
+    assert income.save() == {"money": "100", "material": "47", "fish_sale_material": "7", "codex_money": "0", "codex_material": "0"}
     resumed = SourceIncome(income.save())
     resumed.observe(sold, _state(money="75", material="40", unclaimed="5"))
-    assert resumed.save() == {"money": "105", "material": "50", "fish_sale_material": "7"}
+    assert resumed.save() == {"money": "105", "material": "50", "fish_sale_material": "7", "codex_money": "0", "codex_material": "0"}
 
 
 def test_source_income_excludes_offline_claims_and_lost_pending_money():

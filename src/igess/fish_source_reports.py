@@ -33,6 +33,8 @@ def write_source_progression_artifacts(
             **{field: resources.get(field) for field in (
                 "online_money_acquired_cumulative", "online_resource_acquired_cumulative",
                 "online_fish_sale_material_cumulative",
+                "online_codex_money_cumulative", "online_codex_material_cumulative",
+                "codex_unlocked_count", "codex_claimed_count",
             )},
             "strength": resources["strength"],
             "fish_luck": resources.get("fish_luck"),
@@ -63,7 +65,7 @@ def write_source_progression_artifacts(
             continue
         if event.kind == "source_rejected":
             rejections[event.profile_id][event.details["code"]] += 1
-        else:
+        elif event.details.get("source") != "observation":
             counts[event.profile_id][event.kind] += 1
     behavior = {
         "schema_version": 1,
