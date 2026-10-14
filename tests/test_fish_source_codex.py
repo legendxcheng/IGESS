@@ -28,6 +28,8 @@ def test_formal_codex_claims_are_explicit_one_second_actions_and_separate_income
     events = json.loads((output / 'events.json').read_text(encoding='utf-8'))
     claims = [e for e in events if e['kind'] == 'claim_fish_reward']
     assert claims
+    assert all(json.loads(e['details']['receipt'])['persistence'] ==
+               dict(ok=True, code='ok', dirty=False, retryable=False) for e in claims)
     ids = [json.loads(e['details']['receipt'])['rewardId'] for e in claims]
     assert len(ids) == len(set(ids))
     unlocks = [e for e in events if e['kind'] == 'codex_fish_unlocked']
@@ -71,5 +73,7 @@ def test_codex_session_survives_source_isolated_runtime_package(tmp_path):
         assert codex == source.request({'op': 'query_codex'})
         reward = codex['claimableRewards'][0]['rewardId']
         claim = {'op': 'claim_fish_reward', 'requestId': 'claim', 'rewardId': reward, 'revision': 0}
-        assert runtime.request(claim) == source.request(claim)
+        receipt = runtime.request(claim)
+        assert receipt == source.request(claim)
+        assert receipt['persistence'] == dict(ok=True, code='ok', dirty=False, retryable=False)
         assert runtime.request({'op': 'query'}) == source.request({'op': 'query'})
