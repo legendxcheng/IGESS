@@ -1,17 +1,10 @@
 """Player decisions and permanent observations for source-owned gun progression."""
 from __future__ import annotations
 
-from decimal import Decimal
 from typing import Any
 
 from .schema import Event
-
-
-def _number(dto: dict[str, Any]) -> Decimal:
-    if dto['sign'] == 0:
-        return Decimal(0)
-    digits = Decimal(dto['coeff']).as_tuple().digits
-    return Decimal((int(dto['sign'] < 0), digits, dto['exp']))
+from .fish_source_numbers import source_decimal
 
 
 def choose_gun_action(state: dict[str, Any], allowed: Any):
@@ -23,7 +16,7 @@ def choose_gun_action(state: dict[str, Any], allowed: Any):
             return 'claim_gun_reward', identity, {'op': 'claim_gun_reward', 'rewardId': reward['id']}
     owned = sorted(guns['owned'], key=lambda row: row['id'])
     if owned:
-        best = max(owned, key=lambda row: _number(row['attack']))['id']
+        best = max(owned, key=lambda row: source_decimal(row['attack']))['id']
         if best != guns['combat']['equippedGunId'] and allowed('equip_gun', str(best)):
             return 'equip_gun', str(best), {'op': 'equip_gun', 'gunId': best}
     return None

@@ -346,7 +346,7 @@ def test_upgrade_target_rejects_other_forms(target: object) -> None:
     ("entity", "field", "allowed"),
     [
         ("modifier_type", "stage", ("flat", "add_pct", "mult", "exp")),
-        ("behavior_policy", "type", ("cheap_unlock_first", "fastest_payback", "new_content_bias")),
+        ("behavior_policy", "type", ("cheap_unlock_first", "fastest_payback", "new_content_bias", "source_priority_v1")),
         ("player_profile", "prestige_policy", ("conservative", "efficient_reset", "milestone_based")),
         ("scenario", "time_mode", ("tick", "analytic")),
         ("scenario", "start_state", ("new_player",)),

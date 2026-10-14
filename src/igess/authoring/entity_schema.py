@@ -28,6 +28,7 @@ _BEHAVIOR_POLICY_TYPES = (
     "cheap_unlock_first",
     "fastest_payback",
     "new_content_bias",
+    "source_priority_v1",
 )
 _PRESTIGE_POLICIES = ("conservative", "efficient_reset", "milestone_based")
 _TIME_MODES = ("tick", "analytic")

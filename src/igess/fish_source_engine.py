@@ -29,6 +29,7 @@ from .fish_source_runtime import (
     source_runtime_entry,
 )
 from .fish_source_income import SourceIncome
+from .fish_source_numbers import source_decimal
 from .schema import EconomyModel, Event, SimulationResult, TimelineRow
 
 _BEHAVIORS = frozenset({
@@ -75,23 +76,17 @@ def _unpack_session(payload: Mapping[str, Any]) -> dict[str, Any]:
     return session
 
 
-def _decimal(dto: Mapping[str, Any]) -> Decimal:
-    if dto["sign"] == 0:
-        return Decimal(0)
-    return Decimal((int(dto["sign"] < 0), Decimal(str(dto["coeff"])).as_tuple().digits, int(dto["exp"])))
-
-
 def _number(dto: Mapping[str, Any]) -> str:
-    return str(_decimal(dto))
+    return str(source_decimal(dto))
 
 
 def _affords(wallet: Mapping[str, Any], quote: Mapping[str, Any]) -> bool:
-    return _decimal(wallet[quote["resource"]]) >= _decimal(quote["cost"])
+    return source_decimal(wallet[quote["resource"]]) >= source_decimal(quote["cost"])
 
 
 def _integration_code_digest() -> str:
     digest = hashlib.sha256()
-    for name in ("fish_source_engine.py", "fish_source_runtime.py", "fish_source_reports.py", "fish_source_income.py", "fish_source_guns.py", "fish_source_eggs.py", "fish_source_tides.py"):
+    for name in ("fish_source_engine.py", "fish_source_runtime.py", "fish_source_reports.py", "fish_source_income.py", "fish_source_guns.py", "fish_source_eggs.py", "fish_source_tides.py", "fish_source_numbers.py"):
         path = Path(__file__).parent / name
         if not path.is_file():
             path = path.with_suffix(".pyc")
@@ -502,7 +497,7 @@ class _ProfileRun:
         self.next_record = (sample_time // self.record_interval + 1) * self.record_interval
         self._record()
 
-    def _observe_guns(self) -> None:
+    def _observe_progression(self) -> None:
         self.tide_observations.observe(self.state, self.active_time_seconds, self.scenario.id, self.profile.id, self.events)
         self.egg_observations.observe(self.state, self.active_time_seconds, self.scenario.id, self.profile.id, self.events)
         self.gun_milestones.observe(self.state, self.active_time_seconds, self.scenario.id, self.profile.id, self.events)
@@ -510,7 +505,7 @@ class _ProfileRun:
             self.first_times.setdefault(record["kind"], dict(record))
 
     def _record(self) -> None:
-        self._observe_guns()
+        self._observe_progression()
         if "luck" not in self.state:
             self.state = self.runtime.request({"op": "query"})
         state = self.state
@@ -594,7 +589,7 @@ class _ProfileRun:
         self._observe_codex(before)
         if online:
             self.active_time_seconds += elapsed
-        self._observe_guns()
+        self._observe_progression()
 
     def _command(self, op: str, *, target: str = "", **arguments: Any) -> bool:
         before = self.state
@@ -640,7 +635,7 @@ class _ProfileRun:
                 }, sort_keys=True)},
             ))
             self._record()
-        self._observe_guns()
+        self._observe_progression()
         if op == "start_tide" and receipt.get("phase") == "participating":
             self.first_times.setdefault("fish_tide_participated", {
                 "time_seconds": int(self.state["time"]), "online_time_seconds": str(self.active_time_seconds),
@@ -690,7 +685,7 @@ class _ProfileRun:
         slots = state["hall"]["slotBalances"]
         if state["time"] - self.last_collect >= self.inputs.collect_interval_seconds:
             for slot in slots:
-                if _decimal(slot["money"]) > 0 and self._allowed("collect_slot", str(slot["slot"])):
+                if source_decimal(slot["money"]) > 0 and self._allowed("collect_slot", str(slot["slot"])):
                     return "collect_slot", str(slot["slot"]), {"op": "collect_slot", "slot": slot["slot"]}
         occupied = {item.get("hallSlot") for item in inventory if item.get("hallSlot", 0) > 0}
         for item in inventory:
@@ -722,7 +717,7 @@ class _ProfileRun:
             and not state["trashMan"]["breakthrough"]["active"]
             and not realm["isMax"]
             and state["trashMan"]["realmId"] == state["trashMan"]["highestRealmId"]
-            and _decimal(wallet["material"]) >= _decimal(realm["breakthroughMaterialCost"])
+            and source_decimal(wallet["material"]) >= source_decimal(realm["breakthroughMaterialCost"])
         ):
             add("fund_trash_man_breakthrough", "start_breakthrough")
         hall_quote = actions.get("hallUpgrade")

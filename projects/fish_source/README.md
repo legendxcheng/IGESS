@@ -9,6 +9,8 @@ uv run igess model simulate --project projects/fish_source --scenario week_1_gro
 uv run igess model simulate --project projects/fish_source --scenario month_1_growth
 ```
 
+`igess model status --project projects/fish_source` 使用同一个源引擎执行十 tick 就绪检查，检查源能力和输入并观察状态变化；检查不登记正式运行，也不创建运行报告。通过后仍需以上正式入口生成可归因的报告。
+
 `economy.yaml` 的 `engine.source_runtime.project_root` 默认指向同盘兄弟目录 `E:\fish-oasis`，`data_root` 指向该源项目的 `igess_export/json`。运行需要本机 `lua55`。修改目录布局时更新这两个路径。每次运行会冻结 Lua 模块和所选 JSON 导表，记录二者内容摘要、IGESS 适配器摘要、Lua 版本、策略、种子和模型摘要。标准 timeline、events、analysis、Web 报告、同源成长/行为产物和 checkpoint 位于本项目 `runs/`。
 
 本项目的 `Datas/` 与 `luban_exports/` 仅满足 IGESS 当前 authoring 项目的通用配置结构；Fish 数值实际来自 `engine.source_runtime.data_root`。编辑这些通用工作簿不会改变同源 Fish 数值。要测试新的 Fish 数值，应更新所选 Fish JSON 导表，并在运行产物中核对 `selected_export_sha256`。不应把两个后端的运行当成单因素数值改动比较。

@@ -12,7 +12,8 @@ from itertools import pairwise
 from typing import Any
 
 from .loader import ReportData, ReportLoadError
-from ..fish_source_tides import tide_report_rows
+from ..fish_source_reports import project_source_behavior
+from ..fish_source_numbers import source_decimal
 
 _MILESTONES = {
     "treasure_beast_unlocked": ("treasure_beast", "treasure_beast_unlocked"),
@@ -30,19 +31,7 @@ def _decimal(value: Any) -> Decimal | None:
         return None
     try:
         if isinstance(value, dict):
-            # Construct the DTO exactly; Decimal.scaleb would round to context precision.
-            coefficient = Decimal(str(value["coeff"]))
-            parts = coefficient.as_tuple()
-            if not isinstance(parts.exponent, int):
-                return None
-            result = Decimal(
-                (
-                    int(value["sign"] < 0),
-                    parts.digits,
-                    parts.exponent + int(value["exp"]),
-                )
-            )
-            return Decimal(0) if value["sign"] == 0 else result
+            return source_decimal(value)
         result = Decimal(str(value))
         return result if result.is_finite() else None
     except (KeyError, TypeError, ValueError, InvalidOperation):
@@ -379,40 +368,9 @@ def build_source_projection(data: ReportData) -> dict[str, Any]:
             ]
         growth[profile] = _growth(events, sessions, initial)
         investment[profile] = _investment(events, sessions, initial)
-        accepted = Counter(
-            row["kind"] for row in events if row["kind"] not in {"source_rejected", "gun_milestone", "treasure_beast_unlocked", "egg_admitted", "egg_hatched"}
-            and row.get("details", {}).get("source") != "observation"
-        )
-        rejected = Counter(
-            row.get("details", {}).get("code", "unknown")
-            for row in events
-            if row["kind"] == "source_rejected"
-        )
-        counts.update(accepted)
-        counts["source_rejected"] += sum(rejected.values())
-        tide_rounds = {}
-        for row in events:
-            if row["kind"] == "tide_observed":
-                fact = json.loads(row["details"]["receipt"])
-                tide_rounds[fact["roundId"]] = fact
-        actions[profile] = {
-            "first_times": scope.get("first_times", {}),
-            "lifecycle_gun_milestones": scope.get("lifecycle_gun_milestones", []),
-            "tide_rounds": tide_report_rows(tide_rounds.values(), [
-                {"kind": row["kind"], **row["details"]}
-                for row in events if row["kind"] in {"egg_admitted", "egg_hatched"}
-            ]),
-            "egg_events": [
-                {"time_seconds": row["time_seconds"], "kind": row["kind"], **row["details"]}
-                for row in events if row["kind"] in {"egg_admitted", "egg_hatched"}
-            ],
-            "gun_milestones": [
-                {"time_seconds": row["time_seconds"], **row["details"]}
-                for row in events if row["kind"] == "gun_milestone"
-            ],
-            "accepted_commands": dict(accepted),
-            "rejected_commands": dict(rejected),
-        }
+        actions[profile] = project_source_behavior(events, scope)
+        counts.update(actions[profile]["accepted_commands"])
+        counts["source_rejected"] += sum(actions[profile]["rejected_commands"].values())
     return {
         "execution_window": data.manifest.get("execution_window"),
         "core": {"profiles": core},

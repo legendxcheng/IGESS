@@ -127,6 +127,7 @@ s.wallet.material={sign=1,coeff='9',exp=2}
     assert expected['fish_tide_participated']['time_seconds'] == 10
     assert restored('source_behavior.json')['profiles']['default']['first_times'] == expected
     actions = report['fish_progression']['actions']['default']
+    assert actions == restored('source_behavior.json')['profiles']['default']
     assert actions['first_times'] == expected
     assert 'claim_gun_reward' not in actions['accepted_commands']
     core = report['fish_progression']['core']['profiles']['default']

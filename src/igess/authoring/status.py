@@ -225,7 +225,11 @@ def derive_status(
                                 else:
                                     smoke_eligible = True
                                     try:
-                                        probe = run_ten_tick_probe(model)
+                                        probe = (
+                                            run_ten_tick_probe(model, base_dir=project.root, source_digest=model_digest)
+                                            if model.config.engine_id == "fish_source"
+                                            else run_ten_tick_probe(model)
+                                        )
                                         if probe.artifacts or probe.report_index is not None:
                                             raise AuthoringError(
                                                 "smoke_artifact_unexpected",
