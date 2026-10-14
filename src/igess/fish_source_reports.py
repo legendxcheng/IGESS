@@ -38,6 +38,7 @@ def write_source_progression_artifacts(
             "fish_luck": resources.get("fish_luck"),
             "trash_luck": resources.get("trash_luck"),
             "trash_realm": resources["trash_realm"],
+            "treasure_beast_unlocked": resources.get("treasure_beast_unlocked"),
             "total_throws": resources["total_throws"],
             "strength_rebirth_count": resources["strength_rebirth_count"],
             "trash_man_rebirth_count": resources["trash_man_rebirth_count"],

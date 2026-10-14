@@ -10,7 +10,6 @@ engine:
     data_root: ../../../fish-oasis/igess_export/json
     lua_executable: lua55
     in_fishing_area: true
-    landing_distance_cm: 100
     collect_interval_seconds: 300
     idle_seconds: 30
     advance_mode: equivalent_batch_v1
