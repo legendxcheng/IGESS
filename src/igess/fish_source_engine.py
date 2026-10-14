@@ -23,6 +23,7 @@ from .fish_source_guns import GunMilestones, choose_gun_action
 from .fish_source_runtime import (
     FishSourceRejection,
     FishSourceRuntime,
+    FishSourceRuntimeError,
     data_snapshot_digest,
     source_code_digest,
     source_runtime_entry,
@@ -113,7 +114,7 @@ class _SourceInputs:
     idle_seconds: int
     fast_advance: bool
     sampling_time_basis: str
-    single_tide_at_seconds: int | None
+    room_origin_seconds: int
 
 
 class FishSourceEngineAdapter:
@@ -172,9 +173,11 @@ class FishSourceEngineAdapter:
         lua_executable = source_settings.get("lua_executable", "lua55")
         if not isinstance(lua_executable, str) or not lua_executable:
             raise EngineAdapterError("fish_source_lua_invalid", "Invalid Lua executable")
-        single_tide_at = source_settings.get("single_tide_at_seconds")
-        if single_tide_at is not None and (type(single_tide_at) is not int or single_tide_at < 0):
-            raise EngineAdapterError("fish_source_policy_invalid", "Invalid controlled tide time")
+        if "single_tide_at_seconds" in source_settings:
+            raise EngineAdapterError("fish_source_policy_invalid", "Use the source periodic tide schedule")
+        room_origin = source_settings.get("room_origin_seconds", 0)
+        if type(room_origin) is not int or room_origin < 0:
+            raise EngineAdapterError("fish_source_policy_invalid", "Invalid room time origin")
         fishing_area = source_settings.get("in_fishing_area", True)
         landing_distance = source_settings.get("landing_distance_cm")
         collect_interval = source_settings.get("collect_interval_seconds", 300)
@@ -244,6 +247,17 @@ class FishSourceEngineAdapter:
                 online = session.get("daily_online_seconds")
                 if type(online) is not int or online <= 0 or online > 86400:
                     raise EngineAdapterError("fish_source_session_unsupported", f"{profile_id}: invalid daily online time")
+        try:
+            with FishSourceRuntime(project_root, data_root, lua_executable=lua_executable) as probe:
+                capabilities = probe.capabilities or {}
+                missing = sorted(_REQUIRED_OPERATIONS - set(capabilities.get("actions", [])))
+                if missing or capabilities.get("tideScheduleVersion") != 1 or capabilities.get("naturalLandingVersion") != 1:
+                    raise EngineAdapterError(
+                        "fish_source_capability_missing", ", ".join(missing) or "tideScheduleVersion=1 and naturalLandingVersion=1",
+                    )
+                probe.create(start_at=0, in_fishing_area=fishing_area, fast_advance=advance_mode == "equivalent_batch_v1")
+        except FishSourceRuntimeError as error:
+            raise EngineAdapterError(error.code, str(error)) from error
         code_digest = source_code_digest(project_root)
         data_digest = data_snapshot_digest(data_root)
         integration_digest = _integration_code_digest()
@@ -262,7 +276,7 @@ class FishSourceEngineAdapter:
             lua_executable, fishing_area, landing_distance,
             collect_interval, idle_seconds,
             advance_mode == "equivalent_batch_v1",
-            sampling_time_basis, single_tide_at,
+            sampling_time_basis, room_origin,
         )
         metadata = {
             "engine_id": self.engine_id,
@@ -275,7 +289,7 @@ class FishSourceEngineAdapter:
                 "lua_executable": lua_executable,
                 "policy": _SOURCE_POLICY,
                 "tide_policy": TIDE_POLICY,
-                "single_tide_at_seconds": single_tide_at,
+                "tide_schedule": {"policy": "absolute_opening_only_v1", "room_origin_seconds": room_origin},
                 "gun_policy": "claim_stable_reward_id_then_highest_source_attack_v1",
                 "gun_claim_seconds": 1,
                 "gun_equip_seconds": 1,
@@ -306,6 +320,7 @@ class FishSourceEngineAdapter:
         scenario_id: str,
         *,
         checkpoint_input: str | Path | None = None,
+        until_seconds: int | None = None,
     ) -> EngineExecution:
         run_started = time.perf_counter()
         inputs = prepared.domain_model
@@ -318,6 +333,10 @@ class FishSourceEngineAdapter:
         if _integration_code_digest() != inputs.integration_digest:
             raise EngineAdapterError("fish_source_integration_changed", "IGESS source adapter changed after preparation")
         scenario = prepared.model.scenarios[scenario_id]
+        scenario_end = round(scenario.duration_hours * 3600)
+        if until_seconds is not None and (type(until_seconds) is not int or not 0 < until_seconds <= scenario_end):
+            raise EngineAdapterError("execution_window_invalid", "until_seconds must be within the scenario")
+        execution_end = scenario_end if until_seconds is None else until_seconds
         prepared.manifest_metadata["source_runtime"]["record_interval_seconds"] = scenario.record_interval_seconds
         if checkpoint_input is not None and len(scenario.profiles) != 1:
             raise EngineAdapterError(
@@ -333,6 +352,18 @@ class FishSourceEngineAdapter:
             )
             if existing.scenario_id != scenario_id or existing.profile_id != scenario.profiles[0]:
                 raise EngineAdapterError("fish_source_checkpoint_scope_mismatch", "Checkpoint scenario/profile differs")
+        execution_start = existing.simulated_time_seconds if existing else 0
+        if execution_end < execution_start:
+            raise EngineAdapterError("execution_window_invalid", "Cannot stop before the checkpoint time")
+        prepared.manifest_metadata["execution_window"] = {
+            "requested_until_seconds": until_seconds,
+            "scenario_end_seconds": scenario_end,
+            "start_seconds": execution_start,
+            "end_seconds": execution_end,
+            "event_scope": "current_execution_segment",
+            "accepted_commands_scope": "current_execution_segment",
+            "cumulative_fields": ["wallet", "online_acquisition", "active_time_seconds", "source_total_throws"],
+        }
         checked_at = time.perf_counter()
         timings = {"input_check": checked_at - run_started, "process_start": 0.0,
                    "source_execution": 0.0, "checkpoint": 0.0, "process_close": 0.0}
@@ -365,8 +396,12 @@ class FishSourceEngineAdapter:
                     )
                 runner = _ProfileRun(
                     runtime, prepared.model, scenario_id, profile_id, inputs,
-                    timeline, events, seed, existing,
+                    timeline, events, seed, existing, execution_end,
                 )
+                prepared.manifest_metadata["source_runtime"]["tide_schedule"].update({
+                    "interval_seconds": runner.tide_interval,
+                    "spawn_window_seconds": runner.state["tides"]["config"]["spawnWindowSeconds"],
+                })
                 runner.execute()
                 executed = time.perf_counter()
                 timings["source_execution"] += executed - entered
@@ -404,7 +439,7 @@ class _ProfileRun:
         self, runtime: FishSourceRuntime, model: EconomyModel,
         scenario_id: str, profile_id: str, inputs: _SourceInputs,
         timeline: list[TimelineRow], events: list[Event], seed: int,
-        existing: SimulationCheckpoint | None,
+        existing: SimulationCheckpoint | None, execution_end: int,
     ) -> None:
         self.runtime = runtime
         self.model = model
@@ -414,7 +449,7 @@ class _ProfileRun:
         self.timeline = timeline
         self.events = events
         self.seed = seed
-        self.end = round(self.scenario.duration_hours * 3600)
+        self.end = execution_end
         self.record_interval = self.scenario.record_interval_seconds
         self.request_number = 0
         self.behavior_turn = 0
@@ -424,8 +459,9 @@ class _ProfileRun:
         self.egg_observations = EggObservations(existing.behavior_state.get("egg_observations") if existing else None)
         self.tide_observations = TideObservations(existing.behavior_state.get("tide_observations") if existing else None)
         self.pending_tide: dict[str, Any] | None = None
-        self.single_tide_attempted = False
+        self.next_tide_at = inputs.room_origin_seconds
         self.pending_throw: dict[str, Any] | None = None
+        self.pending_action: dict[str, Any] | None = None
         self.last_receipt: dict[str, Any] = {}
         self.gun_milestones = GunMilestones(existing.behavior_state.get("gun_milestones") if existing else None)
         self.income = SourceIncome(
@@ -445,8 +481,10 @@ class _ProfileRun:
             self.blocked = dict(existing.behavior_state.get("blocked", {}))
             self.active_time_seconds = int(existing.behavior_state.get("active_time_seconds", 0))
             self.pending_throw = existing.behavior_state.get("pending_throw")
+            self.pending_action = existing.behavior_state.get("pending_action")
             self.pending_tide = existing.behavior_state.get("pending_tide")
-            self.single_tide_attempted = existing.behavior_state.get("single_tide_attempted", False)
+            self.next_tide_at = existing.behavior_state["next_tide_at"]
+        self.tide_interval = int(self.state["tides"]["config"]["intervalSeconds"])
         sample_time = self.active_time_seconds if inputs.sampling_time_basis == "online" else self.state["time"]
         self.next_record = (sample_time // self.record_interval + 1) * self.record_interval
         self._record()
@@ -522,6 +560,14 @@ class _ProfileRun:
             self._advance_to(target)
 
     def _advance_to(self, target: int, *, include_luck: bool = False) -> None:
+        # Source hatching can unlock codex entries between report samples.
+        # Observe its deadline independently of the sampling cadence.
+        while self.state["online"]:
+            deadlines = [math.ceil(egg["hatchAt"]) for egg in self.state["eggs"]["items"]
+                         if self.state["time"] < math.ceil(egg["hatchAt"]) < target]
+            if not deadlines:
+                break
+            self._advance_to(min(deadlines))
         before = self.state
         elapsed = target - self.state["time"]
         online = self.state["online"]
@@ -693,6 +739,9 @@ class _ProfileRun:
     def _act(self, behavior: str, target: str, payload: dict[str, Any], limit: int) -> None:
         start = int(self.state["time"])
         duration = 1 if behavior in ("collect_slot", "deploy_fish", "claim_fish_reward", "claim_gun_reward", "equip_gun") else self._duration(behavior)
+        if behavior != "exercise_barbell" and start + duration > limit:
+            self._wait_until(limit)
+            return
         end = min(start + duration, limit)
         if behavior == "manual_throw":
             self.request_number += 1
@@ -706,49 +755,72 @@ class _ProfileRun:
                         "end_at": max(start + duration, landing_at),
                         "distance_cm": self.inputs.landing_distance_cm or plan["distanceCm"],
                     }
-                    self._continue_throw(limit)
+                    self._continue_throw(min(limit, self.end))
                     return
-            self._advance(end)
+            self._wait_until(end)
         elif behavior == "exercise_barbell":
             if self._command("start_exercise"):
-                self._advance(end)
-                if end < limit:
-                    self._command("stop_exercise")
+                self._wait_until(end, kind="exercise")
+            else:
+                self._wait_until(end)
         else:
             self._command(payload["op"], target=target, **{
                 key: value for key, value in payload.items() if key != "op"
             })
             if behavior == "collect_slot":
                 self.last_collect = start
-            self._advance(end)
+            self._wait_until(end)
+
+    def _wait_until(self, end: int, *, kind: str = "wait") -> None:
+        self.pending_action = {"end_at": end, "kind": kind}
+        self._continue_action(min(end, self.end))
+
+    def _continue_action(self, limit: int) -> None:
+        pending = self.pending_action
+        assert pending is not None
+        self._advance(min(pending["end_at"], limit))
+        if self.state["time"] >= pending["end_at"]:
+            if pending["kind"] == "exercise":
+                self._command("stop_exercise")
+            self.pending_action = None
 
     def _continue_throw(self, limit: int) -> None:
         pending = self.pending_throw
         assert pending is not None
-        self._advance(min(pending["landing_at"], limit))
-        if self.state["time"] < pending["landing_at"]:
-            return
-        throw_id = pending["request_id"]
-        if (
-            self._command("select_throw_landing", target=throw_id, requestId=throw_id,
-                          distanceCm=pending["distance_cm"])
-            and self._command("finalize_throw_landing", target=throw_id, requestId=throw_id)
-            and self._command("complete_throw", target=throw_id, requestId=throw_id)
-        ):
-            self._deploy_new_fish()
-        self.pending_throw = None
-        self._advance(min(max(self.state["time"], pending["end_at"]), limit))
+        if not pending.get("landed"):
+            self._advance(min(pending["landing_at"], limit))
+            if self.state["time"] < pending["landing_at"]:
+                return
+            throw_id = pending["request_id"]
+            if (
+                self._command("select_throw_landing", target=throw_id, requestId=throw_id,
+                              distanceCm=pending["distance_cm"])
+                and self._command("finalize_throw_landing", target=throw_id, requestId=throw_id)
+            ):
+                self._command("complete_throw", target=throw_id, requestId=throw_id)
+            pending["landed"] = True
+        self._advance(min(pending["end_at"], limit))
+        if self.state["time"] >= pending["end_at"]:
+            self.pending_throw = None
 
-    def _deploy_new_fish(self) -> None:
-        inventory = self.state["inventory"]["items"]
-        occupied = {item.get("hallSlot") for item in inventory if item.get("hallSlot", 0) > 0}
-        for item in inventory:
-            if item.get("hallSlot", 0) == 0:
-                for slot in range(1, self.state["hall"]["currentLevel"]["capacity"] + 1):
-                    if slot not in occupied:
-                        self._command("deploy_fish", target=str(item["instanceId"]),
-                                      instanceId=item["instanceId"], slot=slot)
-                        return
+    def _round_id(self, opening: int) -> str:
+        origin = self.inputs.room_origin_seconds
+        return f"room:{origin}:round:{(opening - origin) // self.tide_interval}"
+
+    def _skip_tide(self, opening: int, reason: str) -> None:
+        row = {
+            "roundId": self._round_id(opening), "openedAt": opening,
+            "endsAt": opening + 120, "phase": "skipped", "success": True,
+            "reason": reason, "occupied_seconds": 0,
+            "online_time_seconds": self.active_time_seconds,
+            "reloads": [], "eggs": [],
+            "totalMaterialSpent": {"sign": 0, "coeff": "0", "exp": 0},
+            "approximation": TIDE_POLICY["model"],
+        }
+        self.events.append(Event(
+            self.scenario.id, self.profile.id, opening, "tide_observed", row["roundId"],
+            {"receipt": json.dumps(row, ensure_ascii=False, sort_keys=True), "source": "observation"},
+        ))
 
     def _start_tide(self, round_id: str) -> None:
         if self.state.get("gameplay", {}).get("foregroundActivity"):
@@ -773,42 +845,61 @@ class _ProfileRun:
         while self.state["time"] < self.end:
             now = int(self.state["time"])
             day_start = now // 86400 * 86400
-            online_end = min(day_start + online_seconds, self.end)
+            planned_logout = day_start + online_seconds
             day_end = min(day_start + 86400, self.end)
-            if now < online_end:
-                if not self.state["online"]:
-                    if not self._command("go_online"):
-                        raise EngineAdapterError("fish_source_session_failed", "Source rejected go_online")
-                    pending = self.state["offlineReward"].get("pendingOfflineReward")
-                    if pending:
-                        self._command("claim_offline_reward", target=pending["settlementId"],
-                                      settlementId=pending["settlementId"], mode="normal")
-                if self.pending_tide is not None:
-                    self._continue_tide(online_end)
-                    continue
-                controlled_at = self.inputs.single_tide_at_seconds
-                if controlled_at is not None and not self.single_tide_attempted and now >= controlled_at:
-                    self.single_tide_attempted = True
-                    if now == controlled_at and day_start + online_seconds - now >= 120 and self.pending_throw is None:
-                        self._start_tide(f"controlled:{controlled_at}")
-                        continue
-                if controlled_at is not None and not self.single_tide_attempted:
-                    online_end = min(online_end, controlled_at)
-                if self.pending_throw is not None:
-                    self._continue_throw(online_end)
-                    continue
+            if now >= planned_logout:
+                if self.state["online"] and not self._command("go_offline"):
+                    raise EngineAdapterError("fish_source_session_failed", "Source rejected go_offline")
+                self.pending_throw = None
+                self.pending_action = None
+                while self.next_tide_at < day_end:
+                    self._skip_tide(self.next_tide_at, "offline")
+                    self.next_tide_at += self.tide_interval
+                self._advance(day_end)
+                continue
+            if not self.state["online"]:
+                if not self._command("go_online"):
+                    raise EngineAdapterError("fish_source_session_failed", "Source rejected go_online")
+                pending = self.state["offlineReward"].get("pendingOfflineReward")
+                if pending:
+                    self._command("claim_offline_reward", target=pending["settlementId"],
+                                  settlementId=pending["settlementId"], mode="normal")
+            # Complete already-started work before considering the opening at this second.
+            if self.pending_throw and self.pending_throw["end_at"] <= now:
+                self._continue_throw(now)
+            if self.pending_action and self.pending_action["end_at"] <= now:
+                self._continue_action(now)
+            if self.pending_tide and self.pending_tide["endsAt"] <= now:
+                self._continue_tide(now)
+            if now == self.next_tide_at:
+                round_id = self._round_id(now)
+                self.next_tide_at += self.tide_interval
+                if planned_logout - now < 120:
+                    self._skip_tide(now, "insufficient_online_time")
+                elif self.pending_throw or self.pending_action or self.pending_tide:
+                    self._skip_tide(now, "foreground_busy")
+                elif not self.state["guns"]["tideEligible"]:
+                    self._skip_tide(now, "not_unlocked")
+                else:
+                    self._start_tide(round_id)
+            boundary = min(planned_logout, self.next_tide_at)
+            advance_limit = min(boundary, self.end)
+            if self.pending_tide:
+                self._continue_tide(advance_limit)
+            elif self.pending_throw:
+                self._continue_throw(advance_limit)
+            elif self.pending_action:
+                self._continue_action(advance_limit)
+            else:
                 selected = self._choose()
                 if selected is None:
-                    self._advance(min(now + self.inputs.idle_seconds, online_end))
+                    self._wait_until(min(now + self.inputs.idle_seconds, boundary))
                 else:
-                    self._act(*selected, online_end)
-            else:
-                if self.state["online"] and now < self.end and not self._command("go_offline"):
-                    raise EngineAdapterError("fish_source_session_failed", "Source rejected go_offline")
-                if not self.state["online"]:
-                    self.pending_throw = None
-                self._advance(day_end)
+                    self._act(*selected, boundary)
         self._record()
+        self.tide_observations.observe(
+            self.state, self.active_time_seconds, self.scenario.id, self.profile.id, self.events, final=True,
+        )
 
     def checkpoint(self, model_digest: str) -> SimulationCheckpoint:
         session = self.runtime.checkpoint()
@@ -828,8 +919,9 @@ class _ProfileRun:
                 "last_collect": self.last_collect,
                 "blocked": self.blocked,
                 "pending_throw": self.pending_throw,
+                "pending_action": self.pending_action,
                 "pending_tide": self.pending_tide,
-                "single_tide_attempted": self.single_tide_attempted,
+                "next_tide_at": self.next_tide_at,
                 "tide_observations": self.tide_observations.save(),
                 "online_acquisition": self.income.save(),
                 "gun_milestones": self.gun_milestones.save(),

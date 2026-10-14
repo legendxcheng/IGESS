@@ -156,6 +156,10 @@ def add_model_parser(subparsers: argparse._SubParsersAction) -> argparse.Argumen
         help="Optional engine checkpoint to resume from.",
     )
     simulate.add_argument(
+        "--until-seconds", type=int,
+        help="Fish source only: stop at this absolute scenario second and save a resumable checkpoint.",
+    )
+    simulate.add_argument(
         "--override",
         action="append",
         default=[],
@@ -227,6 +231,7 @@ def dispatch_model(args: argparse.Namespace) -> int:
         response = AuthoringService(args.project).simulate(
             args.scenario,
             checkpoint_input=args.checkpoint_in,
+            until_seconds=args.until_seconds,
             overrides=args.override,
             profile_id=args.profile,
         )

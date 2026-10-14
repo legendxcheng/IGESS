@@ -440,6 +440,7 @@ class AuthoringService:
         project_root: str | os.PathLike[str] | None = None,
         *,
         checkpoint_input: str | os.PathLike[str] | None = None,
+        until_seconds: int | None = None,
         overrides: Sequence[str] = (),
         profile_id: str | None = None,
     ) -> CommandResponse:
@@ -461,7 +462,7 @@ class AuthoringService:
                     project,
                     scenario_id,
                     warnings,
-                    checkpoint_input=checkpoint_input,
+                    checkpoint_input=checkpoint_input, until_seconds=until_seconds,
                     overrides=overrides,
                     profile_id=profile_id,
                 )
@@ -862,6 +863,7 @@ class AuthoringService:
         recovered: Sequence[Mapping[str, object]],
         *,
         checkpoint_input: str | os.PathLike[str] | None = None,
+        until_seconds: int | None = None,
         overrides: Sequence[str] = (),
         profile_id: str | None = None,
     ) -> CommandResponse:
@@ -878,6 +880,7 @@ class AuthoringService:
             "tables": str(project.exports),
             "overrides": list(overrides),
             "checkpoint_input": str(checkpoint_input) if checkpoint_input is not None else None,
+            "until_seconds": until_seconds,
         }
         phase = "prepare"
         try:
@@ -903,6 +906,12 @@ class AuthoringService:
                             "scenario_id": scenario_id,
                         },
                     )
+                if until_seconds is not None:
+                    if model.config.engine_id != "fish_source":
+                        raise AuthoringError("execution_window_unsupported", "until_seconds requires fish_source")
+                    scenario_end = round(scenarios[scenario_id].duration_hours * 3600)
+                    if type(until_seconds) is not int or not 0 < until_seconds <= scenario_end:
+                        raise AuthoringError("execution_window_invalid", "until_seconds must be a positive absolute second within the scenario")
                 configured_profiles = list(
                     scenarios[scenario_id].profiles
                 )
@@ -975,7 +984,7 @@ class AuthoringService:
                 )
                 prepared_run = PreparedRun(
                     prepared, adapter, record,
-                    checkpoint_input=checkpoint_input, overrides=tuple(overrides),
+                    checkpoint_input=checkpoint_input, until_seconds=until_seconds, overrides=tuple(overrides),
                     source_context=context,
                 )
                 outcome = FormalRunExecutor(

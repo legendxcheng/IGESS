@@ -7,6 +7,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 from .schema import SimulationResult
+from .fish_source_tides import tide_report_rows
 
 
 def write_source_progression_artifacts(
@@ -85,7 +86,7 @@ def write_source_progression_artifacts(
             profile_id: {
                 "gun_milestones": gun_milestones[profile_id],
                 "egg_events": egg_events[profile_id],
-                "tide_rounds": list(tide_rounds[profile_id].values()),
+                "tide_rounds": tide_report_rows(tide_rounds[profile_id].values(), egg_events[profile_id]),
                 "accepted_commands": dict(sorted(counts[profile_id].items())),
                 "rejected_commands": dict(sorted(rejections[profile_id].items())),
             }

@@ -12,6 +12,7 @@ from itertools import pairwise
 from typing import Any
 
 from .loader import ReportData, ReportLoadError
+from ..fish_source_tides import tide_report_rows
 
 _MILESTONES = {
     "treasure_beast_unlocked": ("treasure_beast", "treasure_beast_unlocked"),
@@ -388,7 +389,10 @@ def build_source_projection(data: ReportData) -> dict[str, Any]:
                 fact = json.loads(row["details"]["receipt"])
                 tide_rounds[fact["roundId"]] = fact
         actions[profile] = {
-            "tide_rounds": list(tide_rounds.values()),
+            "tide_rounds": tide_report_rows(tide_rounds.values(), [
+                {"kind": row["kind"], **row["details"]}
+                for row in events if row["kind"] in {"egg_admitted", "egg_hatched"}
+            ]),
             "egg_events": [
                 {"time_seconds": row["time_seconds"], "kind": row["kind"], **row["details"]}
                 for row in events if row["kind"] in {"egg_admitted", "egg_hatched"}
@@ -401,6 +405,7 @@ def build_source_projection(data: ReportData) -> dict[str, Any]:
             "rejected_commands": dict(rejected),
         }
     return {
+        "execution_window": data.manifest.get("execution_window"),
         "core": {"profiles": core},
         "persistent": {"profiles": growth},
         "investment": investment,
