@@ -87,29 +87,30 @@ def _receipts(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def _sessions(
-    events: list[dict[str, Any]], start: int, end: int
+    events: list[dict[str, Any]], start: int, end: int, initial_online: bool | None = None,
 ) -> list[dict[str, Any]]:
-    # Fresh source sessions start online. A resumed run needs its own online evidence.
-    opened = 0 if start == 0 else None
+    opened = start if (initial_online if initial_online is not None else start == 0) else None
+    began_here = start == 0
     sessions = []
     for event in events:
         time = int(event["time_seconds"])
         if event["kind"] == "go_online" and opened is None:
             opened = time
+            began_here = True
         elif event["kind"] == "go_offline" and opened is not None:
-            sessions.append({"start": opened, "end": time, "complete": True})
+            sessions.append({"start": opened, "end": time, "complete": began_here})
             opened = None
     if opened is not None:
         sessions.append({"start": opened, "end": end, "complete": False})
     return sessions
 
 
-def _active_at(time: int, sessions: list[dict[str, Any]]) -> int:
-    return sum(max(0, min(time, row["end"]) - row["start"]) for row in sessions)
+def _active_at(time: int, sessions: list[dict[str, Any]], initial: int = 0) -> int:
+    return initial + sum(max(0, min(time, row["end"]) - row["start"]) for row in sessions)
 
 
 def _core(
-    samples: list[dict[str, Any]], sessions: list[dict[str, Any]]
+    samples: list[dict[str, Any]], sessions: list[dict[str, Any]], initial: int = 0,
 ) -> dict[str, Any]:
     rows = []
     peaks: dict[str, Decimal] = {}
@@ -117,7 +118,7 @@ def _core(
         wall = int(sample["time_seconds"])
         row = {
             "wall_time_seconds": wall,
-            "active_time_seconds": _active_at(wall, sessions),
+            "active_time_seconds": _active_at(wall, sessions, initial),
             "sample_kind": "source_observation",
         }
         for field in ("strength", "fish_luck", "trash_luck"):
@@ -213,14 +214,14 @@ def _milestone(
 
 
 def _growth(
-    events: list[dict[str, Any]], sessions: list[dict[str, Any]]
+    events: list[dict[str, Any]], sessions: list[dict[str, Any]], initial: int = 0,
 ) -> dict[str, Any]:
     rows = []
     for event in events:
         row = _milestone(
             event,
-            _active_at(int(event["time_seconds"]), sessions),
-            rows[-1]["active_time_seconds"] if rows else 0,
+            _active_at(int(event["time_seconds"]), sessions, initial),
+            rows[-1]["active_time_seconds"] if rows else initial,
         )
         if row:
             rows.append(row)
@@ -241,10 +242,10 @@ def _growth(
         "events_per_active_hour": str(Decimal(len(rows) * 3600) / active)
         if active
         else None,
-        "first_progression_wait_seconds": times[0] if times else active,
+        "first_progression_wait_seconds": times[0] - initial if times else active,
         "max_interval_seconds": maximum,
         "system_progression_max_interval_seconds": maximum,
-        "tail_gap_seconds": active - times[-1] if times else active,
+        "tail_gap_seconds": initial + active - times[-1] if times else active,
         "complete_online_sessions": len(complete),
         "complete_online_sessions_without_progression": empty,
         "complete_online_sessions_without_system_progression": empty,
@@ -253,7 +254,7 @@ def _growth(
 
 
 def _investment(
-    events: list[dict[str, Any]], sessions: list[dict[str, Any]]
+    events: list[dict[str, Any]], sessions: list[dict[str, Any]], initial: int = 0,
 ) -> dict[str, Any]:
     upgrades = [event["receipt"] for event in events if event["kind"] == "upgrade_fish"]
     sales = [event["receipt"] for event in events if event["kind"] == "sell_fish"]
@@ -269,7 +270,7 @@ def _investment(
             {
                 "barbell_id": row["receipt"].get("barbellId"),
                 "wall_time": row["time_seconds"],
-                "active_time": _active_at(int(row["time_seconds"]), sessions),
+                "active_time": _active_at(int(row["time_seconds"]), sessions, initial),
                 "price": _text(row["receipt"].get("moneySpent")),
             }
             for row in events
@@ -280,12 +281,12 @@ def _investment(
 
 def _economy(
     samples: list[dict[str, Any]], events: list[dict[str, Any]],
-    sessions: list[dict[str, Any]],
+    sessions: list[dict[str, Any]], initial: int = 0,
 ) -> dict[str, Any]:
     cumulative, remaining = [], []
     for sample in samples:
         common = {
-            "active_time_seconds": _active_at(int(sample["time_seconds"]), sessions),
+            "active_time_seconds": _active_at(int(sample["time_seconds"]), sessions, initial),
             "wall_time_seconds": sample["time_seconds"],
         }
         remaining.append({
@@ -312,7 +313,7 @@ def _economy(
         if "moneyBalance" in receipt or "materialBalance" in receipt:
             remaining.append({
                 "wall_time_seconds": event["time_seconds"],
-                "active_time_seconds": _active_at(int(event["time_seconds"]), sessions),
+                "active_time_seconds": _active_at(int(event["time_seconds"]), sessions, initial),
                 "money_remaining": _text(receipt.get("moneyBalance")),
                 "resource_remaining": _text(receipt.get("materialBalance")),
             })
@@ -355,23 +356,29 @@ def build_source_projection(data: ReportData) -> dict[str, Any]:
         timeline = [row for row in data.timeline if row.get("profile_id") == profile]
         start = min((int(row["time_seconds"]) for row in timeline), default=0)
         end = max((int(row["time_seconds"]) for row in timeline), default=0)
-        sessions = _sessions(events, start, end)
+        scope = data.manifest.get("source_profiles", {}).get(profile, {})
+        initial = scope.get("initial_active_time_seconds", 0)
+        sessions = _sessions(events, start, end, scope.get("initial_online"))
+        elapsed = initial
+        for session in sessions:
+            session["active_start"] = elapsed
+            elapsed += session["end"] - session["start"]
         samples = sorted(
             data.source_progression.get("profiles", {}).get(profile, []),
             key=lambda row: row["time_seconds"],
         )
         if samples:
-            balance[profile] = _economy(samples, events, sessions)
-            core[profile] = _core(samples, sessions)
+            balance[profile] = _economy(samples, events, sessions, initial)
+            core[profile] = _core(samples, sessions, initial)
             liquidity[profile] = [
                 {
                     **sample,
-                    "active_time_seconds": _active_at(sample["time_seconds"], sessions),
+                    "active_time_seconds": _active_at(sample["time_seconds"], sessions, initial),
                 }
                 for sample in samples
             ]
-        growth[profile] = _growth(events, sessions)
-        investment[profile] = _investment(events, sessions)
+        growth[profile] = _growth(events, sessions, initial)
+        investment[profile] = _investment(events, sessions, initial)
         accepted = Counter(
             row["kind"] for row in events if row["kind"] not in {"source_rejected", "gun_milestone", "treasure_beast_unlocked", "egg_admitted", "egg_hatched"}
             and row.get("details", {}).get("source") != "observation"
@@ -389,6 +396,8 @@ def build_source_projection(data: ReportData) -> dict[str, Any]:
                 fact = json.loads(row["details"]["receipt"])
                 tide_rounds[fact["roundId"]] = fact
         actions[profile] = {
+            "first_times": scope.get("first_times", {}),
+            "lifecycle_gun_milestones": scope.get("lifecycle_gun_milestones", []),
             "tide_rounds": tide_report_rows(tide_rounds.values(), [
                 {"kind": row["kind"], **row["details"]}
                 for row in events if row["kind"] in {"egg_admitted", "egg_hatched"}

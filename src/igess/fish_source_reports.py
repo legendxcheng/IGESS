@@ -11,7 +11,7 @@ from .fish_source_tides import tide_report_rows
 
 
 def write_source_progression_artifacts(
-    result: SimulationResult, output_dir: Path,
+    result: SimulationResult, output_dir: Path, source_profiles: dict | None = None,
 ) -> tuple[str, str]:
     progression = {
         "schema_version": 1,
@@ -35,6 +35,7 @@ def write_source_progression_artifacts(
                 "online_money_acquired_cumulative", "online_resource_acquired_cumulative",
                 "online_fish_sale_material_cumulative",
                 "egg_inventory_count", "egg_hatched_count", "egg_capacity_blocked",
+                "fish_inventory_count", "fish_inventory_capacity",
                 "online_tide_reload_material_cumulative", "online_codex_money_cumulative", "online_codex_material_cumulative",
                 "codex_unlocked_count", "codex_claimed_count",
             )},
@@ -84,6 +85,8 @@ def write_source_progression_artifacts(
         "source": "lua_command_receipts",
         "profiles": {
             profile_id: {
+                "first_times": (source_profiles or {}).get(profile_id, {}).get("first_times", {}),
+                "lifecycle_gun_milestones": (source_profiles or {}).get(profile_id, {}).get("lifecycle_gun_milestones", []),
                 "gun_milestones": gun_milestones[profile_id],
                 "egg_events": egg_events[profile_id],
                 "tide_rounds": tide_report_rows(tide_rounds[profile_id].values(), egg_events[profile_id]),

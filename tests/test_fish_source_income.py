@@ -47,3 +47,20 @@ def test_source_income_retains_small_gains_next_to_hundred_digit_balances():
                    _state(money=huge + ".25", material=huge + ".125"))
     assert Decimal(income.save()["money"]) == Decimal(".25")
     assert Decimal(income.save()["material"]) == Decimal(".125")
+
+
+def test_pending_tide_refund_restores_expense_without_becoming_production():
+    income = SourceIncome()
+    income.observe(_state(material="300"), _state(material="250"), op="start_tide", receipt={
+        "materialSpent": _dto("50"), "materialRefunded": _dto("0"),
+    })
+    restored = SourceIncome(income.save())
+    restored.observe(_state(material="250"), _state(material="300"), op="start_tide", receipt={
+        "materialSpent": _dto("0"), "materialRefunded": _dto("50"),
+    })
+    assert restored.save()["material"] == "0"
+    assert restored.save()["tide_reload_material"] == "0"
+    restored.observe(_state(material="300"), _state(material="300"), op="start_tide", receipt={
+        "materialSpent": _dto("0"), "materialRefunded": _dto("0"),
+    })
+    assert restored.save()["material"] == "0"

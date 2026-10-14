@@ -51,7 +51,7 @@ class OutputWriter:
                 output_dir,
             )
         elif model is not None and model.config.engine_id == "fish_source":
-            domain_artifacts = write_source_progression_artifacts(result, output_dir)
+            domain_artifacts = write_source_progression_artifacts(result, output_dir, (manifest_metadata or {}).get("source_profiles", {}))
         cls.write_manifest(
             result,
             model,

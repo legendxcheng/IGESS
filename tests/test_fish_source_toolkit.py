@@ -6,6 +6,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -19,8 +20,8 @@ from igess.operator_export import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-PYTHON311 = ROOT / ".tmp/py311-venv/Scripts/python.exe"
-SOURCE = Path("E:/fish-oasis")
+PYTHON311 = Path(os.environ.get("IGESS_BUILD_PYTHON", sys.executable))
+SOURCE = Path(os.environ.get("FISH_SOURCE_ROOT", str(ROOT.parent / "fish-oasis")))
 pytestmark = pytest.mark.skipif(
     not PYTHON311.is_file() or not (SOURCE / "simulation/cli.lua").is_file()
     or shutil.which("lua55") is None,
@@ -31,8 +32,15 @@ pytestmark = pytest.mark.skipif(
 @pytest.fixture(scope="module")
 def source_bundle(tmp_path_factory):
     folder = tmp_path_factory.mktemp("source-toolkit") / "bundle"
+    project = folder.parent / "project"
+    project.mkdir()
+    for name in ("Datas", "luban_exports"):
+        shutil.copytree(ROOT / "projects/fish_source" / name, project / name)
+    config = yaml.safe_load((ROOT / "projects/fish_source/economy.yaml").read_text(encoding="utf-8"))
+    config["engine"]["source_runtime"].update(project_root=str(SOURCE), data_root=str(SOURCE / "igess_export/json"))
+    (project / "economy.yaml").write_text(yaml.safe_dump(config), encoding="utf-8")
     export_operator_toolkit(
-        ROOT / "projects/fish_source", folder, tool_version="source-test",
+        project, folder, tool_version="source-test",
         python_command=(str(PYTHON311),), source_root=ROOT,
     )
     return folder

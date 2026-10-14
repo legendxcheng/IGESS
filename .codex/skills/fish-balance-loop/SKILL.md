@@ -13,7 +13,7 @@ Run a source-traceable Fish simulation, open its generated Web report, explain t
 - Do not modify production numeric tables, exported JSON, or generated Lua unless the user explicitly asks.
 - Analyze and propose values or directions; never present a proposal as already applied.
 - Preserve unrelated and uncommitted workspace changes. Run `git status --short` before work and never clean the workspace.
-- Use `E:\fish-oasis\igess_export\json` and its matching `python\schema.py` as the production snapshot. Do not substitute fixtures, copied GDD data, prose values, or CLI overrides for a production balance run.
+- Use `E:\fish-oasis\igess_export\json` as the production snapshot. Do not substitute fixtures, copied GDD data, prose values, or CLI overrides for a production balance run.
 
 ## Select the scenario
 
@@ -28,7 +28,7 @@ Map common requested durations to the existing Fish scenarios:
 
 Use 1 day for early pacing, 7 days for the normal tuning loop, and 30 days for milestone validation.
 
-If the requested duration has no scenario, add a clearly named scenario to `projects/fish/economy.yaml` only when that duration was explicitly requested. Keep the production profile, seed, start state, and data source unchanged. Choose a record interval and compact outputs that keep artifacts practical. Do not emulate a production run with `--override`.
+If the requested duration has no scenario, add a clearly named scenario to `projects/fish_source/economy.yaml` only when that duration was explicitly requested. Keep the production profile, seed, start state, and data source unchanged. Choose a record interval and compact outputs that keep artifacts practical. Do not emulate a production run with `--override`.
 
 ## Run the loop
 
@@ -48,12 +48,12 @@ From `E:\IGESS`:
 
 ```powershell
 git status --short
-.\.tmp\py311-venv\Scripts\igess.exe model status --project projects\fish
+.\.tmp\py311-venv\Scripts\igess.exe model status --project projects\fish_source
 ```
 
-Confirm that the model is ready and that the production data root and generated schema exist. Read the latest `projects/fish/RoadMap.md` and, when resuming another session, `projects/fish/HANDOFF.md` before making rule or tuning recommendations.
+Confirm that the source model is ready, `lua55` is available, and `engine.source_runtime.project_root` / `data_root` point to the intended Fish checkout and selected JSON export. Read `projects/fish_source/README.md` and `projects/fish_source/RoadMap.md` before rule or tuning recommendations. `projects/fish` is retired; preserve its historical code/reports and never use it for a new run or comparison baseline.
 
-If the user says they re-exported tables, do not assume the new data was loaded. Verify the resulting run manifest records `production_data=true`, the expected data root, input hashes, and a model digest.
+If the user says they re-exported tables, do not assume the new data was loaded. Verify `run_manifest.source_runtime.selected_export_root` and `selected_export_sha256` against the actual selected export; require `engine_id=fish_source` and a model digest. This backend has no `production_data` flag.
 
 ### 3. Run through the registered IGESS workflow
 
@@ -61,7 +61,7 @@ Prefer the machine-readable response:
 
 ```powershell
 .\.tmp\py311-venv\Scripts\igess.exe model simulate `
-  --project projects\fish `
+  --project projects\fish_source `
   --scenario week_1_growth `
   --json
 ```
@@ -77,13 +77,14 @@ Read `result.output_dir` and `result.report_index` from the JSON response rather
 - `report/index.html`;
 - `output/run_manifest.json`;
 - `output/final_checkpoint.json`;
-- `output/luck_progression.json` and `.csv`;
-- `output/behavior_progression.json` and `.csv`;
+- `output/source_progression.json`;
+- `output/source_behavior.json`;
+- `report/report_data.json`;
 - standard timeline, events, and analysis outputs.
 
-Confirm the scenario, profile, duration, seed provenance, production-data flag, input hashes, and model digest. Distinguish simulation-rule failures from report or artifact infrastructure failures. Preserve failed run directories as evidence.
+Require the registered `run_status.json` to say `success` and every `run_manifest.artifacts` file to exist. Confirm scenario, profile, execution window, root seed, model digest, source `code_sha256`, `integration_code_sha256`, `selected_export_sha256`, Lua version, player/claim/equipment policy, natural landing policy and periodic tide origin/interval. Preserve the selected production JSON bytes and timestamps. Read source timings and artifact sizes when investigating long-run cost. Distinguish simulation-rule failures from report or artifact infrastructure failures. Preserve failed run directories as evidence.
 
-The 30-day authoring path may fail while writing very large artifacts. Do not describe an in-memory domain result as a successful formal Web-report run. Report the exact boundary that failed and propose output compaction separately.
+A long run can fail at source execution, checkpoint, artifact writing or report generation. Do not describe an in-memory domain result as a successful formal Web-report run. Report the exact boundary that failed and propose output compaction separately.
 
 ### 5. Open the report automatically
 
@@ -99,20 +100,17 @@ If browser inspection is requested and browser-control tooling is available, loa
 
 Treat the Fish-specific progression sections as authoritative. The generic report's `Purchase events: 0` or empty payback data does not mean Fish had no economic activity.
 
-Always review:
+Review metrics that the actual artifacts support:
 
-- Strength current value, peak, rebirth count, and recovery time;
-- FishLuck and TrashLuck current/peak curves, growth rates, divergence, and longest stagnation;
-- first persistent-progression wait;
-- persistent gains per active hour;
-- interval P50/P75/P90/P95, maximum interval, and tail gap;
-- system-only progression count, density, maximum interval, and tail gap;
-- complete online sessions without progression;
-- category counts, diversity, and dominant-category share;
-- torpedo, barbell, fish-hall, realm-breakthrough, and both rebirth timings;
-- final money, material, strength, realm, equipment, and checkpoint consistency when relevant.
+- Strength, Fish Luck and Trash Luck sampled current/peak values and rebirth boundaries. A sampled peak is not a continuous-time true peak; unavailable stagnation or recovery metrics remain unavailable.
+- Source persistent progression rows, active-time waits/density/gaps and online sessions without progression. Separate completed realm progression from breakthrough funding. Individual codex unlocks/claims, fish upgrades, egg observations, repeated participation and repeated gun ownership do not count as new system openings.
+- Lifecycle `first_times` for normal codex completion, gun claim, first tide participation and treasure-beast unlock; use both wall time and cumulative online time. `lifecycle_gun_milestones` retains ownership/equipment/upgrade identities through checkpoints.
+- Each tide's participation/skip reason, actual six reload receipts and expense, occupied seconds, admitted eggs and this segment's hatches. The explicit approximation is **5 acquired random eggs / 120 foreground seconds / 6 reloads**, with damage-independent yield and no real hit/competition model.
+- Exact final wallets, unclaimed hall money, one-time codex money/material, fish-sale material, production and tide expense. Hall collection is a transfer; an admitted egg is not yet a fish. Check source inventory count/capacity and blocked due eggs when relevant.
 
-Use cumulative active play time for player-experience gaps. Do not use the 22-hour offline period to inflate progression waits. Exclude single-fish upgrades from persistent/system progression. Show both current Luck and historical peak so rebirth resets remain visible.
+Use cumulative online time for player-experience gaps; offline waits must not inflate them. Do not infer beast access from strength or initial realm: require the actual area-four landing fact. A production run that never completes a codex or cannot afford tides is a balance finding; do not grant a gun or change inputs to force access.
+
+For a resumed formal run, `execution_window` describes this segment. Commands, events, hatches, sampled peaks and period summaries cover this segment; wallets, source throws and acquisition totals continue the checkpoint. First lifecycle timestamps are retained separately. Report segment online duration separately from cumulative online coordinates. Resume with the same scenario using `--checkpoint-in`; `--until-seconds` is an absolute execution cutoff, not a player logout or a changed model.
 
 Separate three layers in the conclusion:
 
@@ -139,7 +137,7 @@ Do not drown the user in raw event counts. Prefer timings, gaps, rates, peaks, r
 
 Wait for the human designer to confirm that Excel changes were exported. Then rerun the same scenario with the same profile, seed, and policy. Compare baseline and candidate model digests and Fish-specific KPIs.
 
-Use IGESS `compare` or `gate` where it correctly consumes the required metrics. Until Fish-specific compare/gate integration is complete, directly compare `luck_progression` and `behavior_progression` artifacts and clearly label that analysis as Fish-specific.
+Use IGESS `compare` or `gate` where it correctly consumes the required metrics. Until Fish-specific compare/gate integration is complete, directly compare `source_progression` and `source_behavior` artifacts and clearly label that analysis as Fish-specific.
 
 Never launch a broad parameter scan unless the user asks for it and the relevant Fish Luban fields are supported. Preserve one-change-at-a-time attribution whenever practical.
 
