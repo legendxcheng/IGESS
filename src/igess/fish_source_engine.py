@@ -17,6 +17,7 @@ from typing import Any
 
 from .checkpoint import CheckpointCodec, SimulationCheckpoint
 from .engines import EngineAdapterError, EngineExecution, PreparedEngine
+from .fish_source_eggs import EggObservations
 from .fish_source_guns import GunMilestones, choose_gun_action
 from .fish_source_runtime import (
     FishSourceRejection,
@@ -37,7 +38,7 @@ _SOURCE_POLICY = "source_priority_v1"
 _MAX_REPLAY_BYTES = 256 * 1024 * 1024
 _REQUIRED_OPERATIONS = frozenset({
     "query", "query_actions", "query_codex", "claim_fish_reward", "advance", "checkpoint", "restore",
-    "claim_gun_reward", "equip_gun",
+    "claim_gun_reward", "equip_gun", "grant_random_egg", "settle_eggs",
     "go_online", "go_offline", "claim_offline_reward", "collect_slot",
     "deploy_fish", "prepare_throw", "begin_throw_flight",
     "select_throw_landing", "finalize_throw_landing", "complete_throw",
@@ -86,7 +87,7 @@ def _affords(wallet: Mapping[str, Any], quote: Mapping[str, Any]) -> bool:
 
 def _integration_code_digest() -> str:
     digest = hashlib.sha256()
-    for name in ("fish_source_engine.py", "fish_source_runtime.py", "fish_source_reports.py", "fish_source_income.py", "fish_source_guns.py"):
+    for name in ("fish_source_engine.py", "fish_source_runtime.py", "fish_source_reports.py", "fish_source_income.py", "fish_source_guns.py", "fish_source_eggs.py"):
         path = Path(__file__).parent / name
         if not path.is_file():
             path = path.with_suffix(".pyc")
@@ -413,6 +414,7 @@ class _ProfileRun:
         self.active_time_seconds = 0
         self.last_collect = -inputs.collect_interval_seconds
         self.blocked: dict[str, int] = {}
+        self.egg_observations = EggObservations(existing.behavior_state.get("egg_observations") if existing else None)
         self.pending_throw: dict[str, Any] | None = None
         self.last_receipt: dict[str, Any] = {}
         self.gun_milestones = GunMilestones(existing.behavior_state.get("gun_milestones") if existing else None)
@@ -438,6 +440,7 @@ class _ProfileRun:
         self._record()
 
     def _observe_guns(self) -> None:
+        self.egg_observations.observe(self.state, self.active_time_seconds, self.scenario.id, self.profile.id, self.events)
         self.gun_milestones.observe(self.state, self.active_time_seconds, self.scenario.id, self.profile.id, self.events)
 
     def _record(self) -> None:
@@ -457,6 +460,9 @@ class _ProfileRun:
             "online_money_acquired_cumulative": str(self.income.totals["money"]),
             "online_resource_acquired_cumulative": str(self.income.totals["material"]),
             "online_fish_sale_material_cumulative": str(self.income.totals["fish_sale_material"]),
+            "egg_inventory_count": str(len(state["eggs"]["items"])),
+            "egg_hatched_count": str(len(state["eggs"]["hatched"])),
+            "egg_capacity_blocked": str(int(state["eggs"]["capacityBlocked"])),
             "online_codex_money_cumulative": str(self.income.totals["codex_money"]),
             "online_codex_material_cumulative": str(self.income.totals["codex_material"]),
             "codex_unlocked_count": str(len(state["codex"]["unlockedEntries"])),
@@ -779,5 +785,6 @@ class _ProfileRun:
                 "pending_throw": self.pending_throw,
                 "online_acquisition": self.income.save(),
                 "gun_milestones": self.gun_milestones.save(),
+                "egg_observations": self.egg_observations.save(),
             },
         )
