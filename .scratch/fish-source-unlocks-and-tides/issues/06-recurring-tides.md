@@ -4,7 +4,7 @@
 
 **Blocked by:** 05
 
-Status: claimed
+Status: resolved
 
 本票执行《Fish 同源模拟：图鉴奖励、寻宝兽开放与鱼潮》规格；范围与边界以父规格为准。实现前在独立工作树确认基于当前集成分支，使用 tdd 技能；测试边界已获用户确认，无需再次询问。
 
@@ -32,3 +32,13 @@ Status: claimed
 - 当前生产导表的真实CLI证据：`projects/fish_source/runs/20261014T054939850067Z-smoke`（截止6秒），`20261014T054945676310Z-smoke`（同checkpoint继续到10秒），两次均生成成功状态、report/index.html、标准产物与final_checkpoint；相同模型指纹 `sha256:73f3afc16fdfd56d3005e13fbcff10d95e539f7197b7df47f23fb98e321b9e51`。不以此短跑宣称生产已开放鱼潮。
 - 完整逐场事实保留在事件/报告，checkpoint鱼潮观察仅保留最近源场次游标，避免累计复制完整费用回执。报告增加开场墙钟、累计在线时点、入包及本段孵化数；恢复页明示本段与累计字段区别。
 - 后续07边界：早期生命周期首次时点完整恢复展示（旧GunMilestones只保存seen）、从离线段恢复的报告在线区间核查，以及库存分页/大数/长场景基线；详见仓外 `E:/IGESS-worktrees/integration-notes/final-validation.md`。生产JSON、Excel及生成Lua数据未改，不启动Editor/DS，不发布。
+
+## Answer
+
+已集成源绝对周期鱼潮、每日在线边界与动作恢复；正式 API / CLI 分段截止贯穿执行链且不改变模型身份，报告区分本段事件与累计资产，临时单场配置已移除。
+
+- 源项目集成合并：55aad123be4ae5d6303b6fe215d0fd628cc483e5。
+- IGESS 集成合并：92a0008f74a39e4d91576e6c5a4ae474b2885d52。
+- 集成后验证：simulation_tides_test、simulation_eggs_test 通过；源 CLI pytest 9 项通过，包含周期输入变化的恢复拒绝。
+- Python 连续鱼潮、自然落点、formal_run、authoring_cli 组合 62 项通过（289.78 秒）；官方 bun build 重建生产 JS 无差异，通用及源报告 23 项通过。
+- 无合并冲突，未改生产导表和原有无关状态；库存精度、历史正式 fixture 迁移与长期基线留 ticket 07 验证。
