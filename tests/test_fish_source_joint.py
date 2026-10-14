@@ -86,6 +86,38 @@ def test_formal_huge_codex_reward_remains_exact_in_wallet_and_report(tmp_path, m
     assert report['fish_progression']['balance']['profiles']['default']['remaining_rows'][-1]['money_remaining']['exact_value'] == amount
 
 
+def test_formal_blocked_eggs_batch_matches_accurate_artifacts_and_restores(tmp_path, monkeypatch):
+    state = archive("""
+for i=1,200 do s.fish.items[i]={instanceId=i,fishId=101,mutationId=1,weightGram=1000,level=1,hallSlot=i==1 and 1 or 0} end
+s.fish.nextInstanceId=201
+s.eggs.items={{instanceId=1,eggId=101,rarityId=1,mutationId=1,acquiredAt=0,hatchAt=30,rootSeed=77},
+ {instanceId=2,eggId=101,rarityId=1,mutationId=1,acquiredAt=0,hatchAt=150,rootSeed=78}}
+s.eggs.nextInstanceId=3
+""")
+    initial(monkeypatch, state)
+    target = project(tmp_path, duration=180)
+    path = target / 'economy.yaml'
+    config = yaml.safe_load(path.read_text(encoding='utf-8'))
+    config['engine']['source_runtime']['advance_mode'] = 'accurate'
+    path.write_text(yaml.safe_dump(config), encoding='utf-8')
+    _, exact, _ = run(target)
+    config['engine']['source_runtime']['advance_mode'] = 'equivalent_batch_v1'
+    path.write_text(yaml.safe_dump(config), encoding='utf-8')
+    _, batch, _ = run(target)
+    for name in ('timeline.json', 'events.json', 'source_progression.json', 'source_behavior.json'):
+        assert exact(name) == batch(name), name
+    final = batch('timeline.json')[-1]['resources']
+    assert final['egg_capacity_blocked'] == '1' and final['egg_inventory_count'] == '2'
+    samples = {row['time_seconds']: row['resources'] for row in batch('timeline.json')}
+    assert samples[25]['egg_capacity_blocked'] == '0'
+    assert samples[30]['egg_capacity_blocked'] == '1'
+    assert not any(e['kind'] == 'egg_hatched' for e in batch('events.json'))
+    segment, _, _ = run(target, until_seconds=90)
+    _, restored, _ = run(target, checkpoint_input=segment / 'final_checkpoint.json')
+    assert restored('timeline.json')[-1] == batch('timeline.json')[-1]
+    assert restored('final_checkpoint.json')['behavior_state'] == batch('final_checkpoint.json')['behavior_state']
+
+
 def test_formal_wallet_one_below_huge_quote_never_submits_purchase(tmp_path, monkeypatch):
     wallet = '1' + '0' * 118 + '6'
     state = archive()
