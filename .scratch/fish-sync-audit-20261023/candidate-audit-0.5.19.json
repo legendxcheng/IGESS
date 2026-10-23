@@ -1,0 +1,7 @@
+{
+  "version": "0.5.19",
+  "managed_files": 97,
+  "unexpected_files": 0,
+  "hashes_match": true,
+  "source_leak_audit": "passed"
+}

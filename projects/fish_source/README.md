@@ -15,6 +15,10 @@ uv run igess model simulate --project projects/fish_source --scenario month_1_gr
 
 本项目的 `Datas/` 与 `luban_exports/` 仅满足 IGESS 当前 authoring 项目的通用配置结构；Fish 数值实际来自 `engine.source_runtime.data_root`。编辑这些通用工作簿不会改变同源 Fish 数值。要测试新的 Fish 数值，应更新所选 Fish JSON 导表，并在运行产物中核对 `selected_export_sha256`。不应把两个后端的运行当成单因素数值改动比较。
 
+GameBalancer 使用发布时从游戏源码编译的 `bundle/fish-runtime`，不会实时读取开发机的游戏分支。修改 Excel 并导出 JSON 后可直接重新模拟；游戏 Lua 规则、宿主接口或表结构变化后，需要重新构建并更新 GameBalancer。开发机直接运行与交付包是否同步，应分别核对当前源码摘要、包内 `runtime.json.source_code_sha256` 和报告中的 `packaged_source_code_sha256`，不能由其中一条路径成功或失败推断另一条。
+
+2026-10-23 同步修复将已验收的图鉴、枪、蛋和鱼潮宿主接口接回当前游戏源码，同时使用当前游戏的关闭材料回退规则。模拟商店购买候选只包含已开放的神器，并在实际第四区入水、寻宝兽永久开放后可用；已拥有的关闭神器仍可通过源服务选择和使用。该门槛纳入报价缓存身份，解锁后立即刷新。修复及工具版本验证见 [同步修复记录](../../.scratch/fish-sync-audit-20261023/repair-verification.md)。
+
 Web 报告读取同源状态和交易回执，展示力量、双 Luck、钱包与待领金额、金币投资、杠铃购买及每日／每周成长操作。突破资助不等于突破完成；峰值仅指记录中的采样峰值。旧长场景按天采样，无法补出 5 分钟在线毛产出与精确停滞，缺失指标明确显示为未记录。可用 `igess report --run <运行目录>/output --out <运行目录>/report` 更新已有报告展示，无需重新模拟。
 
 新运行的 1／7／30 天场景已恢复每累计在线 300 秒采样（`sampling_time_basis: online`），离线时间不消耗采样周期；另记录上下线、离线奖励领取及两类重生前后状态，相同状态去重。采样只查询源状态，不改变玩家操作；间隔与时间口径写入运行清单。增加采样点需要重新模拟，不能通过重生成旧报告补齐。状态采样仍不代表完整在线毛产出或连续时间真实峰值。

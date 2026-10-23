@@ -1,0 +1,798 @@
+{
+  "game_head": "321fb66e2359ef3629411dc5b17be48c9edb2bca",
+  "source_code_sha256": "75dff59b3d0721bfb787dcecd7ba03b8ae5f87df6bc05c999e58c778f8e3b374",
+  "selected_export_sha256": "5d88fffd0727d1f5b5010162e9aa72c49348c1a31dcf20f6d4476c2a803b9922",
+  "capabilities": {
+    "actions": [
+      "advance",
+      "begin_throw_flight",
+      "cancel_throw",
+      "capabilities",
+      "checkpoint",
+      "claim_offline_reward",
+      "collect_all",
+      "collect_slot",
+      "complete_throw",
+      "create",
+      "deploy_fish",
+      "equip_barbell",
+      "finalize_throw_landing",
+      "go_offline",
+      "go_online",
+      "move_fish",
+      "prepare_throw",
+      "purchase_torpedo",
+      "query",
+      "query_actions",
+      "rebirth_strength",
+      "rebirth_trash_man",
+      "restore",
+      "select_throw_landing",
+      "select_torpedo",
+      "sell_fish",
+      "set_fishing_area",
+      "start_breakthrough",
+      "start_exercise",
+      "stop_exercise",
+      "swap_fish",
+      "synthesize_barbell",
+      "upgrade_fish",
+      "upgrade_fish_10",
+      "upgrade_hall",
+      "withdraw_fish"
+    ],
+    "checkpointFormat": 1,
+    "luaVersion": "Lua 5.5",
+    "protocol": 2,
+    "requestIdentity": "source-command-requestId",
+    "stateFormat": "fish-source-session-v1",
+    "timeUnit": "milliseconds"
+  },
+  "missing_operations": [
+    "claim_fish_reward",
+    "claim_gun_reward",
+    "complete_tide",
+    "equip_gun",
+    "grant_random_egg",
+    "query_codex",
+    "settle_eggs",
+    "start_tide"
+  ],
+  "missing_versions": [
+    "tideScheduleVersion",
+    "naturalLandingVersion",
+    "inventoryProjectionVersion"
+  ],
+  "tables": {
+    "tb_dailyrewardcard": {
+      "rows": 3,
+      "existing_json_matches_excel": false,
+      "existing_json_vs_excel": [],
+      "game_lua_vs_excel": [],
+      "game_lua_vs_existing_json": []
+    },
+    "tb_particle": {
+      "rows": 4,
+      "existing_json_matches_excel": true,
+      "existing_json_vs_excel": [],
+      "game_lua_vs_excel": [],
+      "game_lua_vs_existing_json": []
+    },
+    "tb_rebirthui": {
+      "rows": 2,
+      "existing_json_matches_excel": true,
+      "existing_json_vs_excel": [],
+      "game_lua_vs_excel": [],
+      "game_lua_vs_existing_json": []
+    },
+    "tbbarbell": {
+      "rows": 15,
+      "existing_json_matches_excel": true,
+      "existing_json_vs_excel": [],
+      "game_lua_vs_excel": [],
+      "game_lua_vs_existing_json": []
+    },
+    "tbbonusfirstlayer": {
+      "rows": 3,
+      "existing_json_matches_excel": true,
+      "existing_json_vs_excel": [],
+      "game_lua_vs_excel": [],
+      "game_lua_vs_existing_json": []
+    },
+    "tbcodexfishunlockreward": {
+      "rows": 1146,
+      "existing_json_matches_excel": true,
+      "existing_json_vs_excel": [],
+      "game_lua_vs_excel": [],
+      "game_lua_vs_existing_json": []
+    },
+    "tbcodexgunreward": {
+      "rows": 60,
+      "existing_json_matches_excel": false,
+      "existing_json_vs_excel": [],
+      "game_lua_vs_excel": [],
+      "game_lua_vs_existing_json": []
+    },
+    "tbcodexprogressreward": {
+      "rows": 60,
+      "existing_json_matches_excel": true,
+      "existing_json_vs_excel": [],
+      "game_lua_vs_excel": [],
+      "game_lua_vs_existing_json": []
+    },
+    "tbcompensation": {
+      "rows": 0,
+      "existing_json_matches_excel": true,
+      "existing_json_vs_excel": [],
+      "game_lua_vs_excel": [],
+      "game_lua_vs_existing_json": []
+    },
+    "tbegg": {
+      "rows": 60,
+      "existing_json_matches_excel": false,
+      "existing_json_vs_excel": [],
+      "game_lua_vs_excel": [],
+      "game_lua_vs_existing_json": []
+    },
+    "tbfish": {
+      "rows": 125,
+      "existing_json_matches_excel": true,
+      "existing_json_vs_excel": [],
+      "game_lua_vs_excel": [],
+      "game_lua_vs_existing_json": []
+    },
+    "tbfishhallupgrade": {
+      "rows": 21,
+      "existing_json_matches_excel": true,
+      "existing_json_vs_excel": [],
+      "game_lua_vs_excel": [],
+      "game_lua_vs_existing_json": []
+    },
+    "tbfishorder": {
+      "rows": 2,
+      "existing_json_matches_excel": false,
+      "existing_json_vs_excel": [],
+      "game_lua_vs_excel": [],
+      "game_lua_vs_existing_json": []
+    },
+    "tbfishrandompool": {
+      "rows": 13,
+      "existing_json_matches_excel": true,
+      "existing_json_vs_excel": [],
+      "game_lua_vs_excel": [],
+      "game_lua_vs_existing_json": []
+    },
+    "tbfishtideconfig": {
+      "rows": 1,
+      "existing_json_matches_excel": false,
+      "existing_json_vs_excel": [],
+      "game_lua_vs_excel": [],
+      "game_lua_vs_existing_json": []
+    },
+    "tbfishtideeggmutationpool": {
+      "rows": 6,
+      "existing_json_matches_excel": false,
+      "existing_json_vs_excel": [],
+      "game_lua_vs_excel": [],
+      "game_lua_vs_existing_json": []
+    },
+    "tbfishtideeggraritypool": {
+      "rows": 100,
+      "existing_json_matches_excel": false,
+      "existing_json_vs_excel": [],
+      "game_lua_vs_excel": [],
+      "game_lua_vs_existing_json": []
+    },
+    "tbgun": {
+      "rows": 18,
+      "existing_json_matches_excel": false,
+      "existing_json_vs_excel": [],
+      "game_lua_vs_excel": [],
+      "game_lua_vs_existing_json": []
+    },
+    "tbitemgm": {
+      "rows": 24,
+      "existing_json_matches_excel": false,
+      "existing_json_vs_excel": [
+        {
+          "field": "/8310009/description",
+          "old": "获得双倍变异鱼运气特权",
+          "new": "我十几年"
+        }
+      ],
+      "game_lua_vs_excel": [
+        {
+          "field": "/8310009/description",
+          "old": "获得双倍变异鱼运气特权",
+          "new": "我十几年"
+        }
+      ],
+      "game_lua_vs_existing_json": []
+    },
+    "tbmarqueedata": {
+      "rows": 3,
+      "existing_json_matches_excel": false,
+      "existing_json_vs_excel": [],
+      "game_lua_vs_excel": [],
+      "game_lua_vs_existing_json": []
+    },
+    "tbmutation": {
+      "rows": 6,
+      "existing_json_matches_excel": true,
+      "existing_json_vs_excel": [],
+      "game_lua_vs_excel": [],
+      "game_lua_vs_existing_json": []
+    },
+    "tbresourceitem": {
+      "rows": 20,
+      "existing_json_matches_excel": false,
+      "existing_json_vs_excel": [],
+      "game_lua_vs_excel": [],
+      "game_lua_vs_existing_json": []
+    },
+    "tbstrengthrebirth": {
+      "rows": 10,
+      "existing_json_matches_excel": true,
+      "existing_json_vs_excel": [],
+      "game_lua_vs_excel": [],
+      "game_lua_vs_existing_json": []
+    },
+    "tbtorpedo": {
+      "rows": 26,
+      "existing_json_matches_excel": true,
+      "existing_json_vs_excel": [],
+      "game_lua_vs_excel": [],
+      "game_lua_vs_existing_json": []
+    },
+    "tbtrash": {
+      "rows": 40,
+      "existing_json_matches_excel": false,
+      "existing_json_vs_excel": [
+        {
+          "field": "/1/Denominator/digits",
+          "old": "2",
+          "new": "3"
+        },
+        {
+          "field": "/10/Denominator/digits",
+          "old": "17",
+          "new": "36"
+        },
+        {
+          "field": "/11/Denominator/digits",
+          "old": "36",
+          "new": "76"
+        },
+        {
+          "field": "/12/Denominator/digits",
+          "old": "76",
+          "new": "34"
+        },
+        {
+          "field": "/12/Denominator/scale",
+          "old": 3,
+          "new": 4
+        },
+        {
+          "field": "/13/Denominator/digits",
+          "old": "34",
+          "new": "72"
+        },
+        {
+          "field": "/14/Denominator/digits",
+          "old": "72",
+          "new": "151"
+        },
+        {
+          "field": "/15/Denominator/digits",
+          "old": "151",
+          "new": "68"
+        },
+        {
+          "field": "/15/Denominator/scale",
+          "old": 4,
+          "new": 5
+        },
+        {
+          "field": "/16/Denominator/digits",
+          "old": "68",
+          "new": "143"
+        },
+        {
+          "field": "/17/Denominator/digits",
+          "old": "143",
+          "new": "303"
+        },
+        {
+          "field": "/18/Denominator/digits",
+          "old": "303",
+          "new": "135"
+        },
+        {
+          "field": "/18/Denominator/scale",
+          "old": 5,
+          "new": 6
+        },
+        {
+          "field": "/19/Denominator/digits",
+          "old": "135",
+          "new": "286"
+        },
+        {
+          "field": "/2/Denominator/digits",
+          "old": "5",
+          "new": "10"
+        },
+        {
+          "field": "/20/Denominator/digits",
+          "old": "286",
+          "new": "605"
+        },
+        {
+          "field": "/21/Denominator/digits",
+          "old": "605",
+          "new": "271"
+        },
+        {
+          "field": "/21/Denominator/scale",
+          "old": 6,
+          "new": 7
+        },
+        {
+          "field": "/22/Denominator/digits",
+          "old": "271",
+          "new": "572"
+        },
+        {
+          "field": "/23/Denominator/digits",
+          "old": "572",
+          "new": "1211"
+        },
+        {
+          "field": "/24/Denominator/digits",
+          "old": "1211",
+          "new": "541"
+        },
+        {
+          "field": "/24/Denominator/scale",
+          "old": 7,
+          "new": 8
+        },
+        {
+          "field": "/25/Denominator/digits",
+          "old": "541",
+          "new": "1145"
+        },
+        {
+          "field": "/26/Denominator/digits",
+          "old": "1145",
+          "new": "2421"
+        },
+        {
+          "field": "/27/Denominator/digits",
+          "old": "2421",
+          "new": "1083"
+        },
+        {
+          "field": "/27/Denominator/scale",
+          "old": 8,
+          "new": 9
+        },
+        {
+          "field": "/28/Denominator/digits",
+          "old": "1083",
+          "new": "2290"
+        },
+        {
+          "field": "/29/Denominator/digits",
+          "old": "2290",
+          "new": "4842"
+        },
+        {
+          "field": "/3/Denominator/digits",
+          "old": "13",
+          "new": "6"
+        },
+        {
+          "field": "/3/Denominator/scale",
+          "old": 0,
+          "new": 1
+        },
+        {
+          "field": "/30/Denominator/digits",
+          "old": "4842",
+          "new": "2165"
+        },
+        {
+          "field": "/30/Denominator/scale",
+          "old": 9,
+          "new": 10
+        },
+        {
+          "field": "/31/Denominator/digits",
+          "old": "2165",
+          "new": "4579"
+        },
+        {
+          "field": "/32/Denominator/digits",
+          "old": "4579",
+          "new": "9684"
+        },
+        {
+          "field": "/33/Denominator/digits",
+          "old": "9684",
+          "new": "4331"
+        },
+        {
+          "field": "/33/Denominator/scale",
+          "old": 10,
+          "new": 11
+        },
+        {
+          "field": "/34/Denominator/digits",
+          "old": "4331",
+          "new": "9159"
+        },
+        {
+          "field": "/35/Denominator/digits",
+          "old": "9159",
+          "new": "19369"
+        },
+        {
+          "field": "/36/Denominator/digits",
+          "old": "19369",
+          "new": "4096"
+        },
+        {
+          "field": "/36/Denominator/scale",
+          "old": 11,
+          "new": 12
+        },
+        {
+          "field": "/37/Denominator/digits",
+          "old": "4096",
+          "new": "8192"
+        },
+        {
+          "field": "/38/Denominator/digits",
+          "old": "8192",
+          "new": "16384"
+        },
+        {
+          "field": "/39/Denominator/digits",
+          "old": "16384",
+          "new": "32768"
+        },
+        {
+          "field": "/4/Denominator/digits",
+          "old": "6",
+          "new": "11"
+        },
+        {
+          "field": "/40/Denominator/digits",
+          "old": "32768",
+          "new": "65536"
+        },
+        {
+          "field": "/5/Denominator/digits",
+          "old": "11",
+          "new": "21"
+        },
+        {
+          "field": "/6/Denominator/digits",
+          "old": "21",
+          "new": "8"
+        },
+        {
+          "field": "/6/Denominator/scale",
+          "old": 1,
+          "new": 2
+        },
+        {
+          "field": "/7/Denominator/digits",
+          "old": "8",
+          "new": "18"
+        },
+        {
+          "field": "/8/Denominator/digits",
+          "old": "18",
+          "new": "38"
+        },
+        {
+          "field": "/9/Denominator/digits",
+          "old": "38",
+          "new": "17"
+        },
+        {
+          "field": "/9/Denominator/scale",
+          "old": 2,
+          "new": 3
+        }
+      ],
+      "game_lua_vs_excel": [
+        {
+          "field": "/1/Denominator/digits",
+          "old": "2",
+          "new": "3"
+        },
+        {
+          "field": "/10/Denominator/digits",
+          "old": "17",
+          "new": "36"
+        },
+        {
+          "field": "/11/Denominator/digits",
+          "old": "36",
+          "new": "76"
+        },
+        {
+          "field": "/12/Denominator/digits",
+          "old": "76",
+          "new": "34"
+        },
+        {
+          "field": "/12/Denominator/scale",
+          "old": 3,
+          "new": 4
+        },
+        {
+          "field": "/13/Denominator/digits",
+          "old": "34",
+          "new": "72"
+        },
+        {
+          "field": "/14/Denominator/digits",
+          "old": "72",
+          "new": "151"
+        },
+        {
+          "field": "/15/Denominator/digits",
+          "old": "151",
+          "new": "68"
+        },
+        {
+          "field": "/15/Denominator/scale",
+          "old": 4,
+          "new": 5
+        },
+        {
+          "field": "/16/Denominator/digits",
+          "old": "68",
+          "new": "143"
+        },
+        {
+          "field": "/17/Denominator/digits",
+          "old": "143",
+          "new": "303"
+        },
+        {
+          "field": "/18/Denominator/digits",
+          "old": "303",
+          "new": "135"
+        },
+        {
+          "field": "/18/Denominator/scale",
+          "old": 5,
+          "new": 6
+        },
+        {
+          "field": "/19/Denominator/digits",
+          "old": "135",
+          "new": "286"
+        },
+        {
+          "field": "/2/Denominator/digits",
+          "old": "5",
+          "new": "10"
+        },
+        {
+          "field": "/20/Denominator/digits",
+          "old": "286",
+          "new": "605"
+        },
+        {
+          "field": "/21/Denominator/digits",
+          "old": "605",
+          "new": "271"
+        },
+        {
+          "field": "/21/Denominator/scale",
+          "old": 6,
+          "new": 7
+        },
+        {
+          "field": "/22/Denominator/digits",
+          "old": "271",
+          "new": "572"
+        },
+        {
+          "field": "/23/Denominator/digits",
+          "old": "572",
+          "new": "1211"
+        },
+        {
+          "field": "/24/Denominator/digits",
+          "old": "1211",
+          "new": "541"
+        },
+        {
+          "field": "/24/Denominator/scale",
+          "old": 7,
+          "new": 8
+        },
+        {
+          "field": "/25/Denominator/digits",
+          "old": "541",
+          "new": "1145"
+        },
+        {
+          "field": "/26/Denominator/digits",
+          "old": "1145",
+          "new": "2421"
+        },
+        {
+          "field": "/27/Denominator/digits",
+          "old": "2421",
+          "new": "1083"
+        },
+        {
+          "field": "/27/Denominator/scale",
+          "old": 8,
+          "new": 9
+        },
+        {
+          "field": "/28/Denominator/digits",
+          "old": "1083",
+          "new": "2290"
+        },
+        {
+          "field": "/29/Denominator/digits",
+          "old": "2290",
+          "new": "4842"
+        },
+        {
+          "field": "/3/Denominator/digits",
+          "old": "13",
+          "new": "6"
+        },
+        {
+          "field": "/3/Denominator/scale",
+          "old": 0,
+          "new": 1
+        },
+        {
+          "field": "/30/Denominator/digits",
+          "old": "4842",
+          "new": "2165"
+        },
+        {
+          "field": "/30/Denominator/scale",
+          "old": 9,
+          "new": 10
+        },
+        {
+          "field": "/31/Denominator/digits",
+          "old": "2165",
+          "new": "4579"
+        },
+        {
+          "field": "/32/Denominator/digits",
+          "old": "4579",
+          "new": "9684"
+        },
+        {
+          "field": "/33/Denominator/digits",
+          "old": "9684",
+          "new": "4331"
+        },
+        {
+          "field": "/33/Denominator/scale",
+          "old": 10,
+          "new": 11
+        },
+        {
+          "field": "/34/Denominator/digits",
+          "old": "4331",
+          "new": "9159"
+        },
+        {
+          "field": "/35/Denominator/digits",
+          "old": "9159",
+          "new": "19369"
+        },
+        {
+          "field": "/36/Denominator/digits",
+          "old": "19369",
+          "new": "4096"
+        },
+        {
+          "field": "/36/Denominator/scale",
+          "old": 11,
+          "new": 12
+        },
+        {
+          "field": "/37/Denominator/digits",
+          "old": "4096",
+          "new": "8192"
+        },
+        {
+          "field": "/38/Denominator/digits",
+          "old": "8192",
+          "new": "16384"
+        },
+        {
+          "field": "/39/Denominator/digits",
+          "old": "16384",
+          "new": "32768"
+        },
+        {
+          "field": "/4/Denominator/digits",
+          "old": "6",
+          "new": "11"
+        },
+        {
+          "field": "/40/Denominator/digits",
+          "old": "32768",
+          "new": "65536"
+        },
+        {
+          "field": "/5/Denominator/digits",
+          "old": "11",
+          "new": "21"
+        },
+        {
+          "field": "/6/Denominator/digits",
+          "old": "21",
+          "new": "8"
+        },
+        {
+          "field": "/6/Denominator/scale",
+          "old": 1,
+          "new": 2
+        },
+        {
+          "field": "/7/Denominator/digits",
+          "old": "8",
+          "new": "18"
+        },
+        {
+          "field": "/8/Denominator/digits",
+          "old": "18",
+          "new": "38"
+        },
+        {
+          "field": "/9/Denominator/digits",
+          "old": "38",
+          "new": "17"
+        },
+        {
+          "field": "/9/Denominator/scale",
+          "old": 2,
+          "new": 3
+        }
+      ],
+      "game_lua_vs_existing_json": []
+    },
+    "tbtrashmanrealm": {
+      "rows": 80,
+      "existing_json_matches_excel": true,
+      "existing_json_vs_excel": [],
+      "game_lua_vs_excel": [],
+      "game_lua_vs_existing_json": []
+    },
+    "tbtrashmanrebirth": {
+      "rows": 20,
+      "existing_json_matches_excel": true,
+      "existing_json_vs_excel": [],
+      "game_lua_vs_excel": [],
+      "game_lua_vs_existing_json": []
+    },
+    "tbtrashrandompool": {
+      "rows": 13,
+      "existing_json_matches_excel": true,
+      "existing_json_vs_excel": [],
+      "game_lua_vs_excel": [],
+      "game_lua_vs_existing_json": []
+    }
+  }
+}

@@ -1,0 +1,9 @@
+# Local inspection copies and process state; retain compact audit evidence only.
+candidate-scan-*/
+fresh-json/
+fresh-python/
+source-integration.patch
+workbench.pid
+workbench.stdout.log
+workbench.stderr.log
+__pycache__/

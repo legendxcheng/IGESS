@@ -1,0 +1,197 @@
+[GameBalancer] checking Python 3.11 x64
+[GameBalancer] checking source repository
+[GameBalancer] checking distribution repository
+IGESS has uncommitted changes; the candidate will contain working-tree code.
+  ?? .scratch/fish-sync-audit-20261023/
+  ?? .scratch/formal-run-deepening/gamebalancer-impact.md
+  ?? .scratch/stone-oasis-system-simulation/
+  ?? projects/fish_source/.igess/
+  ?? tests/test_fish_source_current_rules.py
+  ?? uv.lock
+[GameBalancer] running Fish and operator-toolkit regressions
+........................................................................ [ 23%]
+........................................................................ [ 47%]
+........................................................................ [ 70%]
+........................................................................ [ 94%]
+.................                                                        [100%]
+305 passed, 9 deselected in 752.86s (0:12:32)
+[GameBalancer] exporting GameBalancer 0.5.19
+Exported operator toolkit 0.5.19 to E:\GameBalancer (97 managed file(s), 0 removed)
+Review the distribution repository diff before committing or pushing.
+[GameBalancer] E2E run succeeded: 20261023T090740766609Z-smoke
+[GameBalancer] Report HTTP: 200
+[GameBalancer] Production JSON unchanged: true
+[GameBalancer] Candidate prepared; review before committing or pushing.
+ M .igess-delivery-manifest.json
+ M bundle/fish-runtime/runtime.json
+ M bundle/fish-runtime/runtime.luac
+ M igess/__init__.pyc
+ M igess/analyzer.pyc
+ M igess/behavior.pyc
+ M igess/builder.pyc
+ M igess/checkpoint.pyc
+ M igess/compare.pyc
+ M igess/conditions.pyc
+ M igess/engines.pyc
+ M igess/fish_barbell.pyc
+ M igess/fish_barbell_commands.pyc
+ M igess/fish_behavior.pyc
+ M igess/fish_behavior_simulation_support.pyc
+ M igess/fish_behavior_simulator.pyc
+ M igess/fish_behavior_targets.pyc
+ M igess/fish_behavior_weights.pyc
+ M igess/fish_command_results.pyc
+ M igess/fish_commands.pyc
+ M igess/fish_core_progression.pyc
+ M igess/fish_data.pyc
+ M igess/fish_hall.pyc
+ M igess/fish_hall_commands.pyc
+ M igess/fish_hall_model.pyc
+ M igess/fish_hall_ranking.pyc
+ M igess/fish_persistent_progression.pyc
+ M igess/fish_production.pyc
+ M igess/fish_progression_common.pyc
+ M igess/fish_progression_reports.pyc
+ M igess/fish_rebirth_commands.pyc
+ M igess/fish_rewards.pyc
+ M igess/fish_sale.pyc
+ M igess/fish_session.pyc
+ M igess/fish_simulator.pyc
+ M igess/fish_source_eggs.pyc
+ M igess/fish_source_engine.pyc
+ M igess/fish_source_guns.pyc
+ M igess/fish_source_income.pyc
+ M igess/fish_source_numbers.pyc
+ M igess/fish_source_reports.pyc
+ M igess/fish_source_runtime.pyc
+ M igess/fish_source_tides.pyc
+ M igess/fish_state.pyc
+ M igess/fish_state_codec.pyc
+ M igess/fish_state_model.pyc
+ M igess/fish_state_parse.pyc
+ M igess/fish_state_serialization.pyc
+ M igess/fish_state_validation.pyc
+ M igess/fish_throw.pyc
+ M igess/fish_throw_commands.pyc
+ M igess/fish_throw_data.pyc
+ M igess/fish_torpedo.pyc
+ M igess/fish_torpedo_commands.pyc
+ M igess/fish_trash.pyc
+ M igess/fish_trash_breakthrough_commands.pyc
+ M igess/fish_trash_model.pyc
+ M igess/fish_trash_rules.pyc
+ M igess/fish_trash_settlement.pyc
+ M igess/formal_run.pyc
+ M igess/formula.pyc
+ M igess/gates.pyc
+ M igess/human_numbers.pyc
+ M igess/linter.pyc
+ M igess/loader.pyc
+ M igess/metrics.pyc
+ M igess/modifiers.pyc
+ M igess/numbers.pyc
+ M igess/operator_cli.pyc
+ M igess/operator_dashboard.pyc
+ M igess/operator_runtime.pyc
+ M igess/outputs.pyc
+ M igess/payments.pyc
+ M igess/policy.pyc
+ M igess/reporting/__init__.pyc
+ M igess/reporting/kpis.pyc
+ M igess/reporting/loader.pyc
+ M igess/reporting/source_fish.pyc
+ M igess/reporting/static.pyc
+ M igess/reporting/view_model.pyc
+ M igess/run_registry.pyc
+ M igess/schema.pyc
+ M igess/simulator.pyc
+ M igess/time_engine.pyc
+ M igess/trace.pyc
+ M operator-manifest.json
+ .igess-delivery-manifest.json              | 172 ++++++++++++++---------------
+ bundle/fish-runtime/runtime.json           |  47 +++++++-
+ bundle/fish-runtime/runtime.luac           | Bin 2739799 -> 2861259 bytes
+ igess/__init__.pyc                         | Bin 192 -> 192 bytes
+ igess/analyzer.pyc                         | Bin 24012 -> 24012 bytes
+ igess/behavior.pyc                         | Bin 25125 -> 25125 bytes
+ igess/builder.pyc                          | Bin 4773 -> 4773 bytes
+ igess/checkpoint.pyc                       | Bin 19159 -> 19159 bytes
+ igess/compare.pyc                          | Bin 6909 -> 6909 bytes
+ igess/conditions.pyc                       | Bin 1967 -> 1967 bytes
+ igess/engines.pyc                          | Bin 17583 -> 17583 bytes
+ igess/fish_barbell.pyc                     | Bin 15578 -> 15578 bytes
+ igess/fish_barbell_commands.pyc            | Bin 7033 -> 7033 bytes
+ igess/fish_behavior.pyc                    | Bin 27022 -> 27022 bytes
+ igess/fish_behavior_simulation_support.pyc | Bin 14572 -> 14572 bytes
+ igess/fish_behavior_simulator.pyc          | Bin 27701 -> 27701 bytes
+ igess/fish_behavior_targets.pyc            | Bin 8138 -> 8138 bytes
+ igess/fish_behavior_weights.pyc            | Bin 8183 -> 8183 bytes
+ igess/fish_command_results.pyc             | Bin 20860 -> 20860 bytes
+ igess/fish_commands.pyc                    | Bin 1658 -> 1658 bytes
+ igess/fish_core_progression.pyc            | Bin 13412 -> 13412 bytes
+ igess/fish_data.pyc                        | Bin 23318 -> 23318 bytes
+ igess/fish_hall.pyc                        | Bin 33208 -> 33208 bytes
+ igess/fish_hall_commands.pyc               | Bin 9548 -> 9548 bytes
+ igess/fish_hall_model.pyc                  | Bin 4967 -> 4967 bytes
+ igess/fish_hall_ranking.pyc                | Bin 5473 -> 5473 bytes
+ igess/fish_persistent_progression.pyc      | Bin 16873 -> 16873 bytes
+ igess/fish_production.pyc                  | Bin 13221 -> 13221 bytes
+ igess/fish_progression_common.pyc          | Bin 3980 -> 3980 bytes
+ igess/fish_progression_reports.pyc         | Bin 5053 -> 5053 bytes
+ igess/fish_rebirth_commands.pyc            | Bin 6305 -> 6305 bytes
+ igess/fish_rewards.pyc                     | Bin 3767 -> 3767 bytes
+ igess/fish_sale.pyc                        | Bin 13431 -> 13431 bytes
+ igess/fish_session.pyc                     | Bin 5291 -> 5291 bytes
+ igess/fish_simulator.pyc                   | Bin 16754 -> 16754 bytes
+ igess/fish_source_eggs.pyc                 | Bin 3183 -> 3183 bytes
+ igess/fish_source_engine.pyc               | Bin 68271 -> 68271 bytes
+ igess/fish_source_guns.pyc                 | Bin 5192 -> 5192 bytes
+ igess/fish_source_income.pyc               | Bin 5989 -> 5989 bytes
+ igess/fish_source_numbers.pyc              | Bin 1019 -> 1019 bytes
+ igess/fish_source_reports.pyc              | Bin 7147 -> 7147 bytes
+ igess/fish_source_runtime.pyc              | Bin 20437 -> 20437 bytes
+ igess/fish_source_tides.pyc                | Bin 5147 -> 5147 bytes
+ igess/fish_state.pyc                       | Bin 1618 -> 1618 bytes
+ igess/fish_state_codec.pyc                 | Bin 8730 -> 8730 bytes
+ igess/fish_state_model.pyc                 | Bin 24406 -> 24406 bytes
+ igess/fish_state_parse.pyc                 | Bin 13554 -> 13554 bytes
+ igess/fish_state_serialization.pyc         | Bin 8424 -> 8424 bytes
+ igess/fish_state_validation.pyc            | Bin 17737 -> 17737 bytes
+ igess/fish_throw.pyc                       | Bin 26309 -> 26309 bytes
+ igess/fish_throw_commands.pyc              | Bin 10270 -> 10270 bytes
+ igess/fish_throw_data.pyc                  | Bin 29023 -> 29023 bytes
+ igess/fish_torpedo.pyc                     | Bin 8647 -> 8647 bytes
+ igess/fish_torpedo_commands.pyc            | Bin 4187 -> 4187 bytes
+ igess/fish_trash.pyc                       | Bin 629 -> 629 bytes
+ igess/fish_trash_breakthrough_commands.pyc | Bin 3709 -> 3709 bytes
+ igess/fish_trash_model.pyc                 | Bin 20276 -> 20276 bytes
+ igess/fish_trash_rules.pyc                 | Bin 22455 -> 22455 bytes
+ igess/fish_trash_settlement.pyc            | Bin 16208 -> 16208 bytes
+ igess/formal_run.pyc                       | Bin 12112 -> 12112 bytes
+ igess/formula.pyc                          | Bin 11402 -> 11402 bytes
+ igess/gates.pyc                            | Bin 7892 -> 7892 bytes
+ igess/human_numbers.pyc                    | Bin 3196 -> 3196 bytes
+ igess/linter.pyc                           | Bin 22942 -> 22942 bytes
+ igess/loader.pyc                           | Bin 14928 -> 14928 bytes
+ igess/metrics.pyc                          | Bin 5939 -> 5939 bytes
+ igess/modifiers.pyc                        | Bin 3467 -> 3467 bytes
+ igess/numbers.pyc                          | Bin 20752 -> 20752 bytes
+ igess/operator_cli.pyc                     | Bin 3012 -> 3012 bytes
+ igess/operator_dashboard.pyc               | Bin 34771 -> 34771 bytes
+ igess/operator_runtime.pyc                 | Bin 38455 -> 38455 bytes
+ igess/outputs.pyc                          | Bin 11495 -> 11495 bytes
+ igess/payments.pyc                         | Bin 27028 -> 27028 bytes
+ igess/policy.pyc                           | Bin 11207 -> 11207 bytes
+ igess/reporting/__init__.pyc               | Bin 146 -> 146 bytes
+ igess/reporting/kpis.pyc                   | Bin 11844 -> 11844 bytes
+ igess/reporting/loader.pyc                 | Bin 8142 -> 8142 bytes
+ igess/reporting/source_fish.pyc            | Bin 30018 -> 30018 bytes
+ igess/reporting/static.pyc                 | Bin 12202 -> 12202 bytes
+ igess/reporting/view_model.pyc             | Bin 51358 -> 51358 bytes
+ igess/run_registry.pyc                     | Bin 116403 -> 116403 bytes
+ igess/schema.pyc                           | Bin 20132 -> 20132 bytes
+ igess/simulator.pyc                        | Bin 31977 -> 31977 bytes
+ igess/time_engine.pyc                      | Bin 3698 -> 3698 bytes
+ igess/trace.pyc                            | Bin 2630 -> 2630 bytes
+ operator-manifest.json                     |   2 +-
+ 86 files changed, 131 insertions(+), 90 deletions(-)
