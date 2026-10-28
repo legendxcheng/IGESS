@@ -31,15 +31,6 @@ class DevelopmentDiagnostics:
             run_id if isinstance(run_id, str) and _SAFE_ID.fullmatch(run_id)
             else "attempt-" + uuid.uuid4().hex
         )
-        if not _SAFE_ID.fullmatch(diagnostic_id):
-            raise ValueError("invalid diagnostic id")
-        root = self.project_root
-        _require_directory(root)
-        for name in (".igess", "diagnostics"):
-            root = root / name
-            root.mkdir(exist_ok=True)
-            _require_directory(root)
-        path = root / f"{diagnostic_id}.json"
         payload = {
             "schema_version": 1,
             "diagnostic_id": diagnostic_id,
@@ -52,6 +43,27 @@ class DevelopmentDiagnostics:
                 for stage, error in failure.secondary_errors
             ],
         }
+        return self._write(diagnostic_id, payload)
+
+    def write_task_output(self, task_id: str, operation: str, exit_code: int, output: str) -> dict[str, str]:
+        diagnostic_id = "task-log-" + task_id
+        return self._write(diagnostic_id, {
+            "schema_version": 1, "diagnostic_id": diagnostic_id,
+            "recorded_at": datetime.now(timezone.utc).isoformat(),
+            "phase": "task_output", "task_id": task_id, "operation": operation,
+            "exit_code": exit_code, "output_tail": output,
+        })
+
+    def _write(self, diagnostic_id: str, payload: Mapping[str, Any]) -> dict[str, str]:
+        if not _SAFE_ID.fullmatch(diagnostic_id):
+            raise ValueError("invalid diagnostic id")
+        root = self.project_root
+        _require_directory(root)
+        for name in (".igess", "diagnostics"):
+            root = root / name
+            root.mkdir(exist_ok=True)
+            _require_directory(root)
+        path = root / f"{diagnostic_id}.json"
         descriptor, temporary_name = tempfile.mkstemp(prefix=".diagnostic-", suffix=".tmp", dir=root)
         temporary = Path(temporary_name)
         try:

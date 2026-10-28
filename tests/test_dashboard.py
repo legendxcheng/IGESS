@@ -1,3 +1,4 @@
+from dashboard_fixtures import InlineTaskRunner
 import json
 import subprocess
 import sys
@@ -72,7 +73,7 @@ def test_dashboard_accepts_slow_run_and_keeps_reads_responsive(tmp_path):
         return CommandResponse("model.simulate", False, "simulation_failed", "Injected failure")
 
     service.run_authoring_scenario = slow_run
-    server = ThreadingHTTPServer(("127.0.0.1", 0), dashboard._handler(service, None, None, csrf_token="token"))
+    server = ThreadingHTTPServer(("127.0.0.1", 0), dashboard._handler(service, None, None, task_runner_factory=InlineTaskRunner, csrf_token="token"))
     thread = Thread(target=server.serve_forever, daemon=True)
     thread.start()
     connection = HTTPConnection("127.0.0.1", server.server_port, timeout=0.8)
@@ -97,6 +98,7 @@ def test_dashboard_accepts_slow_run_and_keeps_reads_responsive(tmp_path):
         release.set()
         connection.close()
         server.shutdown()
+        server.RequestHandlerClass.close_tasks()
         server.server_close()
         thread.join(5)
 
@@ -114,7 +116,7 @@ def test_dashboard_failure_is_visible_after_refresh_and_allows_next_task(tmp_pat
                                details={"diagnostic_id": "test-failure"})
 
     service.run_authoring_scenario = fail
-    runtime = dashboard._DashboardRuntime(service, None, None, "token", BoundedSemaphore(1))
+    runtime = dashboard._DashboardRuntime(service, None, None, "token", BoundedSemaphore(1), InlineTaskRunner(service, None, None))
     assert runtime.submit("/formal", "day_1")
     deadline = time.monotonic() + 3
     while runtime.snapshot()["state"] == "running" and time.monotonic() < deadline:
@@ -142,7 +144,7 @@ def test_dashboard_slow_model_check_does_not_block_http_or_repeat_on_poll(tmp_pa
         return original()
 
     service.model_status = slow_status
-    server = ThreadingHTTPServer(("127.0.0.1", 0), dashboard._handler(service, None, None))
+    server = ThreadingHTTPServer(("127.0.0.1", 0), dashboard._handler(service, None, None, task_runner_factory=InlineTaskRunner))
     thread = Thread(target=server.serve_forever, daemon=True)
     thread.start()
     connection = HTTPConnection("127.0.0.1", server.server_port, timeout=0.8)
@@ -158,6 +160,7 @@ def test_dashboard_slow_model_check_does_not_block_http_or_repeat_on_poll(tmp_pa
         release.set()
         connection.close()
         server.shutdown()
+        server.RequestHandlerClass.close_tasks()
         server.server_close()
         thread.join(5)
 
@@ -172,7 +175,7 @@ def test_dashboard_reads_saved_diagnostic_summary_without_following_links(tmp_pa
     service.run_authoring_scenario = lambda scenario: CommandResponse(
         'model.simulate', False, 'simulation_failed', 'Simulation failed',
         details={'diagnostic_id': 'failed-run'})
-    runtime = dashboard._DashboardRuntime(service, None, None, 'token', BoundedSemaphore(1))
+    runtime = dashboard._DashboardRuntime(service, None, None, 'token', BoundedSemaphore(1), InlineTaskRunner(service, None, None))
     runtime.submit('/formal', 'day_1')
     deadline = time.monotonic() + 3
     while runtime.snapshot()['state'] == 'running' and time.monotonic() < deadline:
@@ -400,7 +403,7 @@ def test_dashboard_mutations_require_post_and_redirect_home(tmp_path):
     token = "test-csrf-token"
     server = ThreadingHTTPServer(
         ("127.0.0.1", 0),
-        dashboard._handler(service, None, None, csrf_token=token),
+        dashboard._handler(service, None, None, task_runner_factory=InlineTaskRunner, csrf_token=token),
     )
     thread = Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -439,6 +442,7 @@ def test_dashboard_mutations_require_post_and_redirect_home(tmp_path):
     finally:
         connection.close()
         server.shutdown()
+        server.RequestHandlerClass.close_tasks()
         server.server_close()
         thread.join(timeout=5)
 
@@ -452,7 +456,7 @@ def test_dashboard_post_rejects_csrf_origin_host_and_concurrent_mutations(tmp_pa
         dashboard._handler(
             service,
             None,
-            None,
+            None, task_runner_factory=InlineTaskRunner,
             csrf_token=token,
             mutation_guard=guard,
         ),
@@ -520,6 +524,7 @@ def test_dashboard_post_rejects_csrf_origin_host_and_concurrent_mutations(tmp_pa
         assert service.calls == [("formal", "smoke")]
     finally:
         server.shutdown()
+        server.RequestHandlerClass.close_tasks()
         server.server_close()
         thread.join(timeout=5)
 

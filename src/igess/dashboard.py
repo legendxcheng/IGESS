@@ -10,11 +10,12 @@ from collections.abc import Mapping, Sequence
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path, PurePosixPath
-from threading import BoundedSemaphore, Lock, Thread
+from threading import BoundedSemaphore, Event, Lock, Thread
 from time import monotonic
 from urllib.parse import parse_qs, unquote, urlparse
 
-from .dashboard_ui import dashboard_shell
+from .dashboard_ui import dashboard_shell, restart_controls
+from .dashboard_tasks import DashboardTaskRunner
 from .dashboard_projects import discover_dashboard_projects
 from .authoring.project import AuthoringProject
 from .authoring.response import CommandResponse
@@ -70,6 +71,7 @@ def render_dashboard_home(
     *,
     csrf_token: str | None = None,
     status_response: CommandResponse | None = None,
+    check_snapshot: dict | None = None,
 ) -> str:
     token = csrf_token or secrets.token_urlsafe(32)
     try:
@@ -93,6 +95,7 @@ def render_dashboard_home(
                 runs,
                 advice,
                 token,
+                check_snapshot,
             )
         summary = '<div class="counts run-summary" data-view="overview">' + ''.join(
             f'<div><strong>{label}</strong>{count}</div>'
@@ -196,10 +199,17 @@ def _legacy_content(
     runs: Sequence[object],
     advice: object,
     csrf_token: str,
+    check_snapshot: dict | None = None,
 ) -> str:
-    lint = service.lint(config or _SAMPLE_CONFIG, tables or _SAMPLE_TABLES)
+    from types import SimpleNamespace
+
+    lint = (SimpleNamespace(**check_snapshot["status"]) if check_snapshot is not None
+            else service.lint(config or _SAMPLE_CONFIG, tables or _SAMPLE_TABLES))
     try:
-        scenarios = service.available_scenarios(config or _SAMPLE_CONFIG)
+        if check_snapshot is not None and check_snapshot.get("scenario_error"):
+            raise ValueError(check_snapshot["scenario_error"])
+        scenarios = (check_snapshot["scenarios"] if check_snapshot is not None
+                     else service.available_scenarios(config or _SAMPLE_CONFIG))
         scenario_hint = "" if scenarios else "No scenarios configured. Add a scenario to the selected configuration, then refresh the model snapshot."
     except Exception as error:  # noqa: BLE001 - keep diagnostics and history accessible.
         scenarios = ()
@@ -314,16 +324,29 @@ def serve_dashboard(
 ) -> None:
     if not _is_loopback_host(host):
         raise ValueError("Dashboard host must be a loopback address")
+    from .dashboard_process import supervise_dashboard
+
+    supervise_dashboard(project=project, config=config, tables=tables,
+                        runs_root=runs_root, host=host, port=port)
+
+
+
+def _serve_dashboard_worker(*, project, config, tables, runs_root, host, port):
+    if not _is_loopback_host(host):
+        raise ValueError("Dashboard host must be a loopback address")
+    restart = Event()
     projects = discover_dashboard_projects(project, config, tables, runs_root)
-    handler = _handler(None, None, None, projects=projects)
+    handler = _handler(None, None, None, projects=projects, restart_event=restart)
     server = ThreadingHTTPServer((host, port), handler)
-    print(f"IGESS dashboard running at http://{host}:{port}/")
+    print(f"IGESS dashboard running at http://{host}:{server.server_port}/", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         pass
     finally:
+        handler.close_tasks()
         server.server_close()
+    return restart.is_set()
 
 
 class _DashboardRuntime:
@@ -333,9 +356,10 @@ class _DashboardRuntime:
     The mutation guard stays owned by the worker until execution has finished.
     """
 
-    def __init__(self, service, config, tables, token, guard):
+    def __init__(self, service, config, tables, token, guard, task_runner=None):
         self.service, self.config, self.tables = service, config, tables
         self.token, self.guard = token, guard
+        self.task_runner = task_runner or DashboardTaskRunner(service, config, tables)
         self.lock = Lock()
         self.page = dashboard_shell('<section><h2>Checking model in background…</h2><p class="hint">You can inspect task status while the model check completes.</p></section>', str(getattr(service, 'project_root', 'Local project')), 'Loading project')
         self.status = {"command": "model.status", "ok": False, "message": "Checking model in background"}
@@ -344,7 +368,36 @@ class _DashboardRuntime:
         self.refreshing = False
         self.refresh_pending = False
         self.revision = 0
+        self.stopping = False
+        self.workers = set()
         self.refresh()
+
+    def _start_worker(self, target, *args):
+        def work():
+            try:
+                target(*args)
+            finally:
+                with self.lock:
+                    self.workers.discard(thread)
+
+        thread = Thread(target=work, daemon=True)
+        with self.lock:
+            if self.stopping:
+                raise RuntimeError("Dashboard is stopping")
+            self.workers.add(thread)
+            try:
+                thread.start()
+            except BaseException:
+                self.workers.discard(thread)
+                raise
+
+    def close(self):
+        with self.lock:
+            self.stopping = True
+            workers = list(self.workers)
+        self.task_runner.close()
+        for worker in workers:
+            worker.join(timeout=15)
 
     def snapshot(self):
         with self.lock:
@@ -354,43 +407,44 @@ class _DashboardRuntime:
 
     def refresh(self):
         with self.lock:
+            if self.stopping:
+                return
             if self.refreshing:
                 self.refresh_pending = True
                 return
             self.refreshing = True
-        Thread(target=self._refresh, daemon=True).start()
+        self._start_worker(self._refresh)
 
     def _refresh(self):
         try:
-            response = self.service.model_status() if self.service.is_authoring else None
+            check = self.task_runner.run("check")
+            payload = check.get("authoring")
+            response = CommandResponse(**{key: value for key, value in payload.items() if key != "schema_version"}) if payload else None
             page = render_dashboard_home(self.service, self.config, self.tables,
-                                         csrf_token=self.token, status_response=response)
-            if response:
-                status = response.to_payload()
-            else:
-                lint = self.service.lint(self.config or _SAMPLE_CONFIG, self.tables or _SAMPLE_TABLES)
-                status = {"ok": lint.ok, "message": lint.message}
+                                         csrf_token=self.token, status_response=response, check_snapshot=check)
+            status = check["status"]
         except Exception as error:  # noqa: BLE001 - retain a visible refresh error.
             status = {"ok": False, "message": str(error)}
             page = dashboard_shell('<section><h2>Model check failed</h2><p class="failed">' + _e(error) + '</p></section>', str(getattr(self.service, 'project_root', 'Local project')), 'Project unavailable')
         with self.lock:
             self.page, self.status = page, status
-            self.refreshing = False
             self.revision += 1
             pending = self.refresh_pending
             self.refresh_pending = False
+            self.refreshing = pending
         if pending:
-            self.refresh()
+            self._refresh()
 
     def submit(self, path, scenario):
         if not self.guard.acquire(blocking=False):
             return False
         with self.lock:
             self.started = monotonic()
-            self.task = {"state": "running", "message": "Task accepted; executing workflow (including any project lock wait).",
+            message = "Task accepted; executing workflow (including any project lock wait)."
+            self.task = {"state": "running", "message": message,
                          "scenario": scenario, "action": path}
         try:
-            Thread(target=self._execute, args=(path, scenario), daemon=True).start()
+            self._start_worker(self._execute, path, scenario)
         except Exception as error:
             with self.lock:
                 self.task = {"state": "failed", "message": str(error)}
@@ -400,38 +454,27 @@ class _DashboardRuntime:
     def _execute(self, path, scenario):
         outcome = {"state": "failed", "message": "Worker interrupted; check run history before retrying."}
         try:
-            if path == "/advise":
-                result = self.service.run_advice(None if self.service.is_authoring else self.config,
-                                                 None if self.service.is_authoring else self.tables, scenario)
-            elif self.service.is_authoring:
-                result = self.service.run_authoring_scenario(scenario)
-            else:
-                result = self.service.run_scenario(self.config, self.tables, scenario)
-            if isinstance(result, CommandResponse):
-                outcome = {"state": "success" if result.ok else "failed", "message": result.message,
-                           "diagnostic": result.to_payload(), "run_id": result.result.get("run_id")}
-                diagnostic_id = result.details.get("diagnostic_id")
-                if not result.ok and isinstance(diagnostic_id, str):
-                    try:
-                        diagnostic = _read_diagnostic(self.service, diagnostic_id)
-                        error = diagnostic.get("primary_error", {})
-                        summary = str(error.get("message", ""))
-                        if summary:
-                            outcome["message"] += "\n" + str(error.get("error_type", "Error")) + ": " + summary[:2000]
-                    except (OSError, RuntimeError, ValueError, AttributeError):
-                        pass  # The workflow failure and diagnostic identifier remain visible.
-            else:
-                outcome = {"state": getattr(result, "status", "success"),
-                           "message": getattr(result, "message", "Task complete"),
-                           "run_id": getattr(result, "run_id", None)}
+            outcome = self.task_runner.run("advise" if path == "/advise" else "simulate", scenario)
+            diagnostic_id = outcome.get("diagnostic", {}).get("details", {}).get("diagnostic_id")
+            if outcome["state"] == "failed" and isinstance(diagnostic_id, str):
+                try:
+                    diagnostic = _read_diagnostic(self.service, diagnostic_id)
+                    error = diagnostic.get("primary_error", {})
+                    summary = str(error.get("message", ""))
+                    if summary:
+                        outcome["message"] += "\n" + str(error.get("error_type", "Error")) + ": " + summary[:2000]
+                except (OSError, RuntimeError, ValueError, AttributeError):
+                    pass  # The workflow failure and diagnostic identifier remain visible.
         except Exception as error:  # noqa: BLE001 - expose exceptions as task failures.
             outcome = {"state": "failed", "message": f"{type(error).__name__}: {error}"}
         finally:
-            with self.lock:
-                self.task.update(outcome)
-                self.task["duration_seconds"] = round(monotonic() - self.started, 1)
-            self.guard.release()
-            self.refresh()
+            try:
+                self.refresh()
+            finally:
+                with self.lock:
+                    self.task.update(outcome)
+                    self.task["duration_seconds"] = round(monotonic() - self.started, 1)
+                    self.guard.release()
 
     def home(self):
         task = self.snapshot()
@@ -446,6 +489,11 @@ class _DashboardRuntime:
         diagnostic_id = task.get("diagnostic", {}).get("details", {}).get("diagnostic_id")
         if isinstance(diagnostic_id, str) and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,127}", diagnostic_id):
             panel += '<p><a href="/diagnostics/' + diagnostic_id + '">Open failure diagnostic</a></p>'
+        process_log = task.get("process_log")
+        if isinstance(process_log, str) and re.fullmatch(r"task-log-[a-f0-9]{32}", process_log):
+            panel += '<p><a href="/diagnostics/' + process_log + '">Open task output</a></p>'
+        if task.get("log_warning"):
+            panel += '<p>' + _e(task["log_warning"]) + '</p>'
         if task.get("state") == "success" and task.get("run_id"):
             panel += '<p><a href="/reports/' + _e(task['run_id']) + '/index.html">Open completed report</a></p>'
         panel += '</section>'
@@ -457,18 +505,23 @@ function displayTask(t) {
   document.querySelector('#task-state').className = t.state;
   document.querySelector('#task-message').textContent = t.message;
   document.querySelector('#task-time').textContent = 'Elapsed: ' + (t.duration_seconds ?? t.elapsed_seconds) + ' s' + (t.refreshing ? ' — refreshing model snapshot in background' : ' — model snapshot is cached');
-  document.querySelectorAll('button[type=submit]').forEach(b => b.disabled = t.state === 'running' || b.hasAttribute('data-unavailable'));
+  document.querySelectorAll('button[type=submit], [data-mutation]').forEach(b => b.disabled = t.state === 'running' || b.hasAttribute('data-unavailable') || b.hasAttribute('data-empty-history'));
 }
-document.querySelectorAll('form').forEach(f => f.addEventListener('submit', () => {
+document.querySelectorAll('form').forEach(f => f.addEventListener('submit', event => {
+  if (event.defaultPrevented) return;
   f.action = new URL(f.action).pathname + location.hash;
   document.querySelector('#task-message').textContent = 'Submitting task…';
   document.querySelectorAll('button[type=submit]').forEach(b => b.disabled = true);
 }));
 async function poll() {
+  if (window.dashboardRestarting) { setTimeout(poll, 1000); return; }
   try {
     const r = await fetch('/task', {cache: 'no-store', signal: AbortSignal.timeout(4000)});
     if (!r.ok) throw Error('HTTP ' + r.status);
     const t = await r.json();
+    if (window.dashboardRestarting) { setTimeout(poll, 1000); return; }
+    const serverInstance = document.querySelector('#restart-service')?.dataset.instance;
+    if (serverInstance && t.instance_id && serverInstance !== t.instance_id) { location.reload(); return; }
     document.querySelector('#connection-state').textContent = '';
     displayTask(t);
     if (t.revision !== revision || (previousState === 'running' && t.state !== 'running')) { location.reload(); return; }
@@ -510,15 +563,30 @@ def _handler(
     csrf_token: str | None = None,
     mutation_guard: BoundedSemaphore | None = None,
     projects=None,
+    restart_event=None,
+    task_runner_factory=DashboardTaskRunner,
 ):
     token = csrf_token or secrets.token_urlsafe(32)
     guard = mutation_guard or BoundedSemaphore(1)
-    runtime = _DashboardRuntime(service, config, tables, token, guard) if projects is None else None
+    runtime = (_DashboardRuntime(service, config, tables, token, guard,
+                                 task_runner_factory(service, config, tables)) if projects is None else None)
     catalog = {entry.key: entry for entry in projects or ()}
     runtimes = {}
     runtime_lock = Lock()
+    restart_requested = False
+    instance_id = secrets.token_urlsafe(24)
+    server_token = secrets.token_urlsafe(32)
 
     class DashboardHandler(BaseHTTPRequestHandler):
+        @staticmethod
+        def close_tasks():
+            nonlocal restart_requested
+            with runtime_lock:
+                restart_requested = True
+                active = list(runtimes.values()) if catalog else [runtime]
+            for item in active:
+                item.close()
+
         def _select_project(self):
             path = urlparse(self.path).path
             self.prefix = ""
@@ -543,6 +611,9 @@ def _handler(
                 self.end_headers()
                 return None
             with runtime_lock:
+                if restart_requested:
+                    self.send_error(HTTPStatus.SERVICE_UNAVAILABLE, "Dashboard is restarting")
+                    return None
                 if key not in runtimes:
                     entry = catalog[key]
                     try:
@@ -557,7 +628,8 @@ def _handler(
                             str(entry.root), 'Project unavailable',
                         )))
                         return None
-                    runtimes[key] = _DashboardRuntime(*context, secrets.token_urlsafe(32), BoundedSemaphore(1))
+                    runtimes[key] = _DashboardRuntime(*context, secrets.token_urlsafe(32), BoundedSemaphore(1),
+                                                      task_runner_factory(*context))
                 self.runtime = runtimes[key]
             return match[2]
 
@@ -565,6 +637,8 @@ def _handler(
             return self._mount_page(self.runtime.home())
 
         def _mount_page(self, page):
+            if restart_event is not None:
+                page = page.replace('<!-- server-controls -->', restart_controls(server_token, instance_id))
             if not catalog:
                 return page
             # Only known application routes are mounted; report-relative assets
@@ -582,6 +656,14 @@ def _handler(
             return page
 
         def do_GET(self) -> None:  # noqa: N802 - stdlib handler API.
+            if urlparse(self.path).path == "/server/status":
+                self._send_json({"instance_id": instance_id, "restarting": restart_requested})
+                return
+            if urlparse(self.path).path == "/server/restart":
+                self.send_response(HTTPStatus.METHOD_NOT_ALLOWED)
+                self.send_header("Allow", "POST")
+                self.end_headers()
+                return
             path = self._select_project()
             if path is None:
                 return
@@ -590,7 +672,7 @@ def _handler(
                 self._send_html(self._home())
                 return
             if parsed.path == "/task":
-                self._send_json(self.runtime.snapshot())
+                self._send_json({**self.runtime.snapshot(), "instance_id": instance_id})
                 return
             if parsed.path.startswith("/diagnostics/"):
                 identifier = parsed.path.removeprefix("/diagnostics/")
@@ -616,6 +698,64 @@ def _handler(
             self.send_error(HTTPStatus.NOT_FOUND)
 
         def do_POST(self) -> None:  # noqa: N802 - stdlib handler API.
+            if urlparse(self.path).path == "/server/restart":
+                self._restart()
+                return
+            # Serialize admission with the workspace-wide restart check.
+            with runtime_lock:
+                if restart_requested:
+                    self.send_error(HTTPStatus.SERVICE_UNAVAILABLE, "Dashboard is restarting")
+                    return
+            self._post_project()
+
+        def _restart(self):
+            nonlocal restart_requested
+            if restart_event is None:
+                self.send_error(HTTPStatus.NOT_IMPLEMENTED, "Restart requires the Dashboard launcher")
+                return
+            try:
+                form = self._read_form()
+            except (UnicodeError, ValueError):
+                self.send_error(HTTPStatus.BAD_REQUEST)
+                return
+            if (not self._host_is_local() or not self._origin_is_same()
+                    or not secrets.compare_digest(form.get("_csrf", [""])[0], server_token)):
+                self.send_error(HTTPStatus.FORBIDDEN)
+                return
+            if form.get("confirm", [""])[0] != "restart":
+                self.send_error(HTTPStatus.BAD_REQUEST, "Confirm the service restart first")
+                return
+            with runtime_lock:
+                if restart_requested:
+                    self.send_error(HTTPStatus.CONFLICT, "Restart already requested")
+                    return
+                active = list(runtimes.values()) if catalog else [runtime]
+                acquired = []
+                try:
+                    for item in active:
+                        if not item.guard.acquire(blocking=False):
+                            self.send_error(HTTPStatus.CONFLICT, "A project task is running. Wait for it to finish.")
+                            return
+                        acquired.append(item.guard)
+                        if item.snapshot()["refreshing"]:
+                            self.send_error(HTTPStatus.CONFLICT, "A model check is running. Wait for it to finish.")
+                            return
+                    restart_requested = True
+                    restart_event.set()
+                finally:
+                    for held in acquired:
+                        held.release()
+            try:
+                self._send_json({"instance_id": instance_id, "restarting": True})
+            finally:
+                # shutdown must run outside serve_forever, after replying to the browser.
+                Thread(target=self.server.shutdown, daemon=True).start()
+
+        def _submit(self, *args, **kwargs):
+            with runtime_lock:
+                return not restart_requested and self.runtime.submit(*args, **kwargs)
+
+        def _post_project(self):
             path = self._select_project()
             if path is None:
                 return
@@ -637,13 +777,17 @@ def _handler(
                 self.send_error(HTTPStatus.FORBIDDEN)
                 return
             if parsed.path == "/refresh":
-                self.runtime.refresh()
+                with runtime_lock:
+                    if restart_requested:
+                        self.send_error(HTTPStatus.SERVICE_UNAVAILABLE, "Dashboard is restarting")
+                        return
+                    self.runtime.refresh()
                 self.send_response(HTTPStatus.SEE_OTHER)
                 self.send_header("Location", self.prefix + "/")
                 self.end_headers()
                 return
             scenario = "smoke" if parsed.path == "/smoke" else form.get("scenario", ["day_1_progression"])[0]
-            if not self.runtime.submit(parsed.path, scenario):
+            if not self._submit(parsed.path, scenario):
                 self.send_error(HTTPStatus.TOO_MANY_REQUESTS)
                 return
             self.send_response(HTTPStatus.SEE_OTHER)

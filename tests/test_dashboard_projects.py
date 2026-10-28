@@ -1,3 +1,4 @@
+from dashboard_fixtures import InlineTaskRunner
 import re
 import time
 from http.client import HTTPConnection
@@ -36,7 +37,7 @@ def test_invalid_authoring_project_does_not_fall_back_to_sample(tmp_path):
     (root / "Datas").mkdir()
     (root / "economy.yaml").write_text("scenarios: {}")
     entries = discover_dashboard_projects(root)
-    server = ThreadingHTTPServer(("127.0.0.1", 0), dashboard._handler(None, None, None, projects=entries))
+    server = ThreadingHTTPServer(("127.0.0.1", 0), dashboard._handler(None, None, None, task_runner_factory=InlineTaskRunner, projects=entries))
     thread = Thread(target=server.serve_forever, daemon=True)
     thread.start()
     connection = HTTPConnection("127.0.0.1", server.server_port, timeout=2)
@@ -51,6 +52,7 @@ def test_invalid_authoring_project_does_not_fall_back_to_sample(tmp_path):
     finally:
         connection.close()
         server.shutdown()
+        server.RequestHandlerClass.close_tasks()
         server.server_close()
         thread.join(5)
 
@@ -81,7 +83,7 @@ def test_project_routes_isolate_tasks_tokens_reports_and_lazy_status(tmp_path, m
         return CommandResponse("model.simulate", True, "done", "alpha finished")
 
     services["alpha"].run_authoring_scenario = slow_run
-    server = ThreadingHTTPServer(("127.0.0.1", 0), dashboard._handler(None, None, None, projects=entries))
+    server = ThreadingHTTPServer(("127.0.0.1", 0), dashboard._handler(None, None, None, task_runner_factory=InlineTaskRunner, projects=entries))
     thread = Thread(target=server.serve_forever, daemon=True)
     thread.start()
     connection = HTTPConnection("127.0.0.1", server.server_port, timeout=2)
@@ -127,5 +129,6 @@ def test_project_routes_isolate_tasks_tokens_reports_and_lazy_status(tmp_path, m
         release.set()
         connection.close()
         server.shutdown()
+        server.RequestHandlerClass.close_tasks()
         server.server_close()
         thread.join(5)

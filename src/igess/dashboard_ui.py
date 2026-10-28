@@ -24,7 +24,7 @@ def dashboard_shell(content: str, project: str, mode: str) -> str:
   <div class="sidebar-footer"><span class="local-dot"></span> Local workspace<br><small>Game economy simulation</small></div>
 </aside>
 <div class="workspace">
-  <header class="topbar"><span>Workspace <span class="separator">/</span> <strong id="view-label">Overview</strong></span><span class="environment">LOCAL</span></header>
+  <header class="topbar"><span>Workspace <span class="separator">/</span> <strong id="view-label">Overview</strong></span><div class="server-actions"><span class="environment">LOCAL</span><!-- server-controls --></div></header>
   <main id="workspace" tabindex="-1">
     <div class="page-heading"><div><div class="eyebrow">DEVELOPMENT WORKSPACE</div><h1>IGESS Dashboard</h1>
     <p>Inspect your model. Run scenarios. Understand the results.</p></div><a class="button primary" href="#runs">Run a scenario <span aria-hidden="true">↗</span></a></div>
@@ -34,7 +34,25 @@ def dashboard_shell(content: str, project: str, mode: str) -> str:
 </div><script>{_SCRIPT}</script></body></html>'''
 
 
+def restart_controls(token, instance_id):
+    return f'''<button id="restart-service" type="button" data-instance="{html.escape(instance_id, quote=True)}">Restart service…</button>
+<dialog id="restart-service-dialog" aria-labelledby="restart-service-title">
+  <h2 id="restart-service-title">Restart Dashboard service?</h2>
+  <p>This restarts the service for <strong>all projects and browser tabs</strong> to load Dashboard service changes. The page reconnects automatically.</p>
+  <p>Simulation and report code is loaded fresh for every new task; those updates do not require a restart.</p>
+  <p>Running tasks or model checks must finish first. Saved runs are kept; existing static reports need to be generated again to show report changes.</p>
+  <p id="restart-service-status" role="status" aria-live="polite"></p>
+  <div class="dialog-actions">
+    <button id="cancel-restart-service" type="button" autofocus>Cancel</button>
+    <button id="retry-service-connection" type="button" hidden>Retry connection</button>
+    <button id="confirm-restart-service" type="button" data-token="{html.escape(token, quote=True)}">Restart service</button>
+  </div>
+</dialog>'''
+
+
+
 _CSS = r'''
+.server-actions { display:flex; align-items:center; gap:12px; } .server-actions dialog { font-size:14px; }
 :root { color-scheme: dark; --bg:#171717; --panel:#1c1c1c; --raised:#232323; --line:#333; --text:#ededed; --muted:#a1a1aa; --green:#3ecf8e; }
 * { box-sizing:border-box; }
 body { margin:0; background:var(--bg); color:var(--text); font:14px/1.6 "Segoe UI",Arial,sans-serif; }
@@ -146,6 +164,60 @@ _SCRIPT = r'''
   document.querySelector('#clear-filters')?.addEventListener('click', () => {
     document.querySelectorAll('#history-search, #history-status, #history-kind').forEach(el => el.value = '');
     save(); filter(); document.querySelector('#history-search').focus();
+  });
+  const restartButton = document.querySelector('#restart-service');
+  const restartDialog = document.querySelector('#restart-service-dialog');
+  const restartConfirm = document.querySelector('#confirm-restart-service');
+  const restartCancel = document.querySelector('#cancel-restart-service');
+  const reconnect = document.querySelector('#retry-service-connection');
+  const restartStatus = document.querySelector('#restart-service-status');
+  restartButton?.addEventListener('click', () => restartDialog.showModal());
+  restartCancel?.addEventListener('click', () => restartDialog.close());
+  restartDialog?.addEventListener('cancel', event => {
+    if (window.dashboardRestarting) event.preventDefault();
+  });
+  async function waitForService() {
+    reconnect.hidden = true;
+    restartStatus.textContent = 'Restarting service… Waiting for the new service to reconnect.';
+    const deadline = Date.now() + 45000;
+    while (Date.now() < deadline) {
+      try {
+        const response = await fetch('/server/status', {cache:'no-store', signal:AbortSignal.timeout(2000)});
+        if (response.ok) {
+          const state = await response.json();
+          if (state.instance_id && state.instance_id !== restartButton.dataset.instance && !state.restarting) {
+            location.reload();
+            return;
+          }
+        }
+      } catch (_) { /* A short disconnect is expected while the worker restarts. */ }
+      await new Promise(resolve => setTimeout(resolve, 700));
+    }
+    restartStatus.textContent = 'The new service has not connected. Check the server console for startup errors. Retry connection after the service is available; this will not request another restart.';
+    reconnect.hidden = false;
+  }
+  reconnect?.addEventListener('click', waitForService);
+  restartConfirm?.addEventListener('click', async () => {
+    if (window.dashboardRestarting) return;
+    window.dashboardRestarting = true;
+    restartConfirm.disabled = restartCancel.disabled = restartButton.disabled = true;
+    restartStatus.textContent = 'Requesting service restart…';
+    try {
+      const response = await fetch('/server/restart', {
+        method:'POST', body:new URLSearchParams({_csrf:restartConfirm.dataset.token, confirm:'restart'}),
+        signal:AbortSignal.timeout(5000)
+      });
+      if (!response.ok) {
+        restartStatus.textContent = response.status === 409
+          ? 'A project task, model check, or restart is still in progress. Wait for it to finish and try again.'
+          : response.status === 403 ? 'This page has expired. Reload the page before restarting.'
+          : 'Restart was rejected (HTTP ' + response.status + '). Check the server console.';
+        window.dashboardRestarting = false;
+        restartConfirm.disabled = restartCancel.disabled = restartButton.disabled = false;
+        return;
+      }
+    } catch (_) { /* The response may be lost during shutdown; check the new instance. */ }
+    await waitForService();
   });
   filter();
 })();

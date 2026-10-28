@@ -17,6 +17,7 @@
 | Web 报告指标及曲线 | `src/igess/reporting/source_fish.py`：`build_source_projection`；页面继续追踪 `view_model.py`、`static.py`、`assets/report.js`、`assets/report.css` | `tests/test_source_fish_reporting.py`、`tests/test_reporting_view_model.py` |
 | 收集成长、双标签去重、旧报告首次覆盖 | `src/igess/reporting/source_collection.py`：`CollectionGrowth`；`fish_source_engine.py` 的 `collection_growth` 起始基线、`fish_source_runtime.py` 的冻结名称；源 archive 与 `GunMilestones` 负责续跑历史 | `tests/test_fish_collection_reporting.py`、`tests/test_fish_collection_formal.py` |
 | 正式运行、历史终态、报告失败 | `src/igess/authoring/service.py` → `formal_run.py` → `engines.py`；开发工作流 `workflows.py`，历史 `run_registry.py` | `tests/test_formal_run.py`、`tests/test_run_registry.py` |
+| Dashboard 每任务加载源码、进程失败与子进程回收 | `src/igess/dashboard_tasks.py`、`dashboard_task_worker.py`、`dashboard_process_tree.py`；契约见 `docs/dashboard-task-processes.md` | `tests/test_dashboard_task_processes.py` |
 | 编译交付运行包、依赖表、运行包身份 | `src/igess/fish_source_package.py`；平台打包 `operator_export.py`、`operator_runtime.py` | `tests/test_fish_source_package.py`、`tests/test_fish_source_toolkit.py` |
 
 新增参与策略或状态语义的适配模块时，检查 `_integration_code_digest` 是否纳入它；不要只加 import 却让运行身份漏掉行为变化。`fish_source_eggs.py` 等观察模块并不负责发奖结算。

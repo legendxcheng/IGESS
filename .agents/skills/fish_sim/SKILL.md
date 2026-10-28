@@ -50,6 +50,8 @@ uv run --extra dev python -m pytest tests/test_fish_source_formal.py -q
 
 `status` 是十 tick 就绪检查，不登记正式运行。按修改层选择代码导航中的回归；规则和调度修改至少覆盖相关行为与正式 smoke。时间推进、恢复、幂等或性能变化还需验证对应边界或连续运行／恢复运行等价性；只改文档时检查链接和内容即可。检查 skipped 原因，源仓库或 Lua 缺失不能算集成通过。长程验证按影响与用户需求选择 `day_1_growth`、`week_1_growth`、`month_1_growth`，不默认全部运行。
 
+开发 Dashboard 每次模拟、分析和模型检查使用新 Python 进程；保存 Python 策略、适配器或报告代码后直接重新提交即可。Dashboard 自身更新仍需服务重启，旧静态报告仍需重生成。排查网页与 CLI 的执行差异、进程异常或代码更新未生效时，读 `docs/dashboard-task-processes.md`，分别核对任务诊断、实际运行产物与 Lua 源／导表身份。
+
 正式结果使用命令返回的 `output_dir` 与 `report_index`，核对登记状态、`run_manifest.json`、timeline/events、`source_progression.json`、`source_behavior.json` 与 checkpoint。核对引擎、场景、策略、种子、源码／适配器／所选导表摘要；不同输入或策略不能归因为单个数值变化。解释问题时引用文件／符号或运行证据，区分观察事实、原因推断与建议。
 
 仅需跑数值与解读报告时，可读取仓库 `.codex/skills/fish-balance-loop/SKILL.md`；用户要求构建或发布 GameBalancer 时再读取 `.codex/skills/publish-gamebalancer/SKILL.md`。普通模拟开发不自动发布工具包。
