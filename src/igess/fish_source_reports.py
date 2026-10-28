@@ -102,6 +102,7 @@ def project_source_behavior(
         elif kind != "treasure_beast_unlocked" and details.get("source") != "observation":
             accepted[kind] += 1
     return {
+        "collection_growth": scope.get("collection_growth"),
         "first_times": scope.get("first_times", {}),
         "lifecycle_gun_milestones": scope.get("lifecycle_gun_milestones", []),
         "gun_milestones": gun_milestones,

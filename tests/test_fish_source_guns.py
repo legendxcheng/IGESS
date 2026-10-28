@@ -89,7 +89,9 @@ def test_formal_run_claims_then_equips_and_reports_permanent_milestones(tmp_path
     assert claim['time_seconds'] == 0 and equip['time_seconds'] == len(expected_claims) + 1
     behavior = json.loads((output / 'source_behavior.json').read_text(encoding='utf-8'))['profiles']['default']
     milestones = behavior['gun_milestones']
-    assert {m['kind'] for m in milestones} >= {'normal_codex_completed','gun_claimed','gun_equipped','gun_upgraded','fish_tide_unlocked'}
+    assert {m['kind'] for m in milestones} >= {'gun_owned','gun_claimed','gun_equipped','fish_tide_unlocked'}
+    # Already-completed / strengthened codices belong to the starting archive.
+    assert not any(m['kind'] in {'normal_codex_completed', 'gun_upgraded'} for m in milestones)
     assert len({m['identity'] for m in milestones}) == len(milestones)
     assert behavior['accepted_commands']['claim_gun_reward'] == 1
     report = json.loads((Path(response.result['report_index']).parent / 'report_data.json').read_text(encoding='utf-8'))
@@ -97,7 +99,7 @@ def test_formal_run_claims_then_equips_and_reports_permanent_milestones(tmp_path
     assert len(displayed) == len(milestones)
     system_rows = report['fish_progression']['persistent']['profiles']['default']['rows']
     assert len([row for row in system_rows if row['progression_category'] == 'fish_tide_unlocked']) == 1
-    assert not any(row['progression_category'] == 'gun_owned' for row in system_rows)
+    assert len([row for row in system_rows if row['progression_category'] == 'gun_owned']) == 1
 
     resumed = AuthoringService(project).simulate('smoke', checkpoint_input=output / 'final_checkpoint.json')
     assert resumed.ok, resumed.details

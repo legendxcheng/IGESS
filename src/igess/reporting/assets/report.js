@@ -185,7 +185,7 @@ function renderSourceFish(fish) {
   if (investment) investment.querySelector('.section-note').textContent = notes.investment || '';
   const persistent = document.querySelector('[data-fish-persistent-section]');
   if (persistent) {
-    persistent.querySelector('h2').textContent = '系统成长与突破资助时间点';
+    persistent.querySelector('h2').textContent = '系统、收集成长与突破资助时间点';
     persistent.querySelector('.section-note').textContent = notes.persistent || '';
   }
   const liquidity = document.querySelector('[data-source-liquidity-section]');
@@ -609,32 +609,32 @@ function renderPersistentProgression(persistent) {
       const summary = profile.summary || {};
       if (persistent.event_noun) {
         return [
-          kpiCard(`${profileLabel(profileId)} · 成长操作次数`, numericMarkup(summary.total_progression_count),
+          kpiCard(`${profileLabel(profileId)} · 成长事件次数`, numericMarkup(summary.total_progression_count),
             `<p class="kpi-detail">每在线小时 ${numericInline(summary.events_per_active_hour)} 次</p>`),
-          kpiCard('首次成长操作等待', durationMarkup(summary.first_progression_wait_seconds)),
-          kpiCard('最长操作间隔', durationMarkup(summary.max_interval_seconds)),
-          kpiCard('末次成长操作后等待', durationMarkup(summary.tail_gap_seconds)),
-          kpiCard('无成长操作在线时段', numericMarkup(summary.complete_online_sessions_without_progression),
+          kpiCard('首次成长事件等待', durationMarkup(summary.first_progression_wait_seconds)),
+          kpiCard('最长成长间隔', durationMarkup(summary.max_interval_seconds)),
+          kpiCard('末次成长事件后等待', durationMarkup(summary.tail_gap_seconds)),
+          kpiCard('无成长事件在线时段', numericMarkup(summary.complete_online_sessions_without_progression),
             `<p class="kpi-detail">共 ${numericInline(summary.complete_online_sessions)} 个完整在线时段</p>`),
         ].join('');
       }
       return [
         kpiCard(
-          `${profileLabel(profileId)} · ${persistent.event_noun ? '成长操作次数' : '永久成长次数'}`,
+          `${profileLabel(profileId)} · ${persistent.event_noun ? '成长事件次数' : '永久成长次数'}`,
           numericMarkup(summary.total_progression_count),
           `<p class="kpi-detail">每在线小时 ${numericInline(summary.events_per_active_hour)} 次</p>`
         ),
         kpiCard(
-          `${profileLabel(profileId)} · ${persistent.event_noun ? '最长操作间隔' : '最长成长空窗'}`,
+          `${profileLabel(profileId)} · ${persistent.event_noun ? '最长成长间隔' : '最长成长空窗'}`,
           `<div class="kpi-pair"><div><span>全部成长</span>${numericMarkup(summary.max_interval_seconds, '秒')}</div>` +
             `<div><span>系统成长</span>${numericMarkup(summary.system_progression_max_interval_seconds, '秒')}</div></div>`
         ),
         kpiCard(
-          `${profileLabel(profileId)} · ${persistent.event_noun ? '末次成长操作后等待' : '尾部成长空窗'}`,
+          `${profileLabel(profileId)} · ${persistent.event_noun ? '末次成长事件后等待' : '尾部成长空窗'}`,
           numericMarkup(summary.tail_gap_seconds, '秒')
         ),
         kpiCard(
-          `${profileLabel(profileId)} · ${persistent.event_noun ? '无成长操作在线时段' : '无成长在线时段'}`,
+          `${profileLabel(profileId)} · ${persistent.event_noun ? '无成长事件在线时段' : '无成长在线时段'}`,
           `<div class="kpi-pair"><div><span>全部成长</span>${numericMarkup(summary.complete_online_sessions_without_progression)}</div>` +
             `<div><span>系统成长</span>${numericMarkup(summary.complete_online_sessions_without_system_progression)}</div></div>`,
           `<p class="kpi-detail">共 ${numericInline(summary.complete_online_sessions)} 个完整在线时段</p>`
@@ -642,6 +642,8 @@ function renderPersistentProgression(persistent) {
       ].join('');
     }).join('');
   }
+  if (target) target.innerHTML += entries.map(([id, profile]) => profile.collection_coverage
+    ? `<p class="section-note">${escapeHtml(profileLabel(id))}：${escapeHtml(profile.collection_coverage.note)}</p>` : '').join('');
   renderWeeklyProgressionCharts(profiles);
   renderDailyProgressionCharts(profiles);
   renderProgressionEventsTable(profiles);
@@ -658,7 +660,7 @@ function renderWeeklyProgressionCharts(profiles) {
     return;
   }
   const categories = [...new Set(entries.flatMap(({ week }) =>
-    (week.rows || []).map(row => row.progression_category || 'other')
+    (week.rows || []).flatMap(progressionCategories)
   ))].sort((left, right) => progressionCategoryRank(left) - progressionCategoryRank(right));
   const categoryLabels = categories.map(progressionCategoryLabel);
   target.innerHTML = entries.map(({ profileId, week }, index) => {
@@ -682,7 +684,7 @@ function renderWeeklyProgressionCharts(profiles) {
       symbolSize: 12,
       itemStyle: { color: progressionCategoryColor(category) },
       data: rows
-        .filter(row => (row.progression_category || 'other') === category)
+        .filter(row => progressionCategories(row).includes(category))
         .map(row => ({
           value: [Number(row.week_active_time_seconds || 0), categoryIndex],
           row,
@@ -695,11 +697,11 @@ function renderWeeklyProgressionCharts(profiles) {
         formatter: params => {
           const row = params.data.row;
           return [
-            `<strong>${escapeHtml(progressionCategoryLabel(row.progression_category))}</strong>`,
+            `<strong>${escapeHtml(progressionLabels(row))}</strong>`,
             `本周在线：${formatDurationClock(row.week_active_time_seconds)}`,
             `墙钟时间：${formatDurationClock(row.wall_time_seconds)}`,
             `累计在线：${formatDurationClock(row.active_time_seconds)}`,
-            `事件：${escapeHtml(eventKindLabel(row.source_event_kind))} · ${escapeHtml(itemIdentityLabel(row.item_id))}`,
+            `事件：${escapeHtml(eventKindLabel(row.source_event_kind))} · ${escapeHtml(progressionIdentityLabel(row))}`,
             `指标：${escapeHtml(metricLabel(row.metric_id))}`,
             `变化：${numericTooltip(row.metric_before)} → ${numericTooltip(row.metric_after)}`,
             `距上次有效成长：${numericTooltip(row.gap_from_previous_progression_seconds, '秒')}`,
@@ -732,7 +734,7 @@ function renderDailyProgressionCharts(profiles) {
     return;
   }
   const categories = [...new Set(entries.flatMap(({ day }) =>
-    (day.rows || []).map(row => row.progression_category || 'other')
+    (day.rows || []).flatMap(progressionCategories)
   ))].sort((left, right) => progressionCategoryRank(left) - progressionCategoryRank(right));
   const categoryLabels = categories.map(progressionCategoryLabel);
   target.innerHTML = entries.map(({ profileId, day }, index) => {
@@ -756,7 +758,7 @@ function renderDailyProgressionCharts(profiles) {
       symbolSize: 12,
       itemStyle: { color: progressionCategoryColor(category) },
       data: rows
-        .filter(row => (row.progression_category || 'other') === category)
+        .filter(row => progressionCategories(row).includes(category))
         .map(row => ({
           value: [Number(row.day_active_time_seconds || 0), categoryIndex],
           row,
@@ -769,11 +771,11 @@ function renderDailyProgressionCharts(profiles) {
         formatter: params => {
           const row = params.data.row;
           return [
-            `<strong>${escapeHtml(progressionCategoryLabel(row.progression_category))}</strong>`,
+            `<strong>${escapeHtml(progressionLabels(row))}</strong>`,
             `当日在线：${formatDurationClock(row.day_active_time_seconds)}`,
             `墙钟时间：${formatDurationClock(row.wall_time_seconds)}`,
             `累计在线：${formatDurationClock(row.active_time_seconds)}`,
-            `事件：${escapeHtml(eventKindLabel(row.source_event_kind))} · ${escapeHtml(itemIdentityLabel(row.item_id))}`,
+            `事件：${escapeHtml(eventKindLabel(row.source_event_kind))} · ${escapeHtml(progressionIdentityLabel(row))}`,
             `指标：${escapeHtml(metricLabel(row.metric_id))}`,
             `变化：${numericTooltip(row.metric_before)} → ${numericTooltip(row.metric_after)}`,
             `距上次有效成长：${numericTooltip(row.gap_from_previous_progression_seconds, '秒')}`,
@@ -795,6 +797,26 @@ function renderDailyProgressionCharts(profiles) {
   });
 }
 
+function progressionCategories(row) {
+  return row.progression_categories?.length
+    ? [...new Set(row.progression_categories)] : [row.progression_category || 'other'];
+}
+
+function progressionLabels(row) {
+  return progressionCategories(row).map(progressionCategoryLabel).join(' / ');
+}
+
+function progressionIdentityLabel(row) {
+  if (row.fish_id != null) {
+    const label = `鱼种 ${row.fish_id} · 变异 ${row.mutation_id}`;
+    return label + (row.display_name ? ` · ${row.display_name}` : '') +
+      (row.same_observation_batch ? '（同批观察，未区分先后）' : '');
+  }
+  if (row.progression_category === 'gun_owned') return `枪 ${row.gun_id ?? String(row.item_id).split(':').pop()}` + (row.display_name ? ` · ${row.display_name}` : '');
+  if (row.progression_category === 'normal_codex_completed') return `图鉴奖励 ${row.reward_id ?? String(row.item_id).split(':').pop()}`;
+  return itemIdentityLabel(row.item_id);
+}
+
 function progressionCategoryLabel(category) {
   const labels = {
     treasure_beast: '寻宝兽开放',
@@ -809,6 +831,10 @@ function progressionCategoryLabel(category) {
     permanent_unlock: '永久解锁',
     gun_upgraded: '图鉴枪强化',
     fish_tide_unlocked: '鱼潮开放',
+    normal_codex_completed: '正常图鉴完成',
+    gun_owned: '新枪获得',
+    new_fish_species: '新鱼种',
+    new_fish_variant: '新变异组合',
     other: '其他',
   };
   return labels[category] || category || labels.other;
@@ -817,8 +843,9 @@ function progressionCategoryLabel(category) {
 function progressionCategoryCountsMarkup(rows) {
   const counts = new Map();
   (Array.isArray(rows) ? rows : []).forEach(row => {
-    const category = row.progression_category || 'other';
-    counts.set(category, (counts.get(category) || 0) + 1);
+    progressionCategories(row).forEach(category => {
+      counts.set(category, (counts.get(category) || 0) + 1);
+    });
   });
   if (!counts.size) {
     return '<p class="progression-category-counts-empty">暂无分类成长点</p>';
@@ -836,11 +863,19 @@ function progressionCategoryCountsMarkup(rows) {
       '</span>',
     ].join('')).join(''),
     '</div>',
+    rows.some(row => progressionCategories(row).length > 1)
+      ? '<p class="section-note">分类按标签计数，可重叠；双标签不重复增加成长事件总数。</p>' : '',
   ].join('');
 }
 
 function progressionCategoryRank(category) {
   const order = [
+    'new_fish_species',
+    'new_fish_variant',
+    'normal_codex_completed',
+    'gun_owned',
+    'gun_upgraded',
+    'fish_tide_unlocked',
     'best_hall_fish',
     'barbell',
     'fish_hall',
@@ -858,6 +893,12 @@ function progressionCategoryRank(category) {
 
 function progressionCategoryColor(category) {
   const colors = {
+    new_fish_species: '#2563eb',
+    new_fish_variant: '#db2777',
+    normal_codex_completed: '#d97706',
+    gun_owned: '#059669',
+    gun_upgraded: '#7c3aed',
+    fish_tide_unlocked: '#0891b2',
     treasure_beast: '#06b6d4',
     best_hall_fish: '#5470c6',
     barbell: '#91cc75',
@@ -935,7 +976,7 @@ function renderProgressionDensityChart(profiles) {
           ].join('<br>');
         }
         return [
-          `<strong>${escapeHtml(progressionCategoryLabel(row.progression_category))} · ${escapeHtml(itemIdentityLabel(row.item_id))}</strong>`,
+          `<strong>${escapeHtml(progressionLabels(row))} · ${escapeHtml(progressionIdentityLabel(row))}</strong>`,
           `累计在线：${numericTooltip(row.active_time, '秒')}`,
           `变化：${numericTooltip(row.metric_before)} → ${numericTooltip(row.metric_after)}`,
           `差值：${numericTooltip(row.metric_delta)}`,
@@ -969,8 +1010,8 @@ function renderProgressionEventsTable(profiles) {
     '<tr>',
     `<td>${escapeHtml(profileLabel(row.profile_id))}</td>`,
     `<td>${numericTooltip(row.active_time, '秒')}</td>`,
-    `<td>${escapeHtml(progressionCategoryLabel(row.progression_category))}</td>`,
-    `<td>${escapeHtml(eventKindLabel(row.source_event_kind))}<br><code>${escapeHtml(itemIdentityLabel(row.item_id))}</code></td>`,
+    `<td>${escapeHtml(progressionLabels(row))}</td>`,
+    `<td>${escapeHtml(eventKindLabel(row.source_event_kind))}<br><code>${escapeHtml(progressionIdentityLabel(row))}</code></td>`,
     `<td>${numericTooltip(row.gap_from_previous_progression_seconds, '秒')}</td>`,
     `<td>${numericTooltip(row.metric_before)} → ${numericTooltip(row.metric_after)}</td>`,
     `<td>${numericTooltip(row.metric_delta)}</td>`,
@@ -1361,6 +1402,7 @@ function eventKindLabel(kind) {
     claim_offline_reward: '领取离线奖励',
     claim_fish_reward: '领取单鱼图鉴奖励',
     codex_fish_unlocked: '单鱼图鉴解锁',
+    gun_milestone: '图鉴与枪里程碑',
     source_rejected: '源规则拒绝',
   };
   return labels[kind] || kind || '';
@@ -1382,6 +1424,11 @@ function metricLabel(metricId) {
     strength_rebirth_count: '力量重生次数',
     trash_man_rebirth_count: '垃圾佬重生次数',
     target_realm_id: '资助的目标境界',
+    collection_unlocked: '首次收集',
+    normal_codex_completed: '正常图鉴完成',
+    gun_owned: '新枪获得',
+    gun_upgraded: '图鉴枪强化',
+    fish_tide_unlocked: '鱼潮开放',
   };
   return labels[metricId] || metricId || '';
 }

@@ -8,7 +8,7 @@ from igess.human_numbers import human_number
 
 from .kpis import build_overview
 from .loader import ReportData
-from .source_fish import build_source_projection, display_events
+from .source_fish import build_source_projection, display_events, growth_by_session
 
 _SECONDS_PER_DAY = 24 * 60 * 60
 _DEFAULT_FISH_RATE_SAMPLE_SECONDS = 5 * 60
@@ -273,7 +273,8 @@ def _source_fish_progression(source: dict[str, Any]) -> dict[str, Any]:
     for profile_id, profile in persistent.items():
         sessions = source["persistent"]["profiles"][profile_id]["sessions"]
         days, weeks = _source_periods(profile["rows"], sessions)
-        profile.update({"days": days, "weeks": weeks})
+        profile.update({"days": days, "weeks": weeks,
+                        "collection_coverage": source["persistent"]["profiles"][profile_id]["collection_coverage"]})
     investment = {}
     for profile_id, values in source["investment"].items():
         investment[profile_id] = {
@@ -307,7 +308,7 @@ def _source_fish_progression(source: dict[str, Any]) -> dict[str, Any]:
             "available": bool(core or persistent), "mode": "source_observations",
             "notes": source["notes"], "actions": source["actions"],
             "core": {"profiles": core, "peak_basis": "observed_samples"},
-            "persistent": {"profiles": persistent, "event_noun": "成长操作"},
+            "persistent": {"profiles": persistent, "event_noun": "成长事件"},
             "investment": {"scope": "source_receipts", "profiles": investment},
             "liquidity": {"profiles": liquidity}, "balance": {
                 "profiles": balance,
@@ -318,15 +319,15 @@ def _source_fish_progression(source: dict[str, Any]) -> dict[str, Any]:
 def _source_periods(rows: list[dict[str, Any]], sessions: list[dict[str, Any]]) -> tuple[list, list]:
     days = []
     elapsed = 0
-    for session in sessions:
+    for session, group in zip(sessions, growth_by_session(rows, sessions)):
         duration = session["end"] - session["start"]
         elapsed = session.get("active_start", elapsed)
         day_rows = [{**row, "day_active_time_seconds": row["active_time_seconds"] - elapsed,
                      "day_active_time": chart_point(row["active_time_seconds"] - elapsed)}
-                    for row in rows if session["start"] <= row["wall_time_seconds"] <= session["end"]]
+                    for row in group]
         days.append({"day_index": session["start"] // _SECONDS_PER_DAY + 1,
                      "duration_seconds": chart_point(duration), "event_count": chart_point(len(day_rows)),
-                     "event_noun": "成长操作", "rows": day_rows})
+                     "event_noun": "成长事件", "rows": day_rows})
         elapsed += duration
     weeks = []
     for offset in range(0, len(days), 7):
@@ -340,7 +341,7 @@ def _source_periods(rows: list[dict[str, Any]], sessions: list[dict[str, Any]]) 
             duration += int(day["duration_seconds"]["exact_value"])
         weeks.append({"week_index": offset // 7 + 1, "duration_seconds": chart_point(duration),
                       "event_count": chart_point(len(week_rows)), "rows": week_rows,
-                      "event_noun": "成长操作"})
+                      "event_noun": "成长事件"})
     return days, weeks
 
 

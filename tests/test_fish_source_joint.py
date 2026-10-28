@@ -154,7 +154,7 @@ s.wallet.material={sign=1,coeff='9',exp=2}
     first, _, _ = run(target, until_seconds=cutoff)
     _, restored, report = run(target, checkpoint_input=first / 'final_checkpoint.json')
     expected = full('source_behavior.json')['profiles']['default']['first_times']
-    assert expected['normal_codex_completed']['time_seconds'] == 0
+    assert 'normal_codex_completed' not in expected  # Already complete in the starting archive.
     assert expected['gun_claimed']['time_seconds'] == 0
     assert expected['fish_tide_participated']['time_seconds'] == 10
     assert restored('source_behavior.json')['profiles']['default']['first_times'] == expected
@@ -226,17 +226,30 @@ end
     assert int(final['fish_inventory_count']) == int(final['total_throws']) + 5
     assert report['fish_progression']['actions']['default']['tide_rounds'] == rounds
     assert not any(r['progression_category'] in {'codex_fish_unlocked', 'claim_fish_reward', 'egg_hatched'} for r in report['fish_progression']['persistent']['profiles']['default']['rows'])
+    growth = report['fish_progression']['persistent']['profiles']['default']['rows']
+    completed_growth = next(r for r in growth if r['progression_category'] == 'normal_codex_completed')
+    gun_growth = next(r for r in growth if r['progression_category'] == 'gun_owned')
+    assert completed_growth['wall_time_seconds'] == completed['time_seconds']
+    assert gun_growth['wall_time_seconds'] == claim['time_seconds']
+    hatch_growth = [r for r in growth if r['source_event_kind'] == 'codex_fish_unlocked' and r['wall_time_seconds'] == 210]
+    assert hatch_growth and all('new_fish_variant' in r['progression_categories'] for r in hatch_growth)
+    assert not any(r['source_event_kind'] == 'codex_fish_unlocked' and r['wall_time_seconds'] == 180 for r in growth)
     checkpoint = None
     segment_events = []
-    for until in (40, 120, 212, 245):
+    segment_growth = []
+    for until in (completed['time_seconds'], 40, 120, 200, 212, 245):
         segment, segment_read, segment_report = run(target, until_seconds=until, checkpoint_input=checkpoint)
         checkpoint = segment / 'final_checkpoint.json'
         segment_events.extend(segment_read('events.json'))
+        segment_growth.extend(segment_report['fish_progression']['persistent']['profiles']['default']['rows'])
     assert segment_read('timeline.json')[-1] == read('timeline.json')[-1]
     assert segment_read('final_checkpoint.json')['behavior_state'] == read('final_checkpoint.json')['behavior_state']
     assert segment_report['fish_progression']['actions']['default']['first_times'] == behavior['first_times']
     accepted = lambda rows: [e for e in rows if e['details'].get('source') != 'observation' and e['kind'] not in {'gun_milestone', 'egg_admitted', 'egg_hatched'}]
     assert accepted(segment_events) == accepted(events)
+    facts = lambda rows: [(r.get('event_identity'), r['source_event_kind'], r['item_id'],
+                           r['active_time_seconds'], r.get('progression_categories')) for r in rows]
+    assert facts(segment_growth) == facts(growth)
 
 
 def test_formal_partial_egg_notice_failure_is_a_failed_run_with_source_evidence(tmp_path, monkeypatch):

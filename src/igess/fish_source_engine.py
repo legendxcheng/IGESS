@@ -407,6 +407,7 @@ class FishSourceEngineAdapter:
                     "initial_active_time_seconds": runner.initial_active_time_seconds,
                     "first_times": runner.first_times,
                     "lifecycle_gun_milestones": runner.gun_milestones.records,
+                    "collection_growth": runner.collection_growth,
                 }
                 executed = time.perf_counter()
                 timings["source_execution"] += executed - entered
@@ -493,6 +494,12 @@ class _ProfileRun:
         self.tide_interval = int(self.state["tides"]["config"]["intervalSeconds"])
         self.initial_online = self.state["online"]
         self.initial_active_time_seconds = self.active_time_seconds
+        self.collection_growth = {
+            "version": 1,
+            "initial_unlocked_entries": self.state["codex"]["unlockedEntries"],
+            "initial_gun_facts": self.gun_milestones.establish_baseline(self.state),
+            "display_names": runtime.collection_display_names(),
+        }
         sample_time = self.active_time_seconds if inputs.sampling_time_basis == "online" else self.state["time"]
         self.next_record = (sample_time // self.record_interval + 1) * self.record_interval
         self._record()
@@ -649,14 +656,17 @@ class _ProfileRun:
 
     def _observe_codex(self, before: dict[str, Any]) -> None:
         previous = {entry["collectionKey"] for entry in before["codex"]["unlockedEntries"]}
-        for entry in self.state["codex"]["unlockedEntries"]:
-            if entry["collectionKey"] not in previous:
-                self.events.append(Event(
-                    self.scenario.id, self.profile.id, int(self.state["time"]),
-                    "codex_fish_unlocked", entry["collectionKey"],
-                    {"receipt": json.dumps(entry, ensure_ascii=False, sort_keys=True),
-                     "source": "observation"},
-                ))
+        added = sorted(
+            (entry for entry in self.state["codex"]["unlockedEntries"] if entry["collectionKey"] not in previous),
+            key=lambda entry: (entry["fishId"], entry["mutationId"]),
+        )
+        for entry in added:
+            self.events.append(Event(
+                self.scenario.id, self.profile.id, int(self.state["time"]),
+                "codex_fish_unlocked", entry["collectionKey"],
+                {"receipt": json.dumps(entry, ensure_ascii=False, sort_keys=True),
+                 "source": "observation", "observation_batch_size": str(len(added))},
+            ))
 
     def _allowed(self, op: str, target: str = "") -> bool:
         return self.blocked.get(f"{op}:{target}", -1) <= self.state["time"]

@@ -6,12 +6,14 @@ No prices, rewards, probability formulas or game-state transitions are evaluated
 from __future__ import annotations
 
 import json
+from bisect import bisect_right
 from collections import Counter
 from decimal import Decimal, InvalidOperation, localcontext
 from itertools import pairwise
 from typing import Any
 
 from .loader import ReportData, ReportLoadError
+from .source_collection import CollectionGrowth, ordered_observations
 from ..fish_source_reports import project_source_behavior
 from ..fish_source_numbers import source_decimal
 
@@ -98,6 +100,17 @@ def _active_at(time: int, sessions: list[dict[str, Any]], initial: int = 0) -> i
     return initial + sum(max(0, min(time, row["end"]) - row["start"]) for row in sessions)
 
 
+def growth_by_session(rows: list[dict[str, Any]], sessions: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
+    """Assign shared boundary seconds to the later session, exactly once."""
+    groups: list[list[dict[str, Any]]] = [[] for _ in sessions]
+    starts = [session["start"] for session in sessions]
+    for row in rows:
+        index = bisect_right(starts, row["wall_time_seconds"]) - 1
+        if index >= 0 and row["wall_time_seconds"] <= sessions[index]["end"]:
+            groups[index].append(row)
+    return groups
+
+
 def _core(
     samples: list[dict[str, Any]], sessions: list[dict[str, Any]], initial: int = 0,
 ) -> dict[str, Any]:
@@ -132,19 +145,19 @@ def _core(
 
 
 def _milestone(
-    event: dict[str, Any], active: int, previous: int
+    event: dict[str, Any], active: int, previous: int,
+    collection: CollectionGrowth,
 ) -> dict[str, Any] | None:
     kind, receipt = event["kind"], event["receipt"]
-    if kind == "gun_milestone":
-        details = event["details"]
-        if details["kind"] not in {"gun_upgraded", "fish_tide_unlocked"}:
+    if kind in {"gun_milestone", "codex_fish_unlocked"}:
+        fact = collection.project(event)
+        if fact is None:
             return None
-        active = int(details["online_time_seconds"])
         return {
+            **fact,
             "wall_time_seconds": event["time_seconds"], "active_time_seconds": active,
             "stage_id": f"online_day_{int(event['time_seconds']) // 86400 + 1}",
-            "source_event_kind": kind, "progression_category": details["kind"],
-            "item_id": details["identity"], "metric_id": details["kind"],
+            "source_event_kind": kind,
             "metric_before": "0", "metric_after": "1", "metric_delta": "1",
             "relative_delta": None, "gap_from_previous_progression_seconds": active - previous,
         }
@@ -178,9 +191,7 @@ def _milestone(
         item = f"barbell:{receipt.get('barbellId', '')}"
     else:
         before, after = receipt.get("fromRealmId"), receipt.get("toRealmId")
-        item = f"trash_man_realm:{after}"
-        if receipt.get("instant") is True:
-            category, metric = "trash_man_realm", "trash_man_realm_id"
+        item = f"breakthrough_funding:{after}"
     left, right = _decimal(before), _decimal(after)
     return {
         "wall_time_seconds": event["time_seconds"],
@@ -204,26 +215,25 @@ def _milestone(
 
 def _growth(
     events: list[dict[str, Any]], sessions: list[dict[str, Any]], initial: int = 0,
+    *, scope: dict[str, Any], start: int,
 ) -> dict[str, Any]:
-    rows = []
-    for event in events:
+    rows: list[dict[str, Any]] = []
+    collection = CollectionGrowth(scope, full_history=start == 0 and initial == 0,
+                                  has_collection_records=any(e["kind"] == "codex_fish_unlocked" for e in events))
+    for event in ordered_observations(events):
         row = _milestone(
             event,
             _active_at(int(event["time_seconds"]), sessions, initial),
             rows[-1]["active_time_seconds"] if rows else initial,
+            collection,
         )
         if row:
             rows.append(row)
     active = sum(session["end"] - session["start"] for session in sessions)
     times = [row["active_time_seconds"] for row in rows]
     complete = [session for session in sessions if session["complete"]]
-    empty = sum(
-        not any(
-            session["start"] <= row["wall_time_seconds"] <= session["end"]
-            for row in rows
-        )
-        for session in complete
-    )
+    empty = sum(not group for session, group in zip(sessions, growth_by_session(rows, sessions))
+                if session["complete"])
     maximum = max((b - a for a, b in pairwise(times)), default=0)
     summary = {
         "total_progression_count": len(rows),
@@ -239,7 +249,8 @@ def _growth(
         "complete_online_sessions_without_progression": empty,
         "complete_online_sessions_without_system_progression": empty,
     }
-    return {"rows": rows, "summary": summary, "sessions": sessions}
+    return {"rows": rows, "summary": summary, "sessions": sessions,
+            "collection_coverage": collection.coverage}
 
 
 def _investment(
@@ -366,7 +377,7 @@ def build_source_projection(data: ReportData) -> dict[str, Any]:
                 }
                 for sample in samples
             ]
-        growth[profile] = _growth(events, sessions, initial)
+        growth[profile] = _growth(events, sessions, initial, scope=scope, start=start)
         investment[profile] = _investment(events, sessions, initial)
         actions[profile] = project_source_behavior(events, scope)
         counts.update(actions[profile]["accepted_commands"])
@@ -388,7 +399,7 @@ def build_source_projection(data: ReportData) -> dict[str, Any]:
         "notes": {
             "economy": "资源即材料，金币即金钱。每秒速率按相邻在线采样点的实际在线秒数平均，累计获取包含在线生产、卖鱼与一次性图鉴奖励；图鉴奖励单列，不代表稳定生产能力，排除离线奖励，不扣消费。领取鱼厅收入只转移金额，不重复计入产出。当前剩余为可花费的钱包余额，包含离线入账；待领金币单独展示。旧记录缺少在线累计产出时不补算，产出图显示未记录。",
             "core": "力量与双 Luck 来自已保存的源状态采样；峰值仅为采样点峰值。" + sampling_note + "这些状态不等于完整在线毛收入、真实峰值或精确最长停滞，未记录的指标不填零。",
-            "persistent": "按实际上线/下线记录累计在线时间，离线等待不计入间隔。图中统计鱼雷、杠铃、鱼厅、两类重生及突破资助操作；“突破资助”仅表示支付材料，不代表训练已完成。单鱼升级不计入。",
+            "persistent": "按实际上线/下线记录累计在线时间，离线等待不计入间隔。统计原有系统成长、正常图鉴完成、新枪永久获得、新鱼种和新变异组合。首次变异鱼可带两个标签，总次数仅计一次收集事件；分类标签数可重叠。首次依据历史解锁，卖出后再获得不重计，鱼蛋孵化后才计入。时间为源观察时点，同批观察不推断先后。每次成功支付突破材料记一次“突破资助”，包含立即完成的突破，不另计突破完成。单鱼升级不计入。",
             "investment": "支出与卖鱼收入直接汇总成功命令回执。原记录没有单次升级带来的产出变化、完整加工材料收入，因此对应指标显示为未记录；选鱼采用本次同源策略。",
             "liquidity": "钱包可花费与鱼厅待领取分开展示；累计已领取来自领取回执。累计已领取＋当前待领为本次可核算金额，不等于完整在线毛产出。",
         },

@@ -30,7 +30,8 @@ class GunMilestones:
     def save(self) -> dict[str, Any]:
         return {'seen': sorted(self.seen), 'records': list(self.records)}
 
-    def observe(self, state, online_seconds, scenario_id, profile_id, events):
+    @staticmethod
+    def facts(state):
         guns = state['guns']
         facts = []
         for reward in guns['rewards']:
@@ -47,7 +48,15 @@ class GunMilestones:
             facts.append(('gun_equipped', str(guns['combat']['equippedGunId'])))
         if guns['tideEligible']:
             facts.append(('fish_tide_unlocked', 'any_owned_gun'))
-        for kind, target in facts:
+        return facts
+
+    def establish_baseline(self, state):
+        identities = [f'{kind}:{target}' for kind, target in self.facts(state)]
+        self.seen.update(identities)
+        return identities
+
+    def observe(self, state, online_seconds, scenario_id, profile_id, events):
+        for kind, target in self.facts(state):
             identity = f'{kind}:{target}'
             if identity in self.seen:
                 continue

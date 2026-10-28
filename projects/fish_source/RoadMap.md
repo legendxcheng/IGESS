@@ -1,10 +1,14 @@
 # Fish 同源模拟进度
 
-更新：2026-10-23。
+更新：2026-10-28。
 
 ## 在用项目
 
 Fish 的新模拟、规则和调优统一使用 `projects/fish_source`，运行入口与产物见 [README.md](README.md)。`projects/fish` 已停用，其历史代码和报告仅供查证，不作为当前后端的比较基线。
+
+## 2026-10-28 收集成长报表
+
+2026-10-28 收集成长报表已接入正常图鉴完成、新枪永久获得、新鱼种与新变异组合；双标签单事件计数，续跑按源历史建立基线，旧记录缺失明确提示。范围与验收要求见[收集成长规格](../../.scratch/fish-collection-growth-points/spec.md)，验证结果见[实施验证](../../.scratch/fish-collection-growth-points/verification.md)。本地报表更新不代表 GameBalancer 已发布。
 
 ## 2026-10-23 同步修复
 

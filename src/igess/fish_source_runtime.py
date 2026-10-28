@@ -277,6 +277,21 @@ class FishSourceRuntime:
             command["initialState"] = initial_state
         return self.request(command)
 
+    def collection_display_names(self) -> dict[str, dict[str, str]]:
+        """Read display-only labels from the same frozen input the Lua session uses."""
+        if self._frozen_data_root is None:
+            raise FishSourceRuntimeError("simulation_session_closed")
+        result = {}
+        for category, filename in (("fish", "tbfish.json"), ("mutation", "tbmutation.json"), ("gun", "tbgun.json")):
+            path = self._frozen_data_root / filename
+            names = {}
+            if path.is_file():
+                for row in json.loads(path.read_text(encoding="utf-8-sig")):
+                    if isinstance(row, dict) and isinstance(row.get("name"), str):
+                        names[str(row["id"])] = row["name"]
+            result[category] = names
+        return result
+
     def checkpoint(self) -> dict[str, Any]:
         return self.request({"op": "checkpoint"})
 
