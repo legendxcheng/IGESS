@@ -343,7 +343,7 @@ def build_parser() -> argparse.ArgumentParser:
         "Serve the local simulation dashboard",
         "igess dashboard --project . --port 8765",
     )
-    dashboard.add_argument("--project", default=".", help="IGESS project root directory.")
+    dashboard.add_argument("--project", default=".", help="Project or workspace root; discovers projects/ and examples/ for the web project switcher.")
     dashboard.add_argument(
         "--config",
         default=None,
@@ -355,7 +355,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Exported table directory, relative to the project root by default.",
     )
     dashboard.add_argument(
-        "--runs-root", help="Optional directory used to discover simulation runs."
+        "--runs-root", help="Optional history parent directory; each dashboard project uses its own subdirectory."
     )
     dashboard.add_argument("--host", default="127.0.0.1", help="Dashboard bind address.")
     dashboard.add_argument("--port", type=int, default=8765, help="Dashboard TCP port.")

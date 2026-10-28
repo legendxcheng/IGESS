@@ -4,14 +4,18 @@ import html
 import ipaddress
 import json
 import mimetypes
+import re
 import secrets
 from collections.abc import Mapping, Sequence
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path, PurePosixPath
-from threading import BoundedSemaphore
+from threading import BoundedSemaphore, Lock, Thread
+from time import monotonic
 from urllib.parse import parse_qs, unquote, urlparse
 
+from .dashboard_ui import dashboard_shell
+from .dashboard_projects import discover_dashboard_projects
 from .authoring.project import AuthoringProject
 from .authoring.response import CommandResponse
 from .workflows import WorkflowService, _read_bounded_relative_file
@@ -21,7 +25,7 @@ _SAMPLE_CONFIG = "examples/shelldiver_v0/economy.yaml"
 _SAMPLE_TABLES = "examples/shelldiver_v0/luban_exports"
 _MAX_FORM_BYTES = 64 * 1024
 _MAX_REPORT_BYTES = 32 * 1024 * 1024
-_MUTATION_PATHS = frozenset({"/smoke", "/formal", "/run", "/advise"})
+_MUTATION_PATHS = frozenset({"/smoke", "/formal", "/run", "/advise", "/refresh"})
 
 
 def create_dashboard_context(
@@ -29,6 +33,8 @@ def create_dashboard_context(
     config: str | Path | None,
     tables: str | Path | None,
     runs_root: str | Path | None,
+    *,
+    strict_authoring: bool = False,
 ) -> tuple[WorkflowService, str | Path, str | Path | None]:
     """Resolve authoring mode only for an unoverridden project root.
 
@@ -43,7 +49,8 @@ def create_dashboard_context(
         try:
             authoring_project = AuthoringProject.discover(project_path)
         except Exception:  # noqa: BLE001 - a non-authoring root is supported.
-            pass
+            if strict_authoring:
+                raise
         else:
             service = WorkflowService(
                 authoring_project.root,
@@ -62,10 +69,12 @@ def render_dashboard_home(
     tables: str | Path | None,
     *,
     csrf_token: str | None = None,
+    status_response: CommandResponse | None = None,
 ) -> str:
     token = csrf_token or secrets.token_urlsafe(32)
     try:
-        status_response = service.model_status() if service.is_authoring else None
+        if status_response is None and service.is_authoring:
+            status_response = service.model_status()
         runs = service.list_runs()
         advice = service.latest_advice()
         if status_response is not None:
@@ -85,46 +94,26 @@ def render_dashboard_home(
                 advice,
                 token,
             )
+        summary = '<div class="counts run-summary" data-view="overview">' + ''.join(
+            f'<div><strong>{label}</strong>{count}</div>'
+            for label, count in (
+                ("Total runs", len(runs)),
+                ("Successful", sum(getattr(run, "status", "") == "success" for run in runs)),
+                ("Failed", sum(getattr(run, "status", "") == "failed" for run in runs)),
+                ("Running", sum(getattr(run, "status", "") == "running" for run in runs)),
+            )
+        ) + '</div>'
+        main_content = summary + main_content
     except Exception:  # noqa: BLE001 - GET must remain a stable observability boundary.
         main_content = (
             '    <section><h2>Dashboard unavailable</h2><p class="failed">'
             "Model observability data could not be loaded safely.</p></section>"
         )
-    return f"""<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>IGESS Dashboard</title>
-  <style>
-    body {{ margin: 0; font-family: Segoe UI, Arial, sans-serif; background: #f5f7fa; color: #17202a; }}
-    main {{ max-width: 1180px; margin: 0 auto; padding: 24px; }}
-    section {{ background: white; border: 1px solid #d9e1ea; border-radius: 6px; padding: 18px; margin: 14px 0; }}
-    label {{ display: block; font-weight: 700; margin-bottom: 6px; }}
-    select, input {{ padding: 8px; min-width: 280px; }}
-    button {{ padding: 8px 12px; margin-top: 10px; cursor: pointer; }}
-    table {{ width: 100%; border-collapse: collapse; }}
-    th, td {{ border-bottom: 1px solid #e3e8ef; padding: 8px; text-align: left; }}
-    .ok, .ready, .runnable {{ color: #166534; }}
-    .failed {{ color: #991b1b; }}
-    .incomplete {{ color: #92400e; }}
-    .state-badge, .kind {{ display: inline-block; border: 1px solid currentColor; border-radius: 999px; padding: 2px 8px; font-weight: 700; }}
-    .kind {{ color: #334155; font-size: 0.85rem; }}
-    .actions {{ display: flex; flex-wrap: wrap; gap: 14px; align-items: end; }}
-    .actions form {{ border-left: 3px solid #d9e1ea; padding-left: 12px; }}
-    .counts {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; }}
-    .counts div {{ padding: 8px; background: #f8fafc; }}
-    code {{ overflow-wrap: anywhere; }}
-  </style>
-</head>
-<body>
-  <main>
-    <h1>IGESS Dashboard</h1>
-{main_content}
-  </main>
-</body>
-</html>
-"""
+    return dashboard_shell(
+        main_content,
+        str(getattr(service, "project_root", "Local project")),
+        "Authoring project" if service.is_authoring else "Configuration project",
+    )
 
 
 def _authoring_content(
@@ -139,7 +128,7 @@ def _authoring_content(
     counts = status.get("entity_counts")
     count_items = counts.items() if isinstance(counts, Mapping) else ()
     counts_html = "".join(
-        f"<div><strong>{_e(name)}</strong>: {_e(count)}</div>" for name, count in count_items
+        f"<div><strong>{_e(name)}</strong>{_e(count)}</div>" for name, count in count_items
     ) or "<p>No entities defined.</p>"
     missing_html = _issue_list(status.get("missing_requirements"), "No missing requirements.")
     warnings_html = _issue_list(status.get("warnings"), "No warnings.")
@@ -151,11 +140,11 @@ def _authoring_content(
         options = '<option value="" disabled>No scenarios available</option>'
     latest_change = _latest_change_panel(service.latest_change())
     latest_smoke = _latest_smoke_panel(status.get("latest_smoke_run_id"), runs)
-    return f"""    <section>
+    return f"""    <div class="overview-grid" data-view="overview"><section>
       <h2>Model status</h2>
       <p><span class="state-badge {_e(state)}">{_e(state)}</span> {_e(response.message)}</p>
-      <p>Digest: <code>{_e(status.get('model_digest'))}</code></p>
-      <a href="/status">View status JSON</a>
+      <details><summary>Model identity &amp; status JSON</summary><p>Digest: <code>{_e(status.get('model_digest'))}</code></p>
+      <a href="/status">View status JSON</a></details>
       <h3>Defined entities</h3>
       <div class="counts">{counts_html}</div>
       <h3>Missing requirements</h3>
@@ -167,32 +156,35 @@ def _authoring_content(
       <h2>Latest authoring activity</h2>
       {latest_change}
       {latest_smoke}
-    </section>
-    <section>
+    </section></div>
+    <section data-view="runs">
       <h2>Scenario actions</h2>
       <p>Manual scenario actions are recorded as <strong>formal</strong> runs. Automatic smoke records are created by successful rule application.</p>
       <div class="actions">
         <form action="/smoke" method="post">
           {_csrf_input(csrf_token)}
+          <label>Quick validation</label><p>Run the smoke scenario as a formal run.</p>
           <button type="submit">Run smoke scenario (formal)</button>
         </form>
         <form action="/formal" method="post">
           {_csrf_input(csrf_token)}
           <label for="scenario">Formal scenario</label>
           <select id="scenario" name="scenario">{options}</select>
-          <button type="submit">Run formal scenario</button>
+          <button type="submit" {"" if scenarios else "disabled data-unavailable"}>Run formal scenario</button>
         </form>
+
+      </div>
+    </section>
+    {_history_panel(runs)}
+    <section data-view="advice">
+      <h2>Latest advice</h2>
+      <p class="hint">Analyze a scenario and review recommendations before changing your tables.</p>
         <form action="/advise" method="post">
           {_csrf_input(csrf_token)}
           <label for="advice-scenario">Advice scenario</label>
           <select id="advice-scenario" name="scenario">{options}</select>
-          <button type="submit">Run advice (advice)</button>
+          <button type="submit" {"" if scenarios else "disabled data-unavailable"}>Run advice (advice)</button>
         </form>
-      </div>
-    </section>
-    {_history_panel(runs)}
-    <section>
-      <h2>Latest advice</h2>
       {_advice_panel(advice)}
     </section>"""
 
@@ -206,28 +198,41 @@ def _legacy_content(
     csrf_token: str,
 ) -> str:
     lint = service.lint(config or _SAMPLE_CONFIG, tables or _SAMPLE_TABLES)
-    return f"""    <section>
+    try:
+        scenarios = service.available_scenarios(config or _SAMPLE_CONFIG)
+        scenario_hint = "" if scenarios else "No scenarios configured. Add a scenario to the selected configuration, then refresh the model snapshot."
+    except Exception as error:  # noqa: BLE001 - keep diagnostics and history accessible.
+        scenarios = ()
+        scenario_hint = f"Could not load scenarios: {error}. Fix the configuration, then refresh the model snapshot."
+    options = "".join(
+        f'<option value="{_e(scenario)}">{_e(scenario)}</option>' for scenario in scenarios
+    ) or '<option value="" disabled>No scenarios available</option>'
+    disabled = "" if scenarios else "disabled data-unavailable"
+    hint = f'<p class="hint">{_e(scenario_hint)}</p>' if scenario_hint else ""
+    return f"""    <section data-view="overview">
       <h2>Diagnostics</h2>
       <p class="{'ok' if lint.ok else 'failed'}">{_e(lint.message)}</p>
       <p>Config: <code>{_e(config)}</code></p>
       <p>Tables: <code>{_e(tables)}</code></p>
     </section>
-    <section>
+    <section data-view="runs">
       <h2>Run Scenario</h2>
       <form action="/formal" method="post">
         {_csrf_input(csrf_token)}
         <label for="scenario">Scenario</label>
-        <input id="scenario" name="scenario" value="day_1_progression">
-        <button type="submit">Run formal scenario</button>
+        <select id="scenario" name="scenario">{options}</select>
+        {hint}
+        <button type="submit" {disabled}>Run formal scenario</button>
       </form>
     </section>
-    <section>
+    <section data-view="advice">
       <h2>Agent Analyst</h2>
       <form action="/advise" method="post">
         {_csrf_input(csrf_token)}
         <label for="advice-scenario">Scenario</label>
-        <input id="advice-scenario" name="scenario" value="day_1_progression">
-        <button type="submit">Run advice (advice)</button>
+        <select id="advice-scenario" name="scenario">{options}</select>
+        {hint}
+        <button type="submit" {disabled}>Run advice (advice)</button>
       </form>
       {_advice_panel(advice)}
     </section>
@@ -236,26 +241,37 @@ def _legacy_content(
 
 def _history_panel(runs: Sequence[object]) -> str:
     rows = "\n".join(
-        "        <tr>"
-        f"<td>{_e(getattr(record, 'run_id', ''))}</td>"
+        f'<tr data-run data-status="{_e(getattr(record, "status", ""))}" data-kind="{_e(getattr(record, "kind", "formal"))}">'
+        f"<td><code>{_e(getattr(record, 'run_id', ''))}</code></td>"
         f"<td>{_e(getattr(record, 'scenario_id', ''))}</td>"
         f"<td><span class=\"kind kind-{_e(getattr(record, 'kind', 'formal'))}\">{_e(getattr(record, 'kind', 'formal'))}</span></td>"
-        f"<td>{_e(getattr(record, 'status', ''))}</td>"
+        f'<td><span class="state-badge {_e(getattr(record, "status", ""))}">{_e(getattr(record, "status", ""))}</span></td>'
         f"<td>{_e(getattr(record, 'message', ''))}</td>"
-        f"<td><a href=\"/reports/{_e(getattr(record, 'run_id', ''))}/index.html\">report</a></td>"
+        f"<td><a href=\"/reports/{_e(getattr(record, 'run_id', ''))}/index.html\">report</a>"
+        + (f" · <a href=\"/diagnostics/{_e(getattr(record, 'run_id', ''))}\">diagnostic</a>" if getattr(record, 'status', '') == 'failed' else '')
+        + "</td>"
         "</tr>"
-        for record in runs
+        for record in sorted(runs, key=lambda item: getattr(item, 'run_id', ''), reverse=True)
     )
     if not rows:
-        rows = '        <tr><td colspan="6">No runs yet.</td></tr>'
-    return f"""    <section>
+        rows = '<tr><td colspan="6" class="empty-state"><strong>No runs yet.</strong>Choose a scenario above to create your first run.</td></tr>'
+    return f"""    <section data-view="runs">
       <h2>Unified run history</h2>
-      <table>
+      <p class="hint">Newest first · Formal runs, automatic smoke and advice share this history.</p>
+      <div class="history-toolbar">
+        <div class="search-field"><label for="history-search">Search runs</label><input type="search" id="history-search" placeholder="Run ID, scenario or message…"></div>
+        <div><label for="history-status">Status</label><select id="history-status"><option value="">All statuses</option><option value="success">Success</option><option value="failed">Failed</option><option value="running">Running</option></select></div>
+        <div><label for="history-kind">Kind</label><select id="history-kind"><option value="">All kinds</option><option value="formal">Formal</option><option value="smoke">Smoke</option><option value="advice">Advice</option></select></div>
+        <button type="button" id="clear-filters">Clear filters</button>
+      </div>
+      <p id="history-count" class="hint" role="status">{len(runs)} runs</p>
+      <div class="table-scroll" role="region" aria-label="Run history" tabindex="0"><table>
         <thead><tr><th>Run</th><th>Scenario</th><th>Kind</th><th>Status</th><th>Message</th><th>Report</th></tr></thead>
         <tbody>
 {rows}
         </tbody>
-      </table>
+      </table></div>
+      <p id="history-no-match" class="empty-state" hidden>No matching runs. Try a different search or clear the filters.</p>
     </section>"""
 
 
@@ -298,19 +314,8 @@ def serve_dashboard(
 ) -> None:
     if not _is_loopback_host(host):
         raise ValueError("Dashboard host must be a loopback address")
-    service, resolved_config, resolved_tables = create_dashboard_context(
-        project,
-        config,
-        tables,
-        runs_root,
-    )
-    handler = _handler(
-        service,
-        resolved_config,
-        resolved_tables,
-        csrf_token=secrets.token_urlsafe(32),
-        mutation_guard=BoundedSemaphore(1),
-    )
+    projects = discover_dashboard_projects(project, config, tables, runs_root)
+    handler = _handler(None, None, None, projects=projects)
     server = ThreadingHTTPServer((host, port), handler)
     print(f"IGESS dashboard running at http://{host}:{port}/")
     try:
@@ -321,6 +326,182 @@ def serve_dashboard(
         server.server_close()
 
 
+class _DashboardRuntime:
+    """Keep expensive workflow reads and writes outside HTTP request threads.
+
+    Snapshots are explicitly cached; polling never starts a model readiness check.
+    The mutation guard stays owned by the worker until execution has finished.
+    """
+
+    def __init__(self, service, config, tables, token, guard):
+        self.service, self.config, self.tables = service, config, tables
+        self.token, self.guard = token, guard
+        self.lock = Lock()
+        self.page = dashboard_shell('<section><h2>Checking model in background…</h2><p class="hint">You can inspect task status while the model check completes.</p></section>', str(getattr(service, 'project_root', 'Local project')), 'Loading project')
+        self.status = {"command": "model.status", "ok": False, "message": "Checking model in background"}
+        self.task = {"state": "idle", "message": "No task submitted in this server session."}
+        self.started = None
+        self.refreshing = False
+        self.refresh_pending = False
+        self.revision = 0
+        self.refresh()
+
+    def snapshot(self):
+        with self.lock:
+            elapsed = self.task.get("duration_seconds", round(monotonic() - self.started, 1) if self.started else 0)
+            return {**self.task, "elapsed_seconds": elapsed,
+                    "refreshing": self.refreshing, "revision": self.revision}
+
+    def refresh(self):
+        with self.lock:
+            if self.refreshing:
+                self.refresh_pending = True
+                return
+            self.refreshing = True
+        Thread(target=self._refresh, daemon=True).start()
+
+    def _refresh(self):
+        try:
+            response = self.service.model_status() if self.service.is_authoring else None
+            page = render_dashboard_home(self.service, self.config, self.tables,
+                                         csrf_token=self.token, status_response=response)
+            if response:
+                status = response.to_payload()
+            else:
+                lint = self.service.lint(self.config or _SAMPLE_CONFIG, self.tables or _SAMPLE_TABLES)
+                status = {"ok": lint.ok, "message": lint.message}
+        except Exception as error:  # noqa: BLE001 - retain a visible refresh error.
+            status = {"ok": False, "message": str(error)}
+            page = dashboard_shell('<section><h2>Model check failed</h2><p class="failed">' + _e(error) + '</p></section>', str(getattr(self.service, 'project_root', 'Local project')), 'Project unavailable')
+        with self.lock:
+            self.page, self.status = page, status
+            self.refreshing = False
+            self.revision += 1
+            pending = self.refresh_pending
+            self.refresh_pending = False
+        if pending:
+            self.refresh()
+
+    def submit(self, path, scenario):
+        if not self.guard.acquire(blocking=False):
+            return False
+        with self.lock:
+            self.started = monotonic()
+            self.task = {"state": "running", "message": "Task accepted; executing workflow (including any project lock wait).",
+                         "scenario": scenario, "action": path}
+        try:
+            Thread(target=self._execute, args=(path, scenario), daemon=True).start()
+        except Exception as error:
+            with self.lock:
+                self.task = {"state": "failed", "message": str(error)}
+            self.guard.release()
+        return True
+
+    def _execute(self, path, scenario):
+        outcome = {"state": "failed", "message": "Worker interrupted; check run history before retrying."}
+        try:
+            if path == "/advise":
+                result = self.service.run_advice(None if self.service.is_authoring else self.config,
+                                                 None if self.service.is_authoring else self.tables, scenario)
+            elif self.service.is_authoring:
+                result = self.service.run_authoring_scenario(scenario)
+            else:
+                result = self.service.run_scenario(self.config, self.tables, scenario)
+            if isinstance(result, CommandResponse):
+                outcome = {"state": "success" if result.ok else "failed", "message": result.message,
+                           "diagnostic": result.to_payload(), "run_id": result.result.get("run_id")}
+                diagnostic_id = result.details.get("diagnostic_id")
+                if not result.ok and isinstance(diagnostic_id, str):
+                    try:
+                        diagnostic = _read_diagnostic(self.service, diagnostic_id)
+                        error = diagnostic.get("primary_error", {})
+                        summary = str(error.get("message", ""))
+                        if summary:
+                            outcome["message"] += "\n" + str(error.get("error_type", "Error")) + ": " + summary[:2000]
+                    except (OSError, RuntimeError, ValueError, AttributeError):
+                        pass  # The workflow failure and diagnostic identifier remain visible.
+            else:
+                outcome = {"state": getattr(result, "status", "success"),
+                           "message": getattr(result, "message", "Task complete"),
+                           "run_id": getattr(result, "run_id", None)}
+        except Exception as error:  # noqa: BLE001 - expose exceptions as task failures.
+            outcome = {"state": "failed", "message": f"{type(error).__name__}: {error}"}
+        finally:
+            with self.lock:
+                self.task.update(outcome)
+                self.task["duration_seconds"] = round(monotonic() - self.started, 1)
+            self.guard.release()
+            self.refresh()
+
+    def home(self):
+        task = self.snapshot()
+        with self.lock:
+            page = self.page
+        panel = ('<section id="task-panel" aria-live="polite"><h2>Current task</h2>'
+                 '<p id="task-state" class="' + _e(task["state"]) + '">' + _e(task["state"]) + '</p><p id="task-message" style="white-space:pre-wrap">' + _e(task["message"]) + '</p>'
+                 '<p id="task-time"></p><a href="/task" target="_blank">Task details / diagnostics</a>'
+                 '<p id="connection-state"></p>'
+                 '<form action="/refresh" method="post">' + _csrf_input(self.token) +
+                 '<button type="submit">Refresh model snapshot</button></form>')
+        diagnostic_id = task.get("diagnostic", {}).get("details", {}).get("diagnostic_id")
+        if isinstance(diagnostic_id, str) and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,127}", diagnostic_id):
+            panel += '<p><a href="/diagnostics/' + diagnostic_id + '">Open failure diagnostic</a></p>'
+        if task.get("state") == "success" and task.get("run_id"):
+            panel += '<p><a href="/reports/' + _e(task['run_id']) + '/index.html">Open completed report</a></p>'
+        panel += '</section>'
+        script = """<script>
+const revision = REVISION;
+let previousState = STATE;
+function displayTask(t) {
+  document.querySelector('#task-state').textContent = t.state === 'idle' ? 'Ready for a new task' : t.state;
+  document.querySelector('#task-state').className = t.state;
+  document.querySelector('#task-message').textContent = t.message;
+  document.querySelector('#task-time').textContent = 'Elapsed: ' + (t.duration_seconds ?? t.elapsed_seconds) + ' s' + (t.refreshing ? ' — refreshing model snapshot in background' : ' — model snapshot is cached');
+  document.querySelectorAll('button[type=submit]').forEach(b => b.disabled = t.state === 'running' || b.hasAttribute('data-unavailable'));
+}
+document.querySelectorAll('form').forEach(f => f.addEventListener('submit', () => {
+  f.action = new URL(f.action).pathname + location.hash;
+  document.querySelector('#task-message').textContent = 'Submitting task…';
+  document.querySelectorAll('button[type=submit]').forEach(b => b.disabled = true);
+}));
+async function poll() {
+  try {
+    const r = await fetch('/task', {cache: 'no-store', signal: AbortSignal.timeout(4000)});
+    if (!r.ok) throw Error('HTTP ' + r.status);
+    const t = await r.json();
+    document.querySelector('#connection-state').textContent = '';
+    displayTask(t);
+    if (t.revision !== revision || (previousState === 'running' && t.state !== 'running')) { location.reload(); return; }
+    previousState = t.state;
+  } catch (e) { document.querySelector('#connection-state').textContent = 'Cannot reach dashboard. Task outcome is unknown; do not resubmit. ' + e.message; }
+  setTimeout(poll, 1000);
+}
+displayTask(INITIAL);
+poll();
+</script>"""
+        # Escape JSON for script context, independently of HTML text escaping.
+        script = script.replace('REVISION', str(task['revision'])).replace('STATE', json.dumps(task['state']))
+        script = script.replace('INITIAL', json.dumps(task).replace('<', '\\u003c'))
+        if '<div id="task-slot"></div>' in page:
+            page = page.replace('<div id="task-slot"></div>', panel)
+        else:
+            page = page.replace('<h1>IGESS Dashboard</h1>', '<h1>IGESS Dashboard</h1>' + panel)
+        return page.replace('</body>', script + '</body>')
+
+
+def _read_diagnostic(service, identifier):
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,127}", identifier):
+        raise ValueError("Invalid diagnostic identifier")
+    body = _read_bounded_relative_file(
+        Path(service.project_root), (".igess", "diagnostics", identifier + ".json"),
+        max_bytes=_MAX_REPORT_BYTES,
+    )
+    payload = json.loads(body)
+    if not isinstance(payload, dict):
+        raise ValueError("Invalid diagnostic")
+    return payload
+
+
 def _handler(
     service: WorkflowService,
     config: str | Path | None,
@@ -328,22 +509,98 @@ def _handler(
     *,
     csrf_token: str | None = None,
     mutation_guard: BoundedSemaphore | None = None,
+    projects=None,
 ):
     token = csrf_token or secrets.token_urlsafe(32)
     guard = mutation_guard or BoundedSemaphore(1)
+    runtime = _DashboardRuntime(service, config, tables, token, guard) if projects is None else None
+    catalog = {entry.key: entry for entry in projects or ()}
+    runtimes = {}
+    runtime_lock = Lock()
 
     class DashboardHandler(BaseHTTPRequestHandler):
+        def _select_project(self):
+            path = urlparse(self.path).path
+            self.prefix = ""
+            self.project_key = None
+            if not catalog:
+                self.runtime = runtime
+                return path
+            if path == "/":
+                self.send_response(HTTPStatus.SEE_OTHER)
+                self.send_header("Location", "/p/" + next(iter(catalog)) + "/")
+                self.end_headers()
+                return None
+            match = re.fullmatch(r"/p/([a-z0-9-]+)(/.*)?", path)
+            if match is None or match[1] not in catalog:
+                self.send_error(HTTPStatus.NOT_FOUND, "Unknown dashboard project")
+                return None
+            key = match[1]
+            self.prefix, self.project_key = "/p/" + key, key
+            if match[2] is None:
+                self.send_response(HTTPStatus.SEE_OTHER)
+                self.send_header("Location", self.prefix + "/")
+                self.end_headers()
+                return None
+            with runtime_lock:
+                if key not in runtimes:
+                    entry = catalog[key]
+                    try:
+                        context = create_dashboard_context(
+                            entry.root, entry.config, entry.tables, entry.runs_root,
+                            strict_authoring=entry.config is None and entry.tables is None,
+                        )
+                    except Exception as error:  # noqa: BLE001 - retain the project switcher on failure.
+                        self._send_html(self._mount_page(dashboard_shell(
+                            '<section><h2>Project unavailable</h2><p class="failed">' + _e(error) +
+                            '</p><p>Fix the project files and reload, or select another project.</p></section>',
+                            str(entry.root), 'Project unavailable',
+                        )))
+                        return None
+                    runtimes[key] = _DashboardRuntime(*context, secrets.token_urlsafe(32), BoundedSemaphore(1))
+                self.runtime = runtimes[key]
+            return match[2]
+
+        def _home(self):
+            return self._mount_page(self.runtime.home())
+
+        def _mount_page(self, page):
+            if not catalog:
+                return page
+            # Only known application routes are mounted; report-relative assets
+            # keep resolving within their own project-qualified report directory.
+            for route in ("status", "task", "reports/", "diagnostics/", "refresh", "smoke", "formal", "run", "advise"):
+                page = page.replace('href="/' + route, 'href="' + self.prefix + '/' + route)
+                page = page.replace('action="/' + route, 'action="' + self.prefix + '/' + route)
+            page = page.replace("fetch('/task'", "fetch('" + self.prefix + "/task'")
+            options = ''.join(
+                '<option value="/p/' + key + '/"' + (' selected' if key == self.project_key else '') + '>' + _e(entry.label) + '</option>'
+                for key, entry in catalog.items()
+            )
+            picker = '<label for="project-picker">Project</label><select id="project-picker" aria-label="Project">' + options + '</select>'
+            page = page.replace('<!-- project-picker -->', picker)
+            return page
+
         def do_GET(self) -> None:  # noqa: N802 - stdlib handler API.
-            parsed = urlparse(self.path)
+            path = self._select_project()
+            if path is None:
+                return
+            parsed = urlparse(path)
             if parsed.path == "/":
-                self._send_html(
-                    render_dashboard_home(
-                        service,
-                        config,
-                        tables,
-                        csrf_token=token,
-                    )
-                )
+                self._send_html(self._home())
+                return
+            if parsed.path == "/task":
+                self._send_json(self.runtime.snapshot())
+                return
+            if parsed.path.startswith("/diagnostics/"):
+                identifier = parsed.path.removeprefix("/diagnostics/")
+                if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,127}", identifier):
+                    self.send_error(HTTPStatus.NOT_FOUND)
+                    return
+                try:
+                    self._send_json(_read_diagnostic(self.runtime.service, identifier))
+                except (OSError, RuntimeError, ValueError):
+                    self.send_error(HTTPStatus.NOT_FOUND, "No saved diagnostic for this run")
                 return
             if parsed.path == "/status":
                 self._send_status()
@@ -359,7 +616,10 @@ def _handler(
             self.send_error(HTTPStatus.NOT_FOUND)
 
         def do_POST(self) -> None:  # noqa: N802 - stdlib handler API.
-            parsed = urlparse(self.path)
+            path = self._select_project()
+            if path is None:
+                return
+            parsed = urlparse(path)
             if parsed.path not in _MUTATION_PATHS:
                 self.send_error(HTTPStatus.NOT_FOUND)
                 return
@@ -372,38 +632,22 @@ def _handler(
             if (
                 not self._host_is_local()
                 or not self._origin_is_same()
-                or not secrets.compare_digest(supplied_token, token)
+                or not secrets.compare_digest(supplied_token, self.runtime.token)
             ):
                 self.send_error(HTTPStatus.FORBIDDEN)
                 return
-            if not guard.acquire(blocking=False):
+            if parsed.path == "/refresh":
+                self.runtime.refresh()
+                self.send_response(HTTPStatus.SEE_OTHER)
+                self.send_header("Location", self.prefix + "/")
+                self.end_headers()
+                return
+            scenario = "smoke" if parsed.path == "/smoke" else form.get("scenario", ["day_1_progression"])[0]
+            if not self.runtime.submit(parsed.path, scenario):
                 self.send_error(HTTPStatus.TOO_MANY_REQUESTS)
                 return
-            try:
-                try:
-                    scenario = form.get("scenario", ["day_1_progression"])[0]
-                    if parsed.path == "/smoke":
-                        if service.is_authoring:
-                            service.run_authoring_scenario("smoke")
-                        else:
-                            service.run_scenario(config, tables, "smoke")
-                    elif parsed.path in {"/formal", "/run"}:
-                        if service.is_authoring:
-                            service.run_authoring_scenario(scenario)
-                        else:
-                            service.run_scenario(config, tables, scenario)
-                    else:
-                        service.run_advice(
-                            None if service.is_authoring else config,
-                            None if service.is_authoring else tables,
-                            scenario,
-                        )
-                except Exception:  # noqa: BLE001 - operation services persist their failures.
-                    pass
-            finally:
-                guard.release()
             self.send_response(HTTPStatus.SEE_OTHER)
-            self.send_header("Location", "/")
+            self.send_header("Location", self.prefix + "/")
             self.end_headers()
 
         def log_message(self, format: str, *args) -> None:  # noqa: A002
@@ -442,17 +686,14 @@ def _handler(
             )
 
         def _send_status(self) -> None:
-            response = service.model_status() if service.is_authoring else None
-            if response is not None:
-                body = response.to_json().encode("utf-8")
-            else:
-                lint = service.lint(config or _SAMPLE_CONFIG, tables or _SAMPLE_TABLES)
-                body = json.dumps(
-                    {"ok": lint.ok, "message": lint.message},
-                    ensure_ascii=False,
-                    separators=(",", ":"),
-                ).encode("utf-8")
+            with self.runtime.lock:
+                payload = {**self.runtime.status, "cached": True, "refreshing": self.runtime.refreshing}
+            self._send_json(payload)
+
+        def _send_json(self, payload) -> None:
+            body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
             self.send_response(HTTPStatus.OK)
+            self.send_header("Cache-Control", "no-store")
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
@@ -467,7 +708,7 @@ def _handler(
             self.wfile.write(encoded)
 
         def _send_report_file(self, relative: str) -> None:
-            status, content_type, body = send_report_file_response(service, relative)
+            status, content_type, body = send_report_file_response(self.runtime.service, relative)
             self.send_response(int(status))
             self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(body)))

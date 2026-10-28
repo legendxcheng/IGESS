@@ -140,6 +140,10 @@ class WorkflowService:
             profile_id=profile_id,
         )
 
+    def available_scenarios(self, config: str | Path) -> tuple[str, ...]:
+        """Read scenario identities from the selected rules without running a model."""
+        return tuple(ConfigLoader.load_rules_only(self._path(config)).rules.scenarios)
+
     def lint(self, config: str | Path, tables: str | Path) -> WorkflowResult:
         try:
             raw = ConfigLoader.load(self._path(config), self._path(tables))

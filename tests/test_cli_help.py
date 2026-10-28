@@ -72,13 +72,13 @@ CRITICAL_HELP_CASES = (
     (
         "dashboard",
         (
-            ("project", "IGESS project root directory."),
+            ("project", "Project or workspace root; discovers projects/ and examples/ for the web project switcher."),
             ("config", "Economy YAML path, relative to the project root by default."),
             (
                 "tables",
                 "Exported table directory, relative to the project root by default.",
             ),
-            ("runs_root", "Optional directory used to discover simulation runs."),
+            ("runs_root", "Optional history parent directory; each dashboard project uses its own subdirectory."),
             ("host", "Dashboard bind address."),
             ("port", "Dashboard TCP port."),
         ),

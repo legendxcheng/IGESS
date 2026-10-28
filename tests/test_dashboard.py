@@ -1,6 +1,7 @@
 import json
 import subprocess
 import sys
+import time
 from concurrent.futures import ThreadPoolExecutor
 from http import HTTPStatus
 from http.client import HTTPConnection
@@ -26,6 +27,168 @@ from igess.workflows import WorkflowService
 
 CONFIG = "examples/shelldiver_v0/economy.yaml"
 TABLES = "examples/shelldiver_v0/luban_exports"
+
+
+def test_configuration_dashboard_uses_configured_scenario_selects(tmp_path):
+    import yaml
+
+    config = yaml.safe_load(Path(CONFIG).read_text(encoding="utf-8"))
+    scenario = next(iter(config["scenarios"].values()))
+    config["scenarios"] = {"custom<scenario": scenario, "another_scenario": scenario}
+    path = tmp_path / "custom.yaml"
+    path.write_text(yaml.safe_dump(config), encoding="utf-8")
+    service = WorkflowService(project_root=".", runs_root=tmp_path / "runs")
+    body = render_dashboard_home(service, path, TABLES)
+    for field in ("scenario", "advice-scenario"):
+        assert f'<select id="{field}" name="scenario">' in body
+        assert f'<input id="{field}"' not in body
+    assert body.count('<option value="custom&lt;scenario">custom&lt;scenario</option>') == 2
+    assert body.count('<option value="another_scenario">another_scenario</option>') == 2
+    assert '<option value="day_1_progression">' not in body
+
+
+@pytest.mark.parametrize("invalid", [False, True])
+def test_configuration_dashboard_unavailable_scenarios_disable_actions(tmp_path, invalid):
+    import yaml
+
+    config = yaml.safe_load(Path(CONFIG).read_text(encoding="utf-8"))
+    config["scenarios"] = {}
+    path = tmp_path / "empty.yaml"
+    path.write_text("[invalid yaml" if invalid else yaml.safe_dump(config), encoding="utf-8")
+    service = WorkflowService(project_root=".", runs_root=tmp_path / "runs")
+    body = render_dashboard_home(service, path, TABLES)
+    assert body.count('disabled data-unavailable') == 2
+    assert body.count('No scenarios available</option>') == 2
+    assert 'Dashboard unavailable' not in body
+
+
+def test_dashboard_accepts_slow_run_and_keeps_reads_responsive(tmp_path):
+    service = _DashboardService(tmp_path)
+    entered, release = Event(), Event()
+
+    def slow_run(scenario):
+        entered.set()
+        assert release.wait(5)
+        return CommandResponse("model.simulate", False, "simulation_failed", "Injected failure")
+
+    service.run_authoring_scenario = slow_run
+    server = ThreadingHTTPServer(("127.0.0.1", 0), dashboard._handler(service, None, None, csrf_token="token"))
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    connection = HTTPConnection("127.0.0.1", server.server_port, timeout=0.8)
+    try:
+        connection.request("POST", "/formal", urlencode({"_csrf": "token", "scenario": "day_1"}))
+        response = connection.getresponse()
+        response.read()
+        assert response.status == HTTPStatus.SEE_OTHER
+        assert entered.wait(1)
+        for path in ("/", "/status", "/task"):
+            connection.request("GET", path)
+            response = connection.getresponse()
+            body = response.read()
+            assert response.status == HTTPStatus.OK
+            if path == "/task":
+                assert json.loads(body)["state"] == "running"
+        connection.request("POST", "/formal", urlencode({"_csrf": "token"}))
+        response = connection.getresponse()
+        response.read()
+        assert response.status == HTTPStatus.TOO_MANY_REQUESTS
+    finally:
+        release.set()
+        connection.close()
+        server.shutdown()
+        server.server_close()
+        thread.join(5)
+
+
+@pytest.mark.parametrize("failure", ["response", "exception", "report"])
+def test_dashboard_failure_is_visible_after_refresh_and_allows_next_task(tmp_path, failure):
+    service = _DashboardService(tmp_path)
+
+    def fail(scenario):
+        if failure == "exception":
+            raise RuntimeError("Injected <failure>")
+        if failure == "report":
+            return SimpleNamespace(status="failed", message="Injected <failure>: report", run_id="report-failed")
+        return CommandResponse("model.simulate", False, "simulation_failed", "Injected <failure>",
+                               details={"diagnostic_id": "test-failure"})
+
+    service.run_authoring_scenario = fail
+    runtime = dashboard._DashboardRuntime(service, None, None, "token", BoundedSemaphore(1))
+    assert runtime.submit("/formal", "day_1")
+    deadline = time.monotonic() + 3
+    while runtime.snapshot()["state"] == "running" and time.monotonic() < deadline:
+        time.sleep(0.01)
+    task = runtime.snapshot()
+    assert task["state"] == "failed"
+    assert "Injected <failure>" in task["message"]
+    assert "Injected &lt;failure&gt;" in runtime.home()
+    assert "Task details / diagnostics" in runtime.home()
+    if failure == "response":
+        assert '/diagnostics/test-failure' in runtime.home()
+    assert runtime.submit("/formal", "day_1")
+
+
+def test_dashboard_slow_model_check_does_not_block_http_or_repeat_on_poll(tmp_path):
+    service = _DashboardService(tmp_path)
+    entered, release = Event(), Event()
+    original = service.model_status
+    calls = []
+
+    def slow_status():
+        calls.append(True)
+        entered.set()
+        assert release.wait(5)
+        return original()
+
+    service.model_status = slow_status
+    server = ThreadingHTTPServer(("127.0.0.1", 0), dashboard._handler(service, None, None))
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    connection = HTTPConnection("127.0.0.1", server.server_port, timeout=0.8)
+    try:
+        assert entered.wait(1)
+        for path in ("/", "/status", "/task", "/status", "/"):
+            connection.request("GET", path)
+            response = connection.getresponse()
+            response.read()
+            assert response.status == HTTPStatus.OK
+        assert len(calls) == 1
+    finally:
+        release.set()
+        connection.close()
+        server.shutdown()
+        server.server_close()
+        thread.join(5)
+
+
+def test_dashboard_reads_saved_diagnostic_summary_without_following_links(tmp_path):
+    service = _DashboardService(tmp_path)
+    service.project_root = tmp_path
+    diagnostics = tmp_path / '.igess' / 'diagnostics'
+    diagnostics.mkdir(parents=True)
+    path = diagnostics / 'failed-run.json'
+    path.write_text(json.dumps({'primary_error': {'error_type': 'ValueError', 'message': 'Invalid inventory key'}}))
+    service.run_authoring_scenario = lambda scenario: CommandResponse(
+        'model.simulate', False, 'simulation_failed', 'Simulation failed',
+        details={'diagnostic_id': 'failed-run'})
+    runtime = dashboard._DashboardRuntime(service, None, None, 'token', BoundedSemaphore(1))
+    runtime.submit('/formal', 'day_1')
+    deadline = time.monotonic() + 3
+    while runtime.snapshot()['state'] == 'running' and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert 'ValueError: Invalid inventory key' in runtime.home()
+    with pytest.raises(ValueError):
+        dashboard._read_diagnostic(service, '../failed-run')
+    outside = tmp_path / 'outside.json'
+    outside.write_text('{"secret": true}')
+    path.unlink()
+    try:
+        path.symlink_to(outside)
+    except OSError:
+        pytest.skip('symlink creation unavailable')
+    with pytest.raises((OSError, ValueError)):
+        dashboard._read_diagnostic(service, 'failed-run')
 
 
 def test_workflow_service_lints_runs_reports_and_lists_history(tmp_path):
@@ -211,7 +374,10 @@ def test_authoring_dashboard_renders_read_only_observability_with_escaped_values
     assert "resource&lt;script&gt;" in body
     assert "gold&lt;script&gt;" in body
     assert "day&lt;1" in body
-    assert "<script>" not in body
+    # Only the trusted UI controller is executable; model values stay escaped.
+    assert body.count("<script>") == 1
+    assert "resource<script>" not in body
+    assert "gold<script>" not in body
     assert body.index("First &lt;missing&gt;") < body.index("Second &amp; missing")
     assert "Recovered &lt;journal&gt;" in body
     assert "Exports are stale &amp; old" in body
@@ -758,3 +924,60 @@ def test_report_reader_does_not_follow_file_swapped_after_validation(tmp_path):
 
     assert status == HTTPStatus.NOT_FOUND
     assert b"must-not-leak" not in body
+
+
+def test_dashboard_empty_scenarios_disable_only_scenario_dependent_actions(tmp_path):
+    from html.parser import HTMLParser
+
+    class Buttons(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.form = None
+            self.buttons = {}
+
+        def handle_starttag(self, tag, attrs):
+            attrs = dict(attrs)
+            if tag == "form":
+                self.form = attrs.get("action")
+            elif tag == "button" and attrs.get("type") == "submit":
+                self.buttons[self.form] = attrs
+
+        def handle_endtag(self, tag):
+            if tag == "form":
+                self.form = None
+
+    service = _DashboardService(tmp_path)
+    response = service.model_status()
+    response = CommandResponse(
+        "model.status", True, "status", "No scenarios configured",
+        result={**response.result, "available_scenarios": []},
+    )
+    parser = Buttons()
+    parser.feed(render_dashboard_home(service, None, None, status_response=response))
+    for action in ("/formal", "/advise"):
+        assert "disabled" in parser.buttons[action]
+        assert "data-unavailable" in parser.buttons[action]
+
+
+def test_dashboard_history_filter_attributes_escape_untrusted_values(tmp_path):
+    from html.parser import HTMLParser
+
+    class Rows(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.rows = []
+
+        def handle_starttag(self, tag, attrs):
+            attrs = dict(attrs)
+            if tag == "tr" and "data-run" in attrs:
+                self.rows.append(attrs)
+
+    service = _DashboardService(tmp_path)
+    malicious = '\" onmouseover=\"alert(1)'
+    service._runs[0].status = malicious
+    service._runs[0].kind = malicious
+    parser = Rows()
+    parser.feed(render_dashboard_home(service, None, None))
+    row = next(row for row in parser.rows if row["data-status"] == malicious)
+    assert row["data-kind"] == malicious
+    assert "onmouseover" not in row

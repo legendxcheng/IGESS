@@ -157,9 +157,18 @@ formula/source evidence sections.
 
 ### Dashboard
 
-`dashboard` starts a local stdlib HTTP server. It can lint the configured project,
-run the sample scenario, persist run history under `.igess/runs`, and open the
-generated static report for each run.
+`dashboard --project .` starts a local multi-project server. Use the sidebar
+Project selector to switch between direct children of `projects/` and `examples/`
+that contain `economy.yaml`; the retired `projects/fish` is excluded. Starting
+with a specific project selects it first and discovers its workspace siblings.
+New projects are discovered on server restart.
+
+Each project has its own scenario list, cached model status, active task and run
+history. Switching projects does not cancel a running task. Project-qualified
+URLs also allow independent browser tabs and keep report links bound to the
+correct project. Authoring projects retain their source-based readiness checks.
+By default history stays in each project's existing registry; `--runs-root`
+uses a separate `<project-key>` subdirectory for each project's new runs.
 
 ### Comparison
 
