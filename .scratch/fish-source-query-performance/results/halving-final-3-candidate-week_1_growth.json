@@ -1,0 +1,77 @@
+{
+  "variant": "candidate",
+  "scenario": "week_1_growth",
+  "tag": "halving-final-3",
+  "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]",
+  "platform": "Windows-10-10.0.26200-SP0",
+  "timings": {
+    "artifacts": 0.3894818000262603,
+    "report": 0.7782412000233307,
+    "total": 228.01523300004192
+  },
+  "response": {
+    "schema_version": 1,
+    "command": "model.simulate",
+    "ok": true,
+    "code": "simulated",
+    "message": "Simulation complete: week_1_growth",
+    "details": {},
+    "result": {
+      "change_id": null,
+      "engine_id": "fish_source",
+      "kind": "formal",
+      "model_digest": "sha256:a511a2e6caf80f6cc8595d02379a9611197b24d9062236a99d37ec0c98839ce1",
+      "output_dir": "E:\\IGESS\\.tmp\\fish-query-perf\\candidate-project\\runs\\20261028T155423437495Z-week_1_growth\\output",
+      "report_index": "E:\\IGESS\\.tmp\\fish-query-perf\\candidate-project\\runs\\20261028T155423437495Z-week_1_growth\\report\\index.html",
+      "run_id": "20261028T155423437495Z-week_1_growth",
+      "scenario_id": "week_1_growth",
+      "status": "success"
+    }
+  },
+  "source_runtime": {
+    "advance_mode": "equivalent_batch_v1",
+    "code_sha256": "23a45a1197980527db6d624ce0179acb3b31975cf3a311f54bc8b7e330bc9a6f",
+    "codex_claim_policy": "stable_reward_id_one_second_v1",
+    "collect_interval_seconds": 300,
+    "generated_money_definition": "source_collected_slot_receipts_plus_current_unclaimed",
+    "gun_claim_seconds": 1,
+    "gun_equip_seconds": 1,
+    "gun_policy": "claim_stable_reward_id_then_highest_source_attack_v1",
+    "idle_seconds": 30,
+    "in_fishing_area": true,
+    "integration_code_sha256": "a0d854cf640ab5557f6dff099a2f354340259263143ba5bfdf3cf99f15db72ff",
+    "landing_distance_cm": null,
+    "landing_policy": "source_natural_v1",
+    "lua_executable": "lua55",
+    "lua_version": "Lua 5.5",
+    "online_acquisition_definition": "observed_balance_increases_plus_receipt_spending_excludes_offline_claims",
+    "policy": "source_priority_v1",
+    "record_interval_seconds": 300,
+    "sampling_time_basis": "online",
+    "selected_export_root": "E:\\IGESS\\.tmp\\fish-query-perf\\baseline-source\\igess_export\\json",
+    "selected_export_sha256": "23703281785e79924386963c5b040eeecdceb325e91b01ce069a1e2e4a7b51ca",
+    "tide_policy": {
+      "competition": "not_simulated",
+      "duration_seconds": 120,
+      "eggs": 5,
+      "gun_damage_affects_yield": false,
+      "model": "fixed_successful_eggs_v1",
+      "reloads": 6
+    },
+    "tide_schedule": {
+      "interval_seconds": 600,
+      "policy": "absolute_opening_only_v1",
+      "room_origin_seconds": 0,
+      "spawn_window_seconds": 120
+    },
+    "timings_seconds": {
+      "adapter_total": 223.851,
+      "checkpoint": 0.442,
+      "input_check": 0.208,
+      "process_close": 0.284,
+      "process_start": 1.198,
+      "source_execution": 221.72
+    }
+  },
+  "final_observation": "E:\\IGESS\\.tmp\\fish-query-perf\\candidate-project\\runs\\20261028T155423437495Z-week_1_growth\\final_observation.json"
+}

@@ -73,3 +73,10 @@ uv run igess model simulate --project projects/fish_source --scenario day_1_grow
 宿主库存投影聚合源分页并返回真实 `capacity`，不将每页 50 条当成总容量；`source_progression` 保存期末鱼库存、蛋库存与满鱼包孵化阻塞。金额 DTO 在策略报价比较、timeline、收入与报告保留源 BigNumber 精度，包括超过 80 位的系数。受控联合回归覆盖免费图鉴枪链、实际第四区落点后的资助、换弹与逐蛋通知待完成的跨进程恢复；最终生产基线与审查证据见 [实施票 07](../../.scratch/fish-source-unlocks-and-tides/issues/07-formal-baselines.md)。
 
 源换弹延迟结算为退款时，回执用非负 `materialSpent` / `materialRefunded` 分列本次扣款与退款，累计净支出和累计退款另行保留；退款回冲鱼潮净支出，不计为加工或图鉴收入。跨进程重试沿用同一操作身份，已结算退款不重复入账。
+
+
+## 查询性能优化
+
+源宿主共享单次观察快照和完整校验，缓存鱼厅稳定投影，一次构造完整背包，并直接获取幸运映射；同次计算复用相同鱼组合的纯结果。精确大数分块运算和 JSON 编码减少内部开销，保留精度、随机、操作时点、采样、回执及恢复身份；可变返回值仍隔离。
+
+源接口与缓存契约见 `<source>/simulation/README.md` 的“查询性能与隔离”；配对测速、完整最终状态及恢复证据见[查询性能验证](../../.scratch/fish-source-query-performance/verification.md)。本地源码更新不代表 GameBalancer 运行包已发布。

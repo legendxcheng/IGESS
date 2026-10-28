@@ -578,7 +578,7 @@ class _ProfileRun:
         if target != self.state["time"]:
             self._advance_to(target)
 
-    def _advance_to(self, target: int, *, include_luck: bool = False) -> None:
+    def _advance_to(self, target: int, *, include_luck: bool = True) -> None:
         # Source hatching can unlock codex entries between report samples.
         # Observe its deadline independently of the sampling cadence.
         while self.state["online"]:
@@ -625,7 +625,7 @@ class _ProfileRun:
             self.scenario.id, self.profile.id, int(self.state["time"]),
             op, target, {"receipt": json.dumps(receipt, ensure_ascii=False, sort_keys=True)},
         ))
-        self.state = self.runtime.request({"op": "query", "includeLuck": False})
+        self.state = self.runtime.request({"op": "query", "includeLuck": True})
         self.last_receipt = receipt
         self.income.observe(before, self.state, op=op, receipt=receipt)
         self._observe_codex(before)
