@@ -1,0 +1,878 @@
+{
+  "identity": {
+    "source": "23a45a1197980527db6d624ce0179acb3b31975cf3a311f54bc8b7e330bc9a6f",
+    "data": "23703281785e79924386963c5b040eeecdceb325e91b01ce069a1e2e4a7b51ca",
+    "adapter": "6d86a039690cab8fe468c0c8e3857dc12346ade7f5126964f1c9a7f92ce80b87"
+  },
+  "wall": 215.453647599963,
+  "python_cpu": 19.75,
+  "requests": {
+    "capabilities": {
+      "count": 2,
+      "wall": 0.5493916999548674,
+      "python_cpu": 0.0
+    },
+    "create": {
+      "count": 2,
+      "wall": 3.3126548000145704,
+      "python_cpu": 0.0
+    },
+    "query_actions": {
+      "count": 1724,
+      "wall": 7.429239600896835,
+      "python_cpu": 1.34375
+    },
+    "prepare_throw": {
+      "count": 544,
+      "wall": 5.295850301161408,
+      "python_cpu": 0.375
+    },
+    "query": {
+      "count": 7573,
+      "wall": 93.07532899949001,
+      "python_cpu": 2.75
+    },
+    "begin_throw_flight": {
+      "count": 544,
+      "wall": 1.6422281004488468,
+      "python_cpu": 0.484375
+    },
+    "advance": {
+      "count": 2702,
+      "wall": 76.00730580143863,
+      "python_cpu": 2.34375
+    },
+    "select_throw_landing": {
+      "count": 544,
+      "wall": 2.493269000086002,
+      "python_cpu": 0.5
+    },
+    "finalize_throw_landing": {
+      "count": 544,
+      "wall": 0.5675718002021313,
+      "python_cpu": 0.40625
+    },
+    "complete_throw": {
+      "count": 544,
+      "wall": 1.7874412002856843,
+      "python_cpu": 0.5625
+    },
+    "claim_fish_reward": {
+      "count": 117,
+      "wall": 0.4787012000451796,
+      "python_cpu": 0.0625
+    },
+    "deploy_fish": {
+      "count": 24,
+      "wall": 0.021980299963615835,
+      "python_cpu": 0.015625
+    },
+    "collect_slot": {
+      "count": 159,
+      "wall": 0.2767051003756933,
+      "python_cpu": 0.109375
+    },
+    "upgrade_fish": {
+      "count": 168,
+      "wall": 0.20134990039514378,
+      "python_cpu": 0.125
+    },
+    "start_exercise": {
+      "count": 565,
+      "wall": 0.9794815002242103,
+      "python_cpu": 0.375
+    },
+    "stop_exercise": {
+      "count": 565,
+      "wall": 5.497991400363389,
+      "python_cpu": 0.40625
+    },
+    "upgrade_hall": {
+      "count": 19,
+      "wall": 0.022133499966003,
+      "python_cpu": 0.0
+    },
+    "synthesize_barbell": {
+      "count": 5,
+      "wall": 0.007817099918611348,
+      "python_cpu": 0.0
+    },
+    "rebirth_strength": {
+      "count": 4,
+      "wall": 0.007593600021209568,
+      "python_cpu": 0.015625
+    },
+    "claim_gun_reward": {
+      "count": 8,
+      "wall": 0.05500749993370846,
+      "python_cpu": 0.0
+    },
+    "equip_gun": {
+      "count": 2,
+      "wall": 0.0019505000091157854,
+      "python_cpu": 0.0
+    },
+    "start_tide": {
+      "count": 76,
+      "wall": 0.764949000091292,
+      "python_cpu": 0.09375
+    },
+    "go_offline": {
+      "count": 7,
+      "wall": 0.004973299917764962,
+      "python_cpu": 0.03125
+    },
+    "go_online": {
+      "count": 6,
+      "wall": 0.07275940006366,
+      "python_cpu": 0.03125
+    },
+    "claim_offline_reward": {
+      "count": 6,
+      "wall": 0.024734899925533682,
+      "python_cpu": 0.015625
+    },
+    "start_breakthrough": {
+      "count": 13,
+      "wall": 0.021536000072956085,
+      "python_cpu": 0.0
+    },
+    "purchase_torpedo": {
+      "count": 6,
+      "wall": 0.011221100052352995,
+      "python_cpu": 0.0
+    },
+    "complete_tide": {
+      "count": 9,
+      "wall": 0.18257249996531755,
+      "python_cpu": 0.015625
+    },
+    "rebirth_trash_man": {
+      "count": 3,
+      "wall": 0.0057271000114269555,
+      "python_cpu": 0.0
+    },
+    "sell_fish": {
+      "count": 389,
+      "wall": 0.745197600510437,
+      "python_cpu": 0.328125
+    },
+    "checkpoint": {
+      "count": 1,
+      "wall": 0.334796900046058,
+      "python_cpu": 0.015625
+    }
+  },
+  "python_json": {
+    "count": 16875,
+    "seconds": 5.711614198808093,
+    "bytes": 477085897
+  },
+  "lua_runs": [
+    {
+      "capabilities/dispatch": {
+        "bytes": 0,
+        "count": 1,
+        "seconds": 0.0
+      },
+      "capabilities/json.Encode": {
+        "bytes": 982,
+        "count": 1,
+        "seconds": 0.0010000000000000009
+      },
+      "create/archive.GetSnapshot": {
+        "bytes": 0,
+        "count": 8,
+        "seconds": 0.0
+      },
+      "create/dispatch": {
+        "bytes": 0,
+        "count": 1,
+        "seconds": 1.6869999999999998
+      },
+      "create/fish.CalculateProductionSnapshot": {
+        "bytes": 0,
+        "count": 3,
+        "seconds": 0.0
+      },
+      "create/inventory.BuildAll": {
+        "bytes": 0,
+        "count": 1,
+        "seconds": 0.0
+      },
+      "create/json.Encode": {
+        "bytes": 19477,
+        "count": 1,
+        "seconds": 0.0
+      },
+      "create/schema.Clone": {
+        "bytes": 0,
+        "count": 84,
+        "seconds": 0.0
+      },
+      "create/schema.Validate": {
+        "bytes": 0,
+        "count": 9,
+        "seconds": 0.0009999999999998899
+      }
+    },
+    {
+      "advance/archive.GetSnapshot": {
+        "bytes": 0,
+        "count": 5056,
+        "seconds": 1.4430000000001688
+      },
+      "advance/dispatch": {
+        "bytes": 0,
+        "count": 2702,
+        "seconds": 75.59099999999991
+      },
+      "advance/fish.CalculateProductionSnapshot": {
+        "bytes": 0,
+        "count": 5587,
+        "seconds": 13.380000000000834
+      },
+      "advance/json.Encode": {
+        "bytes": 332011,
+        "count": 2702,
+        "seconds": 0.05000000000000471
+      },
+      "advance/schema.Clone": {
+        "bytes": 0,
+        "count": 16360,
+        "seconds": 4.773000000000389
+      },
+      "advance/schema.Validate": {
+        "bytes": 0,
+        "count": 11239,
+        "seconds": 12.051000000000082
+      },
+      "begin_throw_flight/dispatch": {
+        "bytes": 0,
+        "count": 544,
+        "seconds": 1.5280000000002198
+      },
+      "begin_throw_flight/json.Encode": {
+        "bytes": 566669,
+        "count": 544,
+        "seconds": 0.03100000000002545
+      },
+      "capabilities/dispatch": {
+        "bytes": 0,
+        "count": 1,
+        "seconds": 0.0
+      },
+      "capabilities/json.Encode": {
+        "bytes": 982,
+        "count": 1,
+        "seconds": 0.0
+      },
+      "checkpoint/dispatch": {
+        "bytes": 0,
+        "count": 1,
+        "seconds": 0.0
+      },
+      "checkpoint/json.Encode": {
+        "bytes": 4728723,
+        "count": 1,
+        "seconds": 0.30400000000000205
+      },
+      "claim_fish_reward/dispatch": {
+        "bytes": 0,
+        "count": 117,
+        "seconds": 0.4630000000000216
+      },
+      "claim_fish_reward/json.Encode": {
+        "bytes": 71724,
+        "count": 117,
+        "seconds": 0.0020000000000024443
+      },
+      "claim_fish_reward/schema.Clone": {
+        "bytes": 0,
+        "count": 702,
+        "seconds": 0.1019999999999317
+      },
+      "claim_fish_reward/schema.Validate": {
+        "bytes": 0,
+        "count": 351,
+        "seconds": 0.2740000000000409
+      },
+      "claim_gun_reward/archive.GetSnapshot": {
+        "bytes": 0,
+        "count": 8,
+        "seconds": 0.0009999999999976694
+      },
+      "claim_gun_reward/dispatch": {
+        "bytes": 0,
+        "count": 8,
+        "seconds": 0.05500000000000682
+      },
+      "claim_gun_reward/json.Encode": {
+        "bytes": 4089,
+        "count": 8,
+        "seconds": 0.000999999999990564
+      },
+      "claim_gun_reward/schema.Clone": {
+        "bytes": 0,
+        "count": 88,
+        "seconds": 0.018999999999987693
+      },
+      "claim_gun_reward/schema.Validate": {
+        "bytes": 0,
+        "count": 32,
+        "seconds": 0.034000000000020236
+      },
+      "claim_offline_reward/dispatch": {
+        "bytes": 0,
+        "count": 6,
+        "seconds": 0.02100000000001856
+      },
+      "claim_offline_reward/json.Encode": {
+        "bytes": 5657,
+        "count": 6,
+        "seconds": 0.0
+      },
+      "claim_offline_reward/schema.Clone": {
+        "bytes": 0,
+        "count": 12,
+        "seconds": 0.0010000000000047748
+      },
+      "claim_offline_reward/schema.Validate": {
+        "bytes": 0,
+        "count": 18,
+        "seconds": 0.01600000000000179
+      },
+      "collect_slot/dispatch": {
+        "bytes": 0,
+        "count": 159,
+        "seconds": 0.25399999999993383
+      },
+      "collect_slot/json.Encode": {
+        "bytes": 80485,
+        "count": 159,
+        "seconds": 0.0
+      },
+      "collect_slot/schema.Clone": {
+        "bytes": 0,
+        "count": 318,
+        "seconds": 0.07699999999988805
+      },
+      "collect_slot/schema.Validate": {
+        "bytes": 0,
+        "count": 159,
+        "seconds": 0.12500000000002132
+      },
+      "complete_throw/dispatch": {
+        "bytes": 0,
+        "count": 544,
+        "seconds": 1.6940000000002111
+      },
+      "complete_throw/json.Encode": {
+        "bytes": 161853,
+        "count": 544,
+        "seconds": 0.010000000000012221
+      },
+      "complete_throw/schema.Clone": {
+        "bytes": 0,
+        "count": 1088,
+        "seconds": 0.24099999999991994
+      },
+      "complete_throw/schema.Validate": {
+        "bytes": 0,
+        "count": 1088,
+        "seconds": 0.9540000000002622
+      },
+      "complete_tide/archive.GetSnapshot": {
+        "bytes": 0,
+        "count": 225,
+        "seconds": 0.06799999999998896
+      },
+      "complete_tide/dispatch": {
+        "bytes": 0,
+        "count": 9,
+        "seconds": 0.1790000000000056
+      },
+      "complete_tide/json.Encode": {
+        "bytes": 22340,
+        "count": 9,
+        "seconds": 0.0010000000000012221
+      },
+      "complete_tide/schema.Clone": {
+        "bytes": 0,
+        "count": 315,
+        "seconds": 0.0969999999999871
+      },
+      "complete_tide/schema.Validate": {
+        "bytes": 0,
+        "count": 45,
+        "seconds": 0.03500000000001258
+      },
+      "create/archive.GetSnapshot": {
+        "bytes": 0,
+        "count": 8,
+        "seconds": 0.001000000000000112
+      },
+      "create/dispatch": {
+        "bytes": 0,
+        "count": 1,
+        "seconds": 1.623
+      },
+      "create/fish.CalculateProductionSnapshot": {
+        "bytes": 0,
+        "count": 3,
+        "seconds": 0.0
+      },
+      "create/inventory.BuildAll": {
+        "bytes": 0,
+        "count": 1,
+        "seconds": 0.0
+      },
+      "create/json.Encode": {
+        "bytes": 19477,
+        "count": 1,
+        "seconds": 0.0009999999999998899
+      },
+      "create/schema.Clone": {
+        "bytes": 0,
+        "count": 84,
+        "seconds": 0.001000000000000112
+      },
+      "create/schema.Validate": {
+        "bytes": 0,
+        "count": 9,
+        "seconds": 0.0020000000000000018
+      },
+      "deploy_fish/dispatch": {
+        "bytes": 0,
+        "count": 24,
+        "seconds": 0.017000000000008342
+      },
+      "deploy_fish/json.Encode": {
+        "bytes": 4154,
+        "count": 24,
+        "seconds": 0.0009999999999976694
+      },
+      "deploy_fish/schema.Clone": {
+        "bytes": 0,
+        "count": 48,
+        "seconds": 0.00500000000000167
+      },
+      "deploy_fish/schema.Validate": {
+        "bytes": 0,
+        "count": 24,
+        "seconds": 0.011000000000001897
+      },
+      "equip_gun/dispatch": {
+        "bytes": 0,
+        "count": 2,
+        "seconds": 0.001999999999997115
+      },
+      "equip_gun/json.Encode": {
+        "bytes": 683,
+        "count": 2,
+        "seconds": 0.0
+      },
+      "equip_gun/schema.Clone": {
+        "bytes": 0,
+        "count": 8,
+        "seconds": 0.0
+      },
+      "equip_gun/schema.Validate": {
+        "bytes": 0,
+        "count": 2,
+        "seconds": 0.0009999999999976694
+      },
+      "finalize_throw_landing/archive.GetSnapshot": {
+        "bytes": 0,
+        "count": 1632,
+        "seconds": 0.4099999999999304
+      },
+      "finalize_throw_landing/dispatch": {
+        "bytes": 0,
+        "count": 544,
+        "seconds": 0.47799999999995846
+      },
+      "finalize_throw_landing/json.Encode": {
+        "bytes": 610824,
+        "count": 544,
+        "seconds": 0.028000000000017344
+      },
+      "finalize_throw_landing/schema.Clone": {
+        "bytes": 0,
+        "count": 1634,
+        "seconds": 0.4039999999999142
+      },
+      "finalize_throw_landing/schema.Validate": {
+        "bytes": 0,
+        "count": 1,
+        "seconds": 0.0
+      },
+      "go_offline/dispatch": {
+        "bytes": 0,
+        "count": 7,
+        "seconds": 0.006999999999964146
+      },
+      "go_offline/json.Encode": {
+        "bytes": 1005,
+        "count": 7,
+        "seconds": 0.0
+      },
+      "go_offline/schema.Clone": {
+        "bytes": 0,
+        "count": 14,
+        "seconds": 0.003999999999985349
+      },
+      "go_online/archive.GetSnapshot": {
+        "bytes": 0,
+        "count": 24,
+        "seconds": 0.010999999999981469
+      },
+      "go_online/dispatch": {
+        "bytes": 0,
+        "count": 6,
+        "seconds": 0.07299999999999685
+      },
+      "go_online/fish.CalculateProductionSnapshot": {
+        "bytes": 0,
+        "count": 6,
+        "seconds": 0.011000000000002785
+      },
+      "go_online/json.Encode": {
+        "bytes": 3252,
+        "count": 6,
+        "seconds": 0.0
+      },
+      "go_online/schema.Clone": {
+        "bytes": 0,
+        "count": 36,
+        "seconds": 0.015999999999991132
+      },
+      "go_online/schema.Validate": {
+        "bytes": 0,
+        "count": 18,
+        "seconds": 0.019000000000030326
+      },
+      "prepare_throw/archive.GetSnapshot": {
+        "bytes": 0,
+        "count": 544,
+        "seconds": 0.13899999999998514
+      },
+      "prepare_throw/dispatch": {
+        "bytes": 0,
+        "count": 544,
+        "seconds": 5.1090000000000995
+      },
+      "prepare_throw/json.Encode": {
+        "bytes": 613535,
+        "count": 544,
+        "seconds": 0.07899999999998686
+      },
+      "prepare_throw/schema.Clone": {
+        "bytes": 0,
+        "count": 544,
+        "seconds": 0.1359999999999708
+      },
+      "purchase_torpedo/dispatch": {
+        "bytes": 0,
+        "count": 6,
+        "seconds": 0.012000000000000455
+      },
+      "purchase_torpedo/json.Encode": {
+        "bytes": 1507,
+        "count": 6,
+        "seconds": 0.0
+      },
+      "purchase_torpedo/schema.Clone": {
+        "bytes": 0,
+        "count": 12,
+        "seconds": 0.0029999999999983373
+      },
+      "purchase_torpedo/schema.Validate": {
+        "bytes": 0,
+        "count": 12,
+        "seconds": 0.008000000000000895
+      },
+      "query/archive.GetSnapshot": {
+        "bytes": 0,
+        "count": 8983,
+        "seconds": 2.626999999999099
+      },
+      "query/dispatch": {
+        "bytes": 0,
+        "count": 7573,
+        "seconds": 56.624999999999375
+      },
+      "query/fish.CalculateProductionSnapshot": {
+        "bytes": 0,
+        "count": 2351,
+        "seconds": 5.518999999999396
+      },
+      "query/inventory.BuildAll": {
+        "bytes": 0,
+        "count": 1174,
+        "seconds": 9.99099999999984
+      },
+      "query/json.Encode": {
+        "bytes": 441253607,
+        "count": 7573,
+        "seconds": 29.041000000001024
+      },
+      "query/schema.Clone": {
+        "bytes": 0,
+        "count": 561812,
+        "seconds": 3.5779999999986254
+      },
+      "query/schema.Validate": {
+        "bytes": 0,
+        "count": 8983,
+        "seconds": 8.19199999999972
+      },
+      "query_actions/archive.GetSnapshot": {
+        "bytes": 0,
+        "count": 1724,
+        "seconds": 0.40699999999996916
+      },
+      "query_actions/dispatch": {
+        "bytes": 0,
+        "count": 1724,
+        "seconds": 5.109000000000698
+      },
+      "query_actions/json.Encode": {
+        "bytes": 27464049,
+        "count": 1724,
+        "seconds": 1.6509999999993692
+      },
+      "query_actions/schema.Clone": {
+        "bytes": 0,
+        "count": 1724,
+        "seconds": 0.4059999999999644
+      },
+      "rebirth_strength/dispatch": {
+        "bytes": 0,
+        "count": 4,
+        "seconds": 0.007999999999989793
+      },
+      "rebirth_strength/json.Encode": {
+        "bytes": 2054,
+        "count": 4,
+        "seconds": 0.0
+      },
+      "rebirth_strength/schema.Clone": {
+        "bytes": 0,
+        "count": 8,
+        "seconds": 0.0
+      },
+      "rebirth_strength/schema.Validate": {
+        "bytes": 0,
+        "count": 8,
+        "seconds": 0.005000000000008331
+      },
+      "rebirth_trash_man/dispatch": {
+        "bytes": 0,
+        "count": 3,
+        "seconds": 0.005000000000000782
+      },
+      "rebirth_trash_man/json.Encode": {
+        "bytes": 1318,
+        "count": 3,
+        "seconds": 0.0
+      },
+      "rebirth_trash_man/schema.Clone": {
+        "bytes": 0,
+        "count": 6,
+        "seconds": 0.0010000000000047748
+      },
+      "rebirth_trash_man/schema.Validate": {
+        "bytes": 0,
+        "count": 6,
+        "seconds": 0.0029999999999983373
+      },
+      "select_throw_landing/dispatch": {
+        "bytes": 0,
+        "count": 544,
+        "seconds": 2.3649999999997324
+      },
+      "select_throw_landing/json.Encode": {
+        "bytes": 566606,
+        "count": 544,
+        "seconds": 0.04300000000002191
+      },
+      "sell_fish/dispatch": {
+        "bytes": 0,
+        "count": 389,
+        "seconds": 0.6620000000000417
+      },
+      "sell_fish/json.Encode": {
+        "bytes": 83738,
+        "count": 389,
+        "seconds": 0.010000000000047748
+      },
+      "sell_fish/schema.Clone": {
+        "bytes": 0,
+        "count": 778,
+        "seconds": 0.20800000000006946
+      },
+      "sell_fish/schema.Validate": {
+        "bytes": 0,
+        "count": 389,
+        "seconds": 0.36700000000001154
+      },
+      "start_breakthrough/dispatch": {
+        "bytes": 0,
+        "count": 13,
+        "seconds": 0.020999999999977703
+      },
+      "start_breakthrough/json.Encode": {
+        "bytes": 4911,
+        "count": 13,
+        "seconds": 0.0
+      },
+      "start_breakthrough/schema.Clone": {
+        "bytes": 0,
+        "count": 26,
+        "seconds": 0.003999999999992454
+      },
+      "start_breakthrough/schema.Validate": {
+        "bytes": 0,
+        "count": 26,
+        "seconds": 0.01599999999998758
+      },
+      "start_exercise/archive.GetSnapshot": {
+        "bytes": 0,
+        "count": 565,
+        "seconds": 0.13500000000010326
+      },
+      "start_exercise/dispatch": {
+        "bytes": 0,
+        "count": 565,
+        "seconds": 0.8990000000001044
+      },
+      "start_exercise/json.Encode": {
+        "bytes": 144090,
+        "count": 565,
+        "seconds": 0.00699999999997214
+      },
+      "start_exercise/schema.Clone": {
+        "bytes": 0,
+        "count": 565,
+        "seconds": 0.13200000000010315
+      },
+      "start_exercise/schema.Validate": {
+        "bytes": 0,
+        "count": 565,
+        "seconds": 0.5419999999999505
+      },
+      "start_tide/archive.GetSnapshot": {
+        "bytes": 0,
+        "count": 722,
+        "seconds": 0.2290000000000605
+      },
+      "start_tide/dispatch": {
+        "bytes": 0,
+        "count": 76,
+        "seconds": 0.741000000000021
+      },
+      "start_tide/json.Encode": {
+        "bytes": 41489,
+        "count": 76,
+        "seconds": 0.007000000000013884
+      },
+      "start_tide/schema.Clone": {
+        "bytes": 0,
+        "count": 6486,
+        "seconds": 0.29100000000007054
+      },
+      "start_tide/schema.Validate": {
+        "bytes": 0,
+        "count": 184,
+        "seconds": 0.15700000000000713
+      },
+      "stop_exercise/dispatch": {
+        "bytes": 0,
+        "count": 565,
+        "seconds": 5.360000000000174
+      },
+      "stop_exercise/fish.CalculateProductionSnapshot": {
+        "bytes": 0,
+        "count": 565,
+        "seconds": 1.2609999999999064
+      },
+      "stop_exercise/json.Encode": {
+        "bytes": 192217,
+        "count": 565,
+        "seconds": 0.028999999999999915
+      },
+      "stop_exercise/schema.Clone": {
+        "bytes": 0,
+        "count": 1130,
+        "seconds": 0.26200000000013013
+      },
+      "stop_exercise/schema.Validate": {
+        "bytes": 0,
+        "count": 1695,
+        "seconds": 1.8330000000000055
+      },
+      "synthesize_barbell/dispatch": {
+        "bytes": 0,
+        "count": 5,
+        "seconds": 0.004999999999997229
+      },
+      "synthesize_barbell/json.Encode": {
+        "bytes": 2210,
+        "count": 5,
+        "seconds": 0.0
+      },
+      "synthesize_barbell/schema.Clone": {
+        "bytes": 0,
+        "count": 10,
+        "seconds": 0.0
+      },
+      "synthesize_barbell/schema.Validate": {
+        "bytes": 0,
+        "count": 10,
+        "seconds": 0.003999999999992454
+      },
+      "upgrade_fish/dispatch": {
+        "bytes": 0,
+        "count": 168,
+        "seconds": 0.1649999999999987
+      },
+      "upgrade_fish/json.Encode": {
+        "bytes": 58241,
+        "count": 168,
+        "seconds": 0.003000000000001002
+      },
+      "upgrade_fish/schema.Clone": {
+        "bytes": 0,
+        "count": 336,
+        "seconds": 0.05899999999998995
+      },
+      "upgrade_fish/schema.Validate": {
+        "bytes": 0,
+        "count": 168,
+        "seconds": 0.07900000000000018
+      },
+      "upgrade_hall/dispatch": {
+        "bytes": 0,
+        "count": 19,
+        "seconds": 0.01999999999998936
+      },
+      "upgrade_hall/json.Encode": {
+        "bytes": 5063,
+        "count": 19,
+        "seconds": 0.0
+      },
+      "upgrade_hall/schema.Clone": {
+        "bytes": 0,
+        "count": 38,
+        "seconds": 0.006999999999978801
+      },
+      "upgrade_hall/schema.Validate": {
+        "bytes": 0,
+        "count": 19,
+        "seconds": 0.01100000000001522
+      }
+    }
+  ],
+  "warning": "Instrumented diagnostic; inclusive wrapper times overlap, not a speedup benchmark"
+}

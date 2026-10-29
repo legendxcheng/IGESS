@@ -86,7 +86,7 @@ def _affords(wallet: Mapping[str, Any], quote: Mapping[str, Any]) -> bool:
 
 def _integration_code_digest() -> str:
     digest = hashlib.sha256()
-    for name in ("fish_source_engine.py", "fish_source_runtime.py", "fish_source_reports.py", "fish_source_income.py", "fish_source_guns.py", "fish_source_eggs.py", "fish_source_tides.py", "fish_source_numbers.py"):
+    for name in ("fish_source_engine.py", "fish_source_runtime.py", "fish_source_observation.py", "fish_source_reports.py", "fish_source_income.py", "fish_source_guns.py", "fish_source_eggs.py", "fish_source_tides.py", "fish_source_numbers.py"):
         path = Path(__file__).parent / name
         if not path.is_file():
             path = path.with_suffix(".pyc")
@@ -514,7 +514,7 @@ class _ProfileRun:
     def _record(self) -> None:
         self._observe_progression()
         if "luck" not in self.state:
-            self.state = self.runtime.request({"op": "query"})
+            self.state = self.runtime.observe()
         state = self.state
         inventory = state["inventory"]["items"]
         resources = {
@@ -591,7 +591,7 @@ class _ProfileRun:
         elapsed = target - self.state["time"]
         online = self.state["online"]
         self.runtime.request({"op": "advance", "time": target})
-        self.state = self.runtime.request({"op": "query", "includeLuck": include_luck})
+        self.state = self.runtime.observe(include_luck=include_luck)
         self.income.observe(before, self.state)
         self._observe_codex(before)
         if online:
@@ -625,7 +625,7 @@ class _ProfileRun:
             self.scenario.id, self.profile.id, int(self.state["time"]),
             op, target, {"receipt": json.dumps(receipt, ensure_ascii=False, sort_keys=True)},
         ))
-        self.state = self.runtime.request({"op": "query", "includeLuck": True})
+        self.state = self.runtime.observe(include_luck=True)
         self.last_receipt = receipt
         self.income.observe(before, self.state, op=op, receipt=receipt)
         self._observe_codex(before)

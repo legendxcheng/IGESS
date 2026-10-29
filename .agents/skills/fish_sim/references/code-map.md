@@ -60,3 +60,11 @@ rg -n 'claim_fish_reward|start_tide|selected_export_sha256' src/igess tests -g '
 - `Domain/Fishing/ThrowOutcomeResolver.QueryLuck` 与 `Resolve` 共用前置映射；异常规则/边界回到完整结算保持错误。`src/igess/fish_source_engine.py` 首次观察即含幸运值，避免同状态第二次完整查询。
 - `<source>/proj/Script/Core/BigNumber.lua`：精确分块整数算法；`simulation/Json.lua`：有界字段名缓存与等价 DTO 编码。精度、随机、排序和线协议均保持原契约。
 - 源回归见 `simulation/README.md`；正式冻结/差分/串行配对工具见 `.scratch/fish-source-query-performance/` 的 `benchmark.py`、`compare.py`、`run_benchmarks.py`、`probe_arithmetic.py`。不增加观察或减少采样，完整最终 DTO 来自最后一次既有查询。
+
+
+## 状态变化观察与冻结生产
+
+- `src/igess/fish_source_runtime.py` 的 `observe`：能力协商、完整查询回退和观察错误；`fish_source_observation.py`：channel/token 基准、完整状态重建与返回对象隔离，参与适配器摘要。
+- `<source>/simulation/Observation.lua`、`Query.lua` 的 `QueryChanges`：按部分返回变化，私有稳定投影复用；`Host.lua`/`cli.lua` 保证离线与鱼潮中可观察，观察操作不进入源历史。
+- `<source>/proj/Script/Application/PlayerProductionRuntime.lua` 的 `BuildFrozenCalculator` → `Domain/Production/FishHallProductionCalculator.lua` 的 `BuildFrozenContribution` → `FrozenFishRateCache.lua`：冻结规则、会话独立的纯鱼厅产出复用；普通生产入口不启用此缓存。
+- 回归入口：`tests/test_fish_source_observation.py` 与源 `tests/simulation_observation_changes_test.lua`；正式逐次观察差分和串行配对工具在 `.scratch/fish-state-and-advance-performance/`。既有准确/批量、满包孵化和跨进程恢复测试继续适用。

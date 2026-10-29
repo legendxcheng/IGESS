@@ -13,6 +13,8 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any, Self
 
+from .fish_source_observation import SourceObservation
+
 
 class FishSourceRuntimeError(RuntimeError):
     def __init__(self, code: str, detail: str | dict[str, Any] = "") -> None:
@@ -101,6 +103,7 @@ class FishSourceRuntime:
         self.data_digest: str | None = None
         self._frozen_data_root: Path | None = None
         self.capabilities: dict[str, Any] | None = None
+        self._observation = SourceObservation()
 
     def _freeze_source(self) -> Path:
         snapshot = tempfile.TemporaryDirectory(prefix="igess-fish-lua-")
@@ -256,6 +259,21 @@ class FishSourceRuntime:
             raise FishSourceRuntimeError("simulation_protocol_invalid")
         return value
 
+    def observe(self, *, include_luck: bool | None = None) -> dict[str, Any]:
+        """Read the same complete state, using changes when the source supports it."""
+        payload: dict[str, Any] = {"op": "query"}
+        if include_luck is not None:
+            payload["includeLuck"] = include_luck
+        if (self.capabilities or {}).get("observationChangesVersion") != 1:
+            return self.request(payload)
+        payload.update(op="query_changes", channel=self._observation.channel, base=self._observation.token)
+        response = self.request(payload)
+        try:
+            return self._observation.apply(response)
+        except ValueError as exc:
+            self._observation = SourceObservation()
+            raise FishSourceRuntimeError("simulation_observation_invalid", str(exc)) from exc
+
     def create(
         self, *, start_at: int,
         initial_state: dict[str, Any] | None = None,
@@ -309,6 +327,7 @@ class FishSourceRuntime:
         }, timeout_seconds=replay_timeout)
 
     def close(self) -> None:
+        self._observation = SourceObservation()
         process = self._process
         self._process = None
         if process is not None:

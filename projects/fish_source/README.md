@@ -80,3 +80,6 @@ uv run igess model simulate --project projects/fish_source --scenario day_1_grow
 源宿主共享单次观察快照和完整校验，缓存鱼厅稳定投影，一次构造完整背包，并直接获取幸运映射；同次计算复用相同鱼组合的纯结果。精确大数分块运算和 JSON 编码减少内部开销，保留精度、随机、操作时点、采样、回执及恢复身份；可变返回值仍隔离。
 
 源接口与缓存契约见 `<source>/simulation/README.md` 的“查询性能与隔离”；配对测速、完整最终状态及恢复证据见[查询性能验证](../../.scratch/fish-source-query-performance/verification.md)。本地源码更新不代表 GameBalancer 运行包已发布。
+
+
+2026-10-29 状态观察新增可选变化传输：运行时依据源能力自动选择，在原有每个观察点重建完整独立状态，完整 Query 保留为回退接口。源宿主为每个会话创建冻结规则生产计算器，复用稳定鱼厅产出；动态余额、交易校验、精确大数、回执和 checkpoint 身份规则不变。原批量推进算法保留，未接入没有实测收益的事件分段候选。规格、逐次状态差分及整周配对见[状态观察与推进性能](../../.scratch/fish-state-and-advance-performance/spec.md)及[验收记录](../../.scratch/fish-state-and-advance-performance/verification.md)。本地实现不代表 GameBalancer 已更新。
