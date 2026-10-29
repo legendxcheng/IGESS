@@ -1,0 +1,42 @@
+# 演示协议；不是已批准的 Fish 平衡目标。
+schema_version: 1
+target_set_id: fish-demo
+version: "1"
+source: "演示目标，仅用于验证接口，不代表生产规划"
+targets:
+  - target_id: first_day_growth
+    metric_id: growth.count
+    profile_id: default
+    dimensions:
+      day: 1
+    unit: count
+    time_basis: wall
+    scope: segment
+    aggregation: value
+    operator: gte
+    value: 1
+  - target_id: longest_online_gap
+    metric_id: growth.max_gap
+    profile_id: default
+    dimensions: {}
+    unit: seconds
+    time_basis: online
+    scope: segment
+    aggregation: value
+    operator: lte
+    value: 1800
+  - target_id: collection_score
+    metric_id: growth.score
+    profile_id: default
+    dimensions:
+      categories: [new_fish_species, new_fish_variant]
+      scoring: per_label
+      weights:
+        new_fish_species: "1"
+        new_fish_variant: "2"
+    unit: points
+    time_basis: wall
+    scope: segment
+    aggregation: value
+    operator: gte
+    value: "1"

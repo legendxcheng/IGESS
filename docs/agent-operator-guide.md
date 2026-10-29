@@ -464,3 +464,8 @@ http://127.0.0.1:8765/
 ```powershell
 .\.venv\Scripts\python -m pytest
 ```
+
+
+## 已有运行分析（P0）
+
+查询登记运行、提取指标和对照目标定义，使用 [运行分析接口](analysis-api.md) 的 runs、metrics、targets 命令。它们不重跑模拟；目标判定与命令成功分开，先核对覆盖情况和输入身份，再解释偏差。

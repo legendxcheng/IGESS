@@ -69,6 +69,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     add_model_parser(subparsers)
+    from .analysis_api.cli import add_analysis_parsers
+    add_analysis_parsers(subparsers)
 
     def add_command(name: str, summary: str, example: str) -> argparse.ArgumentParser:
         return subparsers.add_parser(
@@ -389,6 +391,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "model":
         return dispatch_model(args)
+    if args.command in {"runs", "metrics", "targets"}:
+        from .analysis_api.cli import dispatch_analysis
+        return dispatch_analysis(args)
     try:
         if args.command == "paid-run":
             from .workflows import WorkflowService

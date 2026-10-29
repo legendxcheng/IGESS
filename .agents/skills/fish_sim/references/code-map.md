@@ -70,3 +70,8 @@ rg -n 'claim_fish_reward|start_tide|selected_export_sha256' src/igess tests -g '
 - `<source>/simulation/Observation.lua`、`Query.lua` 的 `QueryChanges`：按部分返回变化，私有稳定投影复用；`Host.lua`/`cli.lua` 保证离线与鱼潮中可观察，观察操作不进入源历史。
 - `<source>/proj/Script/Application/PlayerProductionRuntime.lua` 的 `BuildFrozenCalculator` → `Domain/Production/FishHallProductionCalculator.lua` 的 `BuildFrozenContribution` → `FrozenFishRateCache.lua`：冻结规则、会话独立的纯鱼厅产出复用；普通生产入口不启用此缓存。
 - 回归入口：`tests/test_fish_source_observation.py` 与源 `tests/simulation_observation_changes_test.lua`；正式逐次观察差分和串行配对工具在 `.scratch/fish-state-and-advance-performance/`。既有准确/批量、满包孵化和跨进程恢复测试继续适用。
+
+
+## 运行查询、指标和目标对照
+
+已有运行分析先看 src/igess/analysis_api/service.py（AnalysisService）及 docs/analysis-api.md；Fish 指标在 fish_metrics.py 复用现有成长投影，目标协议在 targets.py。公共回归为 tests/test_analysis_api.py，使用冻结运行产物，不依赖长模拟。修改指标需同步定义版本、覆盖/证据口径及文档；不要在 CLI 复制领域计数。

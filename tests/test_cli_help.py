@@ -19,6 +19,9 @@ EXPECTED_COMMANDS = {
     "init",
     "lint",
     "model",
+    "runs",
+    "metrics",
+    "targets",
     "paid-run",
     "report",
     "review-proposal",
@@ -119,7 +122,7 @@ CRITICAL_HELP_CASES = (
 )
 
 CRITICAL_COMMANDS = frozenset(case[0] for case in CRITICAL_HELP_CASES)
-NESTED_COMMANDS = frozenset({"model"})
+NESTED_COMMANDS = frozenset({"model", "runs", "metrics", "targets"})
 OTHER_COMMANDS = tuple(sorted(EXPECTED_COMMANDS - CRITICAL_COMMANDS - NESTED_COMMANDS))
 
 

@@ -104,3 +104,8 @@ uv run --extra dev python -m pytest tests/test_fish_source_formal.py -q
 
 
 状态变化观察与推进性能：修改 `observe`、`query_changes` 或冻结生产计算器时，先读源模拟说明的“状态变化观察与冻结生产计算”。消费者仍接收原时点的完整独立状态；传输基准不进 checkpoint，恢复重新建立，完整查询作为回退和差分参照。生产缓存仅用于会话拥有的冻结规则计算器，结算仍使用原精度、校验和回执。验收同时比较逐次逻辑观察与完整业务产物；正式测速关闭诊断记录。
+
+
+## 已有运行的结构化分析
+
+定位运行、提取成长指标或对照已确认的目标定义时，先读 [运行分析接口](../../../docs/analysis-api.md)。使用 runs、metrics、targets 的 JSON 入口；查询不会启动模拟。先检查 coverage 和 value_status，不能把 incomplete、未记录或续跑本段当作完整达标证据。目标文件显式记录版本、分类与权重；演示目标不代表用户已确认的规划，仍按人类决定后改表的流程执行。
