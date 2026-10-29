@@ -1,0 +1,5 @@
+e:\IGESS\src\igess\fish_source_engine.py
+  e:\IGESS\src\igess\fish_source_engine.py:358:9 - error: "__setitem__" method not defined on type "Mapping[str, Any]" (reportIndexIssue)
+  e:\IGESS\src\igess\fish_source_engine.py:406:44 - error: Cannot access attribute "setdefault" for class "Mapping[str, Any]"
+    Attribute "setdefault" is unknown (reportAttributeAccessIssue)
+2 errors, 0 warnings, 0 informations

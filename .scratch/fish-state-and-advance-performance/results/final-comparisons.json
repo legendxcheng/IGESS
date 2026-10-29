@@ -1,0 +1,74 @@
+[
+  {
+    "scenario": "week_1_growth",
+    "tag": "final-trace",
+    "diagnostic_only": true,
+    "core_bytes_identical": true,
+    "checkpoint_history_identical": true,
+    "final_observation_identical": true,
+    "history_entries": 7573,
+    "observation_count": 7573,
+    "baseline_seconds": 215.8211932000122,
+    "candidate_seconds": 179.88978900003713
+  },
+  {
+    "scenario": "week_1_growth",
+    "tag": "final-1",
+    "diagnostic_only": false,
+    "core_bytes_identical": true,
+    "checkpoint_history_identical": true,
+    "final_observation_identical": true,
+    "history_entries": 7573,
+    "observation_count": 0,
+    "baseline_seconds": 204.07986350002466,
+    "candidate_seconds": 189.9133607999538
+  },
+  {
+    "scenario": "week_1_growth",
+    "tag": "final-2",
+    "diagnostic_only": false,
+    "core_bytes_identical": true,
+    "checkpoint_history_identical": true,
+    "final_observation_identical": true,
+    "history_entries": 7573,
+    "observation_count": 0,
+    "baseline_seconds": 211.2007154999883,
+    "candidate_seconds": 196.9525100000319
+  },
+  {
+    "scenario": "week_1_growth",
+    "tag": "final-3",
+    "diagnostic_only": false,
+    "core_bytes_identical": true,
+    "checkpoint_history_identical": true,
+    "final_observation_identical": true,
+    "history_entries": 7573,
+    "observation_count": 0,
+    "baseline_seconds": 220.29712300002575,
+    "candidate_seconds": 193.83506180002587
+  },
+  {
+    "scenario": "day_1_growth",
+    "tag": "final-1",
+    "diagnostic_only": false,
+    "core_bytes_identical": true,
+    "checkpoint_history_identical": true,
+    "final_observation_identical": true,
+    "history_entries": 1099,
+    "observation_count": 0,
+    "baseline_seconds": 16.791723000002094,
+    "candidate_seconds": 15.660041600000113
+  },
+  {
+    "scenario": "day_1_growth",
+    "tag": "final-2",
+    "diagnostic_only": false,
+    "core_bytes_identical": true,
+    "checkpoint_history_identical": true,
+    "final_observation_identical": true,
+    "history_entries": 1099,
+    "observation_count": 0,
+    "baseline_seconds": 16.676972699991893,
+    "candidate_seconds": 15.747869400016498
+  }
+]

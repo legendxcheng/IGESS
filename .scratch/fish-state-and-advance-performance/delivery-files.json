@@ -1,11 +1,12 @@
 {
   "simulation/Observation.lua": "2bb6e3d00e0eeb427f2deafe9ee8047f03b4ef99dff8944645813d3bc93c27bb",
-  "simulation/Query.lua": "0f2a5c240f0501ea494b54b9aa81789682c57c5bb4b49c7e030d30e5af25d28a",
+  "simulation/Query.lua": "e9e82c3fcfa43c50310f85b36ee77ea76972f0e57ca23b23cb9ae91f919d7459",
   "simulation/Host.lua": "01e9695d8d7381ea7418089dad104e0f364c017c09e00a2d038c3b2eca21bb49",
   "simulation/cli.lua": "8ec647a3ba0978eb79affae7a4a56a984a3990f396e35071749340e3001963a1",
   "proj/Script/Application/PlayerProductionRuntime.lua": "f437be544aceb15a00df63e67ed075c359371c77cc098ccbab759e30dfdbb3a6",
   "proj/Script/Domain/Production/FishHallProductionCalculator.lua": "a020aa44de5d5890ed7e9bc5be6b178a918fb8a5b7f5a17b7a2b2db8883b16fd",
   "proj/Script/Domain/Production/FrozenFishRateCache.lua": "9de4736297601f174c5c95f644ccfa65d9ae7cd124f802193d1d30113b03934a",
   "tests/simulation_observation_changes_test.lua": "f791c60eae4efd5e0ff047e80ae946628e0db4fb128d17be0ecf96e4b19802c9",
-  "simulation/README.md": "d4851785e971a5a85f1b27b69d0d4f00b84523283cf63d20bb074c101f80e056"
+  "simulation/README.md": "d4851785e971a5a85f1b27b69d0d4f00b84523283cf63d20bb074c101f80e056",
+  "tests/frozen_fish_production_test.lua": "a3e795b565e87387d0abf2074365cdbb7a143a455f0d7adc01ac9c4fb1df886f"
 }

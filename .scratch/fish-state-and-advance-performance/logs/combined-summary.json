@@ -1,0 +1,92 @@
+[
+  {
+    "test": "simulation_host_test.lua",
+    "exit_code": 0,
+    "seconds": 4.926425399957225,
+    "log": "E:\\IGESS\\.scratch\\fish-state-and-advance-performance\\logs\\combined-simulation_host_test.lua.log"
+  },
+  {
+    "test": "simulation_query_observation_test.lua",
+    "exit_code": 0,
+    "seconds": 0.47403209999902174,
+    "log": "E:\\IGESS\\.scratch\\fish-state-and-advance-performance\\logs\\combined-simulation_query_observation_test.lua.log"
+  },
+  {
+    "test": "simulation_query_validation_test.lua",
+    "exit_code": 0,
+    "seconds": 0.14456859999336302,
+    "log": "E:\\IGESS\\.scratch\\fish-state-and-advance-performance\\logs\\combined-simulation_query_validation_test.lua.log"
+  },
+  {
+    "test": "simulation_observation_changes_test.lua",
+    "exit_code": 0,
+    "seconds": 0.14973710000049323,
+    "log": "E:\\IGESS\\.scratch\\fish-state-and-advance-performance\\logs\\combined-simulation_observation_changes_test.lua.log"
+  },
+  {
+    "test": "simulation_blocked_eggs_test.lua",
+    "exit_code": 0,
+    "seconds": 14.567029399971943,
+    "log": "E:\\IGESS\\.scratch\\fish-state-and-advance-performance\\logs\\combined-simulation_blocked_eggs_test.lua.log"
+  },
+  {
+    "test": "simulation_eggs_test.lua",
+    "exit_code": 0,
+    "seconds": 0.44979139999486506,
+    "log": "E:\\IGESS\\.scratch\\fish-state-and-advance-performance\\logs\\combined-simulation_eggs_test.lua.log"
+  },
+  {
+    "test": "simulation_tides_test.lua",
+    "exit_code": 1,
+    "seconds": 0.8873611999442801,
+    "log": "E:\\IGESS\\.scratch\\fish-state-and-advance-performance\\logs\\combined-simulation_tides_test.lua.log"
+  },
+  {
+    "test": "simulation_natural_landing_test.lua",
+    "exit_code": 0,
+    "seconds": 0.17673840001225471,
+    "log": "E:\\IGESS\\.scratch\\fish-state-and-advance-performance\\logs\\combined-simulation_natural_landing_test.lua.log"
+  },
+  {
+    "test": "fish_inventory_complete_query_test.lua",
+    "exit_code": 0,
+    "seconds": 0.056033400003798306,
+    "log": "E:\\IGESS\\.scratch\\fish-state-and-advance-performance\\logs\\combined-fish_inventory_complete_query_test.lua.log"
+  },
+  {
+    "test": "fish_production_duplicate_projection_test.lua",
+    "exit_code": 0,
+    "seconds": 0.021457599999848753,
+    "log": "E:\\IGESS\\.scratch\\fish-state-and-advance-performance\\logs\\combined-fish_production_duplicate_projection_test.lua.log"
+  },
+  {
+    "test": "big_number_arithmetic_test.lua",
+    "exit_code": 0,
+    "seconds": 0.012205799983348697,
+    "log": "E:\\IGESS\\.scratch\\fish-state-and-advance-performance\\logs\\combined-big_number_arithmetic_test.lua.log"
+  },
+  {
+    "test": "simulation_json_encoding_test.lua",
+    "exit_code": 0,
+    "seconds": 0.02323009999236092,
+    "log": "E:\\IGESS\\.scratch\\fish-state-and-advance-performance\\logs\\combined-simulation_json_encoding_test.lua.log"
+  },
+  {
+    "test": "fish_hall_production_calculator_test.lua",
+    "exit_code": 0,
+    "seconds": 0.21266739995917305,
+    "log": "E:\\IGESS\\.scratch\\fish-state-and-advance-performance\\logs\\combined-fish_hall_production_calculator_test.lua.log"
+  },
+  {
+    "test": "player_production_runtime_test.lua",
+    "exit_code": 0,
+    "seconds": 0.01021699997363612,
+    "log": "E:\\IGESS\\.scratch\\fish-state-and-advance-performance\\logs\\combined-player_production_runtime_test.lua.log"
+  },
+  {
+    "test": "frozen_fish_production_test.lua",
+    "exit_code": 0,
+    "seconds": 0.06834040000103414,
+    "log": "E:\\IGESS\\.scratch\\fish-state-and-advance-performance\\logs\\combined-frozen_fish_production_test.lua.log"
+  }
+]

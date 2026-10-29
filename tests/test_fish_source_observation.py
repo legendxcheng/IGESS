@@ -50,6 +50,22 @@ def test_change_transport_resynchronizes_and_never_replays_commands() -> None:
         assert runtime.checkpoint() == history
 
 
+def test_rejected_session_replacement_preserves_observation_baseline() -> None:
+    with FishSourceRuntime(SOURCE, SOURCE / "igess_export/json") as runtime:
+        runtime.create(start_at=0, random_seed=7, fast_advance=True)
+        runtime.observe()
+        saved = runtime.checkpoint()
+        runtime.request({"op": "advance", "time": 30})
+        current = runtime.observe()
+        assert current["time"] == 30
+        with pytest.raises(FishSourceRejection, match="simulation_session_exists"):
+            runtime.restore(saved)
+        assert runtime.observe() == current
+        with pytest.raises(FishSourceRejection, match="simulation_session_exists"):
+            runtime.create(start_at=0, random_seed=7, fast_advance=True)
+        assert runtime.observe() == current
+
+
 def test_observation_inventory_mutations_and_offline_recovery() -> None:
     script = "package.path='./?.lua;./proj/?.lua;'..package.path; local s=assert(require('Script.Domain.Player.PlayerArchiveSchema').New(0)); io.write(require('simulation.Json').Encode(s))"
     state = json.loads(subprocess.check_output(["lua55", "-e", script], cwd=SOURCE, text=True, encoding="utf-8"))

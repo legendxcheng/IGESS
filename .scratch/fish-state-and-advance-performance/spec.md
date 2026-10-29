@@ -1,6 +1,6 @@
 # Fish 状态观察与推进结算性能优化
 
-Status: ready-for-agent
+Status: ready-for-human
 
 日期：2026-10-29。
 
@@ -118,3 +118,7 @@ Status: ready-for-agent
 - 上一轮实际交付与性能依据：[查询性能验收](../fish-source-query-performance/verification.md)。其中旧版/候选命名仅属于上一轮，不能直接套用到本轮。
 - 维护入口：[Fish 项目说明](../../projects/fish_source/README.md)、[进度](../../projects/fish_source/RoadMap.md)、[Fish 技能](../../.agents/skills/fish_sim/SKILL.md)。相关源宿主契约在源仓模拟说明中。
 - 下一步实施前将本规格拆成可独立验证的工作项。若候选只能通过改变规则、减少观察或大幅扩大范围取得收益，应报告证据并停止该候选，不擅自扩大授权。
+
+## Implementation Result
+
+2026-10-29：用户已授权实施，技术验收完成，等待用户验收。状态观察与冻结生产复用已交付；事件分段未证明收益而丢弃。最终证据见 [验收记录](verification.md)。

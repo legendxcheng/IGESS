@@ -34,16 +34,17 @@ def main() -> None:
     trace = []
     request = FishSourceRuntime.request
 
-    def observe_value(value):
+    def observe_value(value, include_luck):
         nonlocal last_observation
         last_observation = value
         if args.trace:
-            trace.append(hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode()).hexdigest())
+            trace.append({"includeLuck": include_luck, "state_sha256": hashlib.sha256(
+                json.dumps(value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()})
 
     def observed_request(self, payload, **kwargs):
         value = request(self, payload, **kwargs)
         if payload["op"] == "query":
-            observe_value(value)
+            observe_value(value, payload.get("includeLuck"))
         return value
 
     FishSourceRuntime.request = observed_request
@@ -51,7 +52,7 @@ def main() -> None:
     if observe is not None:
         def observed_state(self, **kwargs):
             value = observe(self, **kwargs)
-            observe_value(value)
+            observe_value(value, kwargs.get("include_luck"))
             return value
         FishSourceRuntime.observe = observed_state
 
