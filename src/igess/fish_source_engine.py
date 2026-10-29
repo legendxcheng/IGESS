@@ -296,6 +296,9 @@ class FishSourceEngineAdapter:
                 "landing_distance_cm": landing_distance,
                 "landing_policy": "source_natural_v1" if landing_distance is None else "explicit_distance_v1",
                 "collect_interval_seconds": collect_interval,
+                "collect_policy": "stable_slot_batch_v1",
+                "collect_slot_seconds": 2,
+                "collect_interval_basis": "batch_start",
                 "idle_seconds": idle_seconds,
                 "advance_mode": advance_mode,
                 "sampling_time_basis": sampling_time_basis,
@@ -461,6 +464,7 @@ class _ProfileRun:
         self.behavior_turn = 0
         self.active_time_seconds = 0
         self.last_collect = -inputs.collect_interval_seconds
+        self.pending_collect_slots: list[int] = []
         self.blocked: dict[str, int] = {}
         self.egg_observations = EggObservations(existing.behavior_state.get("egg_observations") if existing else None)
         self.tide_observations = TideObservations(existing.behavior_state.get("tide_observations") if existing else None)
@@ -485,6 +489,7 @@ class _ProfileRun:
             self.request_number = int(existing.behavior_state["request_number"])
             self.behavior_turn = int(existing.behavior_state["behavior_turn"])
             self.last_collect = int(existing.behavior_state["last_collect"])
+            self.pending_collect_slots = list(existing.behavior_state.get("pending_collect_slots", []))
             self.blocked = dict(existing.behavior_state.get("blocked", {}))
             self.active_time_seconds = int(existing.behavior_state.get("active_time_seconds", 0))
             self.pending_throw = existing.behavior_state.get("pending_throw")
@@ -677,6 +682,11 @@ class _ProfileRun:
 
     def _choose(self) -> tuple[str, str, dict[str, Any]] | None:
         state = self.state
+        # Finish this finite batch before choosing other ordinary work. New
+        # production in an already visited slot belongs to the next batch.
+        collection = self._next_collection()
+        if collection is not None:
+            return collection
         gun_action = choose_gun_action(state, self._allowed)
         claims = []
         if gun_action is not None and gun_action[0] == "claim_gun_reward":
@@ -694,9 +704,13 @@ class _ProfileRun:
         inventory = state["inventory"]["items"]
         slots = state["hall"]["slotBalances"]
         if state["time"] - self.last_collect >= self.inputs.collect_interval_seconds:
-            for slot in slots:
-                if source_decimal(slot["money"]) > 0 and self._allowed("collect_slot", str(slot["slot"])):
-                    return "collect_slot", str(slot["slot"]), {"op": "collect_slot", "slot": slot["slot"]}
+            self.pending_collect_slots = sorted(
+                slot["slot"] for slot in slots
+                if source_decimal(slot["money"]) > 0 and self._allowed("collect_slot", str(slot["slot"]))
+            )
+            if self.pending_collect_slots:
+                self.last_collect = int(state["time"])
+                return self._next_collection()
         occupied = {item.get("hallSlot") for item in inventory if item.get("hallSlot", 0) > 0}
         for item in inventory:
             if item.get("hallSlot", 0) == 0:
@@ -766,9 +780,26 @@ class _ProfileRun:
         _, behavior, target, payload = next(row for row in tied if row[1] == chosen)
         return behavior, target, payload
 
+    def _next_collection(self) -> tuple[str, str, dict[str, Any]] | None:
+        if not self.pending_collect_slots:
+            return None
+        balances = {slot["slot"]: slot["money"] for slot in self.state["hall"]["slotBalances"]}
+        while self.pending_collect_slots:
+            slot = self.pending_collect_slots[0]
+            if slot in balances and source_decimal(balances[slot]) > 0 and self._allowed("collect_slot", str(slot)):
+                return "collect_slot", str(slot), {"op": "collect_slot", "slot": slot}
+            # Empty/removed/blocked slots do not consume foreground time.
+            self.pending_collect_slots.pop(0)
+        return None
+
     def _act(self, behavior: str, target: str, payload: dict[str, Any], limit: int) -> None:
         start = int(self.state["time"])
-        duration = 1 if behavior in ("collect_slot", "deploy_fish", "claim_fish_reward", "claim_gun_reward", "equip_gun") else self._duration(behavior)
+        if behavior == "collect_slot":
+            duration = 2
+        elif behavior in ("deploy_fish", "claim_fish_reward", "claim_gun_reward", "equip_gun"):
+            duration = 1
+        else:
+            duration = self._duration(behavior)
         if behavior != "exercise_barbell" and start + duration > limit:
             self._wait_until(limit)
             return
@@ -798,7 +829,10 @@ class _ProfileRun:
                 key: value for key, value in payload.items() if key != "op"
             })
             if behavior == "collect_slot":
-                self.last_collect = start
+                # The source command has already been attempted. Persist only
+                # the remaining slots; pending_action retains its time cost.
+                # Rejections consume this attempt, never spin on the same slot.
+                self.pending_collect_slots.pop(0)
             self._wait_until(end)
 
     def _wait_until(self, end: int, *, kind: str = "wait") -> None:
@@ -947,6 +981,7 @@ class _ProfileRun:
                 "behavior_turn": self.behavior_turn,
                 "active_time_seconds": self.active_time_seconds,
                 "last_collect": self.last_collect,
+                "pending_collect_slots": self.pending_collect_slots,
                 "blocked": self.blocked,
                 "pending_throw": self.pending_throw,
                 "pending_action": self.pending_action,
