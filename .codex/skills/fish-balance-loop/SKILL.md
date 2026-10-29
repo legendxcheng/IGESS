@@ -1,17 +1,17 @@
 ---
 name: fish-balance-loop
-description: Run and review repeatable Fish numeric-balance iterations through IGESS. Use when the user asks to simulate Fish for a duration, open or inspect its Web report, analyze Strength/FishLuck/TrashLuck or persistent-progression pacing, compare a newly exported Luban/Excel data snapshot with a prior run, or discuss attributable tuning proposals while the human designer retains ownership of production table edits and exports.
+description: Run and review repeatable Fish numeric-balance iterations through IGESS. Use when the user delegates a Fish simulation, report inspection, or comparison of exported data snapshots. Follow fish_sim for tuning proposals, human decisions, and Agent edits to production Excel tables with luban-editor.
 ---
 
 # Fish Balance Loop
 
-Run a source-traceable Fish simulation, open its generated Web report, explain the balance findings, and repeat after the human designer edits and exports the production tables.
+Run a source-traceable Fish simulation, open its generated Web report, and explain the balance findings. Follow the collaboration workflow in [fish_sim](../../../.agents/skills/fish_sim/SKILL.md): run reports, analyze, propose, let the human decide, then have the Agent edit and export source tables. Existing-report review does not authorize a new simulation.
 
 ## Preserve the ownership boundary
 
-- Let the human designer edit production Excel/Luban values and run the export.
-- Do not modify production numeric tables, exported JSON, or generated Lua unless the user explicitly asks.
-- Analyze and propose values or directions; never present a proposal as already applied.
+- Let the human designer decide which tuning proposal to apply; execute an already selected plan without asking for the same decision again.
+- After that decision, use fish_sim's source-table workflow and `$luban-editor` to edit `fish-oasis` production `.xlsx` files and export; a subagent may perform this work. Keep undecided proposals unapplied.
+- Distinguish proposed values, applied workbook changes, successful exports, and effects verified by a subsequent report.
 - Preserve unrelated and uncommitted workspace changes. Run `git status --short` before work and never clean the workspace.
 - Use `E:\fish-oasis\igess_export\json` as the production snapshot. Do not substitute fixtures, copied GDD data, prose values, or CLI overrides for a production balance run.
 
@@ -40,7 +40,7 @@ Identify:
 - metrics or systems to emphasize;
 - whether this is a fresh baseline or a candidate to compare with a named prior run.
 
-Make a reasonable default of `week_1_growth` when the user requests a general balance review without a duration. State that assumption before starting.
+When the user delegates a new balance simulation without a duration, use `week_1_growth` and state that assumption before starting. For existing-report review, analyze the specified artifacts without starting a new run.
 
 ### 2. Perform preflight checks
 
@@ -133,9 +133,9 @@ Lead with the balance outcome, then provide:
 
 Do not drown the user in raw event counts. Prefer timings, gaps, rates, peaks, resets, and player-visible milestones.
 
-### 8. Repeat after human export
+### 8. Apply the human decision and verify the next report
 
-Wait for the human designer to confirm that Excel changes were exported. Then rerun the same scenario with the same profile, seed, and policy. Compare baseline and candidate model digests and Fish-specific KPIs.
+After the human selects a proposal, have the Agent edit and export the source workbooks using fish_sim's workflow. Deliver the change list and export evidence. The user runs the next report unless they have delegated that run to the Agent; use the same scenario, profile, seed, and policy for comparison. Compare baseline and candidate model digests and Fish-specific KPIs.
 
 Use IGESS `compare` or `gate` where it correctly consumes the required metrics. Until Fish-specific compare/gate integration is complete, directly compare `source_progression` and `source_behavior` artifacts and clearly label that analysis as Fish-specific.
 
