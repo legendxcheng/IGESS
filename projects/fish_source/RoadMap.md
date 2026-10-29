@@ -6,6 +6,10 @@
 
 Fish 的新模拟、规则和调优统一使用 `projects/fish_source`，运行入口与产物见 [README.md](README.md)。`projects/fish` 已停用，其历史代码和报告仅供查证，不作为当前后端的比较基线。
 
+## 2026-10-29 超过三十条按资质卖鱼
+
+卖鱼触发从满库存调整为背包与摸鱼厅合计超过 30 条，仅出售背包中一级 CPS 最低的普通鱼，逐条降到 30 条；同资质按实例 ID，沿用源卖价、材料结算和每条动作耗时。策略身份写入运行清单，契约见 [README](README.md)，定向验证见 `tests/test_fish_source_sales.py`。需要重新模拟评估材料收入和鱼潮参与；不代表 GameBalancer 已更新。
+
 ## 2026-10-29 金币全部领取策略
 
 修复领取首槽后重置全局间隔、后续槽位长期无法领取的问题。现在固定本轮槽位顺序，逐槽调用源领取，每条鱼耗时 2 秒；默认 300 秒从批次建立时计时。剩余批次和当前耗时随 checkpoint 保存，跨下线／鱼潮继续；完整契约见 [README](README.md)，定向回归见 `tests/test_fish_source_collection.py`，结果见[验证记录](../../.scratch/fish-collect-all/verification.md)。此变更需要重新模拟观察经济节奏，GameBalancer 尚未随本次修复更新。

@@ -63,7 +63,7 @@ s.fish.nextInstanceId={count + 1}
     _, read, _ = run(target)
     events = read('events.json')
     first = next(e for e in events if e['kind'] in {'prepare_throw', 'sell_fish'})
-    assert first['kind'] == ('sell_fish' if count == 200 else 'prepare_throw')
+    assert first['kind'] == 'sell_fish'  # Total ownership is already above thirty.
     assert read('timeline.json')[0]['generators_owned']['deployed_fish'] == 1
     assert not any(e['kind'] == 'source_rejected' for e in events)
     if count == 200:

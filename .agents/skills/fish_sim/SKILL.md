@@ -63,6 +63,7 @@ Fish 是以摸鱼／炸鱼为主题的增量养成游戏，包含随机收集、
 - Python 负责玩家意图、行动耗时、上下线、采样、协议与产物；Lua 负责合法性、价格、扣款、奖励、生产和重生。新增行为接入源操作，避免在 Python 复制经济公式或直接改余额。
 - Fish 实际数值来自 `engine.source_runtime.data_root`，默认 `<source>/igess_export/json`。本项目 `Datas/` 与 `luban_exports/` 是通用 authoring 结构，改它们不会调整 Fish 数值。生产改表／导出遵守上文人类决定、Agent 执行的流程；测试夹具不得充当生产调优结果。
 - `source_priority_v1` 是模拟玩家策略，不等同于真实玩家或旧 Python 策略。行为权重、操作耗时、在线窗口、自然落点与固定距离对照均须保留可归因身份。
+- 卖鱼按背包加摸鱼厅总数严格超过 30 条触发，只出售背包中一级 CPS 最低的普通鱼，直到总数回到 30；上阵鱼保留，同资质取最小实例 ID。资质含变异倍率、不含等级提升，由源 `query_actions.fishSales.levelOneCps` 提供，Python 精确比较。调度、禁用、拒绝与恢复契约见项目 README，修改时运行 `tests/test_fish_source_sales.py`。材料仍由 Lua 结算，不因策略调整改生产数值；旧报告需新模拟才体现卖鱼收入。
 - 金币领取使用固定槽位批次 `stable_slot_batch_v1`，逐槽源操作各占用 2 秒，默认 300 秒从批次建立计时；未完成批次与已提交动作耗时分别持久化。修改领取策略时读项目 README 的批次／下线／鱼潮／拒绝契约，并运行 `tests/test_fish_source_collection.py`；保持源转账与在线收入口径，旧代码指纹 checkpoint 仍拒绝恢复。
 - 查询与采样仅观察状态。优化批量推进、查询缓存或分页时，保持源回执、revision、随机结果和最终状态；缓存身份覆盖相关解锁、库存与存档变化。
 - 截断不是下线。checkpoint 需保留飞行、前台动作、鱼潮、孵化及待完成副作用；重试保持操作身份，避免重复扣款或发奖。金币／材料 DTO 保持 BigNumber 精度。

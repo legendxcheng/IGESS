@@ -38,6 +38,7 @@ _BEHAVIORS = frozenset({
     "strength_rebirth", "trash_man_rebirth", "fund_trash_man_breakthrough",
 })
 _SOURCE_POLICY = "source_priority_v1"
+_FISH_KEEP_COUNT = 30
 _MAX_REPLAY_BYTES = 256 * 1024 * 1024
 _REQUIRED_OPERATIONS = frozenset({
     "query", "query_actions", "query_codex", "claim_fish_reward", "advance", "checkpoint", "restore",
@@ -287,6 +288,8 @@ class FishSourceEngineAdapter:
                 "lua_version": "Lua 5.5",
                 "lua_executable": lua_executable,
                 "policy": _SOURCE_POLICY,
+                "fish_sell_policy": "over_30_lowest_level_one_cps_backpack_v1",
+                "fish_keep_count": _FISH_KEEP_COUNT,
                 "tide_policy": TIDE_POLICY,
                 "tide_schedule": {"policy": "absolute_opening_only_v1", "room_origin_seconds": room_origin},
                 "gun_policy": "claim_stable_reward_id_then_highest_source_attack_v1",
@@ -711,6 +714,28 @@ class _ProfileRun:
             if self.pending_collect_slots:
                 self.last_collect = int(state["time"])
                 return self._next_collection()
+        actions = None
+        sell_weight = self.profile.behavior_weights.get("sell_fish")
+        if (
+            state["inventory"]["total"] > _FISH_KEEP_COUNT
+            and sell_weight is not None
+            and Decimal(sell_weight.to_decimal_string()) > 0
+        ):
+            actions = self.runtime.request({"op": "query_actions"})
+            if "fishSales" not in actions:
+                raise EngineAdapterError("fish_source_sale_quotes_missing", "Source runtime must provide fishSales")
+            sellable = (
+                item for item in actions["fishSales"]
+                if self._allowed("sell_fish", str(item["instanceId"]))
+            )
+            # Lua supplies level-one CPS including mutation, without level gains.
+            item = min(sellable, key=lambda item: (
+                source_decimal(item["levelOneCps"]), item["instanceId"],
+            ), default=None)
+            if item is not None:
+                return "sell_fish", str(item["instanceId"]), {
+                    "op": "sell_fish", "instanceId": item["instanceId"],
+                }
         occupied = {item.get("hallSlot") for item in inventory if item.get("hallSlot", 0) > 0}
         for item in inventory:
             if item.get("hallSlot", 0) == 0:
@@ -719,7 +744,8 @@ class _ProfileRun:
                         return "deploy_fish", str(item["instanceId"]), {
                             "op": "deploy_fish", "instanceId": item["instanceId"], "slot": slot,
                         }
-        actions = self.runtime.request({"op": "query_actions"})
+        if actions is None:
+            actions = self.runtime.request({"op": "query_actions"})
         weights = self.profile.behavior_weights
         candidates: list[tuple[Decimal, str, str, dict[str, Any]]] = []
 
@@ -758,10 +784,6 @@ class _ProfileRun:
         for quote in actions["barbells"]:
             if quote["barbellId"] not in owned_barbells and _affords(wallet, quote):
                 add("synthesize_barbell", "synthesize_barbell", str(quote["barbellId"]), barbellId=quote["barbellId"])
-        undeployed = [item for item in inventory if item.get("hallSlot", 0) == 0]
-        if state["inventory"]["total"] >= state["inventory"]["capacity"] and undeployed:
-            item = undeployed[0]
-            add("sell_fish", "sell_fish", str(item["instanceId"]), instanceId=item["instanceId"])
         if state["inventory"]["total"] < state["inventory"]["capacity"] and self.inputs.fishing_area:
             add("manual_throw", "manual_throw")
         add("exercise_barbell", "exercise_barbell")

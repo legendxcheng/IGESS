@@ -9,6 +9,7 @@
 | 场景时长、在线窗口、权重、行动耗时、采样 | `projects/fish_source/economy.yaml`：`scenarios`、`session_patterns`、`behavior_weights`、`behavior_durations` | `tests/test_fish_source_formal.py` |
 | 引擎准备、能力检查、身份与策略 | `src/igess/fish_source_engine.py`：`FishSourceEngineAdapter.prepare`、`_REQUIRED_OPERATIONS`、`_integration_code_digest` | `tests/test_fish_source_current_rules.py`、`tests/test_fish_source_formal.py` |
 | 玩家选行为、动作互斥、时间推进、截断恢复 | 同文件 `_ProfileRun`：`_choose`、`_act`、`execute`、`_advance_to`、`_continue_throw`、`_continue_tide`、`checkpoint` | `tests/test_fish_source_natural_landing.py`、`tests/test_fish_source_tides.py`、`tests/test_fish_source_joint.py` |
+| 超过三十条按一级 CPS 卖背包鱼 | `fish_source_engine.py`：`_FISH_KEEP_COUNT`、`_choose`、清单 `fish_sell_policy`；源 `simulation/Query.lua` 的 `fishSales` 提供 `levelOneCps` 与 `materialAdded`，沿用源 `sell_fish` 和 `SourceIncome` | `tests/test_fish_source_sales.py`、`tests/test_fish_source_income.py` |
 | 鱼厅金币全部领取、每槽耗时、批次恢复 | 同文件 `_next_collection`、`pending_collect_slots`、`last_collect`；`_act` 提交后移除槽位，`pending_action` 保留剩余耗时；清单 `collect_policy` | `tests/test_fish_source_collection.py`、`tests/test_fish_source_income.py` |
 | Lua 启动、JSON 请求、冻结输入、摘要、replay | `src/igess/fish_source_runtime.py`：`FishSourceRuntime`、`request`、`_freeze_source`、`checkpoint`、`restore` | `tests/test_fish_source_formal.py`、`tests/test_fish_source_joint.py` |
 | 图鉴领取、枪选择与里程碑 | `fish_source_engine.py` 的 `_choose`、`_observe_codex`；`src/igess/fish_source_guns.py` 的 `choose_gun_action`、`GunMilestones` | `tests/test_fish_source_codex.py`、`tests/test_fish_source_guns.py` |
