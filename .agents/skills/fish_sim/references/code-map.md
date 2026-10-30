@@ -43,6 +43,7 @@ rg -n 'claim_fish_reward|start_tide|selected_export_sha256' src/igess tests -g '
 | 导表加载 | `<source>/simulation/SnapshotTables.lua` | 所选 JSON 按源生成 schema 加载；与 `<source>/igess_export/json` 及 `data_root` 对照 |
 | 业务服务 | `<source>/proj/Script/Application/` | 优先检索 `FishThrowService`、`FishHallService`、`BarbellProgressionService`、`TorpedoProgressionService`、`TrashManProgressionService`、`RebirthService`；沿服务追踪实际子模块 |
 | 纯规则与大数 | `<source>/proj/Script/Domain/`、`<source>/proj/Script/Core/BigNumber.lua` | 价格／成长／随机／飞行规则与精确金额；改游戏公式时在此追踪定义 |
+| 寻宝兽突破成本校验 | `<source>/proj/Script/Domain/Trash/TrashEconomyRules.lua` 的 `normalizeRealmRows` | 相邻成本可下降或持平，非满级正数、满级零；回归为 `<source>/tests/trash_realm_price_cadence_test.lua`，综合规则测试为 `trash_economy_rules_test.lua` |
 | 源协议回归 | `<source>/tests/` 中 `simulation_*` | Lua 宿主、CLI、恢复与待完成副作用；按源仓库说明执行 |
 
 先确认源码和导表实际存在。缺少外部源码时仍可分析 IGESS 调用边界，但不能把接口推断当成已核实的源规则，也不能声称完成源集成验证。

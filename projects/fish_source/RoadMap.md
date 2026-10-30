@@ -8,6 +8,8 @@
 
 ## 在用项目
 
+寻宝兽突破成本已取消相邻级别必须递增的限制，支持表驱动的阶段成本升降；非满级正数、满级零及其他境界／返祖校验保留。规则与模拟共用源 `TrashEconomyRules`，专项回归见源仓库 `tests/trash_realm_price_cadence_test.lua`；发布包须另行更新才能使用此规则。
+
 Fish 的新模拟、规则和调优统一使用 `projects/fish_source`，运行入口与产物见 [README.md](README.md)。`projects/fish` 已停用，其历史代码和报告仅供查证，不作为当前后端的比较基线。
 
 ## 2026-10-29 超过三十条按资质卖鱼
