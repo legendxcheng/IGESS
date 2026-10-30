@@ -14,6 +14,7 @@
 | Lua 启动、JSON 请求、冻结输入、摘要、replay | `src/igess/fish_source_runtime.py`：`FishSourceRuntime`、`request`、`_freeze_source`、`checkpoint`、`restore` | `tests/test_fish_source_formal.py`、`tests/test_fish_source_joint.py` |
 | 图鉴领取、枪选择与里程碑 | `fish_source_engine.py` 的 `_choose`、`_observe_codex`；`src/igess/fish_source_guns.py` 的 `choose_gun_action`、`GunMilestones` | `tests/test_fish_source_codex.py`、`tests/test_fish_source_guns.py` |
 | 蛋和鱼潮观察、去重、报告行 | `src/igess/fish_source_eggs.py`、`src/igess/fish_source_tides.py`；实际调度仍在 `_ProfileRun` | `tests/test_fish_source_eggs.py`、`tests/test_fish_source_tides.py` |
+| 养成优先、30 分钟材料预留与鱼潮入场 | `src/igess/fish_source_growth_policy.py`：`growth_options`、`GrowthTideBudget`；engine 的 `execute`、`tide_admission_policy`、checkpoint `growth_tide_budget`；契约见项目 README | `tests/test_fish_growth_priority.py`、`tests/test_fish_source_tides.py`、`tests/test_fish_source_continuation.py` |
 | 在线收入核算、消费回补、领取转账、退款 | `src/igess/fish_source_income.py`：`SourceIncome.observe`；`src/igess/fish_source_numbers.py`：`source_decimal` | `tests/test_fish_source_income.py`、`tests/test_fish_source_joint.py` |
 | 成长和行为 JSON 产物 | `src/igess/fish_source_reports.py`：`write_source_progression_artifacts`、`project_source_behavior` | `tests/test_source_fish_reporting.py` |
 | Web 报告指标及曲线 | `src/igess/reporting/source_fish.py`：`build_source_projection`；页面继续追踪 `view_model.py`、`static.py`、`assets/report.js`、`assets/report.css` | `tests/test_source_fish_reporting.py`、`tests/test_reporting_view_model.py` |

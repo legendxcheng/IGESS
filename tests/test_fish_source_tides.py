@@ -48,6 +48,8 @@ def project(tmp_path,duration):
     for name in ('Datas','luban_exports'):
         shutil.copytree(ROOT/'projects/fish_source'/name,target/name)
     config=yaml.safe_load((ROOT/'projects/fish_source/economy.yaml').read_text(encoding='utf-8'))
+    # These fixtures isolate tide lifecycle; growth-first admission has its own suite.
+    config['player_profiles']['default']['behavior_weights'] = {}
     config['engine']['source_runtime'].update(project_root=str(SOURCE),data_root=str(SOURCE/'igess_export/json'))
     config['scenarios']['smoke']['duration_hours']=str(duration/3600)
     (target/'economy.yaml').write_text(yaml.safe_dump(config,allow_unicode=True),encoding='utf-8')

@@ -2,6 +2,10 @@
 
 更新：2026-10-30。
 
+## 2026-10-30 养成优先鱼潮策略
+
+鱼潮入场前优先已可执行养成，为按历史在线材料收入预计 30 分钟内可达的单个下一材料目标预留；保留原有养成权重、源价格和结算。策略身份、跳过原因与收入观察历史分别写入 manifest、事件及 checkpoint；窗口与边界见 [README](README.md#养成优先与鱼潮材料预留)，回归见 `tests/test_fish_growth_priority.py`。实际成长偏差须以新策略正式运行评估，GameBalancer 发布另行执行。
+
 ## 2026-10-30 逐天累计场景
 
 新增 `day_2_growth`～`day_6_growth`，默认从新玩家运行到第 2～6 个自然日结束，支持逐天调参验证。CLI 与 Dashboard 可显式选择已有 checkpoint／成功历史结果接续到兼容的更长场景，保持模型与源输入身份校验；续跑报告只覆盖新增区间。沿用每天在线 2 小时、累计在线 300 秒采样；命令、恢复成本及版本限制见 [README](README.md)，回归见 `tests/test_fish_source_continuation.py`。

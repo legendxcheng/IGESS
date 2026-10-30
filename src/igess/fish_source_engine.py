@@ -20,6 +20,7 @@ from .engines import EngineAdapterError, EngineExecution, PreparedEngine
 from .fish_source_eggs import EggObservations
 from .fish_source_tides import TIDE_POLICY, TideObservations
 from .fish_source_guns import GunMilestones, choose_gun_action
+from .fish_source_growth_policy import GROWTH_TIDE_POLICY, GrowthTideBudget, growth_options
 from .fish_source_runtime import (
     FishSourceRejection,
     FishSourceRuntime,
@@ -87,7 +88,7 @@ def _affords(wallet: Mapping[str, Any], quote: Mapping[str, Any]) -> bool:
 
 def _integration_code_digest() -> str:
     digest = hashlib.sha256()
-    for name in ("fish_source_engine.py", "fish_source_runtime.py", "fish_source_observation.py", "fish_source_reports.py", "fish_source_income.py", "fish_source_guns.py", "fish_source_eggs.py", "fish_source_tides.py", "fish_source_numbers.py"):
+    for name in ("fish_source_engine.py", "fish_source_runtime.py", "fish_source_observation.py", "fish_source_reports.py", "fish_source_income.py", "fish_source_guns.py", "fish_source_eggs.py", "fish_source_tides.py", "fish_source_numbers.py", "fish_source_growth_policy.py"):
         path = Path(__file__).parent / name
         if not path.is_file():
             path = path.with_suffix(".pyc")
@@ -291,6 +292,7 @@ class FishSourceEngineAdapter:
                 "fish_sell_policy": "over_30_lowest_level_one_cps_backpack_v1",
                 "fish_keep_count": _FISH_KEEP_COUNT,
                 "tide_policy": TIDE_POLICY,
+                "tide_admission_policy": GROWTH_TIDE_POLICY,
                 "tide_schedule": {"policy": "absolute_opening_only_v1", "room_origin_seconds": room_origin},
                 "gun_policy": "claim_stable_reward_id_then_highest_source_attack_v1",
                 "gun_claim_seconds": 1,
@@ -499,6 +501,7 @@ class _ProfileRun:
         self.income = SourceIncome(
             dict(existing.behavior_state.get("online_acquisition", {})) if existing else None
         )
+        self.growth_tide_budget = GrowthTideBudget(existing.behavior_state.get("growth_tide_budget") if existing else None)
         if existing is None:
             self.state = runtime.create(
                 start_at=0, random_seed=seed,
@@ -775,33 +778,13 @@ class _ProfileRun:
             if weight > 0 and self._allowed(op, target):
                 candidates.append((weight, behavior, target, {"op": op, **args}))
 
-        if state["rebirth"]["strength"]["eligible"]:
-            add("strength_rebirth", "rebirth_strength")
-        if state["trashMan"]["unlocked"] and state["rebirth"]["trashMan"]["eligible"]:
-            add("trash_man_rebirth", "rebirth_trash_man")
-        realm = state["trashMan"]["currentRealm"]
-        if (
-            state["trashMan"]["unlocked"]
-            and not state["trashMan"]["breakthrough"]["active"]
-            and not realm["isMax"]
-            and state["trashMan"]["realmId"] == state["trashMan"]["highestRealmId"]
-            and source_decimal(wallet["material"]) >= source_decimal(realm["breakthroughMaterialCost"])
-        ):
-            add("fund_trash_man_breakthrough", "start_breakthrough")
-        hall_quote = actions.get("hallUpgrade")
-        if hall_quote and _affords(wallet, hall_quote):
-            add("upgrade_fish_hall", "upgrade_hall")
+        for option in growth_options(state, actions):
+            if option.affordable(wallet):
+                payload = dict(option.payload)
+                add(option.behavior, payload.pop("op"), option.target, **payload)
         for quote in actions["fishUpgrades"]:
             if _affords(wallet, quote):
                 add("upgrade_fish", "upgrade_fish", str(quote["instanceId"]), instanceId=quote["instanceId"])
-        owned_torpedoes = set(state["torpedo"]["ownedIds"])
-        for quote in actions["torpedoes"]:
-            if quote["torpedoId"] not in owned_torpedoes and _affords(wallet, quote):
-                add("purchase_torpedo", "purchase_torpedo", str(quote["torpedoId"]), torpedoId=quote["torpedoId"])
-        owned_barbells = {item["barbellId"] for item in state["barbell"]["owned"]}
-        for quote in actions["barbells"]:
-            if quote["barbellId"] not in owned_barbells and _affords(wallet, quote):
-                add("synthesize_barbell", "synthesize_barbell", str(quote["barbellId"]), barbellId=quote["barbellId"])
         if state["inventory"]["total"] < state["inventory"]["capacity"] and self.inputs.fishing_area:
             add("manual_throw", "manual_throw")
         add("exercise_barbell", "exercise_barbell")
@@ -911,7 +894,7 @@ class _ProfileRun:
         origin = self.inputs.room_origin_seconds
         return f"room:{origin}:round:{(opening - origin) // self.tide_interval}"
 
-    def _skip_tide(self, opening: int, reason: str) -> None:
+    def _skip_tide(self, opening: int, reason: str, **budget: Any) -> None:
         row = {
             "roundId": self._round_id(opening), "openedAt": opening,
             "endsAt": opening + 120, "phase": "skipped", "success": True,
@@ -920,6 +903,7 @@ class _ProfileRun:
             "reloads": [], "eggs": [],
             "totalMaterialSpent": {"sign": 0, "coeff": "0", "exp": 0},
             "approximation": TIDE_POLICY["model"],
+            **budget,
         }
         self.events.append(Event(
             self.scenario.id, self.profile.id, opening, "tide_observed", row["roundId"],
@@ -978,6 +962,7 @@ class _ProfileRun:
             if now == self.next_tide_at:
                 round_id = self._round_id(now)
                 self.next_tide_at += self.tide_interval
+                self.growth_tide_budget.observe(self.active_time_seconds, self.income.totals)
                 if planned_logout - now < 120:
                     self._skip_tide(now, "insufficient_online_time")
                 elif self.pending_throw or self.pending_action or self.pending_tide:
@@ -985,7 +970,15 @@ class _ProfileRun:
                 elif not self.state["guns"]["tideEligible"]:
                     self._skip_tide(now, "not_unlocked")
                 else:
-                    self._start_tide(round_id)
+                    actions = self.runtime.request({"op": "query_actions"})
+                    reservation = self.growth_tide_budget.skip(
+                        self.state, growth_options(self.state, actions), self.profile.behavior_weights,
+                        self._allowed, self.behavior_turn, planned_logout - now,
+                    )
+                    if reservation:
+                        self._skip_tide(now, **reservation)
+                    else:
+                        self._start_tide(round_id)
             boundary = min(planned_logout, self.next_tide_at)
             advance_limit = min(boundary, self.end)
             if self.pending_tide:
@@ -1029,6 +1022,7 @@ class _ProfileRun:
                 "next_tide_at": self.next_tide_at,
                 "tide_observations": self.tide_observations.save(),
                 "online_acquisition": self.income.save(),
+                "growth_tide_budget": self.growth_tide_budget.save(),
                 "gun_milestones": self.gun_milestones.save(),
                 "first_times": self.first_times,
                 "egg_observations": self.egg_observations.save(),
