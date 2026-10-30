@@ -398,6 +398,49 @@ def test_authoring_dashboard_renders_read_only_observability_with_escaped_values
     assert "Run smoke scenario (formal)" in body
 
 
+def test_dashboard_passes_selected_continuation_to_task_and_rejects_paths(tmp_path):
+    service = _DashboardService(tmp_path)
+    captured, entered = [], Event()
+
+    class Runner(InlineTaskRunner):
+        def run(self, operation, scenario="", *, resume_run_id=None):
+            if operation == "simulate":
+                captured.append((scenario, resume_run_id))
+                entered.set()
+                return {"state": "success", "message": "continued"}
+            return super().run(operation, scenario)
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), dashboard._handler(
+        service, None, None, task_runner_factory=Runner, csrf_token="token",
+    ))
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    connection = HTTPConnection("127.0.0.1", server.server_port, timeout=5)
+    try:
+        for path, run_id in (("/formal", "../other"), ("/advise", "day1-run")):
+            connection.request("POST", path, urlencode({
+                "_csrf": "token", "scenario": "day_2_growth", "resume_run_id": run_id,
+            }))
+            response = connection.getresponse()
+            response.read()
+            assert response.status == HTTPStatus.BAD_REQUEST
+        assert not captured
+        connection.request("POST", "/formal", urlencode({
+            "_csrf": "token", "scenario": "day_2_growth", "resume_run_id": "day1-run",
+        }))
+        response = connection.getresponse()
+        response.read()
+        assert response.status == HTTPStatus.SEE_OTHER
+        assert entered.wait(5)
+        assert captured == [("day_2_growth", "day1-run")]
+    finally:
+        connection.close()
+        server.shutdown()
+        server.RequestHandlerClass.close_tasks()
+        server.server_close()
+        thread.join(5)
+
+
 def test_dashboard_mutations_require_post_and_redirect_home(tmp_path):
     service = _DashboardService(tmp_path)
     token = "test-csrf-token"

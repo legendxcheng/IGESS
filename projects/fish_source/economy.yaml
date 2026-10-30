@@ -224,6 +224,71 @@ scenarios:
     - unlock_timeline
     - prestige_timeline
     - bottleneck_report
+  day_2_growth:
+    duration_hours: '48'
+    time_mode: tick
+    profiles:
+    - default
+    start_state: new_player
+    record_interval_seconds: 300
+    outputs:
+    - resource_curve
+    - purchase_timeline
+    - unlock_timeline
+    - prestige_timeline
+    - bottleneck_report
+  day_3_growth:
+    duration_hours: '72'
+    time_mode: tick
+    profiles:
+    - default
+    start_state: new_player
+    record_interval_seconds: 300
+    outputs:
+    - resource_curve
+    - purchase_timeline
+    - unlock_timeline
+    - prestige_timeline
+    - bottleneck_report
+  day_4_growth:
+    duration_hours: '96'
+    time_mode: tick
+    profiles:
+    - default
+    start_state: new_player
+    record_interval_seconds: 300
+    outputs:
+    - resource_curve
+    - purchase_timeline
+    - unlock_timeline
+    - prestige_timeline
+    - bottleneck_report
+  day_5_growth:
+    duration_hours: '120'
+    time_mode: tick
+    profiles:
+    - default
+    start_state: new_player
+    record_interval_seconds: 300
+    outputs:
+    - resource_curve
+    - purchase_timeline
+    - unlock_timeline
+    - prestige_timeline
+    - bottleneck_report
+  day_6_growth:
+    duration_hours: '144'
+    time_mode: tick
+    profiles:
+    - default
+    start_state: new_player
+    record_interval_seconds: 300
+    outputs:
+    - resource_curve
+    - purchase_timeline
+    - unlock_timeline
+    - prestige_timeline
+    - bottleneck_report
   week_1_growth:
     duration_hours: '168'
     time_mode: tick

@@ -143,6 +143,19 @@ def _authoring_content(
         options = '<option value="" disabled>No scenarios available</option>'
     latest_change = _latest_change_panel(service.latest_change())
     latest_smoke = _latest_smoke_panel(status.get("latest_smoke_run_id"), runs)
+    resume_options = "".join(
+        f'<option value="{_e(run.run_id)}">{_e(run.run_id)}</option>'
+        for run in reversed(runs)
+        if getattr(run, "status", "") == "success"
+        and getattr(run, "engine_id", None) == "fish_source"
+        and (Path(run.run_dir) / "output" / "final_checkpoint.json").is_file()
+    )
+    resume_control = (
+        '<label for="resume-run">起点</label>'
+        '<select id="resume-run" name="resume_run_id"><option value="">从新玩家开始</option>'
+        + resume_options + '</select><p class="hint">选择历史结果可继续到目标天数。'
+        '需保持数值表、策略和源码不变；报告只统计本次新增区间。</p>'
+    ) if resume_options else ""
     return f"""    <div class="overview-grid" data-view="overview"><section>
       <h2>Model status</h2>
       <p><span class="state-badge {_e(state)}">{_e(state)}</span> {_e(response.message)}</p>
@@ -173,6 +186,7 @@ def _authoring_content(
           {_csrf_input(csrf_token)}
           <label for="scenario">Formal scenario</label>
           <select id="scenario" name="scenario">{options}</select>
+          {resume_control}
           <button type="submit" {"" if scenarios else "disabled data-unavailable"}>Run formal scenario</button>
         </form>
 
@@ -435,7 +449,7 @@ class _DashboardRuntime:
         if pending:
             self._refresh()
 
-    def submit(self, path, scenario):
+    def submit(self, path, scenario, *, resume_run_id=None):
         if not self.guard.acquire(blocking=False):
             return False
         with self.lock:
@@ -444,17 +458,18 @@ class _DashboardRuntime:
             self.task = {"state": "running", "message": message,
                          "scenario": scenario, "action": path}
         try:
-            self._start_worker(self._execute, path, scenario)
+            self._start_worker(self._execute, path, scenario, resume_run_id)
         except Exception as error:
             with self.lock:
                 self.task = {"state": "failed", "message": str(error)}
             self.guard.release()
         return True
 
-    def _execute(self, path, scenario):
+    def _execute(self, path, scenario, resume_run_id=None):
         outcome = {"state": "failed", "message": "Worker interrupted; check run history before retrying."}
         try:
-            outcome = self.task_runner.run("advise" if path == "/advise" else "simulate", scenario)
+            options = {"resume_run_id": resume_run_id} if resume_run_id else {}
+            outcome = self.task_runner.run("advise" if path == "/advise" else "simulate", scenario, **options)
             diagnostic_id = outcome.get("diagnostic", {}).get("details", {}).get("diagnostic_id")
             if outcome["state"] == "failed" and isinstance(diagnostic_id, str):
                 try:
@@ -787,7 +802,13 @@ def _handler(
                 self.end_headers()
                 return
             scenario = "smoke" if parsed.path == "/smoke" else form.get("scenario", ["day_1_progression"])[0]
-            if not self._submit(parsed.path, scenario):
+            resume_run_id = form.get("resume_run_id", [""])[0]
+            if resume_run_id and (parsed.path not in {"/formal", "/run"}
+                                  or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,127}", resume_run_id) is None):
+                self.send_error(HTTPStatus.BAD_REQUEST, "Invalid continuation run")
+                return
+            options = {"resume_run_id": resume_run_id} if resume_run_id else {}
+            if not self._submit(parsed.path, scenario, **options):
                 self.send_error(HTTPStatus.TOO_MANY_REQUESTS)
                 return
             self.send_response(HTTPStatus.SEE_OTHER)

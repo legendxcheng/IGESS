@@ -73,6 +73,8 @@ Fish 是以摸鱼／炸鱼为主题的增量养成游戏，包含随机收集、
 
 ## 验证与交付
 
+逐天调参可选 `day_1_growth`～`day_6_growth`，默认从新玩家累计运行到第 N 个自然日结束。输入不变时，用 `--checkpoint-in` 或 Dashboard 历史起点接续到兼容的更长场景；身份校验保留，旧适配器／改表后的 checkpoint 需重建基线。报告仅覆盖新增区间，源恢复仍有历史重放成本；命令和兼容边界见项目 README，验证用 `tests/test_fish_source_continuation.py`。
+
 从 IGESS 根目录执行，环境需 Python 3.11+、项目依赖与 `lua55`。优先使用 README 的入口；已有环境可使用 `.tmp/py311-venv/Scripts/` 下的同名程序。
 
 ```powershell

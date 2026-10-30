@@ -355,8 +355,23 @@ class FishSourceEngineAdapter:
                 expected_engine_id=self.engine_id,
                 expected_model_digest=prepared.model_digest,
             )
-            if existing.scenario_id != scenario_id or existing.profile_id != scenario.profiles[0]:
-                raise EngineAdapterError("fish_source_checkpoint_scope_mismatch", "Checkpoint scenario/profile differs")
+            if existing.profile_id != scenario.profiles[0]:
+                raise EngineAdapterError("fish_source_checkpoint_scope_mismatch", "Checkpoint profile differs")
+            if existing.scenario_id != scenario_id:
+                previous = prepared.model.scenarios.get(existing.scenario_id)
+                # The model digest above still binds every configured scenario,
+                # source byte, selected table, policy and seed. Only the horizon
+                # may grow; compact event details affect report storage only.
+                fields = ("profiles", "start_state", "record_interval_seconds", "time_mode")
+                if (previous is None
+                        or scenario.duration_hours <= previous.duration_hours
+                        or any(getattr(previous, key) != getattr(scenario, key) for key in fields)
+                        or set(previous.outputs) - {"compact_event_details"}
+                        != set(scenario.outputs) - {"compact_event_details"}):
+                    raise EngineAdapterError(
+                        "fish_source_checkpoint_scope_mismatch",
+                        "Resume requires a longer scenario with the same profile, start state, sampling and outputs",
+                    )
         execution_start = existing.simulated_time_seconds if existing else 0
         if execution_end < execution_start:
             raise EngineAdapterError("execution_window_invalid", "Cannot stop before the checkpoint time")
@@ -369,6 +384,9 @@ class FishSourceEngineAdapter:
             "accepted_commands_scope": "current_execution_segment",
             "cumulative_fields": ["wallet", "online_acquisition", "active_time_seconds", "source_total_throws"],
         }
+        if existing is not None:
+            prepared.manifest_metadata["execution_window"]["checkpoint_scenario_id"] = existing.scenario_id
+            prepared.manifest_metadata["execution_window"]["checkpoint_input"] = str(Path(checkpoint_input).resolve())
         checked_at = time.perf_counter()
         timings = {"input_check": checked_at - run_started, "process_start": 0.0,
                    "source_execution": 0.0, "checkpoint": 0.0, "process_close": 0.0}

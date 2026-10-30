@@ -49,6 +49,8 @@ Get-Content -LiteralPath '.igess/diagnostics/<run_id>.json' -Raw
 
 ## 验证与当前边界
 
+Fish Source 可显式使用 `--checkpoint-in` 接续到兼容的更长场景，例如 Day1 → Day2。模型与源输入摘要仍须完全一致，跨场景只允许延长时间并保持画像、初始状态、采样和输出契约；`compact_event_details` 可不同。`execution_window` 保存本段起止、来源场景与 checkpoint 路径，报告标记续跑区间。Dashboard 的历史起点通过当前项目 registry 解析，随后交给同一个正式执行器。恢复成本与命令见 [Fish README](../projects/fish_source/README.md)，跨进程等价回归见 `tests/test_fish_source_continuation.py`。
+
 `tests/test_formal_run.py` 验证旧入口引擎约束及失败保真；三个入口各自的测试覆盖响应兼容、相同 Generic 输入的产物等价、报告失败、Fish checkpoint 恢复和工具包依赖隔离。`tests/test_operator_toolkit.py` 还通过 Python 3.11 实际生成并检查工具包。
 
 旧 `run`、`scan`、`advise` 只支持 Generic，收到 Fish 或其他不支持的引擎时会在写产物前报错。Fish 正式模拟使用 `model simulate`；这不表示它提供 Fish 参数扫描或建议功能。

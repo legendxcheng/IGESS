@@ -34,7 +34,7 @@ class DashboardTaskRunner:
         self._closed = False
         self._launch_process = launch_process or subprocess.Popen
 
-    def run(self, operation, scenario=""):
+    def run(self, operation, scenario="", *, resume_run_id=None):
         if operation not in {"simulate", "advise", "check"}:
             raise ValueError("Unsupported Dashboard operation")
         task_id = uuid.uuid4().hex
@@ -44,7 +44,8 @@ class DashboardTaskRunner:
             claim = directory / "claim.json"
             request.write_text(json.dumps({"version": 1, "task_id": task_id,
                                           "context": self.context, "operation": operation,
-                                          "scenario": scenario, "claim_path": str(claim)}), encoding="utf-8")
+                                          "scenario": scenario, "resume_run_id": resume_run_id,
+                                          "claim_path": str(claim)}), encoding="utf-8")
             code, log = None, ""
             try:
                 code, log = self._run_process(request, result, task_id)

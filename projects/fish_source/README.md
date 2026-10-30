@@ -5,9 +5,31 @@
 ```powershell
 uv run igess model simulate --project projects/fish_source --scenario smoke
 uv run igess model simulate --project projects/fish_source --scenario day_1_growth
+uv run igess model simulate --project projects/fish_source --scenario day_2_growth
+uv run igess model simulate --project projects/fish_source --scenario day_3_growth
+uv run igess model simulate --project projects/fish_source --scenario day_4_growth
+uv run igess model simulate --project projects/fish_source --scenario day_5_growth
+uv run igess model simulate --project projects/fish_source --scenario day_6_growth
 uv run igess model simulate --project projects/fish_source --scenario week_1_growth
 uv run igess model simulate --project projects/fish_source --scenario month_1_growth
 ```
+
+Day1～Day6 是累计场景：`day_N_growth` 默认从新玩家开始运行到第 N 个自然日结束（N × 24 小时），使用默认免费画像、每天在线 2 小时，每累计在线 300 秒采样。按当前调参阶段选择一条命令即可，Dashboard 会从配置自动加载这些场景。独立运行适用于改表后验证前 N 天；输入不变时可显式选择上一轮 checkpoint 接续，见下方“按天接续”。
+
+## 按天接续
+
+先运行 Day1；确认结果后，以返回的 `output_dir/final_checkpoint.json` 运行 Day2，再以 Day2 的新 checkpoint 运行 Day3，依次推进。截止时间仍是目标场景的绝对时间：完整 Day1 接 Day2 时，本段为 86400～172800 秒。
+
+```powershell
+uv run igess model simulate --project projects/fish_source --scenario day_2_growth --checkpoint-in "<Day1运行目录>/output/final_checkpoint.json" --json
+uv run igess model simulate --project projects/fish_source --scenario day_3_growth --checkpoint-in "<Day2运行目录>/output/final_checkpoint.json" --json
+```
+
+Dashboard 的正式运行表单中，选择目标场景，再在“起点”中选择成功历史结果；保留“从新玩家开始”则独立模拟。页面／任务组件更新后需要重启 Dashboard 服务，模拟任务不能代替服务重启。
+
+接续要求模型、源码、导表、适配器、种子与玩家策略身份一致。跨场景仅允许延长时长，画像、初始状态、采样和输出类型须一致（允许长程场景的 `compact_event_details` 存储差异），因此也支持 Day6 接首周或首周接首月。修改数值表、配置或代码后从零重跑；本次适配器升级前的 checkpoint 仍按原身份规则拒绝，需先生成新基线。原报告和 checkpoint 保留，每次接续产生新的运行目录。
+
+续跑报告标为“续跑区间”，事件／成长计数只覆盖本次新增区间；钱包、累计收入、随机状态与生命周期首次记录延续历史。需要前 N 天的完整成长统计时，使用独立累计运行或逐段报告，不能把单段报告当成全程报告。源恢复仍重放历史操作以重建状态，省去前段策略决策和采样处理，但不是零成本加载；节省时间取决于实际运行，不能保证每天耗时固定。
 
 `igess model status --project projects/fish_source` 使用同一个源引擎执行十 tick 就绪检查，检查源能力和输入并观察状态变化；检查不登记正式运行，也不创建运行报告。通过后仍需以上正式入口生成可归因的报告。
 
@@ -25,7 +47,7 @@ Web 报告读取同源状态和交易回执，展示力量、双 Luck、钱包�
 
 新运行在 `source_profiles.collection_growth` 与行为产物中保存本段起始解锁／枪事实及冻结导表名称；checkpoint 继续时从恢复后的源状态建立基线，不重放历史成长。成长时点是源观察时点，同批多组合按稳定身份展示并注明未区分先后，不从曲线采样补造时间。旧新玩家完整事件可重生成；旧续跑缺起始历史时，新鱼种首次不推断，页面显示覆盖不完整。名称优先使用运行保存的快照名称，否则显示 ID。相邻在线时段共用边界秒时只归入后一个时段。规格与验收见[收集成长点](../../.scratch/fish-collection-growth-points/spec.md)。
 
-新运行的 1／7／30 天场景已恢复每累计在线 300 秒采样（`sampling_time_basis: online`），离线时间不消耗采样周期；另记录上下线、离线奖励领取及两类重生前后状态，相同状态去重。采样只查询源状态，不改变玩家操作；间隔与时间口径写入运行清单。增加采样点需要重新模拟，不能通过重生成旧报告补齐。状态采样仍不代表完整在线毛产出或连续时间真实峰值。
+新运行的 1～7／30 天场景每累计在线 300 秒采样（`sampling_time_basis: online`），离线时间不消耗采样周期；另记录上下线、离线奖励领取及两类重生前后状态，相同状态去重。采样只查询源状态，不改变玩家操作；间隔与时间口径写入运行清单。增加采样点需要重新模拟，不能通过重生成旧报告补齐。状态采样仍不代表完整在线毛产出或连续时间真实峰值。
 
 “资源（材料）余额”有独立图表，直接展示源状态的 `material`，横轴为累计在线时间。默认线性视图保留零余额，可切换对数视图查看数量级；它是扣除消耗后的余额，不是累计获取量。通用资源曲线和总览也使用“资源（材料）”名称，与游戏界面对应。
 
@@ -67,7 +89,7 @@ IGESS 对源状态变化和成功回执做收入统计：加回消费，抵消�
 正式策略按源 `tides.config.intervalSeconds` 连续调度，`source_runtime.room_origin_seconds` 默认为 0，并与源生成窗口、入场策略写入清单。只在绝对开场边界判断入场；离线不冻结、不重置且不补场。计划下线不足 120 秒、未解锁或前台忙碌均逐场记录跳过；普通动作不会为了赶场截短既定耗时，锻炼在边界结算并停止，已提交自然飞行跨开场时该场记忙碌。运行清单记录固定五蛋、120 秒、六次换弹的近似，Web 报告展示阶段、耗时、每次换弹与实际总支出；不推断真实命中率或多人竞争。
 
 
-正式运行可用 `--until-seconds` 保存中途状态，再用同一场景与 `--checkpoint-in` 继续。截止秒为场景内绝对秒，不改变场景或模型身份；不可早于恢复点，等于恢复点允许只读重新生成产物。此选项仅支持 fish_source。
+正式运行可用 `--until-seconds` 保存中途状态，再用同一场景或兼容的更长场景与 `--checkpoint-in` 继续。截止秒为场景内绝对秒，不改变场景或模型身份；不可早于恢复点，等于恢复点允许只读重新生成产物。此选项仅支持 fish_source。
 
 ```powershell
 uv run igess model simulate --project projects/fish_source --scenario day_1_growth --until-seconds 660 --json

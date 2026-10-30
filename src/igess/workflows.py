@@ -140,6 +140,17 @@ class WorkflowService:
             profile_id=profile_id,
         )
 
+    def checkpoint_for_run(self, run_id: str) -> Path:
+        """Resolve a selected successful run within this project's registry."""
+        record = next((item for item in self.registry.list_runs() if item.run_id == run_id), None)
+        if record is None or record.status != "success":
+            raise ValueError("Choose a successful run from this project's history")
+        checkpoint = record.run_dir / "output" / "final_checkpoint.json"
+        if (not checkpoint.is_file()
+                or not checkpoint.resolve().is_relative_to(record.run_dir.resolve())):
+            raise ValueError("The selected run has no available checkpoint")
+        return checkpoint
+
     def available_scenarios(self, config: str | Path) -> tuple[str, ...]:
         """Read scenario identities from the selected rules without running a model."""
         return tuple(ConfigLoader.load_rules_only(self._path(config)).rules.scenarios)

@@ -85,8 +85,11 @@ def execute(request):
         result = service.run_advice(None if service.is_authoring else config,
                                     None if service.is_authoring else tables, scenario)
     elif operation == "simulate":
-        result = (service.run_authoring_scenario(scenario) if service.is_authoring
-                  else service.run_scenario(config, tables, scenario))
+        resume_run_id = request.get("resume_run_id")
+        options = ({"checkpoint_input": service.checkpoint_for_run(resume_run_id)}
+                   if resume_run_id else {})
+        result = (service.run_authoring_scenario(scenario, **options) if service.is_authoring
+                  else service.run_scenario(config, tables, scenario, **options))
     else:
         raise ValueError("Unsupported Dashboard operation")
     if isinstance(result, CommandResponse):

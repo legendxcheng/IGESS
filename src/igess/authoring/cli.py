@@ -153,7 +153,7 @@ def add_model_parser(subparsers: argparse._SubParsersAction) -> argparse.Argumen
     )
     simulate.add_argument(
         "--checkpoint-in",
-        help="Optional engine checkpoint to resume from.",
+        help="Optional engine checkpoint; Fish source can continue into a compatible longer scenario.",
     )
     simulate.add_argument(
         "--until-seconds", type=int,

@@ -15,6 +15,11 @@ _SCENARIO_LABELS = {
     "analytic_smoke": "解析式冒烟验证",
     "day_1_progression": "首日成长",
     "day_1_growth": "首日成长",
+    "day_2_growth": "前2天成长",
+    "day_3_growth": "前3天成长",
+    "day_4_growth": "前4天成长",
+    "day_5_growth": "前5天成长",
+    "day_6_growth": "前6天成长",
     "week_1_growth": "首周成长",
     "month_1_growth": "首月成长",
 }
@@ -41,6 +46,9 @@ def generate_static_report(
         newline="\n",
     )
     report_title = title or f"IGESS 调优报告 - {_scenario_label(data.scenario_id)}"
+    window = data.manifest.get("execution_window", {})
+    if title is None and window.get("start_seconds", 0) > 0:
+        report_title += "（续跑区间）"
     index = output_dir / "index.html"
     index.write_text(
         _html(inline_payload, report_title),
