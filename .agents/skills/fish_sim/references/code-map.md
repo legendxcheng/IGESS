@@ -59,10 +59,12 @@ rg -n 'claim_fish_reward|start_tide|selected_export_sha256' src/igess tests -g '
 
 ## 查询性能与等价验收
 
+当前源码先核对 `<source>/simulation/README.md`。下列 2026-10-28 历史优化指针不保证仍在所选源树中；2026-11-01 本轮仅重新落实幸运值直接查询，未重接其他查询缓存或增量观察。
+
 - `<source>/simulation/Query.lua`：会话鱼厅稳定投影缓存、单次拥有快照与完整 schema 校验；动态余额仍用 `FishHallSlotBalanceDraft.BuildQueryEntries`，失败回到原公开查询保留拒绝码。
 - `<source>/proj/Script/Application/`：鱼厅、背包、枪、杠铃、神器、力量重生、离线收益、寻宝兽进阶的内部 `ProjectSnapshot`。原公开查询仍自行读取/校验；`simulation/Guns.lua` 接受同次快照。
 - `PlayerInventoryService.ProjectFullSnapshot` → `PlayerInventory/QueryContract.BuildFullQuery` → `Domain/Fishing/FishInventoryQuery.BuildAll`：一次生成完整库存，公开分页不变；与 `FishEconomyRules.CalculateProductionSnapshot` 的重复鱼复用仅限单次计算，返回大数独立。
-- `Domain/Fishing/ThrowOutcomeResolver.QueryLuck` 与 `Resolve` 共用前置映射；异常规则/边界回到完整结算保持错误。`src/igess/fish_source_engine.py` 首次观察即含幸运值，避免同状态第二次完整查询。
+- `Application/FishThrowService.QueryLuck` → `Domain/Fishing/ThrowOutcomeResolver.QueryLuck`，与 `Resolve` 共用 `prepareLuck`。默认安全目录直接映射四个查询字段；显式 options、异常目录或数值边界回到完整 Resolve 保留错误。源专项回归为 `tests/throw_luck_query_test.lua`；本轮逐次观察差分、核心产物与串行配对证据在 `.scratch/fish-luck-query-20261101/`。
 - `<source>/proj/Script/Core/BigNumber.lua`：精确分块整数算法；`simulation/Json.lua`：有界字段名缓存与等价 DTO 编码。精度、随机、排序和线协议均保持原契约。
 - 源回归见 `simulation/README.md`；正式冻结/差分/串行配对工具见 `.scratch/fish-source-query-performance/` 的 `benchmark.py`、`compare.py`、`run_benchmarks.py`、`probe_arithmetic.py`。不增加观察或减少采样，完整最终 DTO 来自最后一次既有查询。
 

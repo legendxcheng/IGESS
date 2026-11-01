@@ -1,0 +1,26 @@
+[
+  {
+    "variant": "baseline",
+    "scenario": "day_1_growth",
+    "tag": "trace",
+    "trace": true,
+    "started": "2026-11-01T02:16:57.237768+00:00",
+    "finished": "2026-11-01T02:17:37.016153+00:00"
+  },
+  {
+    "variant": "candidate",
+    "scenario": "day_1_growth",
+    "tag": "trace",
+    "trace": true,
+    "started": "2026-11-01T02:17:37.016713+00:00",
+    "finished": "2026-11-01T02:18:07.069176+00:00"
+  },
+  {
+    "variant": "candidate",
+    "scenario": "week_1_growth",
+    "tag": "pair1",
+    "trace": false,
+    "started": "2026-11-01T02:18:07.136017+00:00",
+    "finished": "2026-11-01T02:24:03.949144+00:00"
+  }
+]

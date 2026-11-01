@@ -1,0 +1,29 @@
+{
+  "variant": "candidate",
+  "scenario": "day_1_growth",
+  "tag": "pinned-short",
+  "diagnostic_only": false,
+  "timings": {
+    "total": 18.889325800002553
+  },
+  "response": {
+    "schema_version": 1,
+    "command": "model.simulate",
+    "ok": true,
+    "code": "simulated",
+    "message": "Simulation complete: day_1_growth",
+    "details": {},
+    "result": {
+      "change_id": null,
+      "engine_id": "fish_source",
+      "kind": "formal",
+      "model_digest": "sha256:9da18e0878d74cc20d34d93d1aef4461d5c3c28c8215626f89e4eee1d5d51774",
+      "output_dir": "E:\\IGESS\\.tmp\\fish-luck-query-20261101\\candidate-runs\\20261101T031430793690Z-day_1_growth\\output",
+      "report_index": "E:\\IGESS\\.tmp\\fish-luck-query-20261101\\candidate-runs\\20261101T031430793690Z-day_1_growth\\report\\index.html",
+      "run_id": "20261101T031430793690Z-day_1_growth",
+      "scenario_id": "day_1_growth",
+      "status": "success"
+    }
+  },
+  "stderr": ""
+}

@@ -1,0 +1,174 @@
+{
+  "at": "2026-11-01T02:46:11.517867+00:00",
+  "topology": [
+    {
+      "group": 0,
+      "logical": 0,
+      "core": 0,
+      "efficiency": 1
+    },
+    {
+      "group": 0,
+      "logical": 1,
+      "core": 0,
+      "efficiency": 1
+    },
+    {
+      "group": 0,
+      "logical": 2,
+      "core": 2,
+      "efficiency": 1
+    },
+    {
+      "group": 0,
+      "logical": 3,
+      "core": 2,
+      "efficiency": 1
+    },
+    {
+      "group": 0,
+      "logical": 4,
+      "core": 4,
+      "efficiency": 1
+    },
+    {
+      "group": 0,
+      "logical": 5,
+      "core": 4,
+      "efficiency": 1
+    },
+    {
+      "group": 0,
+      "logical": 6,
+      "core": 6,
+      "efficiency": 1
+    },
+    {
+      "group": 0,
+      "logical": 7,
+      "core": 6,
+      "efficiency": 1
+    },
+    {
+      "group": 0,
+      "logical": 8,
+      "core": 8,
+      "efficiency": 1
+    },
+    {
+      "group": 0,
+      "logical": 9,
+      "core": 8,
+      "efficiency": 1
+    },
+    {
+      "group": 0,
+      "logical": 10,
+      "core": 10,
+      "efficiency": 1
+    },
+    {
+      "group": 0,
+      "logical": 11,
+      "core": 10,
+      "efficiency": 1
+    },
+    {
+      "group": 0,
+      "logical": 12,
+      "core": 12,
+      "efficiency": 1
+    },
+    {
+      "group": 0,
+      "logical": 13,
+      "core": 12,
+      "efficiency": 1
+    },
+    {
+      "group": 0,
+      "logical": 14,
+      "core": 14,
+      "efficiency": 1
+    },
+    {
+      "group": 0,
+      "logical": 15,
+      "core": 14,
+      "efficiency": 1
+    },
+    {
+      "group": 0,
+      "logical": 16,
+      "core": 16,
+      "efficiency": 0
+    },
+    {
+      "group": 0,
+      "logical": 17,
+      "core": 17,
+      "efficiency": 0
+    },
+    {
+      "group": 0,
+      "logical": 18,
+      "core": 18,
+      "efficiency": 0
+    },
+    {
+      "group": 0,
+      "logical": 19,
+      "core": 19,
+      "efficiency": 0
+    },
+    {
+      "group": 0,
+      "logical": 20,
+      "core": 20,
+      "efficiency": 0
+    },
+    {
+      "group": 0,
+      "logical": 21,
+      "core": 21,
+      "efficiency": 0
+    },
+    {
+      "group": 0,
+      "logical": 22,
+      "core": 22,
+      "efficiency": 0
+    },
+    {
+      "group": 0,
+      "logical": 23,
+      "core": 23,
+      "efficiency": 0
+    },
+    {
+      "group": 0,
+      "logical": 24,
+      "core": 24,
+      "efficiency": 0
+    },
+    {
+      "group": 0,
+      "logical": 25,
+      "core": 25,
+      "efficiency": 0
+    },
+    {
+      "group": 0,
+      "logical": 26,
+      "core": 26,
+      "efficiency": 0
+    },
+    {
+      "group": 0,
+      "logical": 27,
+      "core": 27,
+      "efficiency": 0
+    }
+  ],
+  "affinity_mask": 65535
+}

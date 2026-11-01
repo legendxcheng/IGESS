@@ -1,0 +1,74 @@
+[
+  {
+    "tag": "pinned-final1",
+    "scenario": "week_1_growth",
+    "variant": "baseline",
+    "started": "2026-11-01T02:50:56.863755+00:00",
+    "foreign_lua": [],
+    "finished": "2026-11-01T02:55:12.733267+00:00",
+    "returncode": 0
+  },
+  {
+    "tag": "pinned-final1",
+    "scenario": "week_1_growth",
+    "variant": "candidate",
+    "started": "2026-11-01T02:55:12.748718+00:00",
+    "foreign_lua": [],
+    "finished": "2026-11-01T02:58:38.451848+00:00",
+    "returncode": 0
+  },
+  {
+    "tag": "pinned-final2",
+    "scenario": "week_1_growth",
+    "variant": "candidate",
+    "started": "2026-11-01T02:58:38.604068+00:00",
+    "foreign_lua": [],
+    "finished": "2026-11-01T03:02:04.385441+00:00",
+    "returncode": 0
+  },
+  {
+    "tag": "pinned-final2",
+    "scenario": "week_1_growth",
+    "variant": "baseline",
+    "started": "2026-11-01T03:02:04.403875+00:00",
+    "foreign_lua": [],
+    "finished": "2026-11-01T03:06:20.364698+00:00",
+    "returncode": 0
+  },
+  {
+    "tag": "pinned-final3",
+    "scenario": "week_1_growth",
+    "variant": "baseline",
+    "started": "2026-11-01T03:06:20.484838+00:00",
+    "foreign_lua": [],
+    "finished": "2026-11-01T03:10:36.430349+00:00",
+    "returncode": 0
+  },
+  {
+    "tag": "pinned-final3",
+    "scenario": "week_1_growth",
+    "variant": "candidate",
+    "started": "2026-11-01T03:10:36.449251+00:00",
+    "foreign_lua": [],
+    "finished": "2026-11-01T03:14:02.220350+00:00",
+    "returncode": 0
+  },
+  {
+    "tag": "pinned-short",
+    "scenario": "day_1_growth",
+    "variant": "baseline",
+    "started": "2026-11-01T03:14:02.339745+00:00",
+    "foreign_lua": [],
+    "finished": "2026-11-01T03:14:27.437526+00:00",
+    "returncode": 0
+  },
+  {
+    "tag": "pinned-short",
+    "scenario": "day_1_growth",
+    "variant": "candidate",
+    "started": "2026-11-01T03:14:27.454693+00:00",
+    "foreign_lua": [],
+    "finished": "2026-11-01T03:14:47.542373+00:00",
+    "returncode": 0
+  }
+]
