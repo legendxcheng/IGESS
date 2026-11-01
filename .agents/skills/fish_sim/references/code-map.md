@@ -59,7 +59,9 @@ rg -n 'claim_fish_reward|start_tide|selected_export_sha256' src/igess tests -g '
 
 ## 查询性能与等价验收
 
-当前源码先核对 `<source>/simulation/README.md`。下列 2026-10-28 历史优化指针不保证仍在所选源树中；2026-11-01 本轮仅重新落实幸运值直接查询，未重接其他查询缓存或增量观察。
+当前源码先核对 `<source>/simulation/README.md`。下列 2026-10-28 历史优化指针不保证仍在所选源树中；2026-11-01 已重新落实幸运值直接查询及本次 Query 内的快照复用，未重接历史增量观察或其他跨查询缓存。
+
+- 当前快照复用：`<source>/simulation/SnapshotScope.lua` → `Host.lua` 的 ArchiveService 注入 → `Query.lua` 的完整查询作用域；`Guns.lua` 使用独立 combat 分支，`Codex.lua` 复用只读档案视图。写操作和独立查询仍转发原服务，各业务校验保留。回归为源 `tests/simulation_snapshot_scope_test.lua`，差分与串行配对工具在 `.scratch/fish-query-snapshot-reuse-20261101/`。
 
 - `<source>/simulation/Query.lua`：会话鱼厅稳定投影缓存、单次拥有快照与完整 schema 校验；动态余额仍用 `FishHallSlotBalanceDraft.BuildQueryEntries`，失败回到原公开查询保留拒绝码。
 - `<source>/proj/Script/Application/`：鱼厅、背包、枪、杠铃、神器、力量重生、离线收益、寻宝兽进阶的内部 `ProjectSnapshot`。原公开查询仍自行读取/校验；`simulation/Guns.lua` 接受同次快照。

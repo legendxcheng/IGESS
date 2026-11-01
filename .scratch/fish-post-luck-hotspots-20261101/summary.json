@@ -1,0 +1,1840 @@
+{
+  "clean_wall_seconds": 216.33403130003717,
+  "diagnostic_wall_seconds": 298.69220449996646,
+  "requests": {
+    "capabilities": {
+      "calls": 1,
+      "wall_seconds": 0.022428800002671778,
+      "python_cpu_seconds": 0.0
+    },
+    "create": {
+      "calls": 1,
+      "wall_seconds": 2.3411471999716014,
+      "python_cpu_seconds": 0.0
+    },
+    "query_actions": {
+      "calls": 2029,
+      "wall_seconds": 7.575023997225799,
+      "python_cpu_seconds": 1.609375
+    },
+    "prepare_throw": {
+      "calls": 437,
+      "wall_seconds": 6.472114199772477,
+      "python_cpu_seconds": 0.140625
+    },
+    "query": {
+      "calls": 11228,
+      "wall_seconds": 177.3177249924047,
+      "python_cpu_seconds": 3.125
+    },
+    "begin_throw_flight": {
+      "calls": 437,
+      "wall_seconds": 1.5330159000586718,
+      "python_cpu_seconds": 0.21875
+    },
+    "advance": {
+      "calls": 4765,
+      "wall_seconds": 77.68006410170346,
+      "python_cpu_seconds": 3.0625
+    },
+    "select_throw_landing": {
+      "calls": 437,
+      "wall_seconds": 4.798781100776978,
+      "python_cpu_seconds": 0.1875
+    },
+    "finalize_throw_landing": {
+      "calls": 437,
+      "wall_seconds": 0.3241081989835948,
+      "python_cpu_seconds": 0.359375
+    },
+    "complete_throw": {
+      "calls": 437,
+      "wall_seconds": 0.7137216993141919,
+      "python_cpu_seconds": 0.296875
+    },
+    "claim_fish_reward": {
+      "calls": 92,
+      "wall_seconds": 0.18253640027251095,
+      "python_cpu_seconds": 0.046875
+    },
+    "deploy_fish": {
+      "calls": 17,
+      "wall_seconds": 0.01063309982419014,
+      "python_cpu_seconds": 0.03125
+    },
+    "collect_slot": {
+      "calls": 2112,
+      "wall_seconds": 2.461322797345929,
+      "python_cpu_seconds": 1.4375
+    },
+    "upgrade_fish": {
+      "calls": 465,
+      "wall_seconds": 0.4708422002149746,
+      "python_cpu_seconds": 0.25
+    },
+    "start_exercise": {
+      "calls": 481,
+      "wall_seconds": 0.52780580020044,
+      "python_cpu_seconds": 0.265625
+    },
+    "stop_exercise": {
+      "calls": 481,
+      "wall_seconds": 2.383730598841794,
+      "python_cpu_seconds": 0.34375
+    },
+    "upgrade_hall": {
+      "calls": 12,
+      "wall_seconds": 0.009696499910205603,
+      "python_cpu_seconds": 0.0
+    },
+    "synthesize_barbell": {
+      "calls": 7,
+      "wall_seconds": 0.00954480015207082,
+      "python_cpu_seconds": 0.0
+    },
+    "sell_fish": {
+      "calls": 497,
+      "wall_seconds": 0.48013880010694265,
+      "python_cpu_seconds": 0.171875
+    },
+    "claim_gun_reward": {
+      "calls": 5,
+      "wall_seconds": 0.017722500022500753,
+      "python_cpu_seconds": 0.0
+    },
+    "equip_gun": {
+      "calls": 4,
+      "wall_seconds": 0.0038523999974131584,
+      "python_cpu_seconds": 0.0
+    },
+    "start_tide": {
+      "calls": 40,
+      "wall_seconds": 0.5777453000191599,
+      "python_cpu_seconds": 0.0
+    },
+    "complete_tide": {
+      "calls": 18,
+      "wall_seconds": 0.20173609966877848,
+      "python_cpu_seconds": 0.0
+    },
+    "go_offline": {
+      "calls": 7,
+      "wall_seconds": 0.004047700087539852,
+      "python_cpu_seconds": 0.015625
+    },
+    "go_online": {
+      "calls": 6,
+      "wall_seconds": 0.038904499844647944,
+      "python_cpu_seconds": 0.015625
+    },
+    "claim_offline_reward": {
+      "calls": 6,
+      "wall_seconds": 0.014148200047202408,
+      "python_cpu_seconds": 0.0
+    },
+    "start_breakthrough": {
+      "calls": 15,
+      "wall_seconds": 0.019745899946428835,
+      "python_cpu_seconds": 0.0
+    },
+    "rebirth_strength": {
+      "calls": 5,
+      "wall_seconds": 0.007305400096811354,
+      "python_cpu_seconds": 0.0
+    },
+    "purchase_torpedo": {
+      "calls": 5,
+      "wall_seconds": 0.00660779990721494,
+      "python_cpu_seconds": 0.015625
+    },
+    "rebirth_trash_man": {
+      "calls": 3,
+      "wall_seconds": 0.0038327000802382827,
+      "python_cpu_seconds": 0.0
+    },
+    "checkpoint": {
+      "calls": 1,
+      "wall_seconds": 0.26071209996007383,
+      "python_cpu_seconds": 0.03125
+    }
+  },
+  "all_requests": {
+    "capabilities": {
+      "calls": 2,
+      "wall_seconds": 0.04709010000806302,
+      "python_cpu_seconds": 0.0
+    },
+    "create": {
+      "calls": 2,
+      "wall_seconds": 4.739113099989481,
+      "python_cpu_seconds": 0.0
+    },
+    "query_actions": {
+      "calls": 2029,
+      "wall_seconds": 7.575023997225799,
+      "python_cpu_seconds": 1.609375
+    },
+    "prepare_throw": {
+      "calls": 437,
+      "wall_seconds": 6.472114199772477,
+      "python_cpu_seconds": 0.140625
+    },
+    "query": {
+      "calls": 11228,
+      "wall_seconds": 177.3177249924047,
+      "python_cpu_seconds": 3.125
+    },
+    "begin_throw_flight": {
+      "calls": 437,
+      "wall_seconds": 1.5330159000586718,
+      "python_cpu_seconds": 0.21875
+    },
+    "advance": {
+      "calls": 4765,
+      "wall_seconds": 77.68006410170346,
+      "python_cpu_seconds": 3.0625
+    },
+    "select_throw_landing": {
+      "calls": 437,
+      "wall_seconds": 4.798781100776978,
+      "python_cpu_seconds": 0.1875
+    },
+    "finalize_throw_landing": {
+      "calls": 437,
+      "wall_seconds": 0.3241081989835948,
+      "python_cpu_seconds": 0.359375
+    },
+    "complete_throw": {
+      "calls": 437,
+      "wall_seconds": 0.7137216993141919,
+      "python_cpu_seconds": 0.296875
+    },
+    "claim_fish_reward": {
+      "calls": 92,
+      "wall_seconds": 0.18253640027251095,
+      "python_cpu_seconds": 0.046875
+    },
+    "deploy_fish": {
+      "calls": 17,
+      "wall_seconds": 0.01063309982419014,
+      "python_cpu_seconds": 0.03125
+    },
+    "collect_slot": {
+      "calls": 2112,
+      "wall_seconds": 2.461322797345929,
+      "python_cpu_seconds": 1.4375
+    },
+    "upgrade_fish": {
+      "calls": 465,
+      "wall_seconds": 0.4708422002149746,
+      "python_cpu_seconds": 0.25
+    },
+    "start_exercise": {
+      "calls": 481,
+      "wall_seconds": 0.52780580020044,
+      "python_cpu_seconds": 0.265625
+    },
+    "stop_exercise": {
+      "calls": 481,
+      "wall_seconds": 2.383730598841794,
+      "python_cpu_seconds": 0.34375
+    },
+    "upgrade_hall": {
+      "calls": 12,
+      "wall_seconds": 0.009696499910205603,
+      "python_cpu_seconds": 0.0
+    },
+    "synthesize_barbell": {
+      "calls": 7,
+      "wall_seconds": 0.00954480015207082,
+      "python_cpu_seconds": 0.0
+    },
+    "sell_fish": {
+      "calls": 497,
+      "wall_seconds": 0.48013880010694265,
+      "python_cpu_seconds": 0.171875
+    },
+    "claim_gun_reward": {
+      "calls": 5,
+      "wall_seconds": 0.017722500022500753,
+      "python_cpu_seconds": 0.0
+    },
+    "equip_gun": {
+      "calls": 4,
+      "wall_seconds": 0.0038523999974131584,
+      "python_cpu_seconds": 0.0
+    },
+    "start_tide": {
+      "calls": 40,
+      "wall_seconds": 0.5777453000191599,
+      "python_cpu_seconds": 0.0
+    },
+    "complete_tide": {
+      "calls": 18,
+      "wall_seconds": 0.20173609966877848,
+      "python_cpu_seconds": 0.0
+    },
+    "go_offline": {
+      "calls": 7,
+      "wall_seconds": 0.004047700087539852,
+      "python_cpu_seconds": 0.015625
+    },
+    "go_online": {
+      "calls": 6,
+      "wall_seconds": 0.038904499844647944,
+      "python_cpu_seconds": 0.015625
+    },
+    "claim_offline_reward": {
+      "calls": 6,
+      "wall_seconds": 0.014148200047202408,
+      "python_cpu_seconds": 0.0
+    },
+    "start_breakthrough": {
+      "calls": 15,
+      "wall_seconds": 0.019745899946428835,
+      "python_cpu_seconds": 0.0
+    },
+    "rebirth_strength": {
+      "calls": 5,
+      "wall_seconds": 0.007305400096811354,
+      "python_cpu_seconds": 0.0
+    },
+    "purchase_torpedo": {
+      "calls": 5,
+      "wall_seconds": 0.00660779990721494,
+      "python_cpu_seconds": 0.015625
+    },
+    "rebirth_trash_man": {
+      "calls": 3,
+      "wall_seconds": 0.0038327000802382827,
+      "python_cpu_seconds": 0.0
+    },
+    "checkpoint": {
+      "calls": 1,
+      "wall_seconds": 0.26071209996007383,
+      "python_cpu_seconds": 0.03125
+    }
+  },
+  "python_cpu_seconds": 17.1875,
+  "python_response_json": {
+    "calls": 24490,
+    "seconds": 4.487903783796355,
+    "characters": 645474776
+  },
+  "query": [
+    {
+      "label": "dispatch",
+      "count": 11228,
+      "seconds": 130.30199999999883,
+      "self_seconds": 0.05100000000000238
+    },
+    {
+      "label": "pipeline.Query",
+      "count": 11228,
+      "seconds": 130.25099999999884,
+      "self_seconds": 7.003999999999147
+    },
+    {
+      "label": "simulation.Json.Encode",
+      "count": 11228,
+      "seconds": 40.0639999999991,
+      "self_seconds": 40.0639999999991
+    },
+    {
+      "label": "service.throw.QueryLuck",
+      "count": 11228,
+      "seconds": 28.910999999999646,
+      "self_seconds": 1.4459999999998718
+    },
+    {
+      "label": "Script.Domain.Fishing.ThrowOutcomeResolver.QueryLuck",
+      "count": 11228,
+      "seconds": 27.464999999999776,
+      "self_seconds": 0.2039999999999127
+    },
+    {
+      "label": "Script.Domain.Fishing.ThrowLuckMapping.MapStrengthToFishLuck",
+      "count": 11228,
+      "seconds": 27.200999999999816,
+      "self_seconds": 27.200999999999816
+    },
+    {
+      "label": "service.hall.Query",
+      "count": 11228,
+      "seconds": 21.457000000000306,
+      "self_seconds": 2.925000000000673
+    },
+    {
+      "label": "Script.Domain.Player.PlayerArchiveSchema.Validate",
+      "count": 57268,
+      "seconds": 19.17900000000045,
+      "self_seconds": 19.17900000000045
+    },
+    {
+      "label": "Script.Domain.Fishing.FishEconomyRules.CalculateProductionSnapshot",
+      "count": 12714,
+      "seconds": 18.097999999999278,
+      "self_seconds": 8.8489999999989
+    },
+    {
+      "label": "service.trashMan.Query",
+      "count": 11228,
+      "seconds": 17.296000000001243,
+      "self_seconds": 12.391000000000147
+    },
+    {
+      "label": "Script.Domain.Fishing.FishHallRules.CalculateRateSnapshot",
+      "count": 11228,
+      "seconds": 17.082999999999796,
+      "self_seconds": 1.0870000000006717
+    },
+    {
+      "label": "Script.Domain.Player.PlayerArchiveSchema.Clone",
+      "count": 777346,
+      "seconds": 13.796000000000834,
+      "self_seconds": 13.796000000000834
+    },
+    {
+      "label": "Script.Application.PlayerArchiveService.GetSnapshot",
+      "count": 103666,
+      "seconds": 13.205000000000652,
+      "self_seconds": 0.2459999999999818
+    },
+    {
+      "label": "service.guns.Query",
+      "count": 11228,
+      "seconds": 12.999000000000274,
+      "self_seconds": 9.309999999999025
+    },
+    {
+      "label": "Script.Domain.Fishing.FishEconomyRules.CalculateLevelRate",
+      "count": 464338,
+      "seconds": 11.468999999999703,
+      "self_seconds": 5.974999999998904
+    },
+    {
+      "label": "query.inventoryProjection",
+      "count": 11228,
+      "seconds": 8.971999999999493,
+      "self_seconds": 0.07000000000019524
+    },
+    {
+      "label": "service.barbell.Query",
+      "count": 11228,
+      "seconds": 8.777999999999306,
+      "self_seconds": 3.1069999999990006
+    },
+    {
+      "label": "service.inventory.Query",
+      "count": 1486,
+      "seconds": 7.722999999999674,
+      "self_seconds": 0.015000000000016556
+    },
+    {
+      "label": "Script.Domain.Fishing.FishInventoryQuery.Build",
+      "count": 1486,
+      "seconds": 7.533999999999823,
+      "self_seconds": 0.2520000000002307
+    },
+    {
+      "label": "fish.calculateP0",
+      "count": 596671,
+      "seconds": 6.965000000000754,
+      "self_seconds": 6.965000000000754
+    },
+    {
+      "label": "service.rebirth.Query",
+      "count": 11228,
+      "seconds": 5.733000000000529,
+      "self_seconds": 0.5720000000003567
+    },
+    {
+      "label": "service.torpedo.Query",
+      "count": 11228,
+      "seconds": 5.711999999999728,
+      "self_seconds": 0.40199999999990954
+    },
+    {
+      "label": "Script.Domain.Fishing.FishEconomyRules.GetLevelSnapshot",
+      "count": 44111,
+      "seconds": 5.179999999999438,
+      "self_seconds": 0.7240000000004372
+    },
+    {
+      "label": "service.offlineReward.Query",
+      "count": 11228,
+      "seconds": 5.0289999999992805,
+      "self_seconds": 0.11100000000005084
+    },
+    {
+      "label": "service.eggs.Query",
+      "count": 11228,
+      "seconds": 4.767999999999388,
+      "self_seconds": 4.767999999999388
+    },
+    {
+      "label": "service.codex.Query",
+      "count": 11228,
+      "seconds": 1.3680000000006918,
+      "self_seconds": 0.8990000000006977
+    },
+    {
+      "label": "Script.Domain.Fishing.FishEconomyRules.CalculateUpgradeCost",
+      "count": 44111,
+      "seconds": 0.9229999999998202,
+      "self_seconds": 0.44799999999988493
+    },
+    {
+      "label": "Script.Domain.Fishing.FishEconomyRules.CalculateSellPrice",
+      "count": 44111,
+      "seconds": 0.8009999999997737,
+      "self_seconds": 0.31699999999983586
+    },
+    {
+      "label": "service.tides.Query",
+      "count": 11228,
+      "seconds": 0.7490000000000707,
+      "self_seconds": 0.7490000000000707
+    },
+    {
+      "label": "query.copyValue",
+      "count": 11228,
+      "seconds": 0.6220000000000039,
+      "self_seconds": 0.6220000000000039
+    },
+    {
+      "label": "query.sameValue",
+      "count": 11216,
+      "seconds": 0.5569999999996198,
+      "self_seconds": 0.5569999999996198
+    },
+    {
+      "label": "simulation.Json.Decode",
+      "count": 11228,
+      "seconds": 0.2280000000000686,
+      "self_seconds": 0.2280000000000686
+    },
+    {
+      "label": "Script.Domain.Fishing.ThrowLuckMapping.MapTorpedoPowerToTrashLuck",
+      "count": 11228,
+      "seconds": 0.06000000000004846,
+      "self_seconds": 0.06000000000004846
+    }
+  ],
+  "advance": [
+    {
+      "label": "dispatch",
+      "count": 4765,
+      "seconds": 76.92199999999957,
+      "self_seconds": 0.10999999999993637
+    },
+    {
+      "label": "Script.Application.PlayerArchiveService.RunTransaction",
+      "count": 10408,
+      "seconds": 75.69399999999962,
+      "self_seconds": 50.49800000000014
+    },
+    {
+      "label": "Script.Application.PlayerEconomyService.SettleProduction",
+      "count": 10292,
+      "seconds": 75.66299999999978,
+      "self_seconds": 0.04300000000015114
+    },
+    {
+      "label": "Script.Domain.Fishing.FishHallRules.CalculateRateSnapshot",
+      "count": 10288,
+      "seconds": 15.632999999999337,
+      "self_seconds": 0.930999999999766
+    },
+    {
+      "label": "Script.Domain.Fishing.FishEconomyRules.CalculateProductionSnapshot",
+      "count": 10288,
+      "seconds": 14.70199999999957,
+      "self_seconds": 7.201000000001774
+    },
+    {
+      "label": "Script.Domain.Fishing.FishEconomyRules.CalculateLevelRate",
+      "count": 306369,
+      "seconds": 7.500999999997797,
+      "self_seconds": 3.951999999997641
+    },
+    {
+      "label": "Script.Domain.Player.PlayerArchiveSchema.Validate",
+      "count": 20696,
+      "seconds": 6.976000000000138,
+      "self_seconds": 6.976000000000138
+    },
+    {
+      "label": "Script.Domain.Player.PlayerArchiveSchema.Clone",
+      "count": 28903,
+      "seconds": 3.631999999999858,
+      "self_seconds": 3.631999999999858
+    },
+    {
+      "label": "fish.calculateP0",
+      "count": 306369,
+      "seconds": 3.5490000000001554,
+      "self_seconds": 3.5490000000001554
+    },
+    {
+      "label": "Script.Application.PlayerArchiveService.GetSnapshot",
+      "count": 8087,
+      "seconds": 1.0749999999998585,
+      "self_seconds": 0.030000000000011795
+    },
+    {
+      "label": "simulation.Json.Encode",
+      "count": 4765,
+      "seconds": 0.07899999999989848,
+      "self_seconds": 0.07899999999989848
+    },
+    {
+      "label": "simulation.Json.Decode",
+      "count": 4765,
+      "seconds": 0.0550000000000197,
+      "self_seconds": 0.0550000000000197
+    }
+  ],
+  "query_owners": [
+    {
+      "owner": "root",
+      "label": "Script.Application.PlayerArchiveService.GetSnapshot",
+      "count": 11228,
+      "seconds": 1.4749999999997296,
+      "self_seconds": 0.03699999999997683
+    },
+    {
+      "owner": "root",
+      "label": "Script.Domain.Player.PlayerArchiveSchema.Clone",
+      "count": 11228,
+      "seconds": 1.4379999999997528,
+      "self_seconds": 1.4379999999997528
+    },
+    {
+      "owner": "root",
+      "label": "dispatch",
+      "count": 11228,
+      "seconds": 130.30199999999883,
+      "self_seconds": 0.05100000000000238
+    },
+    {
+      "owner": "root",
+      "label": "pipeline.Query",
+      "count": 11228,
+      "seconds": 130.25099999999884,
+      "self_seconds": 7.003999999999147
+    },
+    {
+      "owner": "root",
+      "label": "query.copyValue",
+      "count": 11228,
+      "seconds": 0.6220000000000039,
+      "self_seconds": 0.6220000000000039
+    },
+    {
+      "owner": "root",
+      "label": "query.inventoryProjection",
+      "count": 11228,
+      "seconds": 8.971999999999493,
+      "self_seconds": 0.07000000000019524
+    },
+    {
+      "owner": "root",
+      "label": "query.sameValue",
+      "count": 11216,
+      "seconds": 0.5569999999996198,
+      "self_seconds": 0.5569999999996198
+    },
+    {
+      "owner": "root",
+      "label": "simulation.Json.Decode",
+      "count": 11228,
+      "seconds": 0.2280000000000686,
+      "self_seconds": 0.2280000000000686
+    },
+    {
+      "owner": "root",
+      "label": "simulation.Json.Encode",
+      "count": 11228,
+      "seconds": 40.0639999999991,
+      "self_seconds": 40.0639999999991
+    },
+    {
+      "owner": "service.barbell.Query",
+      "label": "Script.Application.PlayerArchiveService.GetSnapshot",
+      "count": 11228,
+      "seconds": 1.4509999999997114,
+      "self_seconds": 0.039999999999868585
+    },
+    {
+      "owner": "service.barbell.Query",
+      "label": "Script.Domain.Player.PlayerArchiveSchema.Clone",
+      "count": 11228,
+      "seconds": 1.4109999999998428,
+      "self_seconds": 1.4109999999998428
+    },
+    {
+      "owner": "service.barbell.Query",
+      "label": "Script.Domain.Player.PlayerArchiveSchema.Validate",
+      "count": 11228,
+      "seconds": 4.220000000000595,
+      "self_seconds": 4.220000000000595
+    },
+    {
+      "owner": "service.barbell.Query",
+      "label": "service.barbell.Query",
+      "count": 11228,
+      "seconds": 8.777999999999306,
+      "self_seconds": 3.1069999999990006
+    },
+    {
+      "owner": "service.codex.Query",
+      "label": "Script.Application.PlayerArchiveService.GetSnapshot",
+      "count": 1128,
+      "seconds": 0.11999999999993438,
+      "self_seconds": 0.0019999999999900098
+    },
+    {
+      "owner": "service.codex.Query",
+      "label": "Script.Domain.Player.PlayerArchiveSchema.Clone",
+      "count": 1128,
+      "seconds": 0.11799999999994437,
+      "self_seconds": 0.11799999999994437
+    },
+    {
+      "owner": "service.codex.Query",
+      "label": "Script.Domain.Player.PlayerArchiveSchema.Validate",
+      "count": 1128,
+      "seconds": 0.3490000000000597,
+      "self_seconds": 0.3490000000000597
+    },
+    {
+      "owner": "service.codex.Query",
+      "label": "service.codex.Query",
+      "count": 11228,
+      "seconds": 1.3680000000006918,
+      "self_seconds": 0.8990000000006977
+    },
+    {
+      "owner": "service.eggs.Query",
+      "label": "service.eggs.Query",
+      "count": 11228,
+      "seconds": 4.767999999999388,
+      "self_seconds": 4.767999999999388
+    },
+    {
+      "owner": "service.guns.Query",
+      "label": "Script.Application.PlayerArchiveService.GetSnapshot",
+      "count": 22456,
+      "seconds": 2.852000000001085,
+      "self_seconds": 0.04300000000004989
+    },
+    {
+      "owner": "service.guns.Query",
+      "label": "Script.Domain.Player.PlayerArchiveSchema.Clone",
+      "count": 696136,
+      "seconds": 3.646000000001199,
+      "self_seconds": 3.646000000001199
+    },
+    {
+      "owner": "service.guns.Query",
+      "label": "service.guns.Query",
+      "count": 11228,
+      "seconds": 12.999000000000274,
+      "self_seconds": 9.309999999999025
+    },
+    {
+      "owner": "service.hall.Query",
+      "label": "Script.Application.PlayerArchiveService.GetSnapshot",
+      "count": 11228,
+      "seconds": 1.4489999999998355,
+      "self_seconds": 0.023000000000150678
+    },
+    {
+      "owner": "service.hall.Query",
+      "label": "Script.Domain.Fishing.FishEconomyRules.CalculateLevelRate",
+      "count": 332005,
+      "seconds": 8.192000000000107,
+      "self_seconds": 4.237999999998654
+    },
+    {
+      "owner": "service.hall.Query",
+      "label": "Script.Domain.Fishing.FishEconomyRules.CalculateProductionSnapshot",
+      "count": 11228,
+      "seconds": 15.995999999999125,
+      "self_seconds": 7.803999999999016
+    },
+    {
+      "owner": "service.hall.Query",
+      "label": "Script.Domain.Fishing.FishHallRules.CalculateRateSnapshot",
+      "count": 11228,
+      "seconds": 17.082999999999796,
+      "self_seconds": 1.0870000000006717
+    },
+    {
+      "owner": "service.hall.Query",
+      "label": "Script.Domain.Player.PlayerArchiveSchema.Clone",
+      "count": 11228,
+      "seconds": 1.4259999999996849,
+      "self_seconds": 1.4259999999996849
+    },
+    {
+      "owner": "service.hall.Query",
+      "label": "fish.calculateP0",
+      "count": 332005,
+      "seconds": 3.9540000000014537,
+      "self_seconds": 3.9540000000014537
+    },
+    {
+      "owner": "service.hall.Query",
+      "label": "service.hall.Query",
+      "count": 11228,
+      "seconds": 21.457000000000306,
+      "self_seconds": 2.925000000000673
+    },
+    {
+      "owner": "service.inventory.Query",
+      "label": "Script.Application.PlayerArchiveService.GetSnapshot",
+      "count": 1486,
+      "seconds": 0.17399999999983473,
+      "self_seconds": 0.0019999999999882334
+    },
+    {
+      "owner": "service.inventory.Query",
+      "label": "Script.Domain.Fishing.FishEconomyRules.CalculateLevelRate",
+      "count": 132333,
+      "seconds": 3.2769999999995956,
+      "self_seconds": 1.7370000000002501
+    },
+    {
+      "owner": "service.inventory.Query",
+      "label": "Script.Domain.Fishing.FishEconomyRules.CalculateProductionSnapshot",
+      "count": 1486,
+      "seconds": 2.1020000000001535,
+      "self_seconds": 1.0449999999998836
+    },
+    {
+      "owner": "service.inventory.Query",
+      "label": "Script.Domain.Fishing.FishEconomyRules.CalculateSellPrice",
+      "count": 44111,
+      "seconds": 0.8009999999997737,
+      "self_seconds": 0.31699999999983586
+    },
+    {
+      "owner": "service.inventory.Query",
+      "label": "Script.Domain.Fishing.FishEconomyRules.CalculateUpgradeCost",
+      "count": 44111,
+      "seconds": 0.9229999999998202,
+      "self_seconds": 0.44799999999988493
+    },
+    {
+      "owner": "service.inventory.Query",
+      "label": "Script.Domain.Fishing.FishEconomyRules.GetLevelSnapshot",
+      "count": 44111,
+      "seconds": 5.179999999999438,
+      "self_seconds": 0.7240000000004372
+    },
+    {
+      "owner": "service.inventory.Query",
+      "label": "Script.Domain.Fishing.FishInventoryQuery.Build",
+      "count": 1486,
+      "seconds": 7.533999999999823,
+      "self_seconds": 0.2520000000002307
+    },
+    {
+      "owner": "service.inventory.Query",
+      "label": "Script.Domain.Player.PlayerArchiveSchema.Clone",
+      "count": 1486,
+      "seconds": 0.1719999999998465,
+      "self_seconds": 0.1719999999998465
+    },
+    {
+      "owner": "service.inventory.Query",
+      "label": "fish.calculateP0",
+      "count": 264666,
+      "seconds": 3.0109999999993002,
+      "self_seconds": 3.0109999999993002
+    },
+    {
+      "owner": "service.inventory.Query",
+      "label": "service.inventory.Query",
+      "count": 1486,
+      "seconds": 7.722999999999674,
+      "self_seconds": 0.015000000000016556
+    },
+    {
+      "owner": "service.offlineReward.Query",
+      "label": "Script.Application.PlayerArchiveService.GetSnapshot",
+      "count": 11228,
+      "seconds": 1.3690000000000127,
+      "self_seconds": 0.017999999999934957
+    },
+    {
+      "owner": "service.offlineReward.Query",
+      "label": "Script.Domain.Player.PlayerArchiveSchema.Clone",
+      "count": 11228,
+      "seconds": 1.3510000000000777,
+      "self_seconds": 1.3510000000000777
+    },
+    {
+      "owner": "service.offlineReward.Query",
+      "label": "Script.Domain.Player.PlayerArchiveSchema.Validate",
+      "count": 11228,
+      "seconds": 3.5489999999992174,
+      "self_seconds": 3.5489999999992174
+    },
+    {
+      "owner": "service.offlineReward.Query",
+      "label": "service.offlineReward.Query",
+      "count": 11228,
+      "seconds": 5.0289999999992805,
+      "self_seconds": 0.11100000000005084
+    },
+    {
+      "owner": "service.rebirth.Query",
+      "label": "Script.Application.PlayerArchiveService.GetSnapshot",
+      "count": 11228,
+      "seconds": 1.4709999999999237,
+      "self_seconds": 0.036999999999842714
+    },
+    {
+      "owner": "service.rebirth.Query",
+      "label": "Script.Domain.Player.PlayerArchiveSchema.Clone",
+      "count": 11228,
+      "seconds": 1.434000000000081,
+      "self_seconds": 1.434000000000081
+    },
+    {
+      "owner": "service.rebirth.Query",
+      "label": "Script.Domain.Player.PlayerArchiveSchema.Validate",
+      "count": 11228,
+      "seconds": 3.6900000000002486,
+      "self_seconds": 3.6900000000002486
+    },
+    {
+      "owner": "service.rebirth.Query",
+      "label": "service.rebirth.Query",
+      "count": 11228,
+      "seconds": 5.733000000000529,
+      "self_seconds": 0.5720000000003567
+    },
+    {
+      "owner": "service.throw.QueryLuck",
+      "label": "Script.Domain.Fishing.ThrowLuckMapping.MapStrengthToFishLuck",
+      "count": 11228,
+      "seconds": 27.200999999999816,
+      "self_seconds": 27.200999999999816
+    },
+    {
+      "owner": "service.throw.QueryLuck",
+      "label": "Script.Domain.Fishing.ThrowLuckMapping.MapTorpedoPowerToTrashLuck",
+      "count": 11228,
+      "seconds": 0.06000000000004846,
+      "self_seconds": 0.06000000000004846
+    },
+    {
+      "owner": "service.throw.QueryLuck",
+      "label": "Script.Domain.Fishing.ThrowOutcomeResolver.QueryLuck",
+      "count": 11228,
+      "seconds": 27.464999999999776,
+      "self_seconds": 0.2039999999999127
+    },
+    {
+      "owner": "service.throw.QueryLuck",
+      "label": "service.throw.QueryLuck",
+      "count": 11228,
+      "seconds": 28.910999999999646,
+      "self_seconds": 1.4459999999998718
+    },
+    {
+      "owner": "service.tides.Query",
+      "label": "service.tides.Query",
+      "count": 11228,
+      "seconds": 0.7490000000000707,
+      "self_seconds": 0.7490000000000707
+    },
+    {
+      "owner": "service.torpedo.Query",
+      "label": "Script.Application.PlayerArchiveService.GetSnapshot",
+      "count": 11228,
+      "seconds": 1.4220000000001933,
+      "self_seconds": 0.023000000000112042
+    },
+    {
+      "owner": "service.torpedo.Query",
+      "label": "Script.Domain.Player.PlayerArchiveSchema.Clone",
+      "count": 11228,
+      "seconds": 1.3990000000000813,
+      "self_seconds": 1.3990000000000813
+    },
+    {
+      "owner": "service.torpedo.Query",
+      "label": "Script.Domain.Player.PlayerArchiveSchema.Validate",
+      "count": 11228,
+      "seconds": 3.8879999999996246,
+      "self_seconds": 3.8879999999996246
+    },
+    {
+      "owner": "service.torpedo.Query",
+      "label": "service.torpedo.Query",
+      "count": 11228,
+      "seconds": 5.711999999999728,
+      "self_seconds": 0.40199999999990954
+    },
+    {
+      "owner": "service.trashMan.Query",
+      "label": "Script.Application.PlayerArchiveService.GetSnapshot",
+      "count": 11228,
+      "seconds": 1.4220000000003914,
+      "self_seconds": 0.021000000000067853
+    },
+    {
+      "owner": "service.trashMan.Query",
+      "label": "Script.Domain.Player.PlayerArchiveSchema.Clone",
+      "count": 11228,
+      "seconds": 1.4010000000003235,
+      "self_seconds": 1.4010000000003235
+    },
+    {
+      "owner": "service.trashMan.Query",
+      "label": "Script.Domain.Player.PlayerArchiveSchema.Validate",
+      "count": 11228,
+      "seconds": 3.483000000000702,
+      "self_seconds": 3.483000000000702
+    },
+    {
+      "owner": "service.trashMan.Query",
+      "label": "service.trashMan.Query",
+      "count": 11228,
+      "seconds": 17.296000000001243,
+      "self_seconds": 12.391000000000147
+    }
+  ],
+  "combinations": {
+    "CalculateLevelRate/ordinary": {
+      "calls": 828939,
+      "distinct_tuples": 639,
+      "distinct_rule_tuples": 639
+    },
+    "GetLevelSnapshot/ordinary": {
+      "calls": 44111,
+      "distinct_tuples": 539,
+      "distinct_rule_tuples": 539
+    }
+  },
+  "suppressed_recursive_calls": {
+    "query.copyValue": 3772566,
+    "query.sameValue": 2597382
+  },
+  "query_instruction_samples_by_file": [
+    [
+      "@./proj/Script\\Core\\BigNumber.lua",
+      81978
+    ],
+    [
+      "@./simulation\\Json.lua",
+      23260
+    ],
+    [
+      "@./proj/Script\\Domain\\Player\\PlayerArchiveSchemaValidationSupport.lua",
+      12320
+    ],
+    [
+      "@./proj/Script\\Domain\\Player\\PlayerArchiveSchemaMigration.lua",
+      11516
+    ],
+    [
+      "@./proj/Script\\Domain\\Fishing\\FishEconomyRules.lua",
+      6009
+    ],
+    [
+      "@./proj/Script\\Domain\\Player\\BigNumberSaveAdapter.lua",
+      4700
+    ],
+    [
+      "@./proj/Script\\Domain\\Player\\PlayerArchiveCoreValidator.lua",
+      4082
+    ],
+    [
+      "@C:\\Users\\Administrator.DESKTOP-09JQGNK\\AppData\\Local\\Temp\\igess-fish-lua-ogm8u3yj\\simulation\\cli.lua",
+      3834
+    ],
+    [
+      "@./proj/Script\\Application\\ItemGMConfig.lua",
+      3450
+    ],
+    [
+      "@./proj/Script\\Core\\PlainData.lua",
+      3164
+    ],
+    [
+      "@./proj/Script\\Core\\BigNumberMethods.lua",
+      2015
+    ],
+    [
+      "@./proj/Script\\Domain\\Gun\\GunRules.lua",
+      1423
+    ],
+    [
+      "@./simulation\\Query.lua",
+      997
+    ],
+    [
+      "@./proj/Script\\Domain\\Player\\ArchiveProgress\\CollectionProgressValidator.lua",
+      874
+    ],
+    [
+      "@./proj/Script\\Domain\\Modifiers\\ModifierChannelCatalog.lua",
+      833
+    ],
+    [
+      "@./proj/Script\\Domain\\Fishing\\FishProductionPolicy.lua",
+      543
+    ],
+    [
+      "@./proj/Script\\Application\\GunProgressionService.lua",
+      484
+    ],
+    [
+      "@./simulation\\Codex.lua",
+      457
+    ],
+    [
+      "@./proj/Script\\Application\\FishHall\\FishHallContract.lua",
+      351
+    ],
+    [
+      "@./simulation\\Eggs.lua",
+      329
+    ],
+    [
+      "@./proj/Script\\Domain\\Gun\\GunCombatState.lua",
+      297
+    ],
+    [
+      "@./proj/Script\\Domain\\Player\\RankingProgressValidator.lua",
+      297
+    ],
+    [
+      "@./proj/Script\\Domain\\Player\\PlayerArchiveSchema.lua",
+      296
+    ],
+    [
+      "@./proj/Script\\Domain\\CumulativeSpend\\CumulativeSpendState.lua",
+      289
+    ],
+    [
+      "@./proj/Script\\Application\\BarbellProgression\\Contract.lua",
+      267
+    ],
+    [
+      "@./proj/Script\\Domain\\Player\\ArchiveProgress\\TrashProgressValidator.lua",
+      222
+    ],
+    [
+      "@./proj/Script\\Domain\\Modifiers\\TimedBuffState.lua",
+      217
+    ],
+    [
+      "@./proj/Script\\Utils\\TableManager.lua",
+      202
+    ],
+    [
+      "@./proj/Script\\Domain\\Fishing\\FishHallSlotBalanceDraft.lua",
+      194
+    ],
+    [
+      "@./proj/Script\\Domain\\Fishing\\FishInventoryQuery.lua",
+      151
+    ],
+    [
+      "@./proj/Script\\Application\\TorpedoProgression\\TorpedoProgressionContract.lua",
+      141
+    ],
+    [
+      "@./proj/Script\\Domain\\Production\\TrashMan\\ProductionExactMath.lua",
+      141
+    ],
+    [
+      "@./proj/Script\\Domain\\MainTask\\MainTaskState.lua",
+      135
+    ],
+    [
+      "@./proj/Script\\Domain\\Player\\ArchiveProgress\\ProgressValidationSupport.lua",
+      100
+    ],
+    [
+      "@./proj/Script\\Domain\\Fishing\\FishHallRules.lua",
+      83
+    ],
+    [
+      "@./proj/Script\\Config\\ConfigService.lua",
+      80
+    ],
+    [
+      "@./proj/Script\\Domain\\Player\\ArchiveProgress\\RebirthProgressValidator.lua",
+      79
+    ],
+    [
+      "@./proj/Script\\Application\\TrashManProgression\\TrashManProgressionRealmContract.lua",
+      66
+    ],
+    [
+      "@./proj/Script\\Domain\\Fishing\\ThrowModifierResolver.lua",
+      63
+    ],
+    [
+      "@./proj/Script\\Config\\TableAdapter.lua",
+      61
+    ],
+    [
+      "@./proj/Script\\Domain\\SequentialBundle\\SequentialBundleState.lua",
+      59
+    ],
+    [
+      "@./proj/Script\\Domain\\Gun\\GunAcquisitionState.lua",
+      56
+    ],
+    [
+      "@./simulation\\Guns.lua",
+      55
+    ],
+    [
+      "@./proj/Script\\Application\\Collection\\CollectionContractSupport.lua",
+      52
+    ],
+    [
+      "@./proj/Script\\Application\\ItemGMModifierResolver.lua",
+      51
+    ],
+    [
+      "@./proj/Script\\Application\\TrashManProgression\\TrashManProgressionDTO.lua",
+      51
+    ],
+    [
+      "@./proj/Script\\Domain\\DailyRewardCard\\DailyRewardCardState.lua",
+      50
+    ],
+    [
+      "@./proj/Script\\Domain\\Fishing\\ThrowLuckMapping.lua",
+      44
+    ],
+    [
+      "@./proj/Script\\Application\\EffectivePrivilegeResolver.lua",
+      41
+    ],
+    [
+      "@./proj/Script\\Domain\\Egg\\EggInventoryState.lua",
+      35
+    ],
+    [
+      "@./proj/Script\\Domain\\Trash\\TrashEconomyRules.lua",
+      35
+    ],
+    [
+      "@./proj/Script\\Application\\Collection\\CollectionQueryContract.lua",
+      32
+    ],
+    [
+      "@./proj/Script\\Domain\\Items\\ResourceItemState.lua",
+      30
+    ],
+    [
+      "@./proj/Script\\Domain\\Player\\PlayerArchivePrivilegeValidator.lua",
+      28
+    ],
+    [
+      "@./proj/Script\\Domain\\Items\\RewardMailboxState.lua",
+      27
+    ],
+    [
+      "@./proj/Script\\Domain\\Fishing\\ThrowOutcomeResolver.lua",
+      26
+    ],
+    [
+      "@./proj/Script\\Application\\Rebirth\\RebirthContractSupport.lua",
+      25
+    ],
+    [
+      "@./proj/Script\\Application\\FishThrow\\ThrowTransaction.lua",
+      20
+    ],
+    [
+      "@./proj/Script\\Domain\\Modifiers\\ModifierConsumerProjection.lua",
+      20
+    ],
+    [
+      "@./proj/Script\\Application\\FishThrowService.lua",
+      17
+    ],
+    [
+      "@./proj/Script\\Application\\PlayerGameplaySessionService.lua",
+      17
+    ],
+    [
+      "@./proj/Script\\Application\\Rebirth\\RebirthContract.lua",
+      17
+    ],
+    [
+      "@./proj/Script\\Domain\\FishOrder\\FishOrderState.lua",
+      17
+    ],
+    [
+      "@./simulation\\Tides.lua",
+      17
+    ],
+    [
+      "@./proj/Script\\Domain\\Player\\ArchiveProgress\\TrashProgressRuleContext.lua",
+      16
+    ],
+    [
+      "@./proj/Script\\Domain\\SequentialBundle\\SequentialBundleConfig.lua",
+      16
+    ],
+    [
+      "@./proj/Script\\Application\\PlayerArchive\\PlayerArchiveRegistry.lua",
+      14
+    ],
+    [
+      "@./proj/Script\\Domain\\Fishing\\ThrowNumeric.lua",
+      14
+    ],
+    [
+      "@./proj/Script\\Domain\\Player\\PlayerArchiveProgressValidator.lua",
+      13
+    ],
+    [
+      "@./proj/Script\\Application\\OfflineReward\\OfflineRewardContract.lua",
+      12
+    ],
+    [
+      "@./proj/Script\\Application\\TrashManProgression\\TrashManProgressionContract.lua",
+      12
+    ],
+    [
+      "@./proj/Script\\Domain\\Rebirth\\StrengthRebirthRules.lua",
+      11
+    ],
+    [
+      "@./proj/Script\\Domain\\Player\\ServerClock.lua",
+      9
+    ],
+    [
+      "@./proj/Script\\Application\\Rebirth\\RebirthCommand.lua",
+      8
+    ],
+    [
+      "@./proj/Script\\Application\\BarbellProgression\\BarbellMutationExecutor.lua",
+      7
+    ],
+    [
+      "@./proj/Script\\Application\\PlayerArchive\\PlayerArchiveOperations.lua",
+      7
+    ],
+    [
+      "@./proj/Script\\Application\\TrashManProgression\\TrashManProcessingQuery.lua",
+      7
+    ],
+    [
+      "@./proj/Script\\Application\\TrashManProgressionService.lua",
+      6
+    ],
+    [
+      "@./proj/Script\\Domain\\Collection\\FishUnlockRewardConfig.lua",
+      6
+    ],
+    [
+      "@./proj/Script\\Application\\FishThrow\\ThrowCommit.lua",
+      5
+    ],
+    [
+      "@./proj/Script\\Application\\FishThrow\\ThrowPreparation.lua",
+      5
+    ],
+    [
+      "@./proj/Script\\Application\\Rebirth\\RebirthStrengthContract.lua",
+      5
+    ],
+    [
+      "@./proj/Script\\Application\\Rebirth\\RebirthTrashContract.lua",
+      5
+    ],
+    [
+      "@./proj/Script\\Domain\\Player\\PlayerArchiveOfflineRewardValidator.lua",
+      5
+    ],
+    [
+      "@./proj/Script\\Domain\\Fishing\\PendingThrow.lua",
+      4
+    ],
+    [
+      "@./proj/Script\\Domain\\Fishing\\ThrowRulesAdapter.lua",
+      4
+    ],
+    [
+      "@./proj/Script\\Domain\\Item\\ItemGMDeliveryState.lua",
+      4
+    ],
+    [
+      "@./proj/Script\\Application\\EggHatchingService.lua",
+      3
+    ],
+    [
+      "@./proj/Script\\Application\\FishThrow\\ThrowContract.lua",
+      3
+    ],
+    [
+      "@./proj/Script\\Application\\FishThrow\\TimeoutController.lua",
+      3
+    ],
+    [
+      "@./proj/Script\\Application\\Collection\\CollectionCommand.lua",
+      2
+    ],
+    [
+      "@./proj/Script\\Application\\FishTideAccess.lua",
+      2
+    ],
+    [
+      "@./proj/Script\\Application\\PlayerGameplaySession\\PendingThrowSessionState.lua",
+      2
+    ],
+    [
+      "@./proj/Script\\Application\\TorpedoProgressionService.lua",
+      2
+    ],
+    [
+      "@./proj/Script\\Application\\FishHallService.lua",
+      1
+    ],
+    [
+      "@./proj/Script\\Application\\OfflineReward\\OfflineRewardCommand.lua",
+      1
+    ],
+    [
+      "@./proj/Script\\Application\\PlayerGameplaySession\\BarbellExerciseSessionState.lua",
+      1
+    ],
+    [
+      "@./proj/Script\\Application\\PlayerInventoryService.lua",
+      1
+    ],
+    [
+      "@./proj/Script\\Application\\PlayerInventory\\QueryContract.lua",
+      1
+    ],
+    [
+      "@./proj/Script\\Application\\TimedBuffConnectionService.lua",
+      1
+    ],
+    [
+      "@./proj/Script\\Domain\\Fishing\\FishThrowTaskPending.lua",
+      1
+    ]
+  ],
+  "python_by_self": [
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'acquire' of '_thread.lock' objects>",
+      "calls": 122470,
+      "self_seconds": 283.2226157,
+      "inclusive_seconds": 283.2226157
+    },
+    {
+      "file": "D:\\Program Files\\Python311\\Lib\\json\\decoder.py",
+      "line": 343,
+      "function": "raw_decode",
+      "calls": 34160,
+      "self_seconds": 4.2482968,
+      "inclusive_seconds": 4.2482968
+    },
+    {
+      "file": "E:\\IGESS\\.tmp\\fish-post-luck-hotspots-20261101\\igess-src\\igess\\fish_source_eggs.py",
+      "line": 14,
+      "function": "observe",
+      "calls": 11447,
+      "self_seconds": 1.3088807,
+      "inclusive_seconds": 1.4581832000000001
+    },
+    {
+      "file": "D:\\Program Files\\Python311\\Lib\\json\\encoder.py",
+      "line": 334,
+      "function": "_iterencode_dict",
+      "calls": 5609782,
+      "self_seconds": 0.8062760000000001,
+      "inclusive_seconds": 1.0618619
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method io.open>",
+      "calls": 9410,
+      "self_seconds": 0.7204394000000001,
+      "inclusive_seconds": 0.7432798
+    },
+    {
+      "file": "D:\\Program Files\\Python311\\Lib\\json\\encoder.py",
+      "line": 205,
+      "function": "iterencode",
+      "calls": 59072,
+      "self_seconds": 0.5080384,
+      "inclusive_seconds": 0.5134431
+    },
+    {
+      "file": "E:\\IGESS\\.tmp\\fish-post-luck-hotspots-20261101\\igess-src\\igess\\fish_source_numbers.py",
+      "line": 8,
+      "function": "source_decimal",
+      "calls": 215552,
+      "self_seconds": 0.5015392000000001,
+      "inclusive_seconds": 0.7178159000000001
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<built-in method nt.unlink>",
+      "calls": 3109,
+      "self_seconds": 0.2769936,
+      "inclusive_seconds": 0.2769978
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'write' of '_io.TextIOWrapper' objects>",
+      "calls": 264613,
+      "self_seconds": 0.2466424,
+      "inclusive_seconds": 0.2466424
+    },
+    {
+      "file": "E:\\IGESS\\.tmp\\fish-post-luck-hotspots-20261101\\igess-src\\igess\\fish_source_engine.py",
+      "line": 828,
+      "function": "_act",
+      "calls": 4183,
+      "self_seconds": 0.2313572,
+      "inclusive_seconds": 278.05179580000004
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method '__exit__' of '_io._IOBase' objects>",
+      "calls": 9494,
+      "self_seconds": 0.22738480000000003,
+      "inclusive_seconds": 0.22767980000000002
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'as_tuple' of 'decimal.Decimal' objects>",
+      "calls": 361649,
+      "self_seconds": 0.2209007,
+      "inclusive_seconds": 0.34118600000000004
+    },
+    {
+      "file": "E:\\IGESS\\.tmp\\fish-post-luck-hotspots-20261101\\igess-src\\igess\\fish_source_engine.py",
+      "line": 604,
+      "function": "_advance",
+      "calls": 4645,
+      "self_seconds": 0.21685480000000001,
+      "inclusive_seconds": 152.1172411
+    },
+    {
+      "file": "D:\\Program Files\\Python311\\Lib\\json\\encoder.py",
+      "line": 183,
+      "function": "encode",
+      "calls": 59072,
+      "self_seconds": 0.1969244,
+      "inclusive_seconds": 1.9682214000000002
+    },
+    {
+      "file": "D:\\Program Files\\Python311\\Lib\\queue.py",
+      "line": 154,
+      "function": "get",
+      "calls": 24492,
+      "self_seconds": 0.18063320000000002,
+      "inclusive_seconds": 283.75184010000004
+    },
+    {
+      "file": "E:\\IGESS\\.tmp\\fish-post-luck-hotspots-20261101\\igess-src\\igess\\fish_source_engine.py",
+      "line": 542,
+      "function": "_observe_progression",
+      "calls": 11447,
+      "self_seconds": 0.1770614,
+      "inclusive_seconds": 2.1681495
+    },
+    {
+      "file": "E:\\IGESS\\.tmp\\fish-post-luck-hotspots-20261101\\igess-src\\igess\\fish_source_runtime.py",
+      "line": 217,
+      "function": "request",
+      "calls": 24492,
+      "self_seconds": 0.1617906,
+      "inclusive_seconds": 288.8775919
+    },
+    {
+      "file": "E:\\IGESS\\.scratch\\fish-post-luck-hotspots-20261101\\diagnose.py",
+      "line": 29,
+      "function": "measured",
+      "calls": 24490,
+      "self_seconds": 0.1558022,
+      "inclusive_seconds": 289.0602994
+    },
+    {
+      "file": "D:\\Program Files\\Python311\\Lib\\json\\encoder.py",
+      "line": 414,
+      "function": "_iterencode",
+      "calls": 1263974,
+      "self_seconds": 0.1548633,
+      "inclusive_seconds": 1.2219752000000002
+    },
+    {
+      "file": "E:\\IGESS\\.scratch\\fish-post-luck-hotspots-20261101\\diagnose.py",
+      "line": 20,
+      "function": "measured_loads",
+      "calls": 34160,
+      "self_seconds": 0.1310939,
+      "inclusive_seconds": 4.628606
+    },
+    {
+      "file": "E:\\IGESS\\.tmp\\fish-post-luck-hotspots-20261101\\igess-src\\igess\\fish_source_income.py",
+      "line": 28,
+      "function": "observe",
+      "calls": 11228,
+      "self_seconds": 0.1287512,
+      "inclusive_seconds": 0.9386388000000001
+    },
+    {
+      "file": "D:\\Program Files\\Python311\\Lib\\json\\encoder.py",
+      "line": 278,
+      "function": "_iterencode_list",
+      "calls": 1079356,
+      "self_seconds": 0.1231488,
+      "inclusive_seconds": 0.5163102
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'read' of '_io.BufferedReader' objects>",
+      "calls": 6895,
+      "self_seconds": 0.12258640000000001,
+      "inclusive_seconds": 0.12258640000000001
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'get' of 'dict' objects>",
+      "calls": 2014479,
+      "self_seconds": 0.1200177,
+      "inclusive_seconds": 0.12002900000000001
+    },
+    {
+      "file": "E:\\IGESS\\.tmp\\fish-post-luck-hotspots-20261101\\igess-src\\igess\\fish_source_income.py",
+      "line": 11,
+      "function": "_sum",
+      "calls": 45465,
+      "self_seconds": 0.1155067,
+      "inclusive_seconds": 0.4469269
+    }
+  ],
+  "python_by_inclusive": [
+    {
+      "file": "E:\\IGESS\\.tmp\\fish-post-luck-hotspots-20261101\\igess-src\\igess\\cli.py",
+      "line": 389,
+      "function": "main",
+      "calls": 1,
+      "self_seconds": 2.0600000000000003e-05,
+      "inclusive_seconds": 298.69167830000004
+    },
+    {
+      "file": "E:\\IGESS\\.tmp\\fish-post-luck-hotspots-20261101\\igess-src\\igess\\authoring\\cli.py",
+      "line": 222,
+      "function": "dispatch_model",
+      "calls": 1,
+      "self_seconds": 1.6400000000000002e-05,
+      "inclusive_seconds": 298.66846200000003
+    },
+    {
+      "file": "E:\\IGESS\\.tmp\\fish-post-luck-hotspots-20261101\\igess-src\\igess\\authoring\\service.py",
+      "line": 437,
+      "function": "simulate",
+      "calls": 1,
+      "self_seconds": 8.05e-05,
+      "inclusive_seconds": 298.6630956
+    },
+    {
+      "file": "E:\\IGESS\\.tmp\\fish-post-luck-hotspots-20261101\\igess-src\\igess\\authoring\\service.py",
+      "line": 868,
+      "function": "_simulate_shared",
+      "calls": 1,
+      "self_seconds": 0.0020439,
+      "inclusive_seconds": 298.66051170000003
+    },
+    {
+      "file": "E:\\IGESS\\.tmp\\fish-post-luck-hotspots-20261101\\igess-src\\igess\\formal_run.py",
+      "line": 130,
+      "function": "execute",
+      "calls": 1,
+      "self_seconds": 0.0049866,
+      "inclusive_seconds": 295.0135756
+    },
+    {
+      "file": "E:\\IGESS\\.tmp\\fish-post-luck-hotspots-20261101\\igess-src\\igess\\fish_source_engine.py",
+      "line": 325,
+      "function": "run_scenario",
+      "calls": 1,
+      "self_seconds": 0.0013917,
+      "inclusive_seconds": 292.7919906
+    },
+    {
+      "file": "E:\\IGESS\\.tmp\\fish-post-luck-hotspots-20261101\\igess-src\\igess\\fish_source_engine.py",
+      "line": 941,
+      "function": "execute",
+      "calls": 1,
+      "self_seconds": 0.038618,
+      "inclusive_seconds": 289.07291330000004
+    },
+    {
+      "file": "E:\\IGESS\\.scratch\\fish-post-luck-hotspots-20261101\\diagnose.py",
+      "line": 29,
+      "function": "measured",
+      "calls": 24490,
+      "self_seconds": 0.1558022,
+      "inclusive_seconds": 289.0602994
+    },
+    {
+      "file": "E:\\IGESS\\.tmp\\fish-post-luck-hotspots-20261101\\igess-src\\igess\\fish_source_runtime.py",
+      "line": 217,
+      "function": "request",
+      "calls": 24492,
+      "self_seconds": 0.1617906,
+      "inclusive_seconds": 288.8775919
+    },
+    {
+      "file": "D:\\Program Files\\Python311\\Lib\\queue.py",
+      "line": 154,
+      "function": "get",
+      "calls": 24492,
+      "self_seconds": 0.18063320000000002,
+      "inclusive_seconds": 283.75184010000004
+    },
+    {
+      "file": "D:\\Program Files\\Python311\\Lib\\threading.py",
+      "line": 295,
+      "function": "wait",
+      "calls": 24494,
+      "self_seconds": 0.11015050000000001,
+      "inclusive_seconds": 283.4244971
+    },
+    {
+      "file": "~",
+      "line": 0,
+      "function": "<method 'acquire' of '_thread.lock' objects>",
+      "calls": 122470,
+      "self_seconds": 283.2226157,
+      "inclusive_seconds": 283.2226157
+    },
+    {
+      "file": "E:\\IGESS\\.tmp\\fish-post-luck-hotspots-20261101\\igess-src\\igess\\fish_source_engine.py",
+      "line": 828,
+      "function": "_act",
+      "calls": 4183,
+      "self_seconds": 0.2313572,
+      "inclusive_seconds": 278.05179580000004
+    },
+    {
+      "file": "E:\\IGESS\\.tmp\\fish-post-luck-hotspots-20261101\\igess-src\\igess\\fish_source_runtime.py",
+      "line": 262,
+      "function": "observe",
+      "calls": 11228,
+      "self_seconds": 0.022029200000000002,
+      "inclusive_seconds": 177.4222023
+    },
+    {
+      "file": "E:\\IGESS\\.tmp\\fish-post-luck-hotspots-20261101\\igess-src\\igess\\fish_source_engine.py",
+      "line": 604,
+      "function": "_advance",
+      "calls": 4645,
+      "self_seconds": 0.21685480000000001,
+      "inclusive_seconds": 152.1172411
+    },
+    {
+      "file": "E:\\IGESS\\.tmp\\fish-post-luck-hotspots-20261101\\igess-src\\igess\\fish_source_engine.py",
+      "line": 620,
+      "function": "_advance_to",
+      "calls": 4765,
+      "self_seconds": 0.0485196,
+      "inclusive_seconds": 151.8647211
+    },
+    {
+      "file": "E:\\IGESS\\.tmp\\fish-post-luck-hotspots-20261101\\igess-src\\igess\\fish_source_engine.py",
+      "line": 871,
+      "function": "_wait_until",
+      "calls": 3746,
+      "self_seconds": 0.0056324,
+      "inclusive_seconds": 131.86132560000001
+    },
+    {
+      "file": "E:\\IGESS\\.tmp\\fish-post-luck-hotspots-20261101\\igess-src\\igess\\fish_source_engine.py",
+      "line": 875,
+      "function": "_continue_action",
+      "calls": 3746,
+      "self_seconds": 0.028753200000000003,
+      "inclusive_seconds": 131.8547706
+    },
+    {
+      "file": "E:\\IGESS\\.tmp\\fish-post-luck-hotspots-20261101\\igess-src\\igess\\fish_source_engine.py",
+      "line": 640,
+      "function": "_command",
+      "calls": 6463,
+      "self_seconds": 0.101065,
+      "inclusive_seconds": 128.1762646
+    },
+    {
+      "file": "E:\\IGESS\\.tmp\\fish-post-luck-hotspots-20261101\\igess-src\\igess\\fish_source_engine.py",
+      "line": 884,
+      "function": "_continue_throw",
+      "calls": 437,
+      "self_seconds": 0.0596532,
+      "inclusive_seconds": 57.3128703
+    },
+    {
+      "file": "E:\\IGESS\\.tmp\\fish-post-luck-hotspots-20261101\\igess-src\\igess\\fish_source_engine.py",
+      "line": 717,
+      "function": "_choose",
+      "calls": 4183,
+      "self_seconds": 0.08110400000000001,
+      "inclusive_seconds": 8.2768903
+    },
+    {
+      "file": "E:\\IGESS\\.tmp\\fish-post-luck-hotspots-20261101\\igess-src\\igess\\fish_source_runtime.py",
+      "line": 277,
+      "function": "create",
+      "calls": 2,
+      "self_seconds": 7.100000000000001e-06,
+      "inclusive_seconds": 4.7391357
+    },
+    {
+      "file": "E:\\IGESS\\.scratch\\fish-post-luck-hotspots-20261101\\diagnose.py",
+      "line": 20,
+      "function": "measured_loads",
+      "calls": 34160,
+      "self_seconds": 0.1310939,
+      "inclusive_seconds": 4.628606
+    },
+    {
+      "file": "D:\\Program Files\\Python311\\Lib\\json\\__init__.py",
+      "line": 299,
+      "function": "loads",
+      "calls": 34160,
+      "self_seconds": 0.062097700000000006,
+      "inclusive_seconds": 4.4877699
+    },
+    {
+      "file": "D:\\Program Files\\Python311\\Lib\\json\\decoder.py",
+      "line": 332,
+      "function": "decode",
+      "calls": 34160,
+      "self_seconds": 0.08644270000000001,
+      "inclusive_seconds": 4.4047038
+    }
+  ],
+  "warning": "Instrumented inclusive timings overlap; os.clock and instruction samples are diagnostic. No speedup claim. Clone/copy/sameValue recursion is counted separately, timed at outer calls only."
+}

@@ -1,0 +1,6 @@
+simulation gun progression passed
+lua55: tests/simulation_guns_test.lua:80: collection conditions move without changing reward identity
+stack traceback:
+	[C]: in global 'assert'
+	tests/simulation_guns_test.lua:80: in main chunk
+	[C]: in ?

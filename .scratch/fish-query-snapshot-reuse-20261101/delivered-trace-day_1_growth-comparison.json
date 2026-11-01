@@ -1,0 +1,12 @@
+{
+  "first": "E:\\IGESS\\.scratch\\fish-query-snapshot-reuse-20261101\\trace-baseline-day_1_growth.json",
+  "second": "E:\\IGESS\\.scratch\\fish-query-snapshot-reuse-20261101\\delivered-trace-final-day_1_growth.json",
+  "core_bytes_identical": true,
+  "checkpoint_and_ordered_history_identical": true,
+  "negative_control_rejected": true,
+  "observations": 1397,
+  "seconds": [
+    31.38788829999976,
+    19.485533999977633
+  ]
+}

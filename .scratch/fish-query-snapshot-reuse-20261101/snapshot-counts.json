@@ -1,0 +1,22 @@
+{
+  "baseline": [
+    {
+      "snapshots": 16,
+      "validations": 11
+    },
+    {
+      "snapshots": 9,
+      "validations": 5
+    }
+  ],
+  "candidate": [
+    {
+      "snapshots": 1,
+      "validations": 11
+    },
+    {
+      "snapshots": 1,
+      "validations": 5
+    }
+  ]
+}

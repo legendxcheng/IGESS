@@ -1,0 +1,50 @@
+[
+  {
+    "first": "E:\\IGESS\\.scratch\\fish-query-snapshot-reuse-20261101\\delivered1-baseline-week_1_growth.json",
+    "second": "E:\\IGESS\\.scratch\\fish-query-snapshot-reuse-20261101\\delivered1-final-week_1_growth.json",
+    "core_bytes_identical": true,
+    "checkpoint_and_ordered_history_identical": true,
+    "negative_control_rejected": true,
+    "observations": 0,
+    "seconds": [
+      206.02214290003758,
+      199.51915960002225
+    ]
+  },
+  {
+    "first": "E:\\IGESS\\.scratch\\fish-query-snapshot-reuse-20261101\\delivered2-baseline-week_1_growth.json",
+    "second": "E:\\IGESS\\.scratch\\fish-query-snapshot-reuse-20261101\\delivered2-final-week_1_growth.json",
+    "core_bytes_identical": true,
+    "checkpoint_and_ordered_history_identical": true,
+    "negative_control_rejected": true,
+    "observations": 0,
+    "seconds": [
+      216.02496459998656,
+      207.34078510000836
+    ]
+  },
+  {
+    "first": "E:\\IGESS\\.scratch\\fish-query-snapshot-reuse-20261101\\delivered3-baseline-week_1_growth.json",
+    "second": "E:\\IGESS\\.scratch\\fish-query-snapshot-reuse-20261101\\delivered3-final-week_1_growth.json",
+    "core_bytes_identical": true,
+    "checkpoint_and_ordered_history_identical": true,
+    "negative_control_rejected": true,
+    "observations": 0,
+    "seconds": [
+      214.84659019997343,
+      210.33864620001987
+    ]
+  },
+  {
+    "first": "E:\\IGESS\\.scratch\\fish-query-snapshot-reuse-20261101\\delivered-short-baseline-day_1_growth.json",
+    "second": "E:\\IGESS\\.scratch\\fish-query-snapshot-reuse-20261101\\delivered-short-final-day_1_growth.json",
+    "core_bytes_identical": true,
+    "checkpoint_and_ordered_history_identical": true,
+    "negative_control_rejected": true,
+    "observations": 0,
+    "seconds": [
+      19.71439159999136,
+      18.87574420007877
+    ]
+  }
+]

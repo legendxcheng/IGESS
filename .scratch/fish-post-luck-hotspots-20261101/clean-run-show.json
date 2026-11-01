@@ -1,0 +1,521 @@
+{
+  "schema_version": 1,
+  "command": "runs.show",
+  "ok": true,
+  "code": "ok",
+  "message": "Analysis complete",
+  "details": {},
+  "result": {
+    "change_id": null,
+    "duration_seconds": 211.8279999999795,
+    "engine_id": "fish_source",
+    "finished_at": "2026-11-01T06:55:37.099379+00:00",
+    "identity_complete": true,
+    "kind": "formal",
+    "manifest": {
+      "artifacts": [
+        "analysis.json",
+        "analysis.md",
+        "events.csv",
+        "events.json",
+        "payback.csv",
+        "timeline.csv",
+        "timeline.json",
+        "final_checkpoint.json",
+        "source_progression.json",
+        "source_behavior.json"
+      ],
+      "engine_id": "fish_source",
+      "execution_window": {
+        "accepted_commands_scope": "current_execution_segment",
+        "cumulative_fields": [
+          "wallet",
+          "online_acquisition",
+          "active_time_seconds",
+          "source_total_throws"
+        ],
+        "end_seconds": 604800,
+        "event_scope": "current_execution_segment",
+        "requested_until_seconds": null,
+        "scenario_end_seconds": 604800,
+        "start_seconds": 0
+      },
+      "model_digest": "sha256:78809ae99d0e561225db435985d344b13df4938c0c125fe3aec766f33bde59be",
+      "model_id": "fish",
+      "overrides": [],
+      "profiles": [
+        "default"
+      ],
+      "scenario_id": "week_1_growth",
+      "schema_version": 1,
+      "source_profiles": {
+        "default": {
+          "collection_growth": {
+            "display_names": {
+              "fish": {
+                "1001": "利维坦",
+                "1002": "恶魔鲨",
+                "1003": "死神利维坦",
+                "1004": "天灾利维坦",
+                "1005": "Stoppo Luminino",
+                "1006": "Torrtuginni Dragonfrutini",
+                "1007": "Tictac Sahur",
+                "1008": "Cactus Pingu",
+                "101": "小白条",
+                "102": "小鲶鱼",
+                "103": "小翘嘴",
+                "104": "河豚",
+                "105": "鲤鱼",
+                "106": "草鱼",
+                "107": "金鱼",
+                "108": "邪恶鲤鱼",
+                "1101": "Los Primos Blue",
+                "1102": "La Vacca Saturno Saturnita",
+                "1103": "Agarrini La Palini",
+                "1104": "Bottellini",
+                "1105": "Karkerkar Kurkur",
+                "1106": "Blackhole Goat",
+                "1107": "Compactoroni Diskaloni",
+                "1108": "Cappuccino Clownino",
+                "1201": "Nuclearo Dinossauro",
+                "1202": "Los Noo My Hotspotsitos",
+                "1203": "Chillin Chilli",
+                "1204": "Crazylone Pizalone",
+                "1205": "Corn Sahur",
+                "1206": "Meowl",
+                "1207": "Strawberry Elephant",
+                "1208": "Dragonfrutina Dolphinita",
+                "1301": "Guerreiro Digitale",
+                "1302": "Chicleteira Bicicleteira",
+                "1303": "Pot Hotspot",
+                "1304": "Krupuk Pagi Pagi",
+                "1305": "Beluga Beluga",
+                "1306": "Tralaledon",
+                "1307": "Anpali Babel",
+                "1308": "Ketchuru and Musturu",
+                "1401": "Los Primos",
+                "1402": "Mastodontico Telepiedone",
+                "1403": "Espresso Shockantoni",
+                "1404": "Ketupat Kepat",
+                "1405": "Professora 67",
+                "1406": "Astro Tim",
+                "1407": "Dumbelloni",
+                "1408": "Baba Yaga",
+                "1501": "Don Tiramisotto",
+                "1502": "Kicky",
+                "1503": "Smelloni Papayoni",
+                "1504": "Barbelloni Gymrattoni",
+                "1505": "Lucky Fella",
+                "1506": "Coinator Baconator",
+                "1507": "Dribbloni Spaghetti",
+                "1508": "Divinello Starblock",
+                "1601": "Divinello Starblock",
+                "2001": "玄武",
+                "2002": "白虎",
+                "2003": "朱雀",
+                "2004": "青龙",
+                "201": "幼年海龙王",
+                "202": "皇带鱼",
+                "203": "翻车鱼",
+                "204": "海狮",
+                "205": "牛马鱼",
+                "206": "鲤鱼王",
+                "207": "鼠鲨",
+                "208": "卡皮巴拉",
+                "301": "鳌鱼",
+                "302": "味真鲨",
+                "303": "龙舟鱼",
+                "304": "大眼仔",
+                "305": "安康鱼",
+                "306": "三文鱼",
+                "307": "龙鲤",
+                "308": "护士鲨",
+                "401": "邪恶鲨",
+                "402": "积石虎蛟",
+                "403": "冰魄鱼龙",
+                "404": "鲨雕",
+                "405": "海马",
+                "406": "钢齿鲨",
+                "407": "哈基鱼",
+                "408": "熔岩邓氏鲨",
+                "501": "金枪鱼",
+                "502": "赤目鱼龙",
+                "503": "大白鲨",
+                "504": "鲸鲨",
+                "505": "双髻鲨",
+                "506": "沧龙",
+                "507": "美人鱼",
+                "508": "何罗鱼",
+                "601": "长尾鲨",
+                "602": "海龙鳄",
+                "603": "独角鲸",
+                "604": "鲶鱼王",
+                "605": "虎鲸",
+                "606": "机械鲨MK-I",
+                "607": "地壳鲨",
+                "608": "蛇颈龙",
+                "701": "抹香鲸",
+                "702": "迷彩鲶",
+                "703": "幼年杀手鲨",
+                "704": "水晶鲨",
+                "705": "般若鲤",
+                "706": "沧鲨",
+                "707": "鳄鲨",
+                "708": "巨锤鲨",
+                "801": "恶霸鲨",
+                "802": "装甲邓氏鱼",
+                "803": "珍珍",
+                "804": "幽灵鲨",
+                "805": "螳螂鲨",
+                "806": "凜冬海龙王",
+                "807": "机械鲨MK-II",
+                "808": "辐射鲨",
+                "901": "核能鲨",
+                "902": "闪电鳄",
+                "903": "寒冰鲨",
+                "904": "巨齿鳄鲨",
+                "905": "电锯鲨",
+                "906": "魔法鲸",
+                "907": "棱甲酸触",
+                "908": "深渊符文鲨"
+              },
+              "gun": {
+                "10001": "BP_SQ1",
+                "10002": "BP_uzi",
+                "10003": "BP_ve",
+                "10004": "BP_p90",
+                "10005": "BP_s686",
+                "10006": "BP_s12k",
+                "10007": "BP_ak",
+                "10008": "BP_m16",
+                "10009": "BP_M4",
+                "10010": "BP_sks",
+                "10011": "BP_vss",
+                "10012": "BP_mk12",
+                "10013": "BP_ace32",
+                "10014": "BP_m200",
+                "10015": "BP_awm",
+                "10101": "BP_m134",
+                "10102": "BP_98k",
+                "10103": "BP_amr"
+              },
+              "mutation": {
+                "1": "正常",
+                "2": "黄金",
+                "3": "翡翠",
+                "4": "钻石",
+                "5": "星空",
+                "6": "熔融"
+              }
+            },
+            "initial_gun_facts": [],
+            "initial_unlocked_entries": [],
+            "version": 1
+          },
+          "first_times": {
+            "fish_tide_participated": {
+              "online_time_seconds": "6600",
+              "round_id": "room:0:round:11",
+              "time_seconds": 6600
+            },
+            "fish_tide_unlocked": {
+              "identity": "fish_tide_unlocked:any_owned_gun",
+              "kind": "fish_tide_unlocked",
+              "online_time_seconds": "3302",
+              "time_seconds": 3302
+            },
+            "gun_claimed": {
+              "identity": "gun_claimed:301",
+              "kind": "gun_claimed",
+              "online_time_seconds": "3302",
+              "time_seconds": 3302
+            },
+            "gun_equipped": {
+              "identity": "gun_equipped:10003",
+              "kind": "gun_equipped",
+              "online_time_seconds": "3304",
+              "time_seconds": 3304
+            },
+            "gun_owned": {
+              "identity": "gun_owned:10003",
+              "kind": "gun_owned",
+              "online_time_seconds": "3302",
+              "time_seconds": 3302
+            },
+            "normal_codex_completed": {
+              "identity": "normal_codex_completed:301",
+              "kind": "normal_codex_completed",
+              "online_time_seconds": "3277",
+              "time_seconds": 3277
+            },
+            "treasure_beast_unlocked": {
+              "online_time_seconds": "7297",
+              "time_seconds": 86497
+            }
+          },
+          "initial_active_time_seconds": 0,
+          "initial_online": true,
+          "lifecycle_gun_milestones": [
+            {
+              "identity": "normal_codex_completed:301",
+              "kind": "normal_codex_completed",
+              "online_time_seconds": "3277",
+              "time_seconds": 3277
+            },
+            {
+              "identity": "gun_claimed:301",
+              "kind": "gun_claimed",
+              "online_time_seconds": "3302",
+              "time_seconds": 3302
+            },
+            {
+              "identity": "gun_owned:10003",
+              "kind": "gun_owned",
+              "online_time_seconds": "3302",
+              "time_seconds": 3302
+            },
+            {
+              "identity": "fish_tide_unlocked:any_owned_gun",
+              "kind": "fish_tide_unlocked",
+              "online_time_seconds": "3302",
+              "time_seconds": 3302
+            },
+            {
+              "identity": "gun_equipped:10003",
+              "kind": "gun_equipped",
+              "online_time_seconds": "3304",
+              "time_seconds": 3304
+            },
+            {
+              "identity": "normal_codex_completed:401",
+              "kind": "normal_codex_completed",
+              "online_time_seconds": "11063",
+              "time_seconds": 90263
+            },
+            {
+              "identity": "gun_claimed:401",
+              "kind": "gun_claimed",
+              "online_time_seconds": "11086",
+              "time_seconds": 90286
+            },
+            {
+              "identity": "gun_owned:10011",
+              "kind": "gun_owned",
+              "online_time_seconds": "11086",
+              "time_seconds": 90286
+            },
+            {
+              "identity": "gun_equipped:10011",
+              "kind": "gun_equipped",
+              "online_time_seconds": "11088",
+              "time_seconds": 90288
+            },
+            {
+              "identity": "normal_codex_completed:101",
+              "kind": "normal_codex_completed",
+              "online_time_seconds": "20550",
+              "time_seconds": 178950
+            },
+            {
+              "identity": "gun_claimed:101",
+              "kind": "gun_claimed",
+              "online_time_seconds": "20576",
+              "time_seconds": 178976
+            },
+            {
+              "identity": "gun_owned:10001",
+              "kind": "gun_owned",
+              "online_time_seconds": "20576",
+              "time_seconds": 178976
+            },
+            {
+              "identity": "normal_codex_completed:501",
+              "kind": "normal_codex_completed",
+              "online_time_seconds": "23884",
+              "time_seconds": 261484
+            },
+            {
+              "identity": "gun_claimed:501",
+              "kind": "gun_claimed",
+              "online_time_seconds": "23906",
+              "time_seconds": 261506
+            },
+            {
+              "identity": "gun_owned:10005",
+              "kind": "gun_owned",
+              "online_time_seconds": "23906",
+              "time_seconds": 261506
+            },
+            {
+              "identity": "gun_equipped:10005",
+              "kind": "gun_equipped",
+              "online_time_seconds": "23908",
+              "time_seconds": 261508
+            },
+            {
+              "identity": "normal_codex_completed:601",
+              "kind": "normal_codex_completed",
+              "online_time_seconds": "38134",
+              "time_seconds": 434134
+            },
+            {
+              "identity": "gun_claimed:601",
+              "kind": "gun_claimed",
+              "online_time_seconds": "38156",
+              "time_seconds": 434156
+            },
+            {
+              "identity": "gun_owned:10006",
+              "kind": "gun_owned",
+              "online_time_seconds": "38156",
+              "time_seconds": 434156
+            },
+            {
+              "identity": "gun_equipped:10006",
+              "kind": "gun_equipped",
+              "online_time_seconds": "38158",
+              "time_seconds": 434158
+            }
+          ],
+          "pool_growth": {
+            "initial_seen_pool_ids": [],
+            "pools": [
+              {
+                "display_name": "洗脚大盆",
+                "pool_id": 2,
+                "previous_upper_bound": "2E+2"
+              },
+              {
+                "display_name": "幽都冥河",
+                "pool_id": 3,
+                "previous_upper_bound": "3E+3"
+              },
+              {
+                "display_name": "原谅海湾",
+                "pool_id": 4,
+                "previous_upper_bound": "3.0E+4"
+              },
+              {
+                "display_name": "火锅神湖",
+                "pool_id": 5,
+                "previous_upper_bound": "2.20E+5"
+              },
+              {
+                "display_name": "扶桑日湾",
+                "pool_id": 6,
+                "previous_upper_bound": "2.5E+6"
+              },
+              {
+                "display_name": "玄鳞古河",
+                "pool_id": 7,
+                "previous_upper_bound": "4E+6"
+              },
+              {
+                "display_name": "奶茶大海",
+                "pool_id": 8,
+                "previous_upper_bound": "1.0E+7"
+              },
+              {
+                "display_name": "青丘灵湖",
+                "pool_id": 9,
+                "previous_upper_bound": "2.8E+7"
+              },
+              {
+                "display_name": "九野荒海",
+                "pool_id": 10,
+                "previous_upper_bound": "7.0E+7"
+              },
+              {
+                "display_name": "帝江血渊",
+                "pool_id": 11,
+                "previous_upper_bound": "2.50E+8"
+              },
+              {
+                "display_name": "太荒神洋",
+                "pool_id": 12,
+                "previous_upper_bound": "2.5E+9"
+              },
+              {
+                "display_name": "昆仑之墟",
+                "pool_id": 13,
+                "previous_upper_bound": "1.1E+10"
+              }
+            ],
+            "time_basis": "source_observation",
+            "version": 1
+          }
+        }
+      },
+      "source_runtime": {
+        "advance_mode": "equivalent_batch_v1",
+        "code_sha256": "b3f24e2937a9c70d9ea3e0bfe8ea7dd5a17bd1ac2bddd6db4568da9fdaebc41d",
+        "codex_claim_policy": "stable_reward_id_one_second_v1",
+        "collect_interval_basis": "batch_start",
+        "collect_interval_seconds": 300,
+        "collect_policy": "stable_slot_batch_v1",
+        "collect_slot_seconds": 2,
+        "fish_keep_count": 30,
+        "fish_sell_policy": "over_30_lowest_level_one_cps_backpack_v1",
+        "generated_money_definition": "source_collected_slot_receipts_plus_current_unclaimed",
+        "gun_claim_seconds": 1,
+        "gun_equip_seconds": 1,
+        "gun_policy": "claim_stable_reward_id_then_highest_source_attack_v1",
+        "idle_seconds": 30,
+        "in_fishing_area": true,
+        "integration_code_sha256": "9d5ca91921fdb5fcd764fa08e9da2dc2beed6e4a1bf798c5d7b207c4739c7d0c",
+        "landing_distance_cm": null,
+        "landing_policy": "source_natural_v1",
+        "lua_executable": "lua55",
+        "lua_version": "Lua 5.5",
+        "online_acquisition_definition": "observed_balance_increases_plus_receipt_spending_excludes_offline_claims",
+        "policy": "source_priority_v1",
+        "record_interval_seconds": 300,
+        "sampling_time_basis": "online",
+        "selected_export_root": "E:\\IGESS\\.tmp\\fish-post-luck-hotspots-20261101\\data",
+        "selected_export_sha256": "d8ef862c80d2b7654636370b823dce7430902555b2d03dadb7eb35d662dc2d53",
+        "tide_admission_policy": {
+          "horizon_online_seconds": 1800,
+          "income": "observed_online_material_excluding_codex_and_offline",
+          "income_window_online_seconds": 1800,
+          "policy": "growth_first_near_term_reserve_v1",
+          "reservation": "one_next_source_quoted_target_existing_weights_and_turn"
+        },
+        "tide_policy": {
+          "competition": "not_simulated",
+          "duration_seconds": 120,
+          "eggs": 5,
+          "gun_damage_affects_yield": false,
+          "model": "fixed_successful_eggs_v1",
+          "reloads": 6
+        },
+        "tide_schedule": {
+          "interval_seconds": 600,
+          "policy": "absolute_opening_only_v1",
+          "room_origin_seconds": 0,
+          "spawn_window_seconds": 120
+        },
+        "timings_seconds": {
+          "adapter_total": 210.951,
+          "checkpoint": 0.287,
+          "input_check": 0.082,
+          "process_close": 0.175,
+          "process_start": 0.581,
+          "source_execution": 209.826
+        }
+      }
+    },
+    "message": "Run complete",
+    "model_digest": "sha256:78809ae99d0e561225db435985d344b13df4938c0c125fe3aec766f33bde59be",
+    "output_dir": "E:\\IGESS\\.tmp\\fish-post-luck-hotspots-20261101\\clean-runs\\20261101T065205271374Z-week_1_growth\\output",
+    "report_dir": "E:\\IGESS\\.tmp\\fish-post-luck-hotspots-20261101\\clean-runs\\20261101T065205271374Z-week_1_growth\\report",
+    "report_index": "E:\\IGESS\\.tmp\\fish-post-luck-hotspots-20261101\\clean-runs\\20261101T065205271374Z-week_1_growth\\report\\index.html",
+    "run_dir": "E:\\IGESS\\.tmp\\fish-post-luck-hotspots-20261101\\clean-runs\\20261101T065205271374Z-week_1_growth",
+    "run_id": "20261101T065205271374Z-week_1_growth",
+    "scenario_id": "week_1_growth",
+    "schema_version": 1,
+    "started_at": "2026-11-01T06:52:05.272392+00:00",
+    "status": "success",
+    "status_path": "E:\\IGESS\\.tmp\\fish-post-luck-hotspots-20261101\\clean-runs\\20261101T065205271374Z-week_1_growth\\run_status.json",
+    "version": 1
+  }
+}

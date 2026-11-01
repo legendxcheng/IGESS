@@ -117,6 +117,8 @@ uv run igess model simulate --project projects/fish_source --scenario day_1_grow
 
 ## 查询性能优化
 
+2026-11-01 后续实施接入单次完整查询的快照复用：`SnapshotScope` 按会话、coroutine 和查询生命周期隔离，通过既有 ArchiveService 注入服务；枪查询仅复制会被修改的 combat 分支。各服务校验选项不同，仍执行原校验。规格、实施票与整周对照证据见[查询快照复用](../../.scratch/fish-query-snapshot-reuse-20261101/spec.md)所在目录，契约和回归入口见源 `simulation/README.md`。
+
 2026-11-01 当前源码接入幸运值直接查询：`FishThrowService.QueryLuck` 复用 `ThrowOutcomeResolver` 的前置校验与源映射，正常观察只返回四个所需字段。自定义 options、异常目录与数值边界保留完整 Resolve 回退；真实投掷、精度、池边界、源随机结果及 checkpoint 身份保持。实现契约见源 `simulation/README.md` 的“幸运值只读查询”，本轮证据见[验收记录](../../.scratch/fish-luck-query-20261101/verification.md)。以下查询／状态观察优化记录属于当时冻结版本，所选源树是否仍包含对应实现须重新核对；本轮未重接其余优化，也未发布 GameBalancer。
 
 源宿主共享单次观察快照和完整校验，缓存鱼厅稳定投影，一次构造完整背包，并直接获取幸运映射；同次计算复用相同鱼组合的纯结果。精确大数分块运算和 JSON 编码减少内部开销，保留精度、随机、操作时点、采样、回执及恢复身份；可变返回值仍隔离。

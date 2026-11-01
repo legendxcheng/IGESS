@@ -106,6 +106,8 @@ uv run --extra dev python -m pytest tests/test_fish_source_formal.py -q
 
 查询性能维护：先以当前 `<source>/simulation/README.md` 和源码确认已接入能力，不把历史性能记录视为当前实现。幸运值查询由 `ThrowOutcomeResolver.QueryLuck` 与完整 `Resolve` 共用前置映射；默认安全规则只计算四个所需字段，显式 options、异常目录和数值边界回到完整 Resolve 保留错误。修改时运行源 `tests/throw_luck_query_test.lua`，核对精确 DTO、池边界、返回值隔离、随机链和拒绝行为；以逐次完整 Query、核心产物及恢复历史差分验收，同机无探针串行配对计时。
 
+单次完整查询快照复用由 `<source>/simulation/SnapshotScope.lua` 和 Host 的 ArchiveService 注入提供，只在本次 Query、当前会话和 coroutine 内生效；查询结束或异常后清理，嵌套查询独立。各服务的校验选项不同，仍保留原校验。枪查询会修改 combat 投影，必须保持其独立分支；新增查询接入前检查是否修改输入。修改此边界时运行源 `tests/simulation_snapshot_scope_test.lua`，并验证真实跨进程恢复和逐次完整观察，不能只比较终态。
+
 
 状态变化观察与推进性能：修改 `observe`、`query_changes` 或冻结生产计算器时，先读源模拟说明的“状态变化观察与冻结生产计算”。消费者仍接收原时点的完整独立状态；传输基准不进 checkpoint，恢复重新建立，完整查询作为回退和差分参照。生产缓存仅用于会话拥有的冻结规则计算器，结算仍使用原精度、校验和回执。验收同时比较逐次逻辑观察与完整业务产物；正式测速关闭诊断记录。
 

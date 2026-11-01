@@ -1,0 +1,53 @@
+.........F.....                                                          [100%]
+================================== FAILURES ===================================
+____ test_free_codex_gun_recurring_tide_hatching_and_asset_reconciliation _____
+
+tmp_path = WindowsPath('C:/Users/Administrator.DESKTOP-09JQGNK/AppData/Local/Temp/pytest-of-Administrator/pytest-1918/test_free_codex_gun_recurring_0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000019F44314790>
+
+    def test_free_codex_gun_recurring_tide_hatching_and_asset_reconciliation(tmp_path, monkeypatch):
+        state = archive("""
+    local rules=assert(require('Script.Domain.Gun.GunRules').Default())
+    for _,key in ipairs(rules.rewards[101].keys) do
+     if key~='103:1' then s.collection.unlockedKeys[#s.collection.unlockedKeys+1]=key end
+    end
+    """)
+        target = project(tmp_path, duration=245, weights={'manual_throw': '1'})
+        rewards_path = target / 'selected/tbcodexfishunlockreward.json'
+        rewards = json.loads(rewards_path.read_text(encoding='utf-8'))
+        state['collection']['claimedFishUnlockRewardIds'] = [r['id'] for r in rewards if f"{r['fishId']}:{r['mutationId']}" in state['collection']['unlockedKeys']]
+        final_member = next(r for r in rewards if r['id'] == 10103)
+        final_member.update(rewardType='material', rewardAmount={'sign': 1, 'digits': '300', 'scale': 0})
+        rewards_path.write_text(json.dumps(rewards), encoding='utf-8')
+        for name, key, selected in [('tbfishtideeggraritypool', 'eggRarityId', 1), ('tbfishtideeggmutationpool', 'mutationId', 2)]:
+            path = target / f'selected/{name}.json'
+            rows = json.loads(path.read_text(encoding='utf-8'))
+            # A controlled selected export preserves the real source RNG/grant path.
+            for row in rows:
+                if row['poolId'] == 1 and row[key] != selected:
+                    row['weight'] = 0
+            path.write_text(json.dumps(rows), encoding='utf-8')
+        path = target / 'selected/tbegg.json'
+        eggs = json.loads(path.read_text(encoding='utf-8'))
+        next(r for r in eggs if r['id'] == 102)['hatchSeconds'] = 30
+        path.write_text(json.dumps(eggs), encoding='utf-8')
+        path = target / 'economy.yaml'
+        config = yaml.safe_load(path.read_text(encoding='utf-8'))
+        config['engine']['source_runtime']['room_origin_seconds'] = 60
+        path.write_text(yaml.safe_dump(config), encoding='utf-8')
+        initial(monkeypatch, state)
+        _, read, report = run(target)
+        events = read('events.json')
+        completed = next(e for e in events if e['kind'] == 'complete_throw')
+>       assert json.loads(completed['details']['receipt'])['summary']['collectionKey'] == '103:1'
+E       AssertionError: assert '101:1' == '103:1'
+E         
+E         - 103:1
+E         ?   ^
+E         + 101:1
+E         ?   ^
+
+tests\test_fish_source_joint.py:205: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_fish_source_joint.py::test_free_codex_gun_recurring_tide_hatching_and_asset_reconciliation
+1 failed, 14 passed in 233.75s (0:03:53)

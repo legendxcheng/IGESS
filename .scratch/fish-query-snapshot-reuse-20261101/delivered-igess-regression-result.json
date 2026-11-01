@@ -1,0 +1,12 @@
+{
+  "command": [
+    "E:\\IGESS\\.tmp\\py311-venv\\Scripts\\python.exe",
+    "-m",
+    "pytest",
+    "tests/test_fish_source_current_rules.py",
+    "tests/test_fish_source_joint.py",
+    "tests/test_fish_source_toolkit.py",
+    "-q"
+  ],
+  "exit_code": 1
+}

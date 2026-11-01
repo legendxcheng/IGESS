@@ -1,0 +1,68 @@
+ M data-tables/Datas/Gameplay/Barbell.xlsx
+ M data-tables/Datas/Gameplay/Codex.xlsx
+ M data-tables/Datas/Gameplay/FishHallUpgrade.xlsx
+ M data-tables/Datas/Gameplay/FishRandomPool.xlsx
+ M data-tables/Datas/Gameplay/StrengthRebirth.xlsx
+ M data-tables/Datas/Gameplay/Torpedo.xlsx
+ M data-tables/Datas/Gameplay/Trash.xlsx
+ M data-tables/Datas/Gameplay/TrashManRealm.xlsx
+ M docs/SettingValue.xlsx
+ M igess_export/json/tbbarbell.json
+ M igess_export/json/tbcodexgunreward.json
+ M igess_export/json/tbfishhallupgrade.json
+ M igess_export/json/tbfishrandompool.json
+ M igess_export/json/tbstrengthrebirth.json
+ M igess_export/json/tbtorpedo.json
+ M igess_export/json/tbtrash.json
+ M igess_export/json/tbtrashmanrealm.json
+ M proj/Script/Table/tbbarbell.lua
+ M proj/Script/Table/tbcodexgunreward.lua
+ M proj/Script/Table/tbfishhallupgrade.lua
+ M proj/Script/Table/tbfishrandompool.lua
+ M proj/Script/Table/tbstrengthrebirth.lua
+ M proj/Script/Table/tbtorpedo.lua
+ M proj/Script/Table/tbtrash.lua
+ M proj/Script/Table/tbtrashmanrealm.lua
+ M simulation/Query.lua
+ M simulation/README.md
+?? .codex/
+?? .mcp.json
+?? .mcp.json.before-mcp-domain-20260927-103042.bak
+?? docs/guide/ai-ui-icon-communication-example.md
+?? docs/prompt/ui/event-icons-20261005.md
+?? docs/prompt/ui/examples/cumulative-spend-20261005.png
+?? docs/prompt/ui/examples/cumulative-spend-colorful-20261005.png
+?? docs/prompt/ui/examples/lifetime-card-20261012.png
+?? docs/prompt/ui/examples/limited-gift-pack-20261005.png
+?? docs/prompt/ui/examples/limited-gift-pack-colorful-20261005.png
+?? docs/prompt/ui/examples/lottery-20261011.png
+?? docs/prompt/ui/examples/lottery-draw-20261020.png
+?? docs/prompt/ui/examples/lottery-draw-no-green-20261020.png
+?? docs/prompt/ui/examples/month-card-20261010.png
+?? docs/prompt/ui/examples/month-card-20261011.png
+?? docs/prompt/ui/examples/month-card-nogreen-20261010.png
+?? docs/prompt/ui/examples/month-card-redesign-20261010.png
+?? docs/prompt/ui/examples/monthly-card-20261012.png
+?? docs/prompt/ui/examples/official-mall-20261011.png
+?? docs/prompt/ui/examples/treasure-beast-20261020.png
+?? docs/prompt/ui/examples/treasure-beast-no-green-20261020.png
+?? docs/prompt/ui/examples/weekly-card-20261012.png
+?? docs/prompt/ui/lottery-treasure-20261020.md
+?? docs/prompt/ui/month-card-20261010.md
+?? docs/prompt/ui/month-card-nogreen-20261010.md
+?? docs/prompt/ui/month-card-redesign-20261010.md
+?? docs/prompt/ui/official-mall-lottery-20261011.md
+?? docs/prompt/ui/official-mall-month-card-20261011.md
+?? docs/prompt/ui/subscription-cards-20261012.md
+?? docs/prompt/ui/subscription-cards-preview-20261012.png
+?? docs/prompt/ui/variants/
+?? "docs/\346\212\275\345\245\226\350\247\206\351\242\221.mp4"
+?? "gdd/Untitled 1.canvas"
+?? gdd/Untitled.canvas
+?? "gdd/\345\274\237\345\255\220\346\210\230\346\226\227.md"
+?? ref.rar
+?? tests/barbell_fractional_time_cost_test.lua
+?? tests/default_player_camera_lifecycle_test.lua
+?? tests/player_hud_name_service_test.lua
+?? tests/simulation_torpedo_quote_prerequisites_test.lua
+?? tests/w_room_floor_collision_test.lua

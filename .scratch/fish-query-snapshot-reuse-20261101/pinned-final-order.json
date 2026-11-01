@@ -1,0 +1,110 @@
+[
+  {
+    "tag": "pinned-screen",
+    "scenario": "day_1_growth",
+    "variant": "baseline",
+    "started": "2026-11-01T07:22:07.604771+00:00",
+    "foreign_lua": [],
+    "finished": "2026-11-01T07:22:27.121672+00:00",
+    "returncode": 0
+  },
+  {
+    "tag": "pinned-screen",
+    "scenario": "day_1_growth",
+    "variant": "candidate",
+    "started": "2026-11-01T07:22:27.139462+00:00",
+    "foreign_lua": [],
+    "finished": "2026-11-01T07:22:45.628717+00:00",
+    "returncode": 0
+  },
+  {
+    "tag": "pinned-final1",
+    "scenario": "week_1_growth",
+    "variant": "baseline",
+    "started": "2026-11-01T07:22:45.683991+00:00",
+    "foreign_lua": [],
+    "finished": "2026-11-01T07:26:31.608128+00:00",
+    "returncode": 0
+  },
+  {
+    "tag": "pinned-final1",
+    "scenario": "week_1_growth",
+    "variant": "candidate",
+    "started": "2026-11-01T07:26:31.629158+00:00",
+    "foreign_lua": [],
+    "finished": "2026-11-01T07:30:06.643354+00:00",
+    "returncode": 0
+  },
+  {
+    "tag": "pinned-final2",
+    "scenario": "week_1_growth",
+    "variant": "candidate",
+    "started": "2026-11-01T07:30:06.770698+00:00",
+    "foreign_lua": [],
+    "finished": "2026-11-01T07:33:39.814849+00:00",
+    "returncode": 0
+  },
+  {
+    "tag": "pinned-final2",
+    "scenario": "week_1_growth",
+    "variant": "baseline",
+    "started": "2026-11-01T07:33:39.834071+00:00",
+    "foreign_lua": [],
+    "finished": "2026-11-01T07:37:10.917280+00:00",
+    "returncode": 0
+  },
+  {
+    "tag": "pinned-final3",
+    "scenario": "week_1_growth",
+    "variant": "baseline",
+    "started": "2026-11-01T07:37:11.038332+00:00",
+    "foreign_lua": [],
+    "finished": "2026-11-01T07:40:39.167941+00:00",
+    "returncode": 0
+  },
+  {
+    "tag": "pinned-final3",
+    "scenario": "week_1_growth",
+    "variant": "candidate",
+    "started": "2026-11-01T07:40:39.185931+00:00",
+    "foreign_lua": [],
+    "finished": "2026-11-01T07:43:57.221853+00:00",
+    "returncode": 0
+  },
+  {
+    "tag": "pinned-short",
+    "scenario": "day_1_growth",
+    "variant": "baseline",
+    "started": "2026-11-01T07:43:57.340955+00:00",
+    "foreign_lua": [],
+    "finished": "2026-11-01T07:44:16.125927+00:00",
+    "returncode": 0
+  },
+  {
+    "tag": "pinned-short",
+    "scenario": "day_1_growth",
+    "variant": "candidate",
+    "started": "2026-11-01T07:44:16.143889+00:00",
+    "foreign_lua": [],
+    "finished": "2026-11-01T07:44:34.267476+00:00",
+    "returncode": 0
+  },
+  {
+    "tag": "pinned-supplement",
+    "scenario": "week_1_growth",
+    "variant": "candidate",
+    "started": "2026-11-01T07:44:42.215491+00:00",
+    "foreign_lua": [],
+    "finished": "2026-11-01T07:48:00.426974+00:00",
+    "returncode": 0
+  },
+  {
+    "tag": "pinned-supplement",
+    "scenario": "week_1_growth",
+    "variant": "baseline",
+    "started": "2026-11-01T07:48:00.445300+00:00",
+    "foreign_lua": [],
+    "finished": "2026-11-01T07:51:26.592620+00:00",
+    "returncode": 0
+  }
+]

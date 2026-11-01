@@ -1,0 +1,120 @@
+{
+  "week": {
+    "timings": {
+      "baseline": [
+        206.02214290003758,
+        216.02496459998656,
+        214.84659019997343
+      ],
+      "final": [
+        199.51915960002225,
+        207.34078510000836,
+        210.33864620001987
+      ]
+    },
+    "medians": {
+      "baseline": 214.84659019997343,
+      "final": 207.34078510000836
+    },
+    "reduction_percent": 3.4935649167058602,
+    "speed_ratio": 1.036200331238954,
+    "ranges": {
+      "baseline": [
+        206.02214290003758,
+        216.02496459998656
+      ],
+      "final": [
+        199.51915960002225,
+        210.33864620001987
+      ]
+    },
+    "paired_reduction_percent": [
+      3.156448723655203,
+      4.01998885455609,
+      2.0982152873628035
+    ],
+    "paired_reduction_median_percent": 3.156448723655203
+  },
+  "day": {
+    "timings": {
+      "baseline": [
+        19.71439159999136
+      ],
+      "final": [
+        18.87574420007877
+      ]
+    },
+    "medians": {
+      "baseline": 19.71439159999136,
+      "final": 18.87574420007877
+    },
+    "reduction_percent": 4.253985702064256,
+    "speed_ratio": 1.0444298985525078,
+    "ranges": {
+      "baseline": [
+        19.71439159999136,
+        19.71439159999136
+      ],
+      "final": [
+        18.87574420007877,
+        18.87574420007877
+      ]
+    },
+    "paired_reduction_percent": [
+      4.253985702064256
+    ],
+    "paired_reduction_median_percent": 4.253985702064256
+  },
+  "runs": [
+    {
+      "variant": "baseline",
+      "run_id": "20261101T080108752423Z-week_1_growth",
+      "scenario": "week_1_growth",
+      "seconds": 206.02214290003758
+    },
+    {
+      "variant": "final",
+      "run_id": "20261101T080435581976Z-week_1_growth",
+      "scenario": "week_1_growth",
+      "seconds": 199.51915960002225
+    },
+    {
+      "variant": "baseline",
+      "run_id": "20261101T081122164276Z-week_1_growth",
+      "scenario": "week_1_growth",
+      "seconds": 216.02496459998656
+    },
+    {
+      "variant": "final",
+      "run_id": "20261101T080754555659Z-week_1_growth",
+      "scenario": "week_1_growth",
+      "seconds": 207.34078510000836
+    },
+    {
+      "variant": "baseline",
+      "run_id": "20261101T081458284531Z-week_1_growth",
+      "scenario": "week_1_growth",
+      "seconds": 214.84659019997343
+    },
+    {
+      "variant": "final",
+      "run_id": "20261101T081833207987Z-week_1_growth",
+      "scenario": "week_1_growth",
+      "seconds": 210.33864620001987
+    },
+    {
+      "variant": "baseline",
+      "run_id": "20261101T082204259793Z-day_1_growth",
+      "scenario": "day_1_growth",
+      "seconds": 19.71439159999136
+    },
+    {
+      "variant": "final",
+      "run_id": "20261101T082223758716Z-day_1_growth",
+      "scenario": "day_1_growth",
+      "seconds": 18.87574420007877
+    }
+  ],
+  "all_public_run_checks_passed": true,
+  "serial_no_foreign_lua": true
+}
