@@ -1,4 +1,4 @@
-"""Player growth intent and tide budgets from source quotes and observed income."""
+"""Player growth intent and tide limits from source quotes and current wallet."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -8,11 +8,14 @@ from typing import Any
 from .fish_source_numbers import source_decimal
 
 GROWTH_TIDE_POLICY = {
-    "policy": "growth_first_near_term_reserve_v1",
+    "policy": "growth_first_wallet_fraction_near_term_reserve_v1",
+    "max_material_fraction": "0.25",
     "horizon_online_seconds": 1800,
     "income_window_online_seconds": 1800,
     "income": "observed_online_material_excluding_codex_and_offline",
     "reservation": "one_next_source_quoted_target_existing_weights_and_turn",
+    "budget_basis": "current_material_wallet_before_admission",
+    "cost_basis": "equipped_gun_source_reload_cost_times_reload_count",
 }
 
 
@@ -93,6 +96,23 @@ class GrowthTideBudget:
             option = self._select(ready, turn)
             return {"reason": "growth_action_ready", "growthBehavior": option.behavior, "growthTarget": option.target}
 
+        wallet = source_decimal(state["wallet"]["material"])
+        gun = next((row for row in state["guns"]["owned"] if row["id"] == state["guns"]["combat"]["equippedGunId"]), None)
+        if gun is None:
+            return None  # Let the source report its normal admission rejection.
+        reload_cost = source_decimal(gun["reloadResourceCost"])
+        reloads = Decimal(state["tides"]["policy"]["reloads"])
+        fraction = Decimal(GROWTH_TIDE_POLICY["max_material_fraction"])
+        with localcontext() as ctx:
+            values = [wallet, reload_cost, reloads, fraction]
+            ctx.prec = max(80, sum(len(v.as_tuple().digits) for v in values) + 8)
+            cost = reload_cost * reloads
+            limit = wallet * fraction
+            if cost > limit:
+                return {"reason": "tide_material_budget_exceeded",
+                        "materialBalance": str(wallet), "tideMaterialCost": str(cost),
+                        "materialBudget": str(limit), "maxMaterialFraction": str(fraction)}
+
         # Only the next quoted target in each material line can reserve money.
         next_by_behavior = {}
         for weight, option in enabled:
@@ -103,11 +123,6 @@ class GrowthTideBudget:
         elapsed = self.samples[-1][0] - self.samples[0][0]
         if elapsed <= 0:
             return None
-        wallet = source_decimal(state["wallet"]["material"])
-        gun = next((row for row in state["guns"]["owned"] if row["id"] == state["guns"]["combat"]["equippedGunId"]), None)
-        if gun is None:
-            return None  # Let the source report its normal admission rejection.
-        reload_cost = source_decimal(gun["reloadResourceCost"])
         previous, current = Decimal(self.samples[0][1]), Decimal(self.samples[-1][1])
         values = [wallet, reload_cost, previous, current] + [source_decimal(o.quote["cost"]) for _, o in next_by_behavior.values()]
         with localcontext() as ctx:

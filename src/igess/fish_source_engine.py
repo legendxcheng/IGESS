@@ -943,6 +943,7 @@ class _ProfileRun:
                 while self.next_tide_at < day_end:
                     self._skip_tide(self.next_tide_at, "offline")
                     self.next_tide_at += self.tide_interval
+                self.growth_tide_budget.observe(self.active_time_seconds, self.income.totals)
                 self._advance(day_end)
                 continue
             if not self.state["online"]:

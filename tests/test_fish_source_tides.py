@@ -60,6 +60,7 @@ def test_formal_single_tide_occupies_time_and_reports_actual_cost(tmp_path,monke
     create=FishSourceRuntime.create
     def fixture(self,**kwargs):
         kwargs['initial_state']=initial_state()
+        kwargs['initial_state']['wallet']['material']={'sign':1,'coeff':'12','exp':2}
         return create(self,**kwargs)
     monkeypatch.setattr(FishSourceRuntime,'create',fixture)
     target=project(tmp_path,duration)
@@ -112,7 +113,7 @@ def test_formal_recurring_rounds_use_source_interval(tmp_path, monkeypatch):
     create = FishSourceRuntime.create
     def fixture(self, **kwargs):
         state = initial_state()
-        state["wallet"]["material"] = {"sign": 1, "coeff": "9", "exp": 2}
+        state["wallet"]["material"] = {"sign": 1, "coeff": "15", "exp": 2}
         kwargs["initial_state"] = state
         return create(self, **kwargs)
     monkeypatch.setattr(FishSourceRuntime, "create", fixture)

@@ -29,53 +29,85 @@ def state(wallet=500, reload=50):
             "combat": {"equippedGunId": 1}}, "tides": {"policy": {"reloads": 6}}}
 
 
-def budget(gained=600, codex=0):
-    result = GrowthTideBudget()
-    result.observe(0, {"material": Decimal(0), "codex_material": Decimal(0)})
-    result.observe(600, {"material": Decimal(gained), "codex_material": Decimal(codex)})
-    return result
+def budget():
+    return GrowthTideBudget()
 
 
 def decide(b, s, options, *, remaining=7200, allowed=lambda *_: True, weights=None, turn=0):
     return b.skip(s, options, weights or {o.behavior: Weight(1) for o in options}, allowed, turn, remaining)
 
 
-@pytest.mark.parametrize("cost,reason", [(500, "growth_action_ready"), (2300, "growth_material_reserved"), (2301, None)])
-def test_ready_and_exact_thirty_minute_boundary(cost, reason):
-    result = decide(budget(), state(), [option(cost)])
-    assert (result or {}).get("reason") == reason
+@pytest.mark.parametrize("wallet,blocked", [(1199, True), (1200, False), (1201, False), (0, True)])
+def test_entire_tide_cost_at_quarter_wallet_boundary(wallet, blocked):
+    result = decide(budget(), state(wallet), [])
+    assert bool(result) == blocked
+    if blocked:
+        assert result["reason"] == "tide_material_budget_exceeded"
+        assert result["tideMaterialCost"] == "300"
 
 
-def test_one_time_rewards_no_income_and_remaining_session_do_not_lock_remote_goals():
-    assert decide(budget(600, 600), state(), [option(600)]) is None
-    assert decide(GrowthTideBudget(), state(), [option(600)]) is None
-    assert decide(budget(), state(), [option(1101)], remaining=600) is None
-    assert decide(budget(), state(), [option(1100)], remaining=600)["reason"] == "growth_material_reserved"
+def test_ready_growth_still_precedes_tide_and_disabled_growth_does_not():
+    assert decide(budget(), state(1200), [option(500)])["reason"] == "growth_action_ready"
+    assert decide(budget(), state(1200), [option(500)], allowed=lambda *_: False) is None
+    assert decide(budget(), state(1200), [option(500)], weights={"upgrade_fish_hall": Weight(0)}) is None
 
 
-def test_disabled_and_rejected_growth_does_not_reserve_or_block_tides():
-    assert decide(budget(), state(), [option(500)], allowed=lambda *_: False) is None
-    assert decide(budget(), state(), [option(500)], weights={"upgrade_fish_hall": Weight(0)}) is None
+def test_remote_goals_and_income_history_do_not_change_wallet_limit():
+    assert decide(budget(), state(1200), [option(10000000)]) is None
+    assert decide(budget(), state(1199), [option(10000000)])["reason"] == "tide_material_budget_exceeded"
 
 
-def test_existing_weights_and_turn_select_one_target_without_summing_lines():
-    options = [option(900), option(1000, "purchase_torpedo", "2"), option(1100, "purchase_torpedo", "3")]
-    weights = {"upgrade_fish_hall": Weight(1), "purchase_torpedo": Weight(100)}
-    result = decide(budget(), state(), options, weights=weights)
-    assert result["growthTarget"] == "2" and result["reservedMaterial"] == "1000"
-    # A remote next target cannot cause reservation for a later, cheaper target.
-    assert decide(budget(), state(), [option(10000, "purchase_torpedo", "2"), option(700, "purchase_torpedo", "3")]) is None
-
-
-def test_large_exact_dto_boundary_and_restored_income_window():
-    wallet = "1" + "0" * 100
-    cost = str(int(wallet) + 1800)
+def test_budget_recomputed_after_spending_and_gun_change():
     b = budget()
-    expected = decide(b, state(wallet), [option(cost)])
-    assert expected["reason"] == "growth_material_reserved"
-    assert decide(b, state(wallet), [option(str(int(cost) + 1))]) is None
+    assert decide(b, state(1200), []) is None
+    assert decide(b, state(900), [])["reason"] == "tide_material_budget_exceeded"
+    assert decide(b, state(1200, reload=51), [])["reason"] == "tide_material_budget_exceeded"
+    assert decide(b, state(1224, reload=51), []) is None
+
+
+def test_free_tide_and_exact_large_fractional_boundary():
+    assert decide(budget(), state(0, reload=0), []) is None
+    # Beyond Decimal's default precision: equality is allowed, one unit below is not.
+    reload = int("1" + "0" * 100) + 1
+    threshold = reload * 24
+    assert decide(budget(), state(str(threshold), reload=str(reload)), []) is None
+    assert decide(budget(), state(str(threshold - 1), reload=str(reload)), []) is not None
+    assert decide(budget(), state("2.4", reload="0.1"), []) is None
+    assert decide(budget(), state("2.39999999999999999999999999999999999999", reload="0.1"), []) is not None
+
+
+def observed_budget(gained=600, codex=0):
+    b = budget()
+    b.observe(0, {"material": Decimal(0), "codex_material": Decimal(0)})
+    b.observe(600, {"material": Decimal(gained), "codex_material": Decimal(codex)})
+    return b
+
+
+def test_both_guards_apply_independently():
+    # Cheap tide fits 25%, but the nearby growth target still needs its funds.
+    b = observed_budget()
+    assert decide(b, state(1200), [option(3000)])["reason"] == "growth_material_reserved"
+    assert decide(b, state(1200), [option(3001)]) is None
+    # A remote goal or absent observations must never bypass the wallet limit.
+    assert decide(b, state(1199), [option(100000)])["reason"] == "tide_material_budget_exceeded"
+    assert decide(budget(), state(1199), [])["reason"] == "tide_material_budget_exceeded"
+
+
+def test_reserve_excludes_codex_and_respects_remaining_online_time():
+    assert decide(observed_budget(600, 600), state(1200), [option(1500)]) is None
+    assert decide(observed_budget(), state(1200), [option(1800)], remaining=600)["reason"] == "growth_material_reserved"
+    assert decide(observed_budget(), state(1200), [option(1801)], remaining=600) is None
+
+
+def test_reserve_uses_legal_next_target_and_preserves_window_on_resume():
+    b = observed_budget()
+    assert decide(b, state(1200), [option(10000, "purchase_torpedo", "9"), option(1500, "purchase_torpedo", "10")]) is None
+    options = [option(2000, "purchase_torpedo", "2"), option(1800)]
+    weights = {"purchase_torpedo": Weight(100), "upgrade_fish_hall": Weight(1)}
+    result = decide(b, state(1200), options, weights=weights)
+    assert result["growthTarget"] == "2"
     restored = GrowthTideBudget(b.save())
-    assert decide(restored, state(wallet), [option(cost)]) == expected
+    assert decide(restored, state(1200), options, weights=weights) == result
     for t in (1200, 1800, 2400, 3000):
         totals = {"material": Decimal(t), "codex_material": Decimal(0)}
         b.observe(t, totals); restored.observe(t, totals)
@@ -93,7 +125,7 @@ def test_breakthrough_requires_source_prerequisites(locked):
 
 def growth_project(tmp_path, monkeypatch):
     s = archive("""
-s.wallet.material={sign=1,coeff='42',exp=1}
+s.wallet.material={sign=1,coeff='232',exp=1}
 s.combat.ownedGunIds={10001};s.combat.equippedGunId=10001;s.combat.lastSelectedGunId=10001
 """)
     initial(monkeypatch, s)
@@ -110,7 +142,7 @@ def test_formal_growth_then_tide_and_resume_preserve_source_receipts(tmp_path, m
     target = growth_project(tmp_path, monkeypatch)
     _, expected, _ = run(target)
     events = expected("events.json")
-    assert len([e for e in events if e["kind"] == "upgrade_hall"]) == 2
+    assert len([e for e in events if e["kind"] == "upgrade_hall"]) == 3
     starts = [e for e in events if e["kind"] == "start_tide"]
     assert [e["time_seconds"] for e in starts] == [600]
     skipped = [json.loads(e["details"]["receipt"]) for e in events if e["kind"] == "tide_observed" and e["time_seconds"] == 0]
@@ -131,4 +163,4 @@ def test_formal_growth_then_tide_and_resume_preserve_source_receipts(tmp_path, m
     assert combined == events
     assert after("final_checkpoint.json")["behavior_state"] == expected("final_checkpoint.json")["behavior_state"]
     assert _unpack_session(after("final_checkpoint.json")["engine_state"]) == _unpack_session(expected("final_checkpoint.json")["engine_state"])
-    assert expected("run_manifest.json")["source_runtime"]["tide_admission_policy"]["horizon_online_seconds"] == 1800
+    assert expected("run_manifest.json")["source_runtime"]["tide_admission_policy"]["max_material_fraction"] == "0.25"
