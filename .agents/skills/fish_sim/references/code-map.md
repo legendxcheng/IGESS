@@ -6,6 +6,7 @@
 
 | 要改什么 | 先看哪里／检索词 | 对应验证 |
 | --- | --- | --- |
+| 长跑后台交接、完成通知、人类唤醒后恢复 | Skill 的 `scripts/run_background.py`、`references/background-runs.md`；只包装公共 CLI，回执不替代正式运行验证 | `python -m pytest .agents/skills/fish_sim/scripts/test_run_background.py -q`（模拟 CLI 响应，不运行 Fish） |
 | 场景时长、在线窗口、权重、行动耗时、采样 | `projects/fish_source/economy.yaml`：`scenarios`（Day1～Day6 为从零开始的累计场景）、`session_patterns`、`behavior_weights`、`behavior_durations`；命令见项目 README | `tests/test_fish_source_formal.py` |
 | 引擎准备、能力检查、身份与策略 | `src/igess/fish_source_engine.py`：`FishSourceEngineAdapter.prepare`、`_REQUIRED_OPERATIONS`、`_integration_code_digest` | `tests/test_fish_source_current_rules.py`、`tests/test_fish_source_formal.py` |
 | 玩家选行为、动作互斥、时间推进、截断恢复 | 同文件 `_ProfileRun`：`_choose`、`_act`、`execute`、`_advance_to`、`_continue_throw`、`_continue_tide`、`checkpoint` | `tests/test_fish_source_natural_landing.py`、`tests/test_fish_source_tides.py`、`tests/test_fish_source_joint.py` |

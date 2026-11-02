@@ -68,7 +68,7 @@ Prefer the machine-readable response:
 
 Replace the scenario as requested. Do not bypass `WorkflowService`, the Fish engine adapter, `RunRegistry`, or standard artifact generation with an ad hoc domain script when producing a formal report.
 
-Keep the user informed during long simulations. Do not leave more than 60 seconds without a concise progress update when tool execution permits it.
+For long simulations, follow fish_sim's “长跑测：后台执行，等待人类唤醒” workflow and background helper. Hand off the started job and notification details, then end the turn. Resume steps 4–8 when the human wakes the Agent; preserve the original job identity. Short smoke checks may finish in the current turn, and an explicit request for continuous follow-through takes precedence.
 
 ### 4. Validate the new run
 
