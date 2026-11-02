@@ -256,7 +256,11 @@ class FishSourceEngineAdapter:
                     raise EngineAdapterError(
                         "fish_source_capability_missing", ", ".join(missing),
                     )
-                probe.create(start_at=0, in_fishing_area=fishing_area, fast_advance=advance_mode == "equivalent_batch_v1")
+                state = probe.create(start_at=0, in_fishing_area=fishing_area, fast_advance=advance_mode == "equivalent_batch_v1")
+                tide_policy = state.get("tides", {}).get("policy", {})
+                if (tide_policy.get("model") != TIDE_POLICY["model"]
+                        or tide_policy.get("durationSeconds") != TIDE_POLICY["duration_seconds"]):
+                    raise EngineAdapterError("fish_source_capability_missing", "zero-time tide policy required")
         except FishSourceRuntimeError as error:
             raise EngineAdapterError(error.code, str(error)) from error
         code_digest = source_code_digest(project_root)
@@ -897,7 +901,7 @@ class _ProfileRun:
     def _skip_tide(self, opening: int, reason: str, **budget: Any) -> None:
         row = {
             "roundId": self._round_id(opening), "openedAt": opening,
-            "endsAt": opening + 120, "phase": "skipped", "success": True,
+            "endsAt": opening + TIDE_POLICY["duration_seconds"], "phase": "skipped", "success": True,
             "reason": reason, "occupied_seconds": 0,
             "online_time_seconds": self.active_time_seconds,
             "reloads": [], "eggs": [],
@@ -964,7 +968,7 @@ class _ProfileRun:
                 round_id = self._round_id(now)
                 self.next_tide_at += self.tide_interval
                 self.growth_tide_budget.observe(self.active_time_seconds, self.income.totals)
-                if planned_logout - now < 120:
+                if planned_logout - now < TIDE_POLICY["duration_seconds"]:
                     self._skip_tide(now, "insufficient_online_time")
                 elif self.pending_throw or self.pending_action or self.pending_tide:
                     self._skip_tide(now, "foreground_busy")

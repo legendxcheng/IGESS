@@ -223,12 +223,12 @@ end
     assert completed['time_seconds'] < claim['time_seconds'] < equip['time_seconds'] < 60
     rounds = behavior['tide_rounds']
     assert len(rounds) == 1 and rounds[0]['phase'] == 'completed'
-    assert rounds[0]['occupied_seconds'] == 120 and len(rounds[0]['reloads']) == 6
+    assert rounds[0]['occupied_seconds'] == 0 and len(rounds[0]['reloads']) == 6
     assert rounds[0]['admitted_egg_count'] == rounds[0]['hatched_egg_count'] == 5
-    assert all(e['time_seconds'] == 180 for e in events if e['kind'] == 'egg_admitted')
-    assert all(e['time_seconds'] == 210 for e in events if e['kind'] == 'egg_hatched')
-    assert any(e['kind'] == 'claim_fish_reward' and e['time_seconds'] >= 210 for e in events)
-    assert not any(e['kind'] in {'prepare_throw', 'start_exercise'} and 60 <= e['time_seconds'] < 180 for e in events)
+    assert all(e['time_seconds'] == 60 for e in events if e['kind'] == 'egg_admitted')
+    assert all(e['time_seconds'] == 90 for e in events if e['kind'] == 'egg_hatched')
+    assert any(e['kind'] == 'claim_fish_reward' and e['time_seconds'] >= 90 for e in events)
+    assert any(e['kind'] == 'prepare_throw' and 60 <= e['time_seconds'] < 180 for e in events)
     final = read('timeline.json')[-1]['resources']
     assert Decimal(final['online_tide_reload_material_cumulative']) == 300
     costs = sum(Decimal(r['cost']['coeff']).scaleb(r['cost']['exp']) for r in rounds[0]['reloads'])
@@ -244,9 +244,9 @@ end
     gun_growth = next(r for r in growth if r['progression_category'] == 'gun_owned')
     assert completed_growth['wall_time_seconds'] == completed['time_seconds']
     assert gun_growth['wall_time_seconds'] == claim['time_seconds']
-    hatch_growth = [r for r in growth if r['source_event_kind'] == 'codex_fish_unlocked' and r['wall_time_seconds'] == 210]
+    hatch_growth = [r for r in growth if r['source_event_kind'] == 'codex_fish_unlocked' and r['wall_time_seconds'] == 90]
     assert hatch_growth and all('new_fish_variant' in r['progression_categories'] for r in hatch_growth)
-    assert not any(r['source_event_kind'] == 'codex_fish_unlocked' and r['wall_time_seconds'] == 180 for r in growth)
+    assert not any(r['source_event_kind'] == 'codex_fish_unlocked' and r['wall_time_seconds'] == 60 for r in growth)
     checkpoint = None
     segment_events = []
     segment_growth = []

@@ -229,7 +229,7 @@ function renderSourceFish(fish) {
         row.admitted_egg_count ?? (row.eggs || []).filter(egg => egg.admitted).length, row.hatched_egg_count ?? '—',
         row.ammunition?.shots ?? '—', row.ammunition?.reloadCount ?? '—',
         (row.reloads || []).map(reload => tideAmount(reload.cost)).join(' / '), tideAmount(row.totalMaterialSpent)]));
-    if (tideRows.length) actions.querySelector('[data-source-actions]').innerHTML += '<h3>鱼潮参与</h3><p>数值近似：每场 5 颗随机蛋、120 秒。新模型逐颗按 HP ÷ 枪攻击力向上取整，再按每匣 30 发估算装弹次数；空匣起算，首匣付费，场后余弹不结转。假定全部命中，不模拟射速或多人竞争。旧模型固定 6 次换弹，未记录估算发数。蛋入包不等于已孵化。</p><table class="data-table"><thead><tr><th>玩家</th><th>场次</th><th>阶段</th><th>开场墙钟秒</th><th>累计在线秒</th><th>原因</th><th>枪</th><th>占用秒</th><th>入包蛋</th><th>本段孵化蛋</th><th>估算子弹数</th><th>估算装弹次数</th><th>各次换弹费用</th><th>实际材料支出</th></tr></thead><tbody>' +
+    if (tideRows.length) actions.querySelector('[data-source-actions]').innerHTML += '<h3>鱼潮参与</h3><p>数值近似：每场 5 颗随机蛋，参与耗时以本次记录的占用秒为准；0 秒表示不占用模拟在线时间。新模型逐颗按 HP ÷ 枪攻击力向上取整，再按每匣 30 发估算装弹次数；空匣起算，首匣付费，场后余弹不结转。假定全部命中，不模拟射速或多人竞争。旧模型固定 6 次换弹，未记录估算发数。蛋入包不等于已孵化。</p><table class="data-table"><thead><tr><th>玩家</th><th>场次</th><th>阶段</th><th>开场墙钟秒</th><th>累计在线秒</th><th>原因</th><th>枪</th><th>占用秒</th><th>入包蛋</th><th>本段孵化蛋</th><th>估算子弹数</th><th>估算装弹次数</th><th>各次换弹费用</th><th>实际材料支出</th></tr></thead><tbody>' +
       tideRows.map(row => '<tr>' + row.map(value => `<td>${escapeHtml(value)}</td>`).join('') + '</tr>').join('') + '</tbody></table>';
     const eggRows = Object.entries(fish.actions || {}).flatMap(([id, profile]) =>
       (profile.egg_events || []).map(row => [profileLabel(id), row.kind === 'egg_admitted' ? '鱼蛋入包' : '鱼蛋孵化',

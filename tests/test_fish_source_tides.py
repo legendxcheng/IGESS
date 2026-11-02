@@ -38,23 +38,24 @@ s.fish.nextInstanceId=2
 io.write(require('simulation.Json').Encode(s))"""
     return json.loads(subprocess.check_output(['lua55','-e',script],cwd=SOURCE,text=True,encoding='utf-8'))
 
-def test_mid_tide_replay_preserves_costs_and_five_random_eggs(tmp_path):
+def test_same_second_tide_replay_preserves_costs_and_five_random_eggs(tmp_path):
     data = tide_export(tmp_path / "export")
     with FishSourceRuntime(SOURCE,data) as original:
         original.create(start_at=0,initial_state=initial_state(),random_seed=37)
         admitted=original.request({'op':'start_tide','roundId':'round:1'})
         assert admitted['success'] and len(admitted['reloads'])==6
-        original.request({'op':'advance','time':60})
+        assert admitted['openedAt'] == admitted['endsAt'] == 0
         checkpoint=original.checkpoint()
         before=original.request({'op':'query'})
         assert before['eggs']['items']==[]
-        original.request({'op':'advance','time':120})
         completed=original.request({'op':'complete_tide','roundId':'round:1'})
         expected=original.request({'op':'query'})
+        assert completed['completedAt'] == expected['time'] == 0
+        assert original.request({'op':'complete_tide','roundId':'round:1'}) == completed
+        assert original.request({'op':'query'}) == expected
     with FishSourceRuntime(SOURCE,data) as restored:
         assert restored.restore(checkpoint)==before
         assert restored.request({'op':'start_tide','roundId':'round:1'})['materialSpent']['sign']==0
-        restored.request({'op':'advance','time':120})
         assert restored.request({'op':'complete_tide','roundId':'round:1'})==completed
         assert restored.request({'op':'query'})==expected
         assert len(expected['eggs']['items'])==5 and expected['wallet']['material']['sign']==0
@@ -72,7 +73,7 @@ def project(tmp_path,duration):
     return target
 
 @pytest.mark.parametrize('duration',[60,120])
-def test_formal_single_tide_occupies_time_and_reports_actual_cost(tmp_path,monkeypatch,duration):
+def test_formal_single_tide_occupies_zero_time_and_reports_actual_cost(tmp_path,monkeypatch,duration):
     create=FishSourceRuntime.create
     def fixture(self,**kwargs):
         kwargs['initial_state']=initial_state()
@@ -86,23 +87,25 @@ def test_formal_single_tide_occupies_time_and_reports_actual_cost(tmp_path,monke
     events=json.loads((output/'events.json').read_text(encoding='utf-8'))
     starts=[e for e in events if e['kind']=='start_tide']
     assert len(starts)==1
-    assert not any(e['kind'] in {'prepare_throw','start_exercise','collect_slot','claim_fish_reward'} for e in events)
+    assert not any(e['kind'] in {'prepare_throw','start_exercise'} for e in events)
+    complete_index = next(i for i, e in enumerate(events) if e['kind'] == 'complete_tide')
+    assert all(i > complete_index for i, e in enumerate(events) if e['kind'] in {'collect_slot', 'claim_fish_reward'})
     last=json.loads((output/'timeline.json').read_text(encoding='utf-8'))[-1]
     assert last['resources']['online_tide_reload_material_cumulative']=='300'
     assert last['resources']['online_resource_acquired_cumulative']=='0'
     assert last['resources']['online_money_acquired_cumulative']!='0'
     checkpoint=json.loads((output/'final_checkpoint.json').read_text(encoding='utf-8'))
-    if duration==60:
-        assert checkpoint['behavior_state']['pending_tide']['endsAt']==120
-        assert last['resources']['egg_inventory_count']=='0'
-    else:
-        assert checkpoint['behavior_state']['pending_tide'] is None
-        assert last['resources']['egg_inventory_count']=='5'
+    assert checkpoint['behavior_state']['pending_tide'] is None
+    assert int(last['resources']['egg_inventory_count']) + int(last['resources']['egg_hatched_count']) == 5
+    assert {e['time_seconds'] for e in events if e['kind'] == 'egg_admitted'} == {0}
+    completes = [e for e in events if e['kind'] == 'complete_tide']
+    assert len(completes) == 1 and completes[0]['time_seconds'] == starts[0]['time_seconds'] == 0
     behavior=json.loads((output/'source_behavior.json').read_text(encoding='utf-8'))['profiles']['default']
     assert behavior['tide_rounds'][0]['roundId']=='room:0:round:0'
-    assert behavior['tide_rounds'][0]['occupied_seconds']==duration
+    assert behavior['tide_rounds'][0]['occupied_seconds']==0
     manifest=json.loads((output/'run_manifest.json').read_text(encoding='utf-8'))
     assert manifest['source_runtime']['tide_policy']['magazine_size']==30
+    assert manifest['source_runtime']['tide_policy']['duration_seconds']==0
     report=json.loads((Path(response.result['report_index']).parent/'report_data.json').read_text(encoding='utf-8'))
     assert report['fish_progression']['actions']['default']['tide_rounds']==behavior['tide_rounds']
     resumed=AuthoringService(target).simulate('smoke',checkpoint_input=output/'final_checkpoint.json')
@@ -152,7 +155,7 @@ def test_formal_recurring_rounds_use_source_interval(tmp_path, monkeypatch):
     rounds = behavior["tide_rounds"]
     assert [(r["openedAt"], r["phase"]) for r in rounds] == [(0, "completed"), (180, "completed")]
     assert sum(len(r["eggs"]) for r in rounds) == 10
-    assert all(r["occupied_seconds"] == 120 for r in rounds)
+    assert all(r["occupied_seconds"] == 0 for r in rounds)
     manifest = json.loads((output / "run_manifest.json").read_text(encoding="utf-8"))
     assert manifest["source_runtime"]["tide_schedule"] == {
         "policy": "absolute_opening_only_v1", "room_origin_seconds": 0,
@@ -205,8 +208,8 @@ def formal(target, checkpoint=None):
     return output, read("source_behavior.json")["profiles"]["default"], read("events.json"), read("final_checkpoint.json")
 
 
-@pytest.mark.parametrize("online,phase,reason", [(299, "skipped", "insufficient_online_time"), (300, "completed", None)])
-def test_tide_requires_120_planned_online_seconds(tmp_path, monkeypatch, online, phase, reason):
+@pytest.mark.parametrize("online,phase,reason", [(180, "skipped", "offline"), (181, "completed", None), (299, "completed", None)])
+def test_tide_needs_only_to_be_online_at_opening(tmp_path, monkeypatch, online, phase, reason):
     fixture_player(monkeypatch)
     target = configured_project(tmp_path, 301, online=online)
     _, behavior, _, _ = formal(target)
@@ -272,18 +275,17 @@ def test_invalid_periodic_config_is_diagnosed_before_formal_run(tmp_path):
     assert not list((target / "runs").glob("*"))
 
 
-def test_short_source_interval_records_busy_round_and_completes_before_next_opening(tmp_path, monkeypatch):
+def test_short_source_interval_completes_once_at_each_opening(tmp_path, monkeypatch):
     fixture_player(monkeypatch)
     target = configured_project(tmp_path, 241, interval=60)
     _, behavior, events, _ = formal(target)
     assert [(r["openedAt"], r["phase"], r.get("reason")) for r in behavior["tide_rounds"]] == [
-        (0, "completed", None), (60, "skipped", "foreground_busy"),
-        (120, "completed", None), (180, "skipped", "foreground_busy"),
-        (240, "participating", None),
+        (at, "completed", None) for at in (0, 60, 120, 180, 240)
     ]
-    at_120 = [e["kind"] for e in events if e["time_seconds"] == 120]
-    assert at_120.index("complete_tide") < at_120.index("start_tide")
-    assert sum(e["kind"] == "start_tide" for e in events) == 3
+    for at in (0, 60, 120, 180, 240):
+        actions = [e["kind"] for e in events if e["time_seconds"] == at]
+        assert actions.count("start_tide") == actions.count("complete_tide") == 1
+        assert actions.index("start_tide") < actions.index("complete_tide")
 
 
 def test_formal_multiple_checkpoints_continue_same_model_without_duplicate_rounds(tmp_path, monkeypatch):
@@ -293,7 +295,7 @@ def test_formal_multiple_checkpoints_continue_same_model_without_duplicate_round
     checkpoints = []
     segments = []
     previous = None
-    for until in (60, 120, 179, 240, 361):
+    for until in (60, 179, 180, 181, 240, 361):
         response = AuthoringService(target).simulate("smoke", until_seconds=until, checkpoint_input=previous)
         assert response.ok, response.details
         output = Path(response.result["output_dir"])
@@ -304,8 +306,7 @@ def test_formal_multiple_checkpoints_continue_same_model_without_duplicate_round
         manifest = json.loads((output / "run_manifest.json").read_text(encoding="utf-8"))
         assert manifest["execution_window"]["requested_until_seconds"] == until
         assert manifest["execution_window"]["scenario_end_seconds"] == 361
-    assert checkpoints[0]["behavior_state"]["pending_tide"]["endsAt"] == 120
-    assert checkpoints[1]["behavior_state"]["pending_tide"] is None
+    assert all(c["behavior_state"]["pending_tide"] is None for c in checkpoints)
     assert checkpoints[-1]["behavior_state"] == continuous_checkpoint["behavior_state"]
     def commands(events):
         return [e for e in events if e["details"].get("source") != "observation" and e["kind"] not in {"gun_milestone", "egg_admitted", "egg_hatched"}]
@@ -326,17 +327,18 @@ def test_invalid_execution_cutoff_is_diagnosed_without_reserving_run(tmp_path, u
     assert not list((target / "runs").glob("*"))
 
 
-def test_exercise_settles_at_opening_and_pauses_for_entire_tide(tmp_path, monkeypatch):
+def test_exercise_settles_and_ordinary_actions_resume_same_second_after_tide(tmp_path, monkeypatch):
     fixture_player(monkeypatch)
     target = configured_project(tmp_path, 151, origin=31, weights={"exercise_barbell": "1"})
     output, behavior, events, _ = formal(target)
     at_opening = [e["kind"] for e in events if e["time_seconds"] == 31]
     assert at_opening.index("stop_exercise") < at_opening.index("start_tide")
-    assert behavior["tide_rounds"][0]["occupied_seconds"] == 120
-    assert not any(e["kind"] in {"start_exercise", "prepare_throw"} and 31 <= e["time_seconds"] < 151 for e in events)
+    assert behavior["tide_rounds"][0]["occupied_seconds"] == 0
+    assert at_opening.index("start_tide") < at_opening.index("complete_tide") < at_opening.index("collect_slot")
+    assert any(e["kind"] == "start_exercise" and e["time_seconds"] == 33 for e in events)
     rows = json.loads((output / "timeline.json").read_text(encoding="utf-8"))
     strengths = {r["resources"]["strength"] for r in rows if 31 <= r["time_seconds"] <= 151}
-    assert len(strengths) == 1
+    assert len(strengths) > 1
 
 
 @pytest.mark.parametrize("behavior", ["manual_throw", "exercise_barbell"])

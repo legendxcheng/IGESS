@@ -166,14 +166,7 @@ def test_formal_growth_then_tide_and_resume_preserve_source_receipts(tmp_path, m
     first, before, _ = run(target, until_seconds=cutoff)
     _, after, _ = run(target, checkpoint_input=first / "final_checkpoint.json")
     combined = before("events.json") + after("events.json")
-    if cutoff == 650:
-        # Ending a segment emits one final in-progress tide observation. The
-        # continuous run has no transition at this second; keep every other row.
-        extra = [e for e in combined if e["kind"] == "tide_observed" and e["time_seconds"] == cutoff]
-        assert len(extra) == 1
-        receipt = json.loads(extra[0]["details"]["receipt"])
-        assert receipt["phase"] == "participating" and receipt["occupied_seconds"] == 50
-        combined = [e for e in combined if e is not extra[0]]
+    # Instant completion leaves no in-progress tide observation at a later cutoff.
     assert combined == events
     assert after("final_checkpoint.json")["behavior_state"] == expected("final_checkpoint.json")["behavior_state"]
     assert _unpack_session(after("final_checkpoint.json")["engine_state"]) == _unpack_session(expected("final_checkpoint.json")["engine_state"])

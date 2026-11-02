@@ -3,7 +3,7 @@ import json
 from .schema import Event
 
 TIDE_POLICY = {
-    "model": "fixed_eggs_damage_hp_ammunition_v2", "eggs": 5, "duration_seconds": 120,
+    "model": "fixed_eggs_damage_hp_zero_time_v3", "eggs": 5, "duration_seconds": 0,
     "magazine_size": 30, "initial_ammo": 0, "competition": "not_simulated",
     "gun_damage_affects_yield": False, "gun_damage_affects_reload_count": True,
     "shot_policy": "sum_per_egg_ceiling_hp_over_attack_perfect_hits",
@@ -35,7 +35,7 @@ class TideObservations:
             self.receipts = {identity: self.receipts[identity]} if identity in self.receipts else {}
             row = dict(source)
             row["occupied_seconds"] = (
-                min(120, max(0, state["time"] - row["openedAt"]))
+                min(row["endsAt"] - row["openedAt"], max(0, state["time"] - row["openedAt"]))
                 if row["phase"] != "skipped" else 0
             )
             self.starts.setdefault(identity, max(0, online_seconds - row["occupied_seconds"]))

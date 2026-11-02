@@ -105,7 +105,7 @@ def test_rejected_collection_does_not_starve_remaining_slots(tmp_path, monkeypat
 def test_collect_all_keeps_unvisited_slots_across_session_boundaries(tmp_path, monkeypatch, boundary):
     if boundary == "tide":
         target = collection_project(tmp_path, monkeypatch, duration=130, tide_at=4, gun=True)
-        expected_collections = [(1, 1), (124, 2), (126, 3)]
+        expected_collections = [(1, 1), (4, 2), (6, 3)]
     else:
         target = collection_project(tmp_path, monkeypatch, duration=86404, online=4)
         expected_collections = [(1, 1), (86400, 2), (86402, 3)]
