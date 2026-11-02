@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from decimal import Decimal, localcontext
 from typing import Any
 
+from .engines import EngineAdapterError
 from .fish_source_numbers import source_decimal
 
 GROWTH_TIDE_POLICY = {
@@ -15,7 +16,7 @@ GROWTH_TIDE_POLICY = {
     "income": "observed_online_material_excluding_codex_and_offline",
     "reservation": "one_next_source_quoted_target_existing_weights_and_turn",
     "budget_basis": "current_material_wallet_before_admission",
-    "cost_basis": "equipped_gun_source_reload_cost_times_reload_count",
+    "cost_basis": "source_round_damage_hp_ammunition_quote",
 }
 
 
@@ -82,7 +83,7 @@ class GrowthTideBudget:
         while len(self.samples) > 1 and self.samples[1][0] <= cutoff:
             self.samples.pop(0)
 
-    def skip(self, state, options, weights, allowed, turn, remaining_online):
+    def skip(self, state, options, weights, allowed, turn, remaining_online, *, tide_quote=None):
         enabled = []
         for option in options:
             configured = weights.get(option.behavior)
@@ -100,13 +101,15 @@ class GrowthTideBudget:
         gun = next((row for row in state["guns"]["owned"] if row["id"] == state["guns"]["combat"]["equippedGunId"]), None)
         if gun is None:
             return None  # Let the source report its normal admission rejection.
-        reload_cost = source_decimal(gun["reloadResourceCost"])
-        reloads = Decimal(state["tides"]["policy"]["reloads"])
+        if tide_quote is None:
+            raise EngineAdapterError("fish_source_tide_quote_missing", "A source quote for this round is required")
+        if not tide_quote["available"]:
+            return {"reason": tide_quote["reason"]}
+        cost = source_decimal(tide_quote["materialCost"])
         fraction = Decimal(GROWTH_TIDE_POLICY["max_material_fraction"])
         with localcontext() as ctx:
-            values = [wallet, reload_cost, reloads, fraction]
+            values = [wallet, cost, fraction]
             ctx.prec = max(80, sum(len(v.as_tuple().digits) for v in values) + 8)
-            cost = reload_cost * reloads
             limit = wallet * fraction
             if cost > limit:
                 return {"reason": "tide_material_budget_exceeded",
@@ -124,7 +127,7 @@ class GrowthTideBudget:
         if elapsed <= 0:
             return None
         previous, current = Decimal(self.samples[0][1]), Decimal(self.samples[-1][1])
-        values = [wallet, reload_cost, previous, current] + [source_decimal(o.quote["cost"]) for _, o in next_by_behavior.values()]
+        values = [wallet, cost, previous, current] + [source_decimal(o.quote["cost"]) for _, o in next_by_behavior.values()]
         with localcontext() as ctx:
             ctx.prec = max(80, max(v.adjusted() for v in values) - min(v.as_tuple().exponent for v in values) + 16)
             gained = max(Decimal(0), current - previous)
@@ -135,7 +138,7 @@ class GrowthTideBudget:
                 return None
             option = self._select(nearby, turn)
             reserve = source_decimal(option.quote["cost"])
-            if wallet < reserve + reload_cost * state["tides"]["policy"]["reloads"]:
+            if wallet < reserve + cost:
                 return {"reason": "growth_material_reserved", "growthBehavior": option.behavior,
                         "growthTarget": option.target, "reservedMaterial": str(reserve),
                         "observedMaterial": str(gained), "observedOnlineSeconds": elapsed,

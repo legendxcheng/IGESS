@@ -43,7 +43,7 @@ _FISH_KEEP_COUNT = 30
 _MAX_REPLAY_BYTES = 256 * 1024 * 1024
 _REQUIRED_OPERATIONS = frozenset({
     "query", "query_actions", "query_codex", "claim_fish_reward", "advance", "checkpoint", "restore",
-    "claim_gun_reward", "equip_gun", "grant_random_egg", "settle_eggs", "start_tide", "complete_tide",
+    "claim_gun_reward", "equip_gun", "grant_random_egg", "settle_eggs", "query_tide", "start_tide", "complete_tide",
     "go_online", "go_offline", "claim_offline_reward", "collect_slot",
     "deploy_fish", "prepare_throw", "begin_throw_flight",
     "select_throw_landing", "finalize_throw_landing", "complete_throw",
@@ -975,6 +975,7 @@ class _ProfileRun:
                     reservation = self.growth_tide_budget.skip(
                         self.state, growth_options(self.state, actions), self.profile.behavior_weights,
                         self._allowed, self.behavior_turn, planned_logout - now,
+                        tide_quote=self.runtime.request({"op": "query_tide", "roundId": round_id}),
                     )
                     if reservation:
                         self._skip_tide(now, **reservation)

@@ -3,8 +3,11 @@ import json
 from .schema import Event
 
 TIDE_POLICY = {
-    "model": "fixed_successful_eggs_v1", "eggs": 5, "duration_seconds": 120,
-    "reloads": 6, "competition": "not_simulated", "gun_damage_affects_yield": False,
+    "model": "fixed_eggs_damage_hp_ammunition_v2", "eggs": 5, "duration_seconds": 120,
+    "magazine_size": 30, "initial_ammo": 0, "competition": "not_simulated",
+    "gun_damage_affects_yield": False, "gun_damage_affects_reload_count": True,
+    "shot_policy": "sum_per_egg_ceiling_hp_over_attack_perfect_hits",
+    "leftover_ammo": "discarded_after_round",
 }
 
 

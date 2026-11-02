@@ -13,6 +13,21 @@ from igess.fish_source_runtime import FishSourceRuntime
 ROOT=Path(__file__).resolve().parents[1]
 SOURCE=Path(os.environ.get('FISH_SOURCE_ROOT',str(ROOT.parent/'fish-oasis')))
 
+def tide_export(data):
+    # Lifecycle fixtures deliberately hold the numerical workload at six reloads.
+    # The separate ammunition suite varies HP/attack and asserts dynamic counts.
+    shutil.copytree(SOURCE/'igess_export/json', data)
+    for name, field, value in [('tbgun.json', 'baseDamage', 10),
+                               ('tbgun.json', 'reloadResourceCost', 50),
+                               ('tbegg.json', 'baseHp', 310)]:
+        path = data/name
+        rows = json.loads(path.read_text(encoding='utf-8'))
+        for row in rows:
+            row[field] = {'sign': 1, 'digits': str(value), 'scale': 0}
+        path.write_text(json.dumps(rows), encoding='utf-8')
+    return data
+
+
 def initial_state():
     script="""package.path='./?.lua;./proj/?.lua;'..package.path
 local s=assert(require('Script.Domain.Player.PlayerArchiveSchema').New(0))
@@ -23,8 +38,9 @@ s.fish.nextInstanceId=2
 io.write(require('simulation.Json').Encode(s))"""
     return json.loads(subprocess.check_output(['lua55','-e',script],cwd=SOURCE,text=True,encoding='utf-8'))
 
-def test_mid_tide_replay_preserves_costs_and_five_random_eggs():
-    with FishSourceRuntime(SOURCE,SOURCE/'igess_export/json') as original:
+def test_mid_tide_replay_preserves_costs_and_five_random_eggs(tmp_path):
+    data = tide_export(tmp_path / "export")
+    with FishSourceRuntime(SOURCE,data) as original:
         original.create(start_at=0,initial_state=initial_state(),random_seed=37)
         admitted=original.request({'op':'start_tide','roundId':'round:1'})
         assert admitted['success'] and len(admitted['reloads'])==6
@@ -35,7 +51,7 @@ def test_mid_tide_replay_preserves_costs_and_five_random_eggs():
         original.request({'op':'advance','time':120})
         completed=original.request({'op':'complete_tide','roundId':'round:1'})
         expected=original.request({'op':'query'})
-    with FishSourceRuntime(SOURCE,SOURCE/'igess_export/json') as restored:
+    with FishSourceRuntime(SOURCE,data) as restored:
         assert restored.restore(checkpoint)==before
         assert restored.request({'op':'start_tide','roundId':'round:1'})['materialSpent']['sign']==0
         restored.request({'op':'advance','time':120})
@@ -50,7 +66,7 @@ def project(tmp_path,duration):
     config=yaml.safe_load((ROOT/'projects/fish_source/economy.yaml').read_text(encoding='utf-8'))
     # These fixtures isolate tide lifecycle; growth-first admission has its own suite.
     config['player_profiles']['default']['behavior_weights'] = {}
-    config['engine']['source_runtime'].update(project_root=str(SOURCE),data_root=str(SOURCE/'igess_export/json'))
+    config['engine']['source_runtime'].update(project_root=str(SOURCE),data_root=str(tide_export(target/'selected')))
     config['scenarios']['smoke']['duration_hours']=str(duration/3600)
     (target/'economy.yaml').write_text(yaml.safe_dump(config,allow_unicode=True),encoding='utf-8')
     return target
@@ -86,14 +102,14 @@ def test_formal_single_tide_occupies_time_and_reports_actual_cost(tmp_path,monke
     assert behavior['tide_rounds'][0]['roundId']=='room:0:round:0'
     assert behavior['tide_rounds'][0]['occupied_seconds']==duration
     manifest=json.loads((output/'run_manifest.json').read_text(encoding='utf-8'))
-    assert manifest['source_runtime']['tide_policy']['reloads']==6
+    assert manifest['source_runtime']['tide_policy']['magazine_size']==30
     report=json.loads((Path(response.result['report_index']).parent/'report_data.json').read_text(encoding='utf-8'))
     assert report['fish_progression']['actions']['default']['tide_rounds']==behavior['tide_rounds']
     resumed=AuthoringService(target).simulate('smoke',checkpoint_input=output/'final_checkpoint.json')
     assert resumed.ok,resumed.details
 @pytest.mark.parametrize('cost', [0,-1])
 def test_reload_price_zero_is_valid_and_negative_is_diagnosed(tmp_path,cost):
-    data=tmp_path/'export';shutil.copytree(SOURCE/'igess_export/json',data)
+    data=tide_export(tmp_path/'export')
     path=data/'tbgun.json';rows=json.loads(path.read_text(encoding='utf-8'))
     rows[0]['reloadResourceCost']={'sign':cost,'digits':'0' if cost==0 else '1','scale':0}
     path.write_text(json.dumps(rows),encoding='utf-8')
@@ -119,7 +135,7 @@ def test_formal_recurring_rounds_use_source_interval(tmp_path, monkeypatch):
     monkeypatch.setattr(FishSourceRuntime, "create", fixture)
     target = project(tmp_path, 301)
     data = tmp_path / "export"
-    shutil.copytree(SOURCE / "igess_export/json", data)
+    tide_export(data)
     path = data / "tbfishtideconfig.json"
     rows = json.loads(path.read_text(encoding="utf-8"))
     rows[0]["intervalSeconds"] = 180
@@ -147,7 +163,7 @@ def test_formal_recurring_rounds_use_source_interval(tmp_path, monkeypatch):
 def configured_project(tmp_path, duration, *, interval=180, online=7200, origin=0, sample=30, mode="equivalent_batch_v1", weights=None):
     target = project(tmp_path, duration)
     data = tmp_path / "export"
-    shutil.copytree(SOURCE / "igess_export/json", data)
+    tide_export(data)
     path = data / "tbfishtideconfig.json"
     rows = json.loads(path.read_text(encoding="utf-8"))
     rows[0]["intervalSeconds"] = interval

@@ -52,6 +52,18 @@ def run(target, **kwargs):
     return output, read, report
 
 
+def configure_tide_fixture(target):
+    """Hold admission at 300 material while testing lifecycle/report boundaries."""
+    for name, field, value in [('tbgun.json', 'baseDamage', 10),
+                               ('tbgun.json', 'reloadResourceCost', 50),
+                               ('tbegg.json', 'baseHp', 310)]:
+        path = target / 'selected' / name
+        rows = json.loads(path.read_text(encoding='utf-8'))
+        for row in rows:
+            row[field] = {'sign': 1, 'digits': str(value), 'scale': 0}
+        path.write_text(json.dumps(rows), encoding='utf-8')
+
+
 @pytest.mark.parametrize('count', [50, 51, 200])
 def test_formal_inventory_uses_capacity_and_sees_later_page_deployment(tmp_path, monkeypatch, count):
     state = archive(f"""
@@ -139,12 +151,13 @@ def test_restored_report_retains_first_times_and_exact_online_scope(tmp_path, mo
     state = archive("""
 local rules=assert(require('Script.Domain.Gun.GunRules').Default())
 for _,key in ipairs(rules.rewards[101].keys) do s.collection.unlockedKeys[#s.collection.unlockedKeys+1]=key end
-s.wallet.material={sign=1,coeff='9',exp=2}
+s.wallet.material={sign=1,coeff='12',exp=2}
 """)
     rewards = json.loads((SOURCE / 'igess_export/json/tbcodexfishunlockreward.json').read_text(encoding='utf-8'))
     state['collection']['claimedFishUnlockRewardIds'] = [r['id'] for r in rewards if f"{r['fishId']}:{r['mutationId']}" in state['collection']['unlockedKeys']]
     initial(monkeypatch, state)
     target = project(tmp_path, duration=300)
+    configure_tide_fixture(target)
     path = target / 'economy.yaml'
     config = yaml.safe_load(path.read_text(encoding='utf-8'))
     config['engine']['source_runtime']['room_origin_seconds'] = 10
@@ -254,11 +267,12 @@ end
 
 def test_formal_partial_egg_notice_failure_is_a_failed_run_with_source_evidence(tmp_path, monkeypatch):
     state = archive("""
-s.wallet.material={sign=1,coeff='3',exp=2}
+s.wallet.material={sign=1,coeff='12',exp=2}
 s.combat.ownedGunIds={10001};s.combat.equippedGunId=10001;s.combat.lastSelectedGunId=10001
 """)
     initial(monkeypatch, state)
     target = project(tmp_path, duration=121)
+    configure_tide_fixture(target)
     source = tmp_path / 'fault-source'
     for name in ('proj/Script', 'simulation'):
         shutil.copytree(SOURCE / name, source / name)

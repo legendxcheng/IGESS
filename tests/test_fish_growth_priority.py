@@ -1,5 +1,5 @@
 """Growth-first admission preserves source spending and resumable decisions."""
-from decimal import Decimal
+from decimal import Decimal, localcontext
 import json
 
 import pytest
@@ -34,7 +34,12 @@ def budget():
 
 
 def decide(b, s, options, *, remaining=7200, allowed=lambda *_: True, weights=None, turn=0):
-    return b.skip(s, options, weights or {o.behavior: Weight(1) for o in options}, allowed, turn, remaining)
+    with localcontext() as ctx:
+        ctx.prec = 200
+        price = s['guns']['owned'][0]['reloadResourceCost']
+        cost = Decimal(price['coeff']).scaleb(price['exp']) * 6
+    return b.skip(s, options, weights or {o.behavior: Weight(1) for o in options}, allowed, turn, remaining,
+                  tide_quote={'available': True, 'materialCost': dto(cost)})
 
 
 @pytest.mark.parametrize("wallet,blocked", [(1199, True), (1200, False), (1201, False), (0, True)])
@@ -130,6 +135,15 @@ s.combat.ownedGunIds={10001};s.combat.equippedGunId=10001;s.combat.lastSelectedG
 """)
     initial(monkeypatch, s)
     target = project(tmp_path, duration=721, weights={"upgrade_fish_hall": "100"})
+    # Stable lifecycle cost: 5 * ceil(310 / 10) shots => 6 magazines * 50.
+    for name, field, value in [('tbgun.json', 'baseDamage', 10),
+                               ('tbgun.json', 'reloadResourceCost', 50),
+                               ('tbegg.json', 'baseHp', 310)]:
+        data_path = target / 'selected' / name
+        rows = json.loads(data_path.read_text(encoding='utf-8'))
+        for row in rows:
+            row[field] = {'sign': 1, 'digits': str(value), 'scale': 0}
+        data_path.write_text(json.dumps(rows), encoding='utf-8')
     path = target / "economy.yaml"
     config = yaml.safe_load(path.read_text())
     config["scenarios"]["smoke"]["record_interval_seconds"] = 1
