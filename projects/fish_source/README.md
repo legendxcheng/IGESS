@@ -16,6 +16,17 @@ uv run igess model simulate --project projects/fish_source --scenario month_1_gr
 
 Day1～Day6 是累计场景：`day_N_growth` 默认从新玩家开始运行到第 N 个自然日结束（N × 24 小时），使用默认免费画像、每天在线 2 小时，每累计在线 300 秒采样。按当前调参阶段选择一条命令即可，Dashboard 会从配置自动加载这些场景。独立运行适用于改表后验证前 N 天；输入不变时可显式选择上一轮 checkpoint 接续，见下方“按天接续”。
 
+## Agent 通过已运行的 IGESS 跑测
+
+`fish_sim` 代跑默认提交到本机主 Dashboard `http://127.0.0.1:8771`，服务后台执行，页面显示当前任务和完成结果。启动及查询命令（IGESS 根目录）：
+
+```powershell
+.\.tmp\py311-venv\Scripts\python.exe .agents/skills/fish_sim/scripts/run_dashboard.py submit --scenario week_1_growth
+.\.tmp\py311-venv\Scripts\python.exe .agents/skills/fish_sim/scripts/run_dashboard.py status
+```
+
+续跑加 `--resume-run-id <成功运行ID>`。交接提交回执中的网页和状态链接；`accepted` 不表示模拟成功。服务不可用时不会自动另起 CLI 或重启服务。历史库与运行参数边界见 [服务跑测说明](../../.agents/skills/fish_sim/references/dashboard-runs.md)；下面的 CLI 保留给显式独立执行及开发验证。
+
 ## 按天接续
 
 先运行 Day1；确认结果后，以返回的 `output_dir/final_checkpoint.json` 运行 Day2，再以 Day2 的新 checkpoint 运行 Day3，依次推进。截止时间仍是目标场景的绝对时间：完整 Day1 接 Day2 时，本段为 86400～172800 秒。

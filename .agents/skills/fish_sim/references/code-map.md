@@ -6,7 +6,7 @@
 
 | 要改什么 | 先看哪里／检索词 | 对应验证 |
 | --- | --- | --- |
-| 长跑后台交接、完成通知、人类唤醒后恢复 | Skill 的 `scripts/run_background.py`、`references/background-runs.md`；只包装公共 CLI，回执不替代正式运行验证 | `python -m pytest .agents/skills/fish_sim/scripts/test_run_background.py -q`（模拟 CLI 响应，不运行 Fish） |
+| 显式独立 CLI 的后台交接、完成通知与恢复 | Skill 的 `scripts/run_background.py`、`references/background-runs.md`；只包装公共 CLI，回执不替代正式运行验证 | `python -m pytest .agents/skills/fish_sim/scripts/test_run_background.py -q`（模拟 CLI 响应，不运行 Fish） |
 | 场景时长、在线窗口、权重、行动耗时、采样 | `projects/fish_source/economy.yaml`：`scenarios`（Day1～Day6 为从零开始的累计场景）、`session_patterns`、`behavior_weights`、`behavior_durations`；命令见项目 README | `tests/test_fish_source_formal.py` |
 | 引擎准备、能力检查、身份与策略 | `src/igess/fish_source_engine.py`：`FishSourceEngineAdapter.prepare`、`_REQUIRED_OPERATIONS`、`_integration_code_digest` | `tests/test_fish_source_current_rules.py`、`tests/test_fish_source_formal.py` |
 | 玩家选行为、动作互斥、时间推进、截断恢复 | 同文件 `_ProfileRun`：`_choose`、`_act`、`execute`、`_advance_to`、`_continue_throw`、`_continue_tide`、`checkpoint` | `tests/test_fish_source_natural_landing.py`、`tests/test_fish_source_tides.py`、`tests/test_fish_source_joint.py` |
@@ -22,6 +22,7 @@
 | 收集成长、双标签去重、旧报告首次覆盖 | `src/igess/reporting/source_collection.py`：`CollectionGrowth`；`fish_source_engine.py` 的 `collection_growth` 起始基线、`fish_source_runtime.py` 的冻结名称；源 archive 与 `GunMilestones` 负责续跑历史 | `tests/test_fish_collection_reporting.py`、`tests/test_fish_collection_formal.py` |
 | 正式运行、历史终态、报告失败 | `src/igess/authoring/service.py` → `formal_run.py` → `engines.py`；开发工作流 `workflows.py`，历史 `run_registry.py` | `tests/test_formal_run.py`、`tests/test_run_registry.py` |
 | 按天接续到更长场景、选择历史起点 | `fish_source_engine.py` 的 checkpoint 兼容校验与 `execution_window`；`workflows.py` 的 `checkpoint_for_run`；`dashboard.py` → `dashboard_tasks.py` → `dashboard_task_worker.py` | `tests/test_fish_source_continuation.py` |
+| Agent 提交到已运行的 Dashboard | `.agents/skills/fish_sim/scripts/run_dashboard.py`；HTTP 表单准入与 `/task` 在 `src/igess/dashboard.py`；用法见 `references/dashboard-runs.md` | `tests/test_fish_dashboard_client.py` |
 | Dashboard 每任务加载源码、进程失败与子进程回收 | `src/igess/dashboard_tasks.py`、`dashboard_task_worker.py`、`dashboard_process_tree.py`；契约见 `docs/dashboard-task-processes.md` | `tests/test_dashboard_task_processes.py` |
 | 编译交付运行包、依赖表、运行包身份 | `src/igess/fish_source_package.py`；平台打包 `operator_export.py`、`operator_runtime.py` | `tests/test_fish_source_package.py`、`tests/test_fish_source_toolkit.py` |
 

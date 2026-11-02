@@ -57,22 +57,19 @@ If the user says they re-exported tables, do not assume the new data was loaded.
 
 ### 3. Run through the registered IGESS workflow
 
-Prefer the machine-readable response:
+Submit through the already running Dashboard, following fish_sim's [service submission contract](../../../.agents/skills/fish_sim/references/dashboard-runs.md):
 
 ```powershell
-.\.tmp\py311-venv\Scripts\igess.exe model simulate `
-  --project projects\fish_source `
-  --scenario week_1_growth `
-  --json
+.\.tmp\py311-venv\Scripts\python.exe .agents/skills/fish_sim/scripts/run_dashboard.py submit --scenario week_1_growth
 ```
 
-Replace the scenario as requested. Do not bypass `WorkflowService`, the Fish engine adapter, `RunRegistry`, or standard artifact generation with an ad hoc domain script when producing a formal report.
+Use the requested scenario and optional `--resume-run-id`. The default server is `http://127.0.0.1:8771`; override with `--server` only when selecting another instance. Hand off the receipt and Dashboard/task URLs after acceptance, then end the turn for long simulations. Resume steps 4–8 when the human wakes the Agent. Short smoke checks may finish in the current turn; explicit continuous follow-through takes precedence.
 
-For long simulations, follow fish_sim's “长跑测：后台执行，等待人类唤醒” workflow and background helper. Hand off the started job and notification details, then end the turn. Resume steps 4–8 when the human wakes the Agent; preserve the original job identity. Short smoke checks may finish in the current turn, and an explicit request for continuous follow-through takes precedence.
+The project task endpoint describes the current task, not an immutable job. Recover the original run from its receipt and registered history if another submission or service restart has occurred. Service failure never authorizes silently falling back to an independent CLI run. Use the standalone `igess model simulate --json` workflow only when explicitly selected.
 
 ### 4. Validate the new run
 
-Read `result.output_dir` and `result.report_index` from the JSON response rather than guessing the latest directory. Require all applicable artifacts before declaring success:
+Resolve the service task's `run_id` through `runs show/artifacts --json` (using the service's actual project history root). For standalone CLI, read `result.output_dir` and `result.report_index` from its response. Never guess the latest directory. Require all applicable artifacts before declaring success:
 
 - `report/index.html`;
 - `output/run_manifest.json`;
