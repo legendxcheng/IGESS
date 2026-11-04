@@ -1,0 +1,29 @@
+{
+  "variant": "candidate",
+  "tag": "short",
+  "scenario": "smoke",
+  "timings": {
+    "total": 5.972786299986183
+  },
+  "response": {
+    "schema_version": 1,
+    "command": "model.simulate",
+    "ok": true,
+    "code": "simulated",
+    "message": "Simulation complete: smoke",
+    "details": {},
+    "result": {
+      "change_id": null,
+      "engine_id": "fish_source",
+      "kind": "formal",
+      "model_digest": "sha256:948e1e514d53a0ab4834f48924a6188c2cd1a28401cdb8207d2b115941f94c4d",
+      "output_dir": "E:\\IGESS\\.tmp\\fish-whale-rate-cache-20261104\\candidate-project\\runs\\20261104T063011827805Z-smoke\\output",
+      "report_index": "E:\\IGESS\\.tmp\\fish-whale-rate-cache-20261104\\candidate-project\\runs\\20261104T063011827805Z-smoke\\report\\index.html",
+      "run_id": "20261104T063011827805Z-smoke",
+      "scenario_id": "smoke",
+      "status": "success"
+    }
+  },
+  "diagnostic": false,
+  "final_observation": "E:\\IGESS\\.tmp\\fish-whale-rate-cache-20261104\\candidate-project\\runs\\20261104T063011827805Z-smoke\\final_observation.json"
+}

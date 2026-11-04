@@ -2,6 +2,8 @@
 
 此项目通过 IGESS 正式入口运行 Fish 源项目的 Lua 业务服务，无需 DS。自 2026-10-14 起，这是 Fish 唯一在用的模拟项目；新规则、调优、正式运行与报告均在此维护。`projects/fish` Python 后端停用，保留历史代码与报告，不再作为新运行或比较基线。当前进度与待办见 [RoadMap.md](RoadMap.md)。
 
+神兽同种倍率及精确参照产出乘积由源规则作有界缓存，依赖完整大数、数量及配置；动态结算照旧。大 R 上阵与卖鱼在同一次决策中复用动作报价，不增加或删减业务行动。缓存不写入存档，旧源码／适配器身份的 checkpoint 仍拒绝跨版本恢复。维护边界和专项测试见源 `simulation/README.md` 的“神兽纯产出缓存”。
+
 ```powershell
 uv run igess model simulate --project projects/fish_source --scenario smoke
 uv run igess model simulate --project projects/fish_source --scenario day_1_growth

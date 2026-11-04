@@ -1,0 +1,14 @@
+[
+  {
+    "test": "divine_beast_production_test.lua",
+    "exit_code": 1,
+    "stdout": "divine_beast_production_test: OK\n",
+    "stderr": "lua55: tests/divine_beast_production_test.lua:53: other rows default to zero\nstack traceback:\n\t[C]: in global 'assert'\n\ttests/divine_beast_production_test.lua:53: in main chunk\n\t[C]: in ?\n"
+  },
+  {
+    "test": "rebirth_production_integration_test.lua",
+    "exit_code": 1,
+    "stdout": "[Warning][RankingProgressRecorder] stage=progress_rejected source=online_material_production rankId=4 code=ranking_config_manager_unavailable detail=nil\n",
+    "stderr": "lua55: tests/rebirth_production_integration_test.lua:145: fish strength rebirth succeeds: expected=true actual=false\nstack traceback:\n\t[C]: in global 'error'\n\ttests/rebirth_production_integration_test.lua:31: in local 'assertEquals'\n\ttests/rebirth_production_integration_test.lua:145: in main chunk\n\t[C]: in ?\n"
+  }
+]

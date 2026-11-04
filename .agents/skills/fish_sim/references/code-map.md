@@ -76,6 +76,10 @@ rg -n 'claim_fish_reward|start_tide|selected_export_sha256' src/igess tests -g '
 
 ## 状态变化观察与冻结生产
 
+当前神兽缓存：`<source>/proj/Script/Domain/Fishing/FishProductionPolicy.lua` 保存配置／数量对应的最后倍率；`FishBeastRateCache.lua` 保存规则行最后一次精确参照乘积，调用点为 `FishEconomyRules.CalculateLevelRate`。弱键释放、完整大数匹配和副本隔离，动态结算不缓存。专项测试 `tests/fish_beast_rate_cache_test.lua`；大 R 报价复用位于 `src/igess/fish_source_engine.py` 的 `_choose`。正式配对、观察及恢复验证见 `.scratch/fish-whale-rate-cache-20261104/verification.md`。
+
+下列增量观察／冻结生产路径是历史优化导航；先核对所选源树是否实际存在，不以此认定当前运行已启用：
+
 - `src/igess/fish_source_runtime.py` 的 `observe`：能力协商、完整查询回退和观察错误；`fish_source_observation.py`：channel/token 基准、完整状态重建与返回对象隔离，参与适配器摘要。
 - `<source>/simulation/Observation.lua`、`Query.lua` 的 `QueryChanges`：按部分返回变化，私有稳定投影复用；`Host.lua`/`cli.lua` 保证离线与鱼潮中可观察，观察操作不进入源历史。
 - `<source>/proj/Script/Application/PlayerProductionRuntime.lua` 的 `BuildFrozenCalculator` → `Domain/Production/FishHallProductionCalculator.lua` 的 `BuildFrozenContribution` → `FrozenFishRateCache.lua`：冻结规则、会话独立的纯鱼厅产出复用；普通生产入口不启用此缓存。

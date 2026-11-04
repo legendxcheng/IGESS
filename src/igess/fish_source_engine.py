@@ -746,7 +746,8 @@ class _ProfileRun:
             and sell_weight is not None
             and Decimal(sell_weight.to_decimal_string()) > 0
         ):
-            actions = self.runtime.request({"op": "query_actions"})
+            if actions is None:
+                actions = self.runtime.request({"op": "query_actions"})
             if "fishSales" not in actions:
                 raise EngineAdapterError("fish_source_sale_quotes_missing", "Source runtime must provide fishSales")
             sellable = (
