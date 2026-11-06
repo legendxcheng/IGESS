@@ -1,6 +1,6 @@
 ---
 name: fish_sim
-description: 在 IGESS 中开发 projects/fish_source 同源 Lua 模拟，回答 Fish 玩法、架构、策略、恢复与报告口径问题，或对照 SettingValue.xlsx 分析数值报表并提出调优建议。流程为跑报表、分析报表、给出建议、人类决定、Agent 修改 fish-oasis 的 xlsx 源表并导出；改表使用 luban-editor，可委派 subagent。
+description: 在 IGESS 中开发 projects/fish_source 同源 Lua 模拟，回答 Fish 玩法、架构、策略、恢复与报告口径问题，或对照 SettingValue.xlsx 分析数值报表并提出调优建议。流程为跑报表、分析报表、给出建议、人类决定、Agent 修改 fish-oasis 的 xlsx 源表并导出；改表使用 luban-editor，可委派 subagent。重要跑测完成并核验通过后，与人类确认是否保存到 projects/fish_source/docs/simulation-reports.md。
 ---
 
 # Fish 模拟开发、问答与数值调优
@@ -111,6 +111,8 @@ uv run --extra dev python -m pytest tests/test_fish_source_formal.py -q
 开发 Dashboard 每次模拟、分析和模型检查使用新 Python 进程；保存 Python 策略、适配器或报告代码后直接重新提交即可。Dashboard 自身更新仍需服务重启，旧静态报告仍需重生成。排查网页与 CLI 的执行差异、进程异常或代码更新未生效时，读 `docs/dashboard-task-processes.md`，分别核对任务诊断、实际运行产物与 Lua 源／导表身份。
 
 正式结果使用命令返回的 `output_dir` 与 `report_index`，核对登记状态、`run_manifest.json`、timeline/events、`source_progression.json`、`source_behavior.json` 与 checkpoint。核对引擎、场景、策略、种子、源码／适配器／所选导表摘要；不同输入或策略不能归因为单个数值变化。解释问题时引用文件／符号或运行证据，区分观察事实、原因推断与建议。
+
+重要跑测完成并按上述要求核验通过后，向人类交付结果，并询问是否保存到 [模拟报表与调整依据](../../../projects/fish_source/docs/simulation-reports.md)。该文档用于留存关键跑测及后续调整依据；获得人类确认后，先读取现有内容并沿用其结构，记录运行 ID、场景与比较条件、报告／manifest 入口、主要结论及证据局限。区分运行成功、产物核验通过与成长目标达成；目标未评估或未达成时如实标注。
 
 用户明确委托代跑数值时，可读取仓库 `.codex/skills/fish-balance-loop/SKILL.md`；仅解读已有报告时采用本 Skill 的数值调优协作流程，不因该辅助 Skill 的运行步骤自动启动模拟。用户要求构建或发布 GameBalancer 时再读取 `.codex/skills/publish-gamebalancer/SKILL.md`。普通模拟开发不自动发布工具包。
 
