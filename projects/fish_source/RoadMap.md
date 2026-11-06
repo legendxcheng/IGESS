@@ -6,9 +6,21 @@
 
 源规则缓存同种倍率及精确参照产出乘积，每个规则行只保留最后一项，以完整大数及配置依赖匹配，返回独立结果；动态结算和 checkpoint 不变。大 R 决策复用已取得的上阵／卖鱼报价。正确性、恢复与冻结配对记录见 [本轮验证](../../.scratch/fish-whale-rate-cache-20261104/verification.md)。旧身份 checkpoint 仍需原版本，GameBalancer 未发布。
 
+## 2026-11-04 大 R 初始购买场景
+
+新增 `month_1_whale`／`smoke_whale`，经源服务及源入包事务建立 AMR、29 只青龙和永久权益。枪攻击与换弹报价共用 `GunStatsService`；青龙场景采用保留一条最强当前产出普通鱼、其余槽位上阵神兽的独立策略。恢复保留初始购买身份，跨组合续跑拒绝。范围及验收入口见 [场景说明](docs/whale-scenario.md)；长跑成功须以正式运行证据核验，不修改生产表，不发布 GameBalancer。
+
+## 2026-11-03 全部在售永久特权场景
+
+新增 `smoke_all_permanent` 与 `month_1_all_permanent`：同一 `default` 画像和源种子，第 0 秒按冻结商品目录通过源服务发放全部在售永久特权，记录明细和生效倍率；支付过程及便利操作节省不在本轮覆盖内。源 checkpoint 保留权益模式，跨模式续跑拒绝。正式运行和比较证据登记在 [模拟报表记录](docs/simulation-reports.md)，接口与边界见 [README](README.md#开局拥有全部在售永久特权)。本次不发布 GameBalancer。
+
 ## 2026-11-02 鱼潮零分钟占用
 
 鱼潮在绝对开场时刻完成扣费与五蛋入包，前台占用从 120 秒改为 0 秒，随后立即继续普通行动。源周期、按攻击力／HP 的装弹估算及材料预算沿用原规则；蛋孵化从即时入包计时。下线前仍在线的开场可参加，恰好下线时跳过。同秒重复结算、开场边界截断／恢复及报告口径见 `tests/test_fish_source_tides.py`。需按新源码／适配器身份重建基线，GameBalancer 尚未发布。
+
+## 2026-11-02 鱼潮每日收入预算
+
+新增当日累计换弹支出上限：已付费用加本场源报价不得超过当日已获得在线材料收入的 15%，保留单场余额 25% 和近期成长预留。按模拟自然日清零、不结转；日收入包含卖鱼和图鉴材料奖励，排除离线奖励。日内累计起点随 checkpoint 保存，细节和恢复边界见 README 的“养成优先与鱼潮材料预留”，回归入口 `tests/test_fish_tide_daily_budget.py`。本次需要重建 Week2 基线，不修改生产数值或发布 GameBalancer。
 
 ## 2026-11-02 鱼潮装弹估算
 
@@ -28,6 +40,14 @@
 
 本轮冻结输入、固定同一性能核集合的三组 Week1 中位数为 252.677 → 203.618 秒，耗时降低 19.42%；Day1 为 24.588 → 18.889 秒。逐次 Day1 观察、各组核心产物及 checkpoint 有序历史一致。测试期间其他工作更新了寻宝兽境界导表，本成绩不包含该新表或其他候选的合并效果。
 
+## 2026-10-31 神器前置候选与数字 ID 顺序
+
+修复神器 10～15 按字符串排在 9 前、非法购买轮转挤占其他行动的问题。源报价附完整目录前置 ID，普通选择和鱼潮预留共同排除前置未拥有的候选；神器／杠铃按数字 ID 排序，字符串操作身份和拒绝冷却保留。源购买规则、生产价格、行为权重不变。契约见 [README](README.md)，定向回归见 `tests/test_fish_growth_candidates.py`、`tests/test_fish_growth_candidates_source.py`，正式结果见[验证记录](../../.scratch/fish-torpedo-candidates/verification.md)。旧适配器 checkpoint 继续拒绝，GameBalancer 尚未更新。
+
+## 2026-10-30 逐周累计场景与运行 ID 接续
+
+新增 Week2（14 天）、Week3（21 天），Month1 改为四周（28 天）。CLI 新增 `--resume-run-id`，与 Dashboard 共用历史 checkpoint 解析，支持 Week1 → Week2 → Week3 → Month1 每次追加一周；自定义历史库使用 `--runs-root`。模型／源身份校验保留，旧配置 checkpoint 需重建基线。命令与统计边界见 [README](README.md#按周跑测与运行-id-接续)，回归见 `tests/test_fish_source_continuation.py`。
+
 ## 2026-10-30 养成优先鱼潮策略
 
 鱼潮入场前优先已可执行养成，为按历史在线材料收入预计 30 分钟内可达的单个下一材料目标预留；保留原有养成权重、源价格和结算。策略身份、跳过原因与收入观察历史分别写入 manifest、事件及 checkpoint；窗口与边界见 [README](README.md#养成优先与鱼潮材料预留)，回归见 `tests/test_fish_growth_priority.py`。实际成长偏差须以新策略正式运行评估，GameBalancer 发布另行执行。
@@ -42,6 +62,8 @@
 
 Fish 的新模拟、规则和调优统一使用 `projects/fish_source`，运行入口与产物见 [README.md](README.md)。`projects/fish` 已停用，其历史代码和报告仅供查证，不作为当前后端的比较基线。
 
+Web 报告的突破操作统一按成功支付计为“突破资助”，包含立即完成的突破；页面移除“垃圾佬境界”指标，原始状态和存档保留。已有运行可重生成报告更新展示。
+
 ## 2026-10-29 超过三十条按资质卖鱼
 
 卖鱼触发从满库存调整为背包与摸鱼厅合计超过 30 条，仅出售背包中一级 CPS 最低的普通鱼，逐条降到 30 条；同资质按实例 ID，沿用源卖价、材料结算和每条动作耗时。策略身份写入运行清单，契约见 [README](README.md)，定向验证见 `tests/test_fish_source_sales.py`。需要重新模拟评估材料收入和鱼潮参与；不代表 GameBalancer 已更新。
@@ -51,6 +73,8 @@ Fish 的新模拟、规则和调优统一使用 `projects/fish_source`，运行�
 修复领取首槽后重置全局间隔、后续槽位长期无法领取的问题。现在固定本轮槽位顺序，逐槽调用源领取，每条鱼耗时 2 秒；默认 300 秒从批次建立时计时。剩余批次和当前耗时随 checkpoint 保存，跨下线／鱼潮继续；完整契约见 [README](README.md)，定向回归见 `tests/test_fish_source_collection.py`，结果见[验证记录](../../.scratch/fish-collect-all/verification.md)。此变更需要重新模拟观察经济节奏，GameBalancer 尚未随本次修复更新。
 
 ## 2026-10-28 收集成长报表
+
+成长图新增力量达标“进入新鱼池”分类，按冻结 FishRandomPool 上限首次跨越计点，包含每日／每周计数、间隔与悬停详情；初始池、重生重复进入及续跑历史不重计。旧运行不从采样补造首次事件，需重新模拟。规格与验证见[鱼池成长点](../../.scratch/fish-pool-growth/spec.md)。
 
 2026-10-28 收集成长报表已接入正常图鉴完成、新枪永久获得、新鱼种与新变异组合；双标签单事件计数，续跑按源历史建立基线，旧记录缺失明确提示。范围与验收要求见[收集成长规格](../../.scratch/fish-collection-growth-points/spec.md)，验证结果见[实施验证](../../.scratch/fish-collection-growth-points/verification.md)。本地报表更新不代表 GameBalancer 已发布。
 

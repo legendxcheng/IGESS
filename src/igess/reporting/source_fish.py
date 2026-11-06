@@ -149,6 +149,19 @@ def _milestone(
     collection: CollectionGrowth,
 ) -> dict[str, Any] | None:
     kind, receipt = event["kind"], event["receipt"]
+    if kind == "fish_pool_entered":
+        return {
+            "event_identity": f"fish_pool:{receipt['pool_id']}",
+            "item_id": f"fish_pool:{receipt['pool_id']}",
+            "pool_id": receipt["pool_id"], "display_name": receipt.get("display_name", ""),
+            "strength": receipt["strength"], "previous_upper_bound": receipt["previous_upper_bound"],
+            "wall_time_seconds": event["time_seconds"], "active_time_seconds": active,
+            "stage_id": f"online_day_{int(event['time_seconds']) // 86400 + 1}",
+            "source_event_kind": kind, "progression_category": "fish_pool",
+            "metric_id": "fish_pool_entered", "metric_before": "0", "metric_after": "1",
+            "metric_delta": "1", "relative_delta": None,
+            "gap_from_previous_progression_seconds": active - previous,
+        }
     if kind in {"gun_milestone", "codex_fish_unlocked"}:
         fact = collection.project(event)
         if fact is None:
@@ -220,7 +233,14 @@ def _growth(
     rows: list[dict[str, Any]] = []
     collection = CollectionGrowth(scope, full_history=start == 0 and initial == 0,
                                   has_collection_records=any(e["kind"] == "codex_fish_unlocked" for e in events))
+    pool_scope = scope.get("pool_growth") or {}
+    seen_pools = set(pool_scope.get("initial_seen_pool_ids", []))
     for event in ordered_observations(events):
+        if event["kind"] == "fish_pool_entered":
+            pool_id = event["receipt"]["pool_id"]
+            if pool_id in seen_pools:
+                continue
+            seen_pools.add(pool_id)
         row = _milestone(
             event,
             _active_at(int(event["time_seconds"]), sessions, initial),
@@ -250,6 +270,10 @@ def _growth(
         "complete_online_sessions_without_system_progression": empty,
     }
     return {"rows": rows, "summary": summary, "sessions": sessions,
+            "pool_coverage": {"recorded": pool_scope.get("version") == 1,
+                              "note": ("新鱼池按力量首次超过上一池上限计点；初始已达池和重生后的重复进入不计。时间为源观察时点。"
+                                       if pool_scope.get("version") == 1 else
+                                       "本次运行未记录新鱼池成长，需重新模拟；不从力量采样补推首次时点。")},
             "collection_coverage": collection.coverage}
 
 

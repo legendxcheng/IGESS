@@ -1,0 +1,1603 @@
+{
+  "record_id": "FREE-28D-001",
+  "recorded_on": "2026-11-03",
+  "run_id": "20261103T093453303079Z-month_1_growth",
+  "run_status": {
+    "change_id": null,
+    "duration_seconds": 3353.9060000000027,
+    "engine_id": "fish_source",
+    "finished_at": "2026-11-03T10:30:47.219756+00:00",
+    "kind": "formal",
+    "message": "Run complete",
+    "model_digest": "sha256:089e4382d504181cf4b96e68e1a94c13e037f69c6660e7bd7febf40443a76419",
+    "output_dir": "E:\\IGESS\\projects\\fish_source\\runs\\20261103T093453303079Z-month_1_growth\\output",
+    "report_dir": "E:\\IGESS\\projects\\fish_source\\runs\\20261103T093453303079Z-month_1_growth\\report",
+    "report_index": "E:\\IGESS\\projects\\fish_source\\runs\\20261103T093453303079Z-month_1_growth\\report\\index.html",
+    "run_id": "20261103T093453303079Z-month_1_growth",
+    "scenario_id": "month_1_growth",
+    "started_at": "2026-11-03T09:34:53.308726+00:00",
+    "status": "success",
+    "version": 1
+  },
+  "manifest": {
+    "artifacts": [
+      "analysis.json",
+      "analysis.md",
+      "events.csv",
+      "events.json",
+      "payback.csv",
+      "timeline.csv",
+      "timeline.json",
+      "final_checkpoint.json",
+      "source_progression.json",
+      "source_behavior.json"
+    ],
+    "engine_id": "fish_source",
+    "execution_window": {
+      "accepted_commands_scope": "current_execution_segment",
+      "cumulative_fields": [
+        "wallet",
+        "online_acquisition",
+        "active_time_seconds",
+        "source_total_throws"
+      ],
+      "end_seconds": 2419200,
+      "event_scope": "current_execution_segment",
+      "requested_until_seconds": null,
+      "scenario_end_seconds": 2419200,
+      "start_seconds": 0
+    },
+    "model_digest": "sha256:089e4382d504181cf4b96e68e1a94c13e037f69c6660e7bd7febf40443a76419",
+    "model_id": "fish",
+    "overrides": [],
+    "profiles": [
+      "default"
+    ],
+    "scenario_id": "month_1_growth",
+    "schema_version": 1,
+    "source_profiles": {
+      "default": {
+        "collection_growth": {
+          "display_names": {
+            "fish": {
+              "1001": "利维坦",
+              "1002": "恶魔鲨",
+              "1003": "死神利维坦",
+              "1004": "天灾利维坦",
+              "1005": "鹏鳍鲨雕",
+              "1006": "锤尾邓氏鱼",
+              "1007": "翼冠王蛇",
+              "1008": "螭吻灵卫",
+              "101": "小白条",
+              "102": "小鲶鱼",
+              "103": "小翘嘴",
+              "104": "河豚",
+              "105": "鲤鱼",
+              "106": "草鱼",
+              "107": "金鱼",
+              "108": "邪恶鲤鱼",
+              "1101": "角背霜熊",
+              "1102": "熔岩犀牛",
+              "1103": "六耳猕猴",
+              "1104": "剑脊熔甲鱼",
+              "1105": "冥狮豺神",
+              "1106": "六牙霜象王",
+              "1107": "盘角炎猿",
+              "1108": "地狱三头犬",
+              "1201": "穷奇暴君",
+              "1202": "垂云鲲鲸",
+              "1203": "蝶冠星鳐",
+              "1204": "麒麟",
+              "1205": "鹿冠冰龙",
+              "1206": "玄鬃黑龙",
+              "1207": "宇宙龙",
+              "1208": "幽鲲星灵",
+              "1301": "星河龙王",
+              "1302": "Chicleteira Bicicleteira",
+              "1303": "Pot Hotspot",
+              "1304": "Krupuk Pagi Pagi",
+              "1305": "Beluga Beluga",
+              "1306": "Tralaledon",
+              "1307": "Anpali Babel",
+              "1308": "Ketchuru and Musturu",
+              "1401": "Los Primos",
+              "1402": "Mastodontico Telepiedone",
+              "1403": "Espresso Shockantoni",
+              "1404": "Ketupat Kepat",
+              "1405": "Professora 67",
+              "1406": "Astro Tim",
+              "1407": "Dumbelloni",
+              "1408": "Baba Yaga",
+              "1501": "Don Tiramisotto",
+              "1502": "Kicky",
+              "1503": "Smelloni Papayoni",
+              "1504": "Barbelloni Gymrattoni",
+              "1505": "Lucky Fella",
+              "1506": "Coinator Baconator",
+              "1507": "Dribbloni Spaghetti",
+              "1508": "Divinello Starblock",
+              "1601": "Divinello Starblock",
+              "2001": "玄武",
+              "2002": "白虎",
+              "2003": "朱雀",
+              "2004": "青龙",
+              "201": "幼年海龙王",
+              "202": "皇带鱼",
+              "203": "翻车鱼",
+              "204": "海狮",
+              "205": "牛马鱼",
+              "206": "鲤鱼王",
+              "207": "鼠鲨",
+              "208": "卡皮巴拉",
+              "301": "鳌鱼",
+              "302": "味真鲨",
+              "303": "龙舟鱼",
+              "304": "大眼仔",
+              "305": "安康鱼",
+              "306": "三文鱼",
+              "307": "龙鲤",
+              "308": "护士鲨",
+              "401": "邪恶鲨",
+              "402": "积石虎蛟",
+              "403": "冰魄鱼龙",
+              "404": "鲨雕",
+              "405": "海马",
+              "406": "钢齿鲨",
+              "407": "哈基鱼",
+              "408": "熔岩邓氏鲨",
+              "501": "金枪鱼",
+              "502": "赤目鱼龙",
+              "503": "大白鲨",
+              "504": "鲸鲨",
+              "505": "双髻鲨",
+              "506": "沧龙",
+              "507": "美人鱼",
+              "508": "何罗鱼",
+              "601": "长尾鲨",
+              "602": "海龙鳄",
+              "603": "独角鲸",
+              "604": "鲶鱼王",
+              "605": "虎鲸",
+              "606": "机械鲨MK-I",
+              "607": "地壳鲨",
+              "608": "蛇颈龙",
+              "701": "抹香鲸",
+              "702": "迷彩鲶",
+              "703": "幼年杀手鲨",
+              "704": "水晶鲨",
+              "705": "般若鲤",
+              "706": "沧鲨",
+              "707": "鳄鲨",
+              "708": "巨锤鲨",
+              "801": "恶霸鲨",
+              "802": "装甲邓氏鱼",
+              "803": "珍珍",
+              "804": "幽灵鲨",
+              "805": "螳螂鲨",
+              "806": "凜冬海龙王",
+              "807": "机械鲨MK-II",
+              "808": "辐射鲨",
+              "901": "核能鲨",
+              "902": "闪电鳄",
+              "903": "寒冰鲨",
+              "904": "巨齿鳄鲨",
+              "905": "电锯鲨",
+              "906": "魔法鲸",
+              "907": "棱甲酸触",
+              "908": "深渊符文鲨"
+            },
+            "gun": {
+              "10001": "BP_SQ1",
+              "10002": "BP_uzi",
+              "10003": "BP_ve",
+              "10004": "BP_p90",
+              "10005": "BP_s686",
+              "10006": "BP_s12k",
+              "10007": "BP_ak",
+              "10008": "BP_m16",
+              "10009": "BP_M4",
+              "10010": "BP_sks",
+              "10011": "BP_vss",
+              "10012": "BP_mk12",
+              "10013": "BP_ace32",
+              "10014": "BP_m200",
+              "10015": "BP_awm",
+              "10101": "BP_m134",
+              "10102": "BP_98k",
+              "10103": "BP_amr"
+            },
+            "mutation": {
+              "1": "正常",
+              "2": "黄金",
+              "3": "翡翠",
+              "4": "钻石",
+              "5": "星空",
+              "6": "熔融"
+            }
+          },
+          "initial_gun_facts": [],
+          "initial_unlocked_entries": [],
+          "version": 1
+        },
+        "first_times": {
+          "fish_tide_participated": {
+            "online_time_seconds": "6000",
+            "round_id": "room:0:round:10",
+            "time_seconds": 6000
+          },
+          "fish_tide_unlocked": {
+            "identity": "fish_tide_unlocked:any_owned_gun",
+            "kind": "fish_tide_unlocked",
+            "online_time_seconds": "3302",
+            "time_seconds": 3302
+          },
+          "gun_claimed": {
+            "identity": "gun_claimed:301",
+            "kind": "gun_claimed",
+            "online_time_seconds": "3302",
+            "time_seconds": 3302
+          },
+          "gun_equipped": {
+            "identity": "gun_equipped:10003",
+            "kind": "gun_equipped",
+            "online_time_seconds": "3304",
+            "time_seconds": 3304
+          },
+          "gun_owned": {
+            "identity": "gun_owned:10003",
+            "kind": "gun_owned",
+            "online_time_seconds": "3302",
+            "time_seconds": 3302
+          },
+          "gun_upgraded": {
+            "identity": "gun_upgraded:402",
+            "kind": "gun_upgraded",
+            "online_time_seconds": "16043",
+            "time_seconds": 174443
+          },
+          "normal_codex_completed": {
+            "identity": "normal_codex_completed:301",
+            "kind": "normal_codex_completed",
+            "online_time_seconds": "3277",
+            "time_seconds": 3277
+          },
+          "treasure_beast_unlocked": {
+            "online_time_seconds": "7294",
+            "time_seconds": 86494
+          }
+        },
+        "initial_active_time_seconds": 0,
+        "initial_online": true,
+        "lifecycle_gun_milestones": [
+          {
+            "identity": "normal_codex_completed:301",
+            "kind": "normal_codex_completed",
+            "online_time_seconds": "3277",
+            "time_seconds": 3277
+          },
+          {
+            "identity": "gun_claimed:301",
+            "kind": "gun_claimed",
+            "online_time_seconds": "3302",
+            "time_seconds": 3302
+          },
+          {
+            "identity": "gun_owned:10003",
+            "kind": "gun_owned",
+            "online_time_seconds": "3302",
+            "time_seconds": 3302
+          },
+          {
+            "identity": "fish_tide_unlocked:any_owned_gun",
+            "kind": "fish_tide_unlocked",
+            "online_time_seconds": "3302",
+            "time_seconds": 3302
+          },
+          {
+            "identity": "gun_equipped:10003",
+            "kind": "gun_equipped",
+            "online_time_seconds": "3304",
+            "time_seconds": 3304
+          },
+          {
+            "identity": "normal_codex_completed:401",
+            "kind": "normal_codex_completed",
+            "online_time_seconds": "10753",
+            "time_seconds": 89953
+          },
+          {
+            "identity": "gun_claimed:401",
+            "kind": "gun_claimed",
+            "online_time_seconds": "10776",
+            "time_seconds": 89976
+          },
+          {
+            "identity": "gun_owned:10011",
+            "kind": "gun_owned",
+            "online_time_seconds": "10776",
+            "time_seconds": 89976
+          },
+          {
+            "identity": "gun_equipped:10011",
+            "kind": "gun_equipped",
+            "online_time_seconds": "10778",
+            "time_seconds": 89978
+          },
+          {
+            "identity": "normal_codex_completed:201",
+            "kind": "normal_codex_completed",
+            "online_time_seconds": "10860",
+            "time_seconds": 90060
+          },
+          {
+            "identity": "gun_claimed:201",
+            "kind": "gun_claimed",
+            "online_time_seconds": "10902",
+            "time_seconds": 90102
+          },
+          {
+            "identity": "gun_owned:10002",
+            "kind": "gun_owned",
+            "online_time_seconds": "10902",
+            "time_seconds": 90102
+          },
+          {
+            "identity": "gun_upgraded:402",
+            "kind": "gun_upgraded",
+            "online_time_seconds": "16043",
+            "time_seconds": 174443
+          },
+          {
+            "identity": "normal_codex_completed:501",
+            "kind": "normal_codex_completed",
+            "online_time_seconds": "23029",
+            "time_seconds": 260629
+          },
+          {
+            "identity": "gun_claimed:501",
+            "kind": "gun_claimed",
+            "online_time_seconds": "23051",
+            "time_seconds": 260651
+          },
+          {
+            "identity": "gun_owned:10005",
+            "kind": "gun_owned",
+            "online_time_seconds": "23051",
+            "time_seconds": 260651
+          },
+          {
+            "identity": "gun_equipped:10005",
+            "kind": "gun_equipped",
+            "online_time_seconds": "23053",
+            "time_seconds": 260653
+          },
+          {
+            "identity": "normal_codex_completed:601",
+            "kind": "normal_codex_completed",
+            "online_time_seconds": "30608",
+            "time_seconds": 347408
+          },
+          {
+            "identity": "gun_claimed:601",
+            "kind": "gun_claimed",
+            "online_time_seconds": "30630",
+            "time_seconds": 347430
+          },
+          {
+            "identity": "gun_owned:10006",
+            "kind": "gun_owned",
+            "online_time_seconds": "30630",
+            "time_seconds": 347430
+          },
+          {
+            "identity": "gun_equipped:10006",
+            "kind": "gun_equipped",
+            "online_time_seconds": "30632",
+            "time_seconds": 347432
+          },
+          {
+            "identity": "gun_upgraded:102",
+            "kind": "gun_upgraded",
+            "online_time_seconds": "61300",
+            "time_seconds": 694900
+          },
+          {
+            "identity": "gun_upgraded:202",
+            "kind": "gun_upgraded",
+            "online_time_seconds": "61400",
+            "time_seconds": 695000
+          },
+          {
+            "identity": "gun_upgraded:602",
+            "kind": "gun_upgraded",
+            "online_time_seconds": "63307",
+            "time_seconds": 696907
+          },
+          {
+            "identity": "normal_codex_completed:101",
+            "kind": "normal_codex_completed",
+            "online_time_seconds": "67830",
+            "time_seconds": 780630
+          },
+          {
+            "identity": "gun_claimed:101",
+            "kind": "gun_claimed",
+            "online_time_seconds": "67863",
+            "time_seconds": 780663
+          },
+          {
+            "identity": "gun_owned:10001",
+            "kind": "gun_owned",
+            "online_time_seconds": "67863",
+            "time_seconds": 780663
+          },
+          {
+            "identity": "gun_upgraded:302",
+            "kind": "gun_upgraded",
+            "online_time_seconds": "68800",
+            "time_seconds": 781600
+          },
+          {
+            "identity": "normal_codex_completed:701",
+            "kind": "normal_codex_completed",
+            "online_time_seconds": "77658",
+            "time_seconds": 869658
+          },
+          {
+            "identity": "gun_claimed:701",
+            "kind": "gun_claimed",
+            "online_time_seconds": "77679",
+            "time_seconds": 869679
+          },
+          {
+            "identity": "gun_owned:10008",
+            "kind": "gun_owned",
+            "online_time_seconds": "77679",
+            "time_seconds": 869679
+          },
+          {
+            "identity": "gun_equipped:10008",
+            "kind": "gun_equipped",
+            "online_time_seconds": "77681",
+            "time_seconds": 869681
+          },
+          {
+            "identity": "gun_upgraded:702",
+            "kind": "gun_upgraded",
+            "online_time_seconds": "94162",
+            "time_seconds": 1123762
+          },
+          {
+            "identity": "normal_codex_completed:801",
+            "kind": "normal_codex_completed",
+            "online_time_seconds": "118497",
+            "time_seconds": 1385697
+          },
+          {
+            "identity": "gun_claimed:801",
+            "kind": "gun_claimed",
+            "online_time_seconds": "118516",
+            "time_seconds": 1385716
+          },
+          {
+            "identity": "gun_owned:10009",
+            "kind": "gun_owned",
+            "online_time_seconds": "118516",
+            "time_seconds": 1385716
+          },
+          {
+            "identity": "gun_equipped:10009",
+            "kind": "gun_equipped",
+            "online_time_seconds": "118518",
+            "time_seconds": 1385718
+          },
+          {
+            "identity": "gun_upgraded:802",
+            "kind": "gun_upgraded",
+            "online_time_seconds": "126142",
+            "time_seconds": 1472542
+          },
+          {
+            "identity": "normal_codex_completed:901",
+            "kind": "normal_codex_completed",
+            "online_time_seconds": "152740",
+            "time_seconds": 1815940
+          },
+          {
+            "identity": "gun_claimed:901",
+            "kind": "gun_claimed",
+            "online_time_seconds": "152757",
+            "time_seconds": 1815957
+          },
+          {
+            "identity": "gun_owned:10007",
+            "kind": "gun_owned",
+            "online_time_seconds": "152757",
+            "time_seconds": 1815957
+          },
+          {
+            "identity": "gun_equipped:10007",
+            "kind": "gun_equipped",
+            "online_time_seconds": "152759",
+            "time_seconds": 1815959
+          },
+          {
+            "identity": "gun_upgraded:902",
+            "kind": "gun_upgraded",
+            "online_time_seconds": "184577",
+            "time_seconds": 2164577
+          }
+        ],
+        "pool_growth": {
+          "initial_seen_pool_ids": [],
+          "pools": [
+            {
+              "display_name": "洗脚大盆",
+              "pool_id": 2,
+              "previous_upper_bound": "2E+2"
+            },
+            {
+              "display_name": "幽都冥河",
+              "pool_id": 3,
+              "previous_upper_bound": "3E+3"
+            },
+            {
+              "display_name": "原谅海湾",
+              "pool_id": 4,
+              "previous_upper_bound": "3.0E+4"
+            },
+            {
+              "display_name": "火锅神湖",
+              "pool_id": 5,
+              "previous_upper_bound": "2.20E+5"
+            },
+            {
+              "display_name": "扶桑日湾",
+              "pool_id": 6,
+              "previous_upper_bound": "2.5E+6"
+            },
+            {
+              "display_name": "玄鳞古河",
+              "pool_id": 7,
+              "previous_upper_bound": "2.8E+7"
+            },
+            {
+              "display_name": "奶茶大海",
+              "pool_id": 8,
+              "previous_upper_bound": "3.00E+8"
+            },
+            {
+              "display_name": "青丘灵湖",
+              "pool_id": 9,
+              "previous_upper_bound": "8.40E+8"
+            },
+            {
+              "display_name": "九野荒海",
+              "pool_id": 10,
+              "previous_upper_bound": "2.100E+9"
+            },
+            {
+              "display_name": "帝江血渊",
+              "pool_id": 11,
+              "previous_upper_bound": "7.500E+9"
+            },
+            {
+              "display_name": "太荒神洋",
+              "pool_id": 12,
+              "previous_upper_bound": "7.50E+10"
+            },
+            {
+              "display_name": "昆仑之墟",
+              "pool_id": 13,
+              "previous_upper_bound": "3.30E+11"
+            }
+          ],
+          "time_basis": "source_observation",
+          "version": 1
+        }
+      }
+    },
+    "source_runtime": {
+      "advance_mode": "equivalent_batch_v1",
+      "code_sha256": "3731c2b2f79700cb9d6bffec2d6a91ea2f646e68b286ab4d644bfa0716c474ea",
+      "codex_claim_policy": "stable_reward_id_one_second_v1",
+      "collect_interval_basis": "batch_start",
+      "collect_interval_seconds": 300,
+      "collect_policy": "stable_slot_batch_v1",
+      "collect_slot_seconds": 2,
+      "fish_keep_count": 30,
+      "fish_sell_policy": "over_30_lowest_level_one_cps_backpack_v1",
+      "generated_money_definition": "source_collected_slot_receipts_plus_current_unclaimed",
+      "gun_claim_seconds": 1,
+      "gun_equip_seconds": 1,
+      "gun_policy": "claim_stable_reward_id_then_highest_source_attack_v1",
+      "idle_seconds": 30,
+      "in_fishing_area": true,
+      "integration_code_sha256": "f9014106aa5d37d21770da18f318f8ae3d4ad388c1a29186032dcfa6b65161ba",
+      "landing_distance_cm": null,
+      "landing_policy": "source_natural_v1",
+      "lua_executable": "lua55",
+      "lua_version": "Lua 5.5",
+      "online_acquisition_definition": "observed_balance_increases_plus_receipt_spending_excludes_offline_claims",
+      "policy": "source_priority_v1",
+      "record_interval_seconds": 300,
+      "sampling_time_basis": "online",
+      "selected_export_root": "E:\\fish-oasis\\igess_export\\json",
+      "selected_export_sha256": "b8f240eb94fc6be6a4401fb36794b743819c6276fd1452e1bc4921f33e872a3b",
+      "tide_admission_policy": {
+        "budget_basis": "current_material_wallet_before_admission",
+        "cost_basis": "source_round_damage_hp_ammunition_quote",
+        "daily_income": "observed_online_material_including_sales_and_codex_excluding_offline",
+        "daily_spending": "source_paid_reload_receipts_plus_full_round_quote",
+        "daily_window": "simulation_wall_day_86400_seconds_no_carry",
+        "horizon_online_seconds": 1800,
+        "income": "observed_online_material_excluding_codex_and_offline",
+        "income_window_online_seconds": 1800,
+        "max_daily_income_fraction": "0.15",
+        "max_material_fraction": "0.25",
+        "policy": "growth_first_wallet_fraction_daily_income_near_term_reserve_v2",
+        "reservation": "one_next_source_quoted_target_existing_weights_and_turn"
+      },
+      "tide_policy": {
+        "competition": "not_simulated",
+        "duration_seconds": 0,
+        "eggs": 5,
+        "gun_damage_affects_reload_count": true,
+        "gun_damage_affects_yield": false,
+        "initial_ammo": 0,
+        "leftover_ammo": "discarded_after_round",
+        "magazine_size": 30,
+        "model": "fixed_eggs_damage_hp_zero_time_v3",
+        "shot_policy": "sum_per_egg_ceiling_hp_over_attack_perfect_hits"
+      },
+      "tide_schedule": {
+        "interval_seconds": 600,
+        "policy": "absolute_opening_only_v1",
+        "room_origin_seconds": 0,
+        "spawn_window_seconds": 120
+      },
+      "timings_seconds": {
+        "adapter_total": 3346.165,
+        "checkpoint": 3.2,
+        "input_check": 0.204,
+        "process_close": 0.298,
+        "process_start": 1.132,
+        "source_execution": 3341.331
+      }
+    }
+  },
+  "checkpoint_identity": {
+    "engine_id": "fish_source",
+    "model_digest": "sha256:089e4382d504181cf4b96e68e1a94c13e037f69c6660e7bd7febf40443a76419",
+    "profile_id": "default",
+    "root_random_seed": 2031507854,
+    "scenario_id": "month_1_growth",
+    "simulated_time_seconds": 2419200
+  },
+  "source_session_origin": {
+    "fastAdvance": true,
+    "inFishingArea": true,
+    "randomSeed": 2031507854,
+    "startAt": 0
+  },
+  "active_time_seconds": 201600,
+  "observed_session_schedule": {
+    "online_seconds_per_day": 7200,
+    "offline_seconds_per_day": 79200,
+    "days": 28,
+    "go_online_seconds": [
+      86400,
+      172800,
+      259200,
+      345600,
+      432000,
+      518400,
+      604800,
+      691200,
+      777600,
+      864000,
+      950400,
+      1036800,
+      1123200,
+      1209600,
+      1296000,
+      1382400,
+      1468800,
+      1555200,
+      1641600,
+      1728000,
+      1814400,
+      1900800,
+      1987200,
+      2073600,
+      2160000,
+      2246400,
+      2332800
+    ],
+    "go_offline_seconds": [
+      7200,
+      93600,
+      180000,
+      266400,
+      352800,
+      439200,
+      525600,
+      612000,
+      698400,
+      784800,
+      871200,
+      957600,
+      1044000,
+      1130400,
+      1216800,
+      1303200,
+      1389600,
+      1476000,
+      1562400,
+      1648800,
+      1735200,
+      1821600,
+      1908000,
+      1994400,
+      2080800,
+      2167200,
+      2253600,
+      2340000
+    ]
+  },
+  "metrics": {
+    "all_count": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "requested_end_seconds": 2419200,
+        "requested_start_seconds": 0,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {},
+      "evidence_selection": {
+        "dimensions": {},
+        "matched_count": 331,
+        "truncated": true
+      },
+      "metric_id": "growth.count",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "wall",
+      "unit": "count",
+      "value": 331,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "all_labels": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "requested_end_seconds": 2419200,
+        "requested_start_seconds": 0,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {},
+      "evidence_selection": {
+        "dimensions": {},
+        "matched_count": 331,
+        "truncated": true
+      },
+      "metric_id": "growth.labels",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "wall",
+      "unit": "count",
+      "value": 348,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "all_gap": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {},
+      "evidence_selection": {
+        "dimensions": {},
+        "matched_count": 2,
+        "observed_event_count": 331,
+        "rule": "growth.max_gap determining boundaries (first maximum on ties)",
+        "truncated": false
+      },
+      "metric_id": "growth.max_gap",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "online",
+      "unit": "seconds",
+      "value": 3900,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "core_gap": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {
+        "categories": [
+          "fish_pool",
+          "barbell",
+          "torpedo",
+          "strength_rebirth",
+          "fish_hall",
+          "treasure_beast",
+          "breakthrough_funding",
+          "trash_man_rebirth",
+          "gun_owned",
+          "gun_upgraded"
+        ]
+      },
+      "evidence_selection": {
+        "dimensions": {
+          "categories": [
+            "fish_pool",
+            "barbell",
+            "torpedo",
+            "strength_rebirth",
+            "fish_hall",
+            "treasure_beast",
+            "breakthrough_funding",
+            "trash_man_rebirth",
+            "gun_owned",
+            "gun_upgraded"
+          ]
+        },
+        "matched_count": 2,
+        "observed_event_count": 124,
+        "rule": "growth.max_gap determining boundaries (first maximum on ties)",
+        "truncated": false
+      },
+      "metric_id": "growth.max_gap",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "online",
+      "unit": "seconds",
+      "value": 10128,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "fish_pool": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "requested_end_seconds": 2419200,
+        "requested_start_seconds": 0,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {
+        "categories": [
+          "fish_pool"
+        ]
+      },
+      "evidence_selection": {
+        "dimensions": {
+          "categories": [
+            "fish_pool"
+          ]
+        },
+        "matched_count": 8,
+        "truncated": false
+      },
+      "metric_id": "growth.labels",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "wall",
+      "unit": "count",
+      "value": 8,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "barbell": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "requested_end_seconds": 2419200,
+        "requested_start_seconds": 0,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {
+        "categories": [
+          "barbell"
+        ]
+      },
+      "evidence_selection": {
+        "dimensions": {
+          "categories": [
+            "barbell"
+          ]
+        },
+        "matched_count": 11,
+        "truncated": false
+      },
+      "metric_id": "growth.labels",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "wall",
+      "unit": "count",
+      "value": 11,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "torpedo": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "requested_end_seconds": 2419200,
+        "requested_start_seconds": 0,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {
+        "categories": [
+          "torpedo"
+        ]
+      },
+      "evidence_selection": {
+        "dimensions": {
+          "categories": [
+            "torpedo"
+          ]
+        },
+        "matched_count": 13,
+        "truncated": false
+      },
+      "metric_id": "growth.labels",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "wall",
+      "unit": "count",
+      "value": 13,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "strength_rebirth": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "requested_end_seconds": 2419200,
+        "requested_start_seconds": 0,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {
+        "categories": [
+          "strength_rebirth"
+        ]
+      },
+      "evidence_selection": {
+        "dimensions": {
+          "categories": [
+            "strength_rebirth"
+          ]
+        },
+        "matched_count": 8,
+        "truncated": false
+      },
+      "metric_id": "growth.labels",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "wall",
+      "unit": "count",
+      "value": 8,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "fish_hall": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "requested_end_seconds": 2419200,
+        "requested_start_seconds": 0,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {
+        "categories": [
+          "fish_hall"
+        ]
+      },
+      "evidence_selection": {
+        "dimensions": {
+          "categories": [
+            "fish_hall"
+          ]
+        },
+        "matched_count": 25,
+        "truncated": false
+      },
+      "metric_id": "growth.labels",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "wall",
+      "unit": "count",
+      "value": 25,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "treasure_beast": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "requested_end_seconds": 2419200,
+        "requested_start_seconds": 0,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {
+        "categories": [
+          "treasure_beast"
+        ]
+      },
+      "evidence_selection": {
+        "dimensions": {
+          "categories": [
+            "treasure_beast"
+          ]
+        },
+        "matched_count": 1,
+        "truncated": false
+      },
+      "metric_id": "growth.labels",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "wall",
+      "unit": "count",
+      "value": 1,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "breakthrough_funding": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "requested_end_seconds": 2419200,
+        "requested_start_seconds": 0,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {
+        "categories": [
+          "breakthrough_funding"
+        ]
+      },
+      "evidence_selection": {
+        "dimensions": {
+          "categories": [
+            "breakthrough_funding"
+          ]
+        },
+        "matched_count": 33,
+        "truncated": false
+      },
+      "metric_id": "growth.labels",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "wall",
+      "unit": "count",
+      "value": 33,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "trash_man_rebirth": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "requested_end_seconds": 2419200,
+        "requested_start_seconds": 0,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {
+        "categories": [
+          "trash_man_rebirth"
+        ]
+      },
+      "evidence_selection": {
+        "dimensions": {
+          "categories": [
+            "trash_man_rebirth"
+          ]
+        },
+        "matched_count": 8,
+        "truncated": false
+      },
+      "metric_id": "growth.labels",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "wall",
+      "unit": "count",
+      "value": 8,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "new_fish_species": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "requested_end_seconds": 2419200,
+        "requested_start_seconds": 0,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {
+        "categories": [
+          "new_fish_species"
+        ]
+      },
+      "evidence_selection": {
+        "dimensions": {
+          "categories": [
+            "new_fish_species"
+          ]
+        },
+        "matched_count": 85,
+        "truncated": false
+      },
+      "metric_id": "growth.labels",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "wall",
+      "unit": "count",
+      "value": 85,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "new_fish_variant": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "requested_end_seconds": 2419200,
+        "requested_start_seconds": 0,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {
+        "categories": [
+          "new_fish_variant"
+        ]
+      },
+      "evidence_selection": {
+        "dimensions": {
+          "categories": [
+            "new_fish_variant"
+          ]
+        },
+        "matched_count": 129,
+        "truncated": true
+      },
+      "metric_id": "growth.labels",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "wall",
+      "unit": "count",
+      "value": 129,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "normal_codex_completed": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "requested_end_seconds": 2419200,
+        "requested_start_seconds": 0,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {
+        "categories": [
+          "normal_codex_completed"
+        ]
+      },
+      "evidence_selection": {
+        "dimensions": {
+          "categories": [
+            "normal_codex_completed"
+          ]
+        },
+        "matched_count": 9,
+        "truncated": false
+      },
+      "metric_id": "growth.labels",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "wall",
+      "unit": "count",
+      "value": 9,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "gun_owned": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "requested_end_seconds": 2419200,
+        "requested_start_seconds": 0,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {
+        "categories": [
+          "gun_owned"
+        ]
+      },
+      "evidence_selection": {
+        "dimensions": {
+          "categories": [
+            "gun_owned"
+          ]
+        },
+        "matched_count": 9,
+        "truncated": false
+      },
+      "metric_id": "growth.labels",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "wall",
+      "unit": "count",
+      "value": 9,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "gun_upgraded": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "requested_end_seconds": 2419200,
+        "requested_start_seconds": 0,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {
+        "categories": [
+          "gun_upgraded"
+        ]
+      },
+      "evidence_selection": {
+        "dimensions": {
+          "categories": [
+            "gun_upgraded"
+          ]
+        },
+        "matched_count": 8,
+        "truncated": false
+      },
+      "metric_id": "growth.labels",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "wall",
+      "unit": "count",
+      "value": 8,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "week_1": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "requested_end_seconds": 604800,
+        "requested_start_seconds": 0,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {
+        "week": 1
+      },
+      "evidence_selection": {
+        "dimensions": {
+          "week": 1
+        },
+        "matched_count": 151,
+        "truncated": true
+      },
+      "metric_id": "growth.count",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "wall",
+      "unit": "count",
+      "value": 151,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "week_2": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "requested_end_seconds": 1209600,
+        "requested_start_seconds": 604800,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {
+        "week": 2
+      },
+      "evidence_selection": {
+        "dimensions": {
+          "week": 2
+        },
+        "matched_count": 83,
+        "truncated": false
+      },
+      "metric_id": "growth.count",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "wall",
+      "unit": "count",
+      "value": 83,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "week_3": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "requested_end_seconds": 1814400,
+        "requested_start_seconds": 1209600,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {
+        "week": 3
+      },
+      "evidence_selection": {
+        "dimensions": {
+          "week": 3
+        },
+        "matched_count": 48,
+        "truncated": false
+      },
+      "metric_id": "growth.count",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "wall",
+      "unit": "count",
+      "value": 48,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "week_4": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "requested_end_seconds": 2419200,
+        "requested_start_seconds": 1814400,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {
+        "week": 4
+      },
+      "evidence_selection": {
+        "dimensions": {
+          "week": 4
+        },
+        "matched_count": 49,
+        "truncated": false
+      },
+      "metric_id": "growth.count",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "wall",
+      "unit": "count",
+      "value": 49,
+      "value_status": "recorded",
+      "value_type": "integer"
+    }
+  },
+  "final_progression": {
+    "time_seconds": 2419200,
+    "spendable_money": "2914293103109712.30302068423857341954055110170119866229485645169143251527750242051636291565492981503910051838458851065039759558262684254399629477154692195812427197242587550984893596250913105905055999755859375",
+    "unclaimed_money": "685349236416612.63342608646226958518462456976528828569375936016779232219631591972913483735268010854751294712242532863581899497526635659325326193835097007588063501982815484137034900413709692656993865966796875",
+    "collected_money": "144794796633271605.97722603616741633459677175557253677631027781828788726214412700468926102287180111623535738312650654424261939256847231111338084992060838771206330403431249143064718509776866994798183441162109375",
+    "generated_money": "145480145869688218.6106521226296859197813963253378250620040371784556795843404429244183958602244812247828703302489318728784383875437386677066341118589593577879439390541406462720175341019057668745517730712890625",
+    "material": "441067052",
+    "online_money_acquired_cumulative": "145480145869845338.6106521226296859197813963253378250620040371784556795843404429244183958602244812247828703302489318728784383875437386677066341118589593577879439390541406462720175341019057668745517730712890625000",
+    "online_resource_acquired_cumulative": "6610127765.500",
+    "online_fish_sale_material_cumulative": "136403130",
+    "egg_inventory_count": "0",
+    "egg_hatched_count": "775",
+    "egg_capacity_blocked": "0",
+    "fish_inventory_count": "31",
+    "fish_inventory_capacity": "200",
+    "online_tide_reload_material_cumulative": "550356480",
+    "online_codex_money_cumulative": "157120",
+    "online_codex_material_cumulative": "228480",
+    "codex_unlocked_count": "212",
+    "codex_claimed_count": "193",
+    "strength": "926480001",
+    "fish_luck": "28047158912.201623168",
+    "trash_luck": "11060554.329200184",
+    "trash_realm": "33",
+    "treasure_beast_unlocked": "1",
+    "total_throws": "1703",
+    "strength_rebirth_count": "8",
+    "trash_man_rebirth_count": "8",
+    "deployed_fish": 30
+  },
+  "accepted_commands": {
+    "begin_throw_flight": 1703,
+    "claim_fish_reward": 193,
+    "claim_gun_reward": 9,
+    "claim_offline_reward": 27,
+    "collect_slot": 15123,
+    "complete_throw": 1703,
+    "complete_tide": 155,
+    "deploy_fish": 30,
+    "equip_gun": 7,
+    "finalize_throw_landing": 1703,
+    "go_offline": 28,
+    "go_online": 27,
+    "prepare_throw": 1703,
+    "purchase_torpedo": 13,
+    "rebirth_strength": 8,
+    "rebirth_trash_man": 8,
+    "select_throw_landing": 1703,
+    "sell_fish": 2447,
+    "start_breakthrough": 33,
+    "start_exercise": 1836,
+    "start_tide": 155,
+    "stop_exercise": 1836,
+    "synthesize_barbell": 11,
+    "upgrade_fish": 1784,
+    "upgrade_hall": 25
+  },
+  "rejected_commands": {},
+  "first_times": {
+    "normal_codex_completed": {
+      "time_seconds": 3277,
+      "kind": "normal_codex_completed",
+      "identity": "normal_codex_completed:301",
+      "online_time_seconds": "3277"
+    },
+    "gun_claimed": {
+      "time_seconds": 3302,
+      "kind": "gun_claimed",
+      "identity": "gun_claimed:301",
+      "online_time_seconds": "3302"
+    },
+    "gun_owned": {
+      "time_seconds": 3302,
+      "kind": "gun_owned",
+      "identity": "gun_owned:10003",
+      "online_time_seconds": "3302"
+    },
+    "fish_tide_unlocked": {
+      "time_seconds": 3302,
+      "kind": "fish_tide_unlocked",
+      "identity": "fish_tide_unlocked:any_owned_gun",
+      "online_time_seconds": "3302"
+    },
+    "gun_equipped": {
+      "time_seconds": 3304,
+      "kind": "gun_equipped",
+      "identity": "gun_equipped:10003",
+      "online_time_seconds": "3304"
+    },
+    "fish_tide_participated": {
+      "time_seconds": 6000,
+      "online_time_seconds": "6000",
+      "round_id": "room:0:round:10"
+    },
+    "treasure_beast_unlocked": {
+      "time_seconds": 86494,
+      "online_time_seconds": "7294"
+    },
+    "gun_upgraded": {
+      "time_seconds": 174443,
+      "kind": "gun_upgraded",
+      "identity": "gun_upgraded:402",
+      "online_time_seconds": "16043"
+    }
+  },
+  "pool_milestones": [
+    {
+      "time_seconds": 244,
+      "pool_id": 2,
+      "display_name": "洗脚大盆",
+      "previous_upper_bound": "2E+2",
+      "strength": "242",
+      "active_time_seconds": 244
+    },
+    {
+      "time_seconds": 1590,
+      "pool_id": 3,
+      "display_name": "幽都冥河",
+      "previous_upper_bound": "3E+3",
+      "strength": "3206",
+      "active_time_seconds": 1590
+    },
+    {
+      "time_seconds": 86488,
+      "pool_id": 4,
+      "display_name": "原谅海湾",
+      "previous_upper_bound": "3.0E+4",
+      "strength": "32302",
+      "active_time_seconds": 7288
+    },
+    {
+      "time_seconds": 178863,
+      "pool_id": 5,
+      "display_name": "火锅神湖",
+      "previous_upper_bound": "2.20E+5",
+      "strength": "220101",
+      "active_time_seconds": 20463
+    },
+    {
+      "time_seconds": 524709,
+      "pool_id": 6,
+      "display_name": "扶桑日湾",
+      "previous_upper_bound": "2.5E+6",
+      "strength": "2510121",
+      "active_time_seconds": 49509
+    },
+    {
+      "time_seconds": 1040986,
+      "pool_id": 7,
+      "display_name": "玄鳞古河",
+      "previous_upper_bound": "2.8E+7",
+      "strength": "28085801",
+      "active_time_seconds": 90586
+    },
+    {
+      "time_seconds": 1731476,
+      "pool_id": 8,
+      "display_name": "奶茶大海",
+      "previous_upper_bound": "3.00E+8",
+      "strength": "300674001",
+      "active_time_seconds": 147476
+    },
+    {
+      "time_seconds": 2335788,
+      "pool_id": 9,
+      "display_name": "青丘灵湖",
+      "previous_upper_bound": "8.40E+8",
+      "strength": "842160001",
+      "active_time_seconds": 197388
+    }
+  ],
+  "artifact_sha256": {
+    "output/run_manifest.json": "6ec5a55cfd97549fce28057e18b4708372f7442682d3debbcb9063b272373dba",
+    "output/events.json": "24403fdb247517e3c0a89369bfdbbc5d471332ef8e302ee041290331ebfe7ab6",
+    "output/timeline.json": "818b7505dfa8d07f277d6e9728c5fff9a68c8530403babeec0b1ff3bd073efca",
+    "output/source_progression.json": "e2f5358dd71366d819fb4748438d8ff4cae48d34c3e3e9f5590fc77f7329b738",
+    "output/source_behavior.json": "cd24f44f4b53c2af1ebe8b728bbe1a9171b614d5cc9571fc380776066202a04e",
+    "output/final_checkpoint.json": "43eaaec062a3aafc76cc6fd98aa6ad1759be02fbcb7beef6787373b400d3c77b",
+    "report/index.html": "cac01aa3a5c997315b05c0b86ff895bcb2b31c614d62963c9cebea6d573dba60",
+    "run_status.json": "13e0ade3090536ad288fd8f9475045efe022482955fddc0e23227275faf2cff6"
+  },
+  "evidence_note": "metrics use the public metrics extract CLI; other fields are read-only extracts from frozen run artifacts. This summary is not a full backup of the run."
+}

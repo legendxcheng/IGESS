@@ -280,6 +280,8 @@ class FishSourceRuntime:
         random_seed: int = 0,
         in_fishing_area: bool = False,
         fast_advance: bool = False,
+        permanent_privilege_mode: str | None = None,
+        initial_loadout_mode: str | None = None,
     ) -> dict[str, Any]:
         if self.source_digest is None:
             raise FishSourceRuntimeError("simulation_session_closed")
@@ -293,6 +295,14 @@ class FishSourceRuntime:
         }
         if initial_state is not None:
             command["initialState"] = initial_state
+        if initial_loadout_mode is not None:
+            if (self.capabilities or {}).get("initialLoadoutVersion") != 1:
+                raise FishSourceRuntimeError("simulation_initial_loadout_unavailable")
+            command["initialLoadoutMode"] = initial_loadout_mode
+        if permanent_privilege_mode is not None:
+            if (self.capabilities or {}).get("permanentPrivilegesVersion") != 1:
+                raise FishSourceRuntimeError("simulation_permanent_privileges_unavailable")
+            command["permanentPrivilegeMode"] = permanent_privilege_mode
         return self.request(command)
 
     def collection_display_names(self) -> dict[str, dict[str, str]]:
@@ -308,6 +318,21 @@ class FishSourceRuntime:
                     if isinstance(row, dict) and isinstance(row.get("name"), str):
                         names[str(row["id"])] = row["name"]
             result[category] = names
+        return result
+
+    def pool_growth_thresholds(self) -> list[dict[str, Any]]:
+        """Freeze report labels and inclusive upper bounds; source validates the table."""
+        from .fish_source_numbers import source_decimal
+
+        if self._frozen_data_root is None:
+            raise FishSourceRuntimeError("simulation_session_closed")
+        rows = json.loads((self._frozen_data_root / "tbfishrandompool.json").read_text(encoding="utf-8-sig"))
+        result = []
+        for previous, row in zip(rows, rows[1:]):
+            bound = previous["strengthUpperBound"]
+            value = source_decimal({"sign": bound["sign"], "coeff": bound["digits"], "exp": bound["scale"]})
+            result.append({"pool_id": row["id"], "display_name": row.get("name", ""),
+                           "previous_upper_bound": str(value)})
         return result
 
     def checkpoint(self) -> dict[str, Any]:

@@ -20,7 +20,8 @@ from .engines import EngineAdapterError, EngineExecution, PreparedEngine
 from .fish_source_eggs import EggObservations
 from .fish_source_tides import TIDE_POLICY, TideObservations
 from .fish_source_guns import GunMilestones, choose_gun_action
-from .fish_source_growth_policy import GROWTH_TIDE_POLICY, GrowthTideBudget, growth_options
+from .fish_source_growth_policy import GROWTH_TIDE_POLICY, GrowthTideBudget, growth_options, target_order
+from .fish_source_pools import PoolMilestones
 from .fish_source_runtime import (
     FishSourceRejection,
     FishSourceRuntime,
@@ -29,6 +30,7 @@ from .fish_source_runtime import (
     source_code_digest,
     source_runtime_entry,
 )
+from .fish_source_loadout import choose_loadout_hall_action
 from .fish_source_income import SourceIncome
 from .fish_source_numbers import source_decimal
 from .schema import EconomyModel, Event, SimulationResult, TimelineRow
@@ -88,7 +90,7 @@ def _affords(wallet: Mapping[str, Any], quote: Mapping[str, Any]) -> bool:
 
 def _integration_code_digest() -> str:
     digest = hashlib.sha256()
-    for name in ("fish_source_engine.py", "fish_source_runtime.py", "fish_source_observation.py", "fish_source_reports.py", "fish_source_income.py", "fish_source_guns.py", "fish_source_eggs.py", "fish_source_tides.py", "fish_source_numbers.py", "fish_source_growth_policy.py"):
+    for name in ("fish_source_engine.py", "fish_source_runtime.py", "fish_source_observation.py", "fish_source_reports.py", "fish_source_income.py", "fish_source_guns.py", "fish_source_eggs.py", "fish_source_tides.py", "fish_source_numbers.py", "fish_source_pools.py", "fish_source_growth_policy.py", "fish_source_loadout.py"):
         path = Path(__file__).parent / name
         if not path.is_file():
             path = path.with_suffix(".pyc")
@@ -114,6 +116,8 @@ class _SourceInputs:
     fast_advance: bool
     sampling_time_basis: str
     room_origin_seconds: int
+    permanent_privileges_by_scenario: dict[str, str]
+    initial_loadout_by_scenario: dict[str, str]
 
 
 class FishSourceEngineAdapter:
@@ -183,6 +187,18 @@ class FishSourceEngineAdapter:
         idle_seconds = source_settings.get("idle_seconds", 30)
         advance_mode = source_settings.get("advance_mode", "accurate")
         sampling_time_basis = source_settings.get("sampling_time_basis", "wall")
+        permanent_privileges = source_settings.get("permanent_privileges_by_scenario", {})
+        if not isinstance(permanent_privileges, dict) or any(
+            key not in model.scenarios or mode not in ("all_on_sale", "all_defined")
+            for key, mode in permanent_privileges.items()
+        ):
+            raise EngineAdapterError("fish_source_privileges_invalid", "Invalid scenario permanent privileges")
+        initial_loadouts = source_settings.get("initial_loadout_by_scenario", {})
+        if not isinstance(initial_loadouts, dict) or any(
+            key not in model.scenarios or mode != "whale_qinglong_29"
+            for key, mode in initial_loadouts.items()
+        ):
+            raise EngineAdapterError("fish_source_loadout_invalid", "Invalid scenario starting loadout")
         if type(fishing_area) is not bool or any(
             type(value) is not int or value <= 0
             for value in (collect_interval, idle_seconds)
@@ -250,6 +266,10 @@ class FishSourceEngineAdapter:
             with FishSourceRuntime(project_root, data_root, lua_executable=lua_executable) as probe:
                 capabilities = probe.capabilities or {}
                 missing = sorted(_REQUIRED_OPERATIONS - set(capabilities.get("actions", [])))
+                if permanent_privileges and capabilities.get("permanentPrivilegesVersion") != 1:
+                    missing.append("permanentPrivilegesVersion=1")
+                if initial_loadouts and capabilities.get("initialLoadoutVersion") != 1:
+                    missing.append("initialLoadoutVersion=1")
                 versions = ("tideScheduleVersion", "naturalLandingVersion", "inventoryProjectionVersion")
                 missing.extend(name + "=1" for name in versions if capabilities.get(name) != 1)
                 if missing:
@@ -282,6 +302,7 @@ class FishSourceEngineAdapter:
             collect_interval, idle_seconds,
             advance_mode == "equivalent_batch_v1",
             sampling_time_basis, room_origin,
+            dict(permanent_privileges), dict(initial_loadouts),
         )
         metadata = {
             "engine_id": self.engine_id,
@@ -438,6 +459,9 @@ class FishSourceEngineAdapter:
                     "first_times": runner.first_times,
                     "lifecycle_gun_milestones": runner.gun_milestones.records,
                     "collection_growth": runner.collection_growth,
+                    "pool_growth": runner.pool_milestones.scope,
+                    "permanent_privileges": runner.permanent_privileges,
+                    "initial_loadout": runner.initial_loadout,
                 }
                 executed = time.perf_counter()
                 timings["source_execution"] += executed - entered
@@ -506,11 +530,21 @@ class _ProfileRun:
             dict(existing.behavior_state.get("online_acquisition", {})) if existing else None
         )
         self.growth_tide_budget = GrowthTideBudget(existing.behavior_state.get("growth_tide_budget") if existing else None)
+        loadout_mode = inputs.initial_loadout_by_scenario.get(scenario_id)
+        if existing is not None and inputs.initial_loadout_by_scenario.get(existing.scenario_id) != loadout_mode:
+            raise EngineAdapterError("fish_source_checkpoint_loadout_mismatch", "Cannot change initial inventory when continuing")
+        privilege_mode = inputs.permanent_privileges_by_scenario.get(scenario_id)
+        if existing is not None:
+            previous_mode = inputs.permanent_privileges_by_scenario.get(existing.scenario_id)
+            if previous_mode != privilege_mode:
+                raise EngineAdapterError("fish_source_checkpoint_privileges_mismatch", "Cannot change purchased benefits when continuing")
         if existing is None:
             self.state = runtime.create(
                 start_at=0, random_seed=seed,
                 in_fishing_area=inputs.fishing_area,
                 fast_advance=inputs.fast_advance,
+                **({"permanent_privilege_mode": privilege_mode} if privilege_mode else {}),
+                **({"initial_loadout_mode": loadout_mode} if loadout_mode else {}),
             )
         else:
             self.state = runtime.restore(_unpack_session(existing.engine_state))
@@ -524,6 +558,19 @@ class _ProfileRun:
             self.pending_action = existing.behavior_state.get("pending_action")
             self.pending_tide = existing.behavior_state.get("pending_tide")
             self.next_tide_at = existing.behavior_state["next_tide_at"]
+        self.initial_loadout = (
+            runtime.request({"op": "query_initial_loadout"}) if loadout_mode
+            else {"mode": "none", "paymentSimulated": False, "version": 1}
+        )
+        if loadout_mode and self.initial_loadout.get("mode") != loadout_mode:
+            raise EngineAdapterError("fish_source_loadout_mismatch", "Source starting inventory differs from scenario")
+        self.permanent_privileges = (
+            runtime.request({"op": "query_permanent_privileges"}) if privilege_mode
+            else {"mode": "none", "items": [], "paymentSimulated": False, "version": 1}
+        )
+        if privilege_mode and self.permanent_privileges.get("mode") != privilege_mode:
+            raise EngineAdapterError("fish_source_privileges_mismatch", "Source benefit mode differs from scenario")
+        self.growth_tide_budget.observe_daily(self.state["time"], self.income.totals)
         self.tide_interval = int(self.state["tides"]["config"]["intervalSeconds"])
         self.initial_online = self.state["online"]
         self.initial_active_time_seconds = self.active_time_seconds
@@ -533,11 +580,19 @@ class _ProfileRun:
             "initial_gun_facts": self.gun_milestones.establish_baseline(self.state),
             "display_names": runtime.collection_display_names(),
         }
+        self.pool_milestones = PoolMilestones(
+            runtime.pool_growth_thresholds(), self.state,
+            existing.behavior_state.get("pool_milestones") if existing else None,
+        )
         sample_time = self.active_time_seconds if inputs.sampling_time_basis == "online" else self.state["time"]
         self.next_record = (sample_time // self.record_interval + 1) * self.record_interval
         self._record()
 
     def _observe_progression(self) -> None:
+        if (self.state["wallet"]["strength"] != self.pool_milestones.last_strength
+                and self.state.get("luck") is None):
+            self.state = self.runtime.request({"op": "query", "includeLuck": True})
+        self.pool_milestones.observe(self.state, self.active_time_seconds, self.scenario.id, self.profile.id, self.events)
         self.tide_observations.observe(self.state, self.active_time_seconds, self.scenario.id, self.profile.id, self.events)
         self.egg_observations.observe(self.state, self.active_time_seconds, self.scenario.id, self.profile.id, self.events)
         self.gun_milestones.observe(self.state, self.active_time_seconds, self.scenario.id, self.profile.id, self.events)
@@ -626,6 +681,7 @@ class _ProfileRun:
         self.runtime.request({"op": "advance", "time": target})
         self.state = self.runtime.observe(include_luck=include_luck)
         self.income.observe(before, self.state)
+        self.growth_tide_budget.observe_daily(self.state["time"], self.income.totals)
         self._observe_codex(before)
         if online:
             self.active_time_seconds += elapsed
@@ -661,6 +717,7 @@ class _ProfileRun:
         self.state = self.runtime.observe(include_luck=True)
         self.last_receipt = receipt
         self.income.observe(before, self.state, op=op, receipt=receipt)
+        self.growth_tide_budget.observe_daily(self.state["time"], self.income.totals)
         self._observe_codex(before)
         if not before["trashMan"]["unlocked"] and self.state["trashMan"]["unlocked"]:
             self.first_times.setdefault("treasure_beast_unlocked", {
@@ -740,6 +797,11 @@ class _ProfileRun:
                 self.last_collect = int(state["time"])
                 return self._next_collection()
         actions = None
+        if self.initial_loadout["mode"] != "none":
+            actions = self.runtime.request({"op": "query_actions"})
+            hall_action = choose_loadout_hall_action(state, actions, self._allowed)
+            if hall_action:
+                return hall_action
         sell_weight = self.profile.behavior_weights.get("sell_fish")
         if (
             state["inventory"]["total"] > _FISH_KEEP_COUNT
@@ -763,7 +825,7 @@ class _ProfileRun:
                     "op": "sell_fish", "instanceId": item["instanceId"],
                 }
         occupied = {item.get("hallSlot") for item in inventory if item.get("hallSlot", 0) > 0}
-        for item in inventory:
+        for item in inventory if self.initial_loadout["mode"] == "none" else []:
             if item.get("hallSlot", 0) == 0:
                 for slot in range(1, state["hall"]["currentLevel"]["capacity"] + 1):
                     if slot not in occupied and self._allowed("deploy_fish", str(item["instanceId"])):
@@ -801,7 +863,7 @@ class _ProfileRun:
         }
         maximum = max(row[0] for row in candidates)
         tied = [row for row in candidates if row[0] == maximum]
-        tied.sort(key=lambda row: (priority.get(row[1], 4), row[1], row[2]))
+        tied.sort(key=lambda row: (priority.get(row[1], 4), row[1], target_order(row[1], row[2])))
         behaviors = list(dict.fromkeys(row[1] for row in tied))
         chosen = behaviors[self.behavior_turn % len(behaviors)]
         self.behavior_turn += 1
@@ -824,7 +886,7 @@ class _ProfileRun:
         start = int(self.state["time"])
         if behavior == "collect_slot":
             duration = 2
-        elif behavior in ("deploy_fish", "claim_fish_reward", "claim_gun_reward", "equip_gun"):
+        elif behavior in ("deploy_fish", "withdraw_fish", "claim_fish_reward", "claim_gun_reward", "equip_gun"):
             duration = 1
         else:
             duration = self._duration(behavior)
@@ -977,11 +1039,14 @@ class _ProfileRun:
                     self._skip_tide(now, "not_unlocked")
                 else:
                     actions = self.runtime.request({"op": "query_actions"})
+                    tide_quote = self.runtime.request({"op": "query_tide", "roundId": round_id})
                     reservation = self.growth_tide_budget.skip(
                         self.state, growth_options(self.state, actions), self.profile.behavior_weights,
                         self._allowed, self.behavior_turn, planned_logout - now,
-                        tide_quote=self.runtime.request({"op": "query_tide", "roundId": round_id}),
+                        tide_quote=tide_quote,
                     )
+                    if reservation is None:
+                        reservation = self.growth_tide_budget.skip_daily(tide_quote)
                     if reservation:
                         self._skip_tide(now, **reservation)
                     else:
@@ -1031,6 +1096,7 @@ class _ProfileRun:
                 "online_acquisition": self.income.save(),
                 "growth_tide_budget": self.growth_tide_budget.save(),
                 "gun_milestones": self.gun_milestones.save(),
+                "pool_milestones": self.pool_milestones.save(),
                 "first_times": self.first_times,
                 "egg_observations": self.egg_observations.save(),
             },

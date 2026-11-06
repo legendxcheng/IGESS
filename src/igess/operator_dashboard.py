@@ -17,6 +17,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 import webbrowser
 
 from .operator_runtime import OperatorBundle, OperatorError, OperatorService, sanitize_diagnostic
+from .run_registry import format_run_duration
 
 
 _MAX_FORM_BYTES = 64 * 1024
@@ -110,6 +111,7 @@ def render_operator_home(
             f"<td><code>{_e(record.run_id)}</code></td>"
             f"<td>{_e(record.scenario_id)}</td>"
             f'<td class="{"ok" if record.status == "success" else "failed"}">{_e(record.status)}</td>'
+            f'<td>{_e(format_run_duration(record, missing="未记录", running="运行中…"))}</td>'
             f"<td>{_e(record.message)}</td>"
             f"<td>{' · '.join(result_links)}</td>"
             "<td>"
@@ -119,7 +121,7 @@ def render_operator_home(
             "</td>"
             "</tr>"
         )
-    history_rows = "".join(rows) or '<tr><td colspan="6">暂无运行记录。</td></tr>'
+    history_rows = "".join(rows) or '<tr><td colspan="7">暂无运行记录。</td></tr>'
     size = _human_bytes(service.history_size_bytes())
     return f"""<!doctype html>
 <html lang="zh-CN">
@@ -141,7 +143,8 @@ def render_operator_home(
     .run-button {{ width: 100%; min-height: 42px; }} .check {{ margin: 14px 0 0; }}
     table {{ width: 100%; border-collapse: collapse; font-size: 14px; }}
     th, td {{ padding: 10px 8px; border-bottom: 1px solid #e5eaf1; text-align: left; vertical-align: top; }}
-    td:nth-child(4) {{ max-width: 360px; overflow-wrap: anywhere; }}
+    td:nth-child(4) {{ white-space: nowrap; }}
+    td:nth-child(5) {{ max-width: 360px; overflow-wrap: anywhere; }}
     a {{ color: #175cd3; }} .ok {{ color: #087443; }} .failed {{ color: #b42318; }}
     .notice {{ font-weight: 700; }} .danger {{ border-color: #fecaca; }} code {{ overflow-wrap: anywhere; }}
     @media (max-width: 850px) {{ .grid {{ grid-template-columns: 1fr; }} main {{ padding: 16px; }} table {{ display: block; overflow-x: auto; }} }}
@@ -167,7 +170,7 @@ def render_operator_home(
   </section>
   <section>
     <h2>运行历史</h2>
-    <table><thead><tr><th>运行</th><th>场景</th><th>状态</th><th>说明</th><th>结果</th><th></th></tr></thead><tbody>{history_rows}</tbody></table>
+    <table><thead><tr><th>运行</th><th>场景</th><th>状态</th><th>耗时</th><th>说明</th><th>结果</th><th></th></tr></thead><tbody>{history_rows}</tbody></table>
   </section>
   <section class="danger">
     <h2>历史清理</h2>

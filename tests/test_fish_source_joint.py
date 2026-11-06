@@ -148,6 +148,9 @@ def test_formal_wallet_one_below_huge_quote_never_submits_purchase(tmp_path, mon
 
 @pytest.mark.parametrize('cutoff', [60, 200])
 def test_restored_report_retains_first_times_and_exact_online_scope(tmp_path, monkeypatch, cutoff):
+    # Isolate lifecycle history from daily admission for this pre-funded archive.
+    from igess.fish_source_growth_policy import GrowthTideBudget
+    monkeypatch.setattr(GrowthTideBudget, 'skip_daily', lambda self, quote: None)
     state = archive("""
 local rules=assert(require('Script.Domain.Gun.GunRules').Default())
 for _,key in ipairs(rules.rewards[101].keys) do s.collection.unlockedKeys[#s.collection.unlockedKeys+1]=key end
@@ -266,6 +269,9 @@ end
 
 
 def test_formal_partial_egg_notice_failure_is_a_failed_run_with_source_evidence(tmp_path, monkeypatch):
+    # Exercise the notification failure after admission with a pre-funded archive.
+    from igess.fish_source_growth_policy import GrowthTideBudget
+    monkeypatch.setattr(GrowthTideBudget, 'skip_daily', lambda self, quote: None)
     state = archive("""
 s.wallet.material={sign=1,coeff='12',exp=2}
 s.combat.ownedGunIds={10001};s.combat.equippedGunId=10001;s.combat.lastSelectedGunId=10001

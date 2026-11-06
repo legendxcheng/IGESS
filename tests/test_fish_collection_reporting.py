@@ -126,7 +126,10 @@ def test_report_renders_both_labels_one_event_and_readable_identity(tmp_path, as
     node = shutil.which("node")
     if node is None:
         pytest.skip("Node is required for the report frontend")
-    report(tmp_path, [unlock(1, 102, 2), gun(2, 'normal_codex_completed', 1001), gun(3, 'gun_owned', 1)])
+    report(tmp_path, [unlock(1, 102, 2), gun(2, 'normal_codex_completed', 1001), gun(3, 'gun_owned', 1),
+                     {"profile_id": "default", "time_seconds": 4, "kind": "fish_pool_entered",
+                      "item_id": "2", "details": {"source": "observation", "receipt": json.dumps({
+                          "pool_id": 2, "display_name": "洗脚大盆", "previous_upper_bound": "50", "strength": "51"})}}])
     harness = r'''
 const fs = require('fs'), vm = require('vm');
 const data = fs.readFileSync(process.argv[1], 'utf8');
@@ -154,10 +157,12 @@ setImmediate(() => {
                             text=True, encoding='utf-8', capture_output=True, check=True)
     rendered = json.loads(result.stdout)
     html = rendered['elements']['[data-daily-progression-charts]']['innerHTML']
-    assert '3 次成长事件' in html
+    assert '4 次成长事件' in html
     assert '新鱼种' in html and '新变异' in html
     assert '标签' in html and '重复' in html
-    assert {s['name'] for s in rendered['chart']['series']} == {'新鱼种', '新变异组合', '正常图鉴完成', '新枪获得'}
+    assert {s['name'] for s in rendered['chart']['series']} == {'新鱼种', '新变异组合', '正常图鉴完成', '新枪获得', '进入新鱼池'}
     tips = '\n'.join(rendered['tips'])
     assert '鱼种 102' in tips and '变异 2' in tips and '新鱼种 / 新变异组合' in tips
     assert '新枪获得' in tips
+    assert 'FishRandomPool 2' in tips and '洗脚大盆' in tips
+    assert '力量 &gt; 50' in tips and '观察力量 51' in tips

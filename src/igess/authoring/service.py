@@ -30,7 +30,7 @@ from ..linter import ConfigLinter
 from ..loader import ConfigLoader
 from ..outputs import OutputWriter
 from ..reporting.static import generate_static_report
-from ..run_registry import RunRecord, RunRegistry
+from ..run_registry import RunRecord, RunRegistry, RunTimer
 from ..simulator import Simulator
 from .change import ModelChange, parse_change_text
 from .change_records import ChangeRecordStore
@@ -440,6 +440,7 @@ class AuthoringService:
         project_root: str | os.PathLike[str] | None = None,
         *,
         checkpoint_input: str | os.PathLike[str] | None = None,
+        resume_run_id: str | None = None,
         until_seconds: int | None = None,
         overrides: Sequence[str] = (),
         profile_id: str | None = None,
@@ -449,6 +450,8 @@ class AuthoringService:
         warnings: Sequence[Mapping[str, object]] = ()
         phase = "recovery"
         try:
+            if checkpoint_input is not None and resume_run_id is not None:
+                raise ValueError("Choose either checkpoint_input or resume_run_id")
             recovery_context = self._recovery_context(project_root)
             with self._lock_factory(recovery_context, True):
                 warnings = _warning_sequence(
@@ -458,6 +461,8 @@ class AuthoringService:
             with self._shared_snapshot_factory(recovery_context, warnings):
                 phase = "project"
                 project = self._project_factory(recovery_context.root)
+                if resume_run_id is not None:
+                    checkpoint_input = self._registry_factory(project).checkpoint_for_run(resume_run_id)
                 response = self._simulate_shared(
                     project,
                     scenario_id,
@@ -593,6 +598,7 @@ class AuthoringService:
                 )
                 run_id = run_destination.name
                 phase = "smoke"
+                smoke_timer = RunTimer()
                 probe = self._probe_runner(model, "smoke", transaction.staged_run_dir)
                 phase = "artifact"
                 self._stage_smoke_record(
@@ -600,6 +606,7 @@ class AuthoringService:
                     run_destination,
                     change_id,
                     post_digest,
+                    smoke_timer,
                 )
                 status = replace(status, latest_smoke_run_id=run_id)
                 smoke = {
@@ -752,6 +759,7 @@ class AuthoringService:
         destination: Path,
         change_id: str,
         model_digest: str,
+        timer: RunTimer,
     ) -> None:
         staged = transaction.staged_run_dir
         probe_output = staged / "run"
@@ -788,6 +796,7 @@ class AuthoringService:
                 "kind": "smoke",
                 "change_id": change_id,
                 "model_digest": model_digest,
+                **timer.finish(),
             }
             (staged / "run_status.json").write_text(
                 json.dumps(

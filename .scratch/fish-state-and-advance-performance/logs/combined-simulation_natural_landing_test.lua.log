@@ -1,4 +1,0 @@
-[Warning][RankingProgressRecorder] stage=progress_rejected source=fish_throw_complete rankId=6 code=ranking_config_manager_unavailable detail=nil
-[Warning][RankingProgressRecorder] stage=progress_rejected source=fish_throw_complete rankId=6 code=ranking_config_manager_unavailable detail=nil
-[Warning][RankingProgressRecorder] stage=progress_rejected source=fish_sell rankId=4 code=ranking_config_manager_unavailable detail=nil
-simulation_natural_landing_test passed

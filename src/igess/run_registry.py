@@ -2,13 +2,16 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import re
 import secrets
 import stat
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterable, Literal
+from time import monotonic
 
 
 RunKind = Literal["smoke", "formal", "advice"]
@@ -45,6 +48,72 @@ class RunRecord:
     change_id: str | None = None
     model_digest: str | None = None
     engine_id: str | None = None
+    started_at: str | None = None
+    finished_at: str | None = None
+    duration_seconds: float | None = None
+
+
+@dataclass(frozen=True)
+class RunTimer:
+    """Measure real execution time, independently of simulated time."""
+
+    started_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    _started: float = field(default_factory=lambda: monotonic())
+
+    def finish(self) -> dict[str, Any]:
+        return {
+            "started_at": self.started_at,
+            "finished_at": datetime.now(timezone.utc).isoformat(),
+            "duration_seconds": max(0.0, monotonic() - self._started),
+        }
+
+
+def _timing_timestamp(value: object) -> str | None:
+    if isinstance(value, str):
+        try:
+            if datetime.fromisoformat(value).utcoffset() is not None:
+                return value
+        except ValueError:
+            pass
+    return None
+
+
+def _timing_duration(value: object) -> float | None:
+    if type(value) in (int, float):
+        try:
+            if math.isfinite(value) and value >= 0:
+                return float(value)
+        except OverflowError:
+            pass
+    return None
+
+
+def format_run_duration(record: object, *, missing: str = "Not recorded", running: str = "Running…") -> str:
+    seconds = getattr(record, "duration_seconds", None)
+    if seconds is None:
+        return running if getattr(record, "status", None) == "running" else missing
+    if seconds < 1:
+        return "<1 s"
+    seconds = int(seconds)
+    hours, remainder = divmod(seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    if hours:
+        return f"{hours} h {minutes} min {seconds} s"
+    if minutes:
+        return f"{minutes} min {seconds} s"
+    return f"{seconds} s"
+
+
+@dataclass(frozen=True)
+class HistoryCleanupPreview:
+    count: int
+    digest: str
+
+
+@dataclass(frozen=True)
+class HistoryCleanupResult:
+    deleted: int
+    retained: int
 
 
 @dataclass(frozen=True)
@@ -129,6 +198,7 @@ class RunRegistry:
         if read_roots is not None:
             roots.extend(Path(root) for root in read_roots)
         self.read_roots = tuple(_deduplicate_roots(roots))
+        self._timers: dict[Path, RunTimer] = {}
 
     def new_run_dir(
         self,
@@ -225,8 +295,51 @@ class RunRegistry:
             payload["engine_id"] = engine_id
 
         status_path = run_dir / "run_status.json"
+        timer_key = run_dir.resolve()
+        previous = (
+            self._load_bound_record(self.runs_root, run_dir).record
+            if os.path.lexists(status_path) else None
+        )
+        timing = {
+            "started_at": previous.started_at if previous else None,
+            "finished_at": previous.finished_at if previous else None,
+            "duration_seconds": previous.duration_seconds if previous else None,
+        }
+        timer = self._timers.get(timer_key)
+        finished = status in {"success", "failed"} or (
+            kind == "advice" and status in {"ok", "needs_attention"}
+        )
+        if status == "running" and previous is None:
+            timer = RunTimer()
+            timing["started_at"] = timer.started_at
+        elif finished and previous and previous.status == "running":
+            if timer is not None:
+                timing = timer.finish()
+            elif previous.started_at is not None:
+                # A different registry/process may finish a persisted running record.
+                finished_at = datetime.now(timezone.utc)
+                timing["finished_at"] = finished_at.isoformat()
+                timing["duration_seconds"] = max(
+                    0.0, (finished_at - datetime.fromisoformat(previous.started_at)).total_seconds(),
+                )
+        payload.update(timing)
         _atomic_write_status(self.runs_root, run_dir, payload)
+        if status == "running" and timer is not None:
+            self._timers[timer_key] = timer
+        elif finished:
+            self._timers.pop(timer_key, None)
         return self._load_bound_record(self.runs_root, run_dir).record
+
+    def checkpoint_for_run(self, run_id: str) -> Path:
+        """Resolve a successful registered run, never an arbitrary input path."""
+        record = next((item for item in self.list_runs() if item.run_id == run_id), None)
+        if record is None or record.status != "success":
+            raise ValueError("Choose a successful run from this project's history")
+        checkpoint = record.run_dir / "output" / "final_checkpoint.json"
+        if (not checkpoint.is_file()
+                or not checkpoint.resolve().is_relative_to(record.run_dir.resolve())):
+            raise ValueError("The selected run has no available checkpoint")
+        return checkpoint
 
     def list_runs(self) -> list[RunRecord]:
         records: dict[str, RunRecord] = {}
@@ -249,6 +362,120 @@ class RunRegistry:
         """Return the newest automatic smoke record across readable roots."""
 
         return self.latest(kind="smoke")
+
+    def preview_history_cleanup(self) -> HistoryCleanupPreview:
+        """Describe an explicit cleanup across all configured history roots."""
+
+        return self._cleanup_preview(
+            self._history_cleanup_candidates(), self._pending_history_cleanup(),
+        )
+
+    def _run_deletion_groups(self) -> dict[str, list[tuple[Path, _BoundRunRecord]]]:
+        groups: dict[str, list[tuple[Path, _BoundRunRecord]]] = {}
+        for root in self.read_roots:
+            for bound in self._bound_records_from_root(root):
+                groups.setdefault(bound.record.run_id, []).append((root, bound))
+        return groups
+
+    def preview_run_deletions(self) -> dict[str, HistoryCleanupPreview]:
+        return {
+            run_id: self._cleanup_preview(candidates, [])
+            for run_id, candidates in self._run_deletion_groups().items()
+            if all(bound.record.status in {"success", "failed"} for _, bound in candidates)
+        }
+
+    def delete_run(self, run_id: str, expected_digest: str) -> HistoryCleanupResult:
+        """Delete the confirmed Run ID, including its registered legacy copies."""
+        _require_component(run_id, "run_id")
+        candidates = self._run_deletion_groups().get(run_id, [])
+        if not candidates or any(
+            bound.record.status not in {"success", "failed"} for _, bound in candidates
+        ):
+            raise ValueError("Run is missing or not completed. Refresh the history.")
+        preview = self._cleanup_preview(candidates, [])
+        if not secrets.compare_digest(preview.digest, expected_digest):
+            raise ValueError("Run changed. Refresh and confirm the deletion again.")
+        deleted = 0
+        for root, bound in candidates:
+            registry = RunRegistry(root)
+            recovery = registry._recover_run_trash(run_id=run_id)
+            if run_id not in recovery.protected_live_run_ids:
+                deleted += registry._quarantine_and_delete_run(
+                    bound, completed_only=True, recovery_run_id=run_id,
+                )
+        return HistoryCleanupResult(deleted, preview.count - deleted)
+
+    def clear_history(self, expected_digest: str) -> HistoryCleanupResult:
+        """Delete only the completed records covered by the user's preview.
+
+        Unlike automatic retention, this explicit action includes legacy roots.
+        Running, unknown, malformed and unregistered directories are preserved.
+        """
+
+        candidates = self._history_cleanup_candidates()
+        pending = self._pending_history_cleanup()
+        preview = self._cleanup_preview(candidates, pending)
+        if not secrets.compare_digest(preview.digest, expected_digest):
+            raise ValueError("History changed. Refresh and confirm the cleanup again.")
+        recoveries = {root: RunRegistry(root)._recover_run_trash() for root in self.read_roots}
+        deleted = sum(
+            manifest.run_id in recoveries[root].deleted_run_ids
+            for root, manifest in pending
+        ) + sum(
+            bound.record.run_id not in recoveries[root].protected_live_run_ids
+            and RunRegistry(root)._quarantine_and_delete_run(bound, completed_only=True)
+            for root, bound in candidates
+        )
+        return HistoryCleanupResult(deleted, preview.count - deleted)
+
+    def _history_cleanup_candidates(self) -> list[tuple[Path, _BoundRunRecord]]:
+        return [
+            (root, bound)
+            for root in self.read_roots
+            for bound in self._bound_records_from_root(root)
+            if bound.record.status in {"success", "failed"}
+        ]
+
+    def _pending_history_cleanup(self) -> list[tuple[Path, _TombstoneManifest]]:
+        pending = []
+        for root in self.read_roots:
+            trash = root / _TRASH_NAME
+            for path in _strict_tombstone_manifests(trash):
+                try:
+                    manifest = _read_tombstone_manifest(root, trash, path)
+                    identity = _snapshot_owned_run_dir(trash, trash / manifest.tombstone)
+                    if (
+                        manifest.status_payload.get("status") in {"success", "failed"}
+                        and _manifest_matches_directory(manifest, identity)
+                    ):
+                        pending.append((root, manifest))
+                except (OSError, RuntimeError, UnicodeError, ValueError, TypeError):
+                    continue
+        return pending
+
+    @staticmethod
+    def _cleanup_preview(
+        candidates: list[tuple[Path, _BoundRunRecord]],
+        pending: list[tuple[Path, _TombstoneManifest]],
+    ) -> HistoryCleanupPreview:
+        payload = [
+            (
+                os.path.abspath(root),
+                bound.loaded.directory_identity.st_dev,
+                bound.loaded.directory_identity.st_ino,
+                _stat_signature(bound.loaded.status_identity),
+                bound.loaded.payload,
+            )
+            for root, bound in candidates
+        ]
+        pending_payload = [
+            (os.path.abspath(root), manifest.tombstone, _stat_signature(manifest.file_identity))
+            for root, manifest in pending
+        ]
+        digest = hashlib.sha256(
+            json.dumps((payload, pending_payload), sort_keys=True, ensure_ascii=False).encode("utf-8")
+        ).hexdigest()
+        return HistoryCleanupPreview(len(candidates) + len(pending), digest)
 
     def prune_smoke(self, keep: int = 20) -> list[str]:
         """Delete old automatic smoke runs from the modern registry only."""
@@ -350,9 +577,20 @@ class RunRegistry:
             change_id=change_id,
             model_digest=model_digest,
             engine_id=engine_id,
+            started_at=_timing_timestamp(payload.get("started_at")),
+            finished_at=_timing_timestamp(payload.get("finished_at")),
+            duration_seconds=_timing_duration(payload.get("duration_seconds")),
         )
 
     def _quarantine_and_delete_smoke(self, original: _BoundRunRecord) -> bool:
+        if original.record.kind != "smoke":
+            return False
+        return self._quarantine_and_delete_run(original)
+
+    def _quarantine_and_delete_run(
+        self, original: _BoundRunRecord, *, completed_only: bool = False,
+        recovery_run_id: str | None = None,
+    ) -> bool:
         record = original.record
         destination: Path | None = None
         manifest_path: Path | None = None
@@ -363,7 +601,11 @@ class RunRegistry:
             current = self._load_bound_record(self.runs_root, record.run_dir)
             if (
                 current.record.run_id != record.run_id
-                or current.record.kind != "smoke"
+                or current.record.kind != record.kind
+                or (completed_only and current.record.status not in {"success", "failed"})
+                or current.loaded.payload != original.loaded.payload
+                or _stat_signature(current.loaded.status_identity)
+                != _stat_signature(original.loaded.status_identity)
                 or not os.path.samestat(
                     original.loaded.directory_identity,
                     current.loaded.directory_identity,
@@ -435,8 +677,8 @@ class RunRegistry:
                 quarantined.payload,
                 expected_run_id=record.run_id,
             )
-            if metadata[2] != "smoke":
-                raise ValueError("quarantined run is not a smoke record")
+            if metadata[2] != record.kind:
+                raise ValueError("quarantined run kind changed")
             if (
                 not os.path.samestat(
                     current.loaded.status_identity,
@@ -493,10 +735,10 @@ class RunRegistry:
             return False
         finally:
             if moved and destination is not None:
-                self._recover_run_trash()
+                self._recover_run_trash(run_id=recovery_run_id)
 
-    def _recover_run_trash(self) -> _TrashRecovery:
-        return _recover_run_trash(self.runs_root)
+    def _recover_run_trash(self, *, run_id: str | None = None) -> _TrashRecovery:
+        return _recover_run_trash(self.runs_root, run_id=run_id)
 
 
 def _parse_run_metadata(
@@ -901,8 +1143,8 @@ def _write_tombstone_manifest(
         raise ValueError("tombstone must not exist before its manifest is written")
     run_id = _stored_run_id(loaded.payload)
     metadata = _parse_run_metadata(loaded.payload, expected_run_id=run_id)
-    if metadata[2] != "smoke":
-        raise ValueError("only smoke tombstones can have deletion manifests")
+    if metadata[2] != "smoke" and loaded.payload.get("status") not in {"success", "failed"}:
+        raise ValueError("only completed runs can have manual deletion manifests")
     _validate_manifest_status_payload(loaded.payload, run_id)
     entries_by_path = {entry.path: entry for entry in entries}
     if len(entries_by_path) != len(entries):
@@ -1104,8 +1346,6 @@ def _read_tombstone_manifest(
     kind_value = document["kind"]
     _require_kind(kind_value)
     kind: RunKind = kind_value
-    if kind != "smoke":
-        raise ValueError("tombstone manifest is not for a smoke run")
     directory_identity = document["directory_identity"]
     if (
         not isinstance(directory_identity, dict)
@@ -1119,6 +1359,8 @@ def _read_tombstone_manifest(
     status_payload = document["status"]
     if not isinstance(status_payload, dict):
         raise ValueError("tombstone manifest status must be an object")
+    if kind != "smoke" and status_payload.get("status") not in {"success", "failed"}:
+        raise ValueError("manual deletion manifest is not for a completed run")
     _validate_manifest_status_payload(status_payload, run_id)
     metadata = _parse_run_metadata(status_payload, expected_run_id=run_id)
     if metadata[2] != kind:
@@ -2069,7 +2311,7 @@ def _new_tombstone_name() -> str:
     return f"tomb-{secrets.token_hex(16)}"
 
 
-def _recover_run_trash(root: Path) -> _TrashRecovery:
+def _recover_run_trash(root: Path, *, run_id: str | None = None) -> _TrashRecovery:
     trash = root / _TRASH_NAME
     try:
         if not _path_exists_or_link(trash):
@@ -2083,14 +2325,15 @@ def _recover_run_trash(root: Path) -> _TrashRecovery:
     protected_tombstones: set[str] = set()
     protected_live_run_ids: set[str] = set()
     for manifest_path in _strict_tombstone_manifests(trash):
-        run_id, protected_tombstone, protected_live_run_id = _recover_one_manifest(
+        deleted_run_id, protected_tombstone, protected_live_run_id = _recover_one_manifest(
             root,
             trash,
             trash_identity,
             manifest_path,
+            only_run_id=run_id,
         )
-        if run_id is not None and run_id not in deleted:
-            deleted.append(run_id)
+        if deleted_run_id is not None and deleted_run_id not in deleted:
+            deleted.append(deleted_run_id)
         if protected_tombstone is not None:
             protected_tombstones.add(protected_tombstone)
         if protected_live_run_id is not None:
@@ -2102,7 +2345,7 @@ def _recover_run_trash(root: Path) -> _TrashRecovery:
         for tombstone in _strict_tombstones(trash):
             if tombstone.name in protected_tombstones:
                 continue
-            if _recover_one_tombstone(root, trash, trash_identity, tombstone):
+            if _recover_one_tombstone(root, trash, trash_identity, tombstone, only_run_id=run_id):
                 progress = True
         if not progress:
             break
@@ -2137,11 +2380,15 @@ def _recover_one_manifest(
     trash: Path,
     trash_identity: os.stat_result,
     manifest_path: Path,
+    *,
+    only_run_id: str | None = None,
 ) -> tuple[str | None, str | None, str | None]:
     try:
         if not _directory_identity_matches(root, trash, trash_identity):
             return None, None, None
         manifest = _read_tombstone_manifest(root, trash, manifest_path)
+        if only_run_id is not None and manifest.run_id != only_run_id:
+            return None, None, None
         if not os.path.samestat(manifest.file_identity, manifest_path.lstat()):
             return None, None, None
         tombstone = trash / manifest.tombstone
@@ -2200,6 +2447,8 @@ def _recover_one_tombstone(
     trash: Path,
     trash_identity: os.stat_result,
     tombstone: Path,
+    *,
+    only_run_id: str | None = None,
 ) -> bool:
     displaced: Path | None = None
     try:
@@ -2210,6 +2459,8 @@ def _recover_one_tombstone(
             loaded.payload,
             expected_run_id=_stored_run_id(loaded.payload),
         )
+        if only_run_id is not None and run_id != only_run_id:
+            return False
         desired = root / run_id
         if not _path_exists_or_link(desired):
             return _move_tombstone_to_run(

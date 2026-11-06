@@ -21,6 +21,8 @@ _SCENARIO_LABELS = {
     "day_5_growth": "前5天成长",
     "day_6_growth": "前6天成长",
     "week_1_growth": "首周成长",
+    "week_2_growth": "前2周成长",
+    "week_3_growth": "前3周成长",
     "month_1_growth": "首月成长",
 }
 

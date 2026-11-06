@@ -129,6 +129,9 @@ def test_breakthrough_requires_source_prerequisites(locked):
 
 
 def growth_project(tmp_path, monkeypatch):
+    # Isolate existing growth/wallet guards and paid lifecycle from the daily
+    # income guard, which has a separate real-source integration suite.
+    monkeypatch.setattr(GrowthTideBudget, 'skip_daily', lambda self, quote: None)
     s = archive("""
 s.wallet.material={sign=1,coeff='232',exp=1}
 s.combat.ownedGunIds={10001};s.combat.equippedGunId=10001;s.combat.lastSelectedGunId=10001

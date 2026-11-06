@@ -59,6 +59,8 @@ def test_workflow_report_failure_keeps_outputs_and_records_diagnostic(
     record = workflow.run_scenario(CONFIG, TABLES, "analytic_smoke")
 
     assert record.status == "failed"
+    assert record.duration_seconds is not None and record.duration_seconds >= 0
+    assert record.started_at and record.finished_at
     assert (record.output_dir / "timeline.json").is_file()
     assert (record.output_dir / "run_manifest.json").is_file()
     diagnostic = tmp_path / ".igess/diagnostics" / f"{record.run_id}.json"

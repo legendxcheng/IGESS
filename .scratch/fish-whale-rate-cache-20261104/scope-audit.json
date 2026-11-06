@@ -1,8 +1,0 @@
-{
-  "modified_existing_source_files": [
-    "simulation/README.md",
-    "proj/Script/Domain/Fishing/FishEconomyRules.lua",
-    "proj/Script/Domain/Fishing/FishProductionPolicy.lua"
-  ],
-  "no_other_frozen_source_changes": true
-}

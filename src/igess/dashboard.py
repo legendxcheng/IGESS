@@ -15,8 +15,9 @@ from time import monotonic
 from urllib.parse import parse_qs, unquote, urlparse
 
 from .dashboard_ui import dashboard_shell, restart_controls
-from .dashboard_tasks import DashboardTaskRunner
 from .dashboard_projects import discover_dashboard_projects
+from .dashboard_tasks import DashboardTaskRunner
+from .run_registry import format_run_duration
 from .authoring.project import AuthoringProject
 from .authoring.response import CommandResponse
 from .workflows import WorkflowService, _read_bounded_relative_file
@@ -26,7 +27,7 @@ _SAMPLE_CONFIG = "examples/shelldiver_v0/economy.yaml"
 _SAMPLE_TABLES = "examples/shelldiver_v0/luban_exports"
 _MAX_FORM_BYTES = 64 * 1024
 _MAX_REPORT_BYTES = 32 * 1024 * 1024
-_MUTATION_PATHS = frozenset({"/smoke", "/formal", "/run", "/advise", "/refresh"})
+_MUTATION_PATHS = frozenset({"/smoke", "/formal", "/run", "/advise", "/refresh", "/clear-history", "/delete-run"})
 
 
 def create_dashboard_context(
@@ -192,7 +193,7 @@ def _authoring_content(
 
       </div>
     </section>
-    {_history_panel(runs)}
+    {_history_panel(runs, service, csrf_token)}
     <section data-view="advice">
       <h2>Latest advice</h2>
       <p class="hint">Analyze a scenario and review recommendations before changing your tables.</p>
@@ -260,25 +261,42 @@ def _legacy_content(
       </form>
       {_advice_panel(advice)}
     </section>
-    {_history_panel(runs)}"""
+    {_history_panel(runs, service, csrf_token)}"""
 
 
-def _history_panel(runs: Sequence[object]) -> str:
+def _history_panel(runs: Sequence[object], service: WorkflowService, csrf_token: str) -> str:
+    cleanup = service.preview_history_cleanup()
+    deletions = service.preview_run_deletions()
+    disabled = 'disabled data-empty-history' if cleanup.count == 0 else ''
+
+    def delete_button(record: object) -> str:
+        run_id = getattr(record, 'run_id', '')
+        preview = deletions.get(run_id)
+        attributes = (
+            f'data-run-digest="{_e(preview.digest)}" data-run-copies="{preview.count}"'
+            if preview else 'disabled data-unavailable title="Only completed, safely registered runs can be deleted."'
+        )
+        return (
+            f'<td><button type="button" class="danger" data-delete-run="{_e(run_id)}" '
+            f'data-mutation aria-label="Delete run {_e(run_id)}" {attributes}>Delete…</button></td>'
+        )
+
     rows = "\n".join(
         f'<tr data-run data-status="{_e(getattr(record, "status", ""))}" data-kind="{_e(getattr(record, "kind", "formal"))}">'
         f"<td><code>{_e(getattr(record, 'run_id', ''))}</code></td>"
         f"<td>{_e(getattr(record, 'scenario_id', ''))}</td>"
         f"<td><span class=\"kind kind-{_e(getattr(record, 'kind', 'formal'))}\">{_e(getattr(record, 'kind', 'formal'))}</span></td>"
         f'<td><span class="state-badge {_e(getattr(record, "status", ""))}">{_e(getattr(record, "status", ""))}</span></td>'
+        f'<td class="run-duration">{_e(format_run_duration(record))}</td>'
         f"<td>{_e(getattr(record, 'message', ''))}</td>"
-        f"<td><a href=\"/reports/{_e(getattr(record, 'run_id', ''))}/index.html\">report</a>"
+        f"<td><a data-report-link href=\"/reports/{_e(getattr(record, 'run_id', ''))}/index.html\">report</a>"
         + (f" · <a href=\"/diagnostics/{_e(getattr(record, 'run_id', ''))}\">diagnostic</a>" if getattr(record, 'status', '') == 'failed' else '')
         + "</td>"
-        "</tr>"
+        + delete_button(record) + "</tr>"
         for record in sorted(runs, key=lambda item: getattr(item, 'run_id', ''), reverse=True)
     )
     if not rows:
-        rows = '<tr><td colspan="6" class="empty-state"><strong>No runs yet.</strong>Choose a scenario above to create your first run.</td></tr>'
+        rows = '<tr><td colspan="8" class="empty-state"><strong>No runs yet.</strong>Choose a scenario above to create your first run.</td></tr>'
     return f"""    <section data-view="runs">
       <h2>Unified run history</h2>
       <p class="hint">Newest first · Formal runs, automatic smoke and advice share this history.</p>
@@ -290,12 +308,47 @@ def _history_panel(runs: Sequence[object]) -> str:
       </div>
       <p id="history-count" class="hint" role="status">{len(runs)} runs</p>
       <div class="table-scroll" role="region" aria-label="Run history" tabindex="0"><table>
-        <thead><tr><th>Run</th><th>Scenario</th><th>Kind</th><th>Status</th><th>Message</th><th>Report</th></tr></thead>
+        <thead><tr><th>Run</th><th>Scenario</th><th>Kind</th><th>Status</th><th>Duration</th><th>Message</th><th>Report</th><th>Actions</th></tr></thead>
         <tbody>
 {rows}
         </tbody>
       </table></div>
       <p id="history-no-match" class="empty-state" hidden>No matching runs. Try a different search or clear the filters.</p>
+      <dialog id="delete-run-dialog" aria-labelledby="delete-run-title">
+        <h2 id="delete-run-title">Delete this run?</h2>
+        <p>Project: <strong>{_e(service.project_root)}</strong></p>
+        <p>Run: <code id="delete-run-name"></code></p>
+        <p>Permanently delete this run's reports and simulation outputs, including <strong id="delete-run-copies"></strong> stored copies across current and legacy history. This cannot be undone.</p>
+        <form action="/delete-run" method="post">
+          {_csrf_input(csrf_token)}
+          <input type="hidden" name="run_id">
+          <input type="hidden" name="run_digest">
+          <input type="hidden" name="confirm" value="delete">
+          <div class="dialog-actions">
+            <button type="button" id="cancel-delete-run" autofocus>Cancel</button>
+            <button type="submit" class="danger">Delete run</button>
+          </div>
+        </form>
+      </dialog>
+      <div class="history-cleanup">
+        <p class="hint">Clear completed runs and reports for this project, including legacy history. Search and filters do not limit this action.</p>
+        <button type="button" id="clear-history" class="danger" data-mutation {disabled}>Clear history…</button>
+      </div>
+      <dialog id="clear-history-dialog" aria-labelledby="clear-history-title">
+        <h2 id="clear-history-title">Clear this project's history?</h2>
+        <p>Project: <strong>{_e(service.project_root)}</strong></p>
+        <p>Permanently delete <strong>{cleanup.count}</strong> completed stored runs (formal, smoke and advice), including their reports and simulation outputs.</p>
+        <p class="hint">Includes legacy history and ignores search and filters. Running or unknown records, model inputs and change audits are kept. This cannot be undone.</p>
+        <form action="/clear-history" method="post">
+          {_csrf_input(csrf_token)}
+          <input type="hidden" name="history_digest" value="{_e(cleanup.digest)}">
+          <input type="hidden" name="confirm" value="clear">
+          <div class="dialog-actions">
+            <button type="button" id="cancel-clear-history" autofocus>Cancel</button>
+            <button type="submit" class="danger" {disabled}>Delete {cleanup.count} completed runs</button>
+          </div>
+        </form>
+      </dialog>
     </section>"""
 
 
@@ -322,7 +375,7 @@ def _latest_smoke_panel(run_id: object, runs: Sequence[object]) -> str:
         return f"<h3>Latest smoke</h3><p><code>{_e(run_id)}</code></p>"
     return (
         "<h3>Latest smoke</h3>"
-        f"<p><a href=\"/reports/{_e(run_id)}/index.html\"><code>{_e(run_id)}</code></a> "
+        f"<p><a data-report-link href=\"/reports/{_e(run_id)}/index.html\"><code>{_e(run_id)}</code></a> "
         f"— {_e(getattr(record, 'status', ''))}: {_e(getattr(record, 'message', ''))}</p>"
     )
 
@@ -342,7 +395,6 @@ def serve_dashboard(
 
     supervise_dashboard(project=project, config=config, tables=tables,
                         runs_root=runs_root, host=host, port=port)
-
 
 
 def _serve_dashboard_worker(*, project, config, tables, runs_root, host, port):
@@ -449,25 +501,33 @@ class _DashboardRuntime:
         if pending:
             self._refresh()
 
-    def submit(self, path, scenario, *, resume_run_id=None):
+    def submit(self, path, scenario, *, history_digest=None, run_id=None, resume_run_id=None):
         if not self.guard.acquire(blocking=False):
             return False
         with self.lock:
             self.started = monotonic()
-            message = "Task accepted; executing workflow (including any project lock wait)."
+            message = "Deleting confirmed run…" if path == "/delete-run" else "Clearing confirmed history…" if path == "/clear-history" else "Task accepted; executing workflow (including any project lock wait)."
             self.task = {"state": "running", "message": message,
                          "scenario": scenario, "action": path}
         try:
-            self._start_worker(self._execute, path, scenario, resume_run_id)
+            self._start_worker(self._execute, path, scenario, history_digest, run_id, resume_run_id)
         except Exception as error:
             with self.lock:
                 self.task = {"state": "failed", "message": str(error)}
             self.guard.release()
         return True
 
-    def _execute(self, path, scenario, resume_run_id=None):
+    def _execute(self, path, scenario, history_digest=None, run_id=None, resume_run_id=None):
         outcome = {"state": "failed", "message": "Worker interrupted; check run history before retrying."}
         try:
+            if path == "/delete-run":
+                result = self.service.delete_run(run_id, history_digest)
+                outcome = {"state": "success" if result.ok else "failed", "message": result.message}
+                return
+            if path == "/clear-history":
+                result = self.service.clear_history(history_digest)
+                outcome = {"state": "success" if result.ok else "failed", "message": result.message}
+                return
             options = {"resume_run_id": resume_run_id} if resume_run_id else {}
             outcome = self.task_runner.run("advise" if path == "/advise" else "simulate", scenario, **options)
             diagnostic_id = outcome.get("diagnostic", {}).get("details", {}).get("diagnostic_id")
@@ -510,7 +570,7 @@ class _DashboardRuntime:
         if task.get("log_warning"):
             panel += '<p>' + _e(task["log_warning"]) + '</p>'
         if task.get("state") == "success" and task.get("run_id"):
-            panel += '<p><a href="/reports/' + _e(task['run_id']) + '/index.html">Open completed report</a></p>'
+            panel += '<p><a data-report-link href="/reports/' + _e(task['run_id']) + '/index.html">Open completed report</a></p>'
         panel += '</section>'
         script = """<script>
 const revision = REVISION;
@@ -658,7 +718,7 @@ def _handler(
                 return page
             # Only known application routes are mounted; report-relative assets
             # keep resolving within their own project-qualified report directory.
-            for route in ("status", "task", "reports/", "diagnostics/", "refresh", "smoke", "formal", "run", "advise"):
+            for route in ("status", "task", "reports/", "diagnostics/", "refresh", "smoke", "formal", "run", "advise", "clear-history", "delete-run"):
                 page = page.replace('href="/' + route, 'href="' + self.prefix + '/' + route)
                 page = page.replace('action="/' + route, 'action="' + self.prefix + '/' + route)
             page = page.replace("fetch('/task'", "fetch('" + self.prefix + "/task'")
@@ -799,6 +859,24 @@ def _handler(
                     self.runtime.refresh()
                 self.send_response(HTTPStatus.SEE_OTHER)
                 self.send_header("Location", self.prefix + "/")
+                self.end_headers()
+                return
+            if parsed.path in {"/clear-history", "/delete-run"}:
+                single = parsed.path == "/delete-run"
+                digest = form.get("run_digest" if single else "history_digest", [""])[0]
+                run_id = form.get("run_id", [""])[0] if single else None
+                if (
+                    form.get("confirm", [""])[0] != ("delete" if single else "clear")
+                    or re.fullmatch(r"[0-9a-f]{64}", digest) is None
+                    or (single and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,127}", run_id) is None)
+                ):
+                    self.send_error(HTTPStatus.BAD_REQUEST, "Confirm a history cleanup preview first")
+                    return
+                if not self._submit(parsed.path, "", history_digest=digest, run_id=run_id):
+                    self.send_error(HTTPStatus.TOO_MANY_REQUESTS)
+                    return
+                self.send_response(HTTPStatus.SEE_OTHER)
+                self.send_header("Location", self.prefix + "/#runs")
                 self.end_headers()
                 return
             scenario = "smoke" if parsed.path == "/smoke" else form.get("scenario", ["day_1_progression"])[0]

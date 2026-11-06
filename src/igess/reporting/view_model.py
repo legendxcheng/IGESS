@@ -21,6 +21,7 @@ def build_report_view_model(data: ReportData) -> dict[str, Any]:
             str(resource_id)
             for row in data.timeline
             for resource_id in dict(row.get("resources", {}))
+            if source is None or resource_id != "trash_realm"
         }
     )
     return {
@@ -111,6 +112,7 @@ def _overview(data: ReportData, resource_ids: list[str], source: dict[str, Any] 
         profile_id: {
             resource_id: chart_point(value)
             for resource_id, value in resources.items()
+            if source is None or resource_id in resource_ids
         }
         for profile_id, resources in exact["final_resources"].items()
     }
@@ -274,6 +276,7 @@ def _source_fish_progression(source: dict[str, Any]) -> dict[str, Any]:
         sessions = source["persistent"]["profiles"][profile_id]["sessions"]
         days, weeks = _source_periods(profile["rows"], sessions)
         profile.update({"days": days, "weeks": weeks,
+                        "pool_coverage": source["persistent"]["profiles"][profile_id]["pool_coverage"],
                         "collection_coverage": source["persistent"]["profiles"][profile_id]["collection_coverage"]})
     investment = {}
     for profile_id, values in source["investment"].items():

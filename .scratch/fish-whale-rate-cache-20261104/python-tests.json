@@ -1,8 +1,0 @@
-{
-  "command": "uv run --extra dev python -m pytest tests/test_fish_source_whale.py tests/test_fish_source_sales.py tests/test_fish_source_formal.py tests/test_fish_tide_ammunition.py -q",
-  "exit_code": 0,
-  "passed": 38,
-  "skipped": 0,
-  "seconds": 349.89,
-  "output": "38 passed in 349.89s (0:05:49)"
-}

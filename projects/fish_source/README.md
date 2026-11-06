@@ -2,7 +2,23 @@
 
 此项目通过 IGESS 正式入口运行 Fish 源项目的 Lua 业务服务，无需 DS。自 2026-10-14 起，这是 Fish 唯一在用的模拟项目；新规则、调优、正式运行与报告均在此维护。`projects/fish` Python 后端停用，保留历史代码与报告，不再作为新运行或比较基线。当前进度与待办见 [RoadMap.md](RoadMap.md)。
 
+免费、付费及不同玩家策略的历史报表统一登记在 [模拟报表记录](docs/simulation-reports.md)，保留固定运行 ID、输入身份、关键指标与比较口径。
+
+## 大 R 初始购买场景
+
+`month_1_whale` 为 28 天、每天在线 2 小时，`smoke_whale` 为 600 秒验证。开局拥有最强配置付费枪、29 只青龙和全部在售永久特权；具体源规则、上阵策略与比较限制见 [大 R 场景](docs/whale-scenario.md)。提交仍使用 Dashboard，正式完成后再登记报表。
+
 神兽同种倍率及精确参照产出乘积由源规则作有界缓存，依赖完整大数、数量及配置；动态结算照旧。大 R 上阵与卖鱼在同一次决策中复用动作报价，不增加或删减业务行动。缓存不写入存档，旧源码／适配器身份的 checkpoint 仍拒绝跨版本恢复。维护边界和专项测试见源 `simulation/README.md` 的“神兽纯产出缓存”。
+
+## 开局拥有全部在售永久特权
+
+`smoke_all_permanent` 为 600 秒验证，`month_1_all_permanent` 为完整 28 天、每天在线 2 小时。两者继续使用 `default` 画像及其种子派生，基础行动权重、采样、鱼潮预算与免费场景一致。`engine.source_runtime.permanent_privileges_by_scenario` 按场景选择 `all_on_sale`；源宿主从本次冻结 `tbitemgm` 筛选 `isPrivilege=true`、非限时且 `isForSale=true` 的条目，在第 0 秒通过真实 `ItemGMService.GrantPrivilege` 建立权益。商品 ID、名称、源回执与实际 Modifier 写入 manifest 的 `source_profiles.default.permanent_privileges`。
+
+这是“购买完成后开始游戏”的数值场景，不模拟支付渠道、价格、扣费或购买意愿，不赠送其他资源、神兽、枪、药水或卡片。当前在售定义不含已停售的一键收钱和双倍力量。自动炸鱼只建立真实拥有资格，基础策略仍按现有主动投掷调度，不估算省去手动操作或与锻炼并行的便利收益；源投掷速度等数值权益仍由 Lua 结算。
+
+权益选择写入源 checkpoint 的 origin，恢复时重建同一初始权益并回放后续操作；跨权益场景拒绝续跑。免费场景不发放权益。开发接口的 `all_defined` 可用于明确要求包含停售永久定义的实验，不能当成当前可售商品组合，也不自动启用一键收钱策略。
+
+提交长跑使用 Dashboard：`python .agents/skills/fish_sim/scripts/run_dashboard.py submit --scenario month_1_all_permanent`。接入变更使旧 checkpoint 身份失效；严格评价付费差异时，需要在同一新版本重建免费基线，旧免费报表保留为历史参考。定向回归见 `tests/test_fish_source_privileges.py`。
 
 ```powershell
 uv run igess model simulate --project projects/fish_source --scenario smoke
@@ -13,6 +29,8 @@ uv run igess model simulate --project projects/fish_source --scenario day_4_grow
 uv run igess model simulate --project projects/fish_source --scenario day_5_growth
 uv run igess model simulate --project projects/fish_source --scenario day_6_growth
 uv run igess model simulate --project projects/fish_source --scenario week_1_growth
+uv run igess model simulate --project projects/fish_source --scenario week_2_growth
+uv run igess model simulate --project projects/fish_source --scenario week_3_growth
 uv run igess model simulate --project projects/fish_source --scenario month_1_growth
 ```
 
@@ -28,6 +46,25 @@ Day1～Day6 是累计场景：`day_N_growth` 默认从新玩家开始运行到�
 ```
 
 续跑加 `--resume-run-id <成功运行ID>`。交接提交回执中的网页和状态链接；`accepted` 不表示模拟成功。服务不可用时不会自动另起 CLI 或重启服务。历史库与运行参数边界见 [服务跑测说明](../../.agents/skills/fish_sim/references/dashboard-runs.md)；下面的 CLI 保留给显式独立执行及开发验证。
+
+## 按周跑测与运行 ID 接续
+
+Week1、Week2、Week3、Month1 分别累计到第 7、14、21、28 天（168、336、504、672 小时）。Month1 按四周定义；旧版 30 天报告仍保留原来的时长。以上命令不指定起点时均从新玩家开始，每天在线 2 小时。
+
+先完整跑完 Week1，使用响应中的 `result.run_id` 作为 Week2 的起点；后续每次使用刚完成的运行 ID。这里需要的是某次历史运行的 ID，而不是 `week_1_growth` 这样的场景 ID。
+
+```powershell
+uv run igess model simulate --project projects/fish_source --scenario week_1_growth --json
+uv run igess model simulate --project projects/fish_source --scenario week_2_growth --resume-run-id "<Week1运行ID>" --json
+uv run igess model simulate --project projects/fish_source --scenario week_3_growth --resume-run-id "<Week2运行ID>" --json
+uv run igess model simulate --project projects/fish_source --scenario month_1_growth --resume-run-id "<Week3运行ID>" --json
+```
+
+完整相邻周接续时每次增加 7 个自然日（每天在线 2 小时，共增加在线 14 小时）。目标场景定义绝对终点；若起点是中途截断的运行，本次会从截断点补到目标终点，不能称为恰好增加一周。
+
+用 `igess runs list --project projects/fish_source --json` 查询历史 ID。`--resume-run-id` 与 `--checkpoint-in` 互斥，只接受所选历史库中的成功运行且 checkpoint 必须存在；引擎继续校验输入兼容性。自定义 Dashboard 历史位置时，查询与模拟均加 `--runs-root "<该项目历史目录>"`，模拟的新结果也写入该目录；多项目 Dashboard 使用其项目子目录，不是历史父目录。Dashboard 中选择目标场景与历史“起点”即可完成同样的接续。
+
+本次新增场景和 Month1 时长调整会改变模型摘要；更新前生成的 checkpoint 不兼容，需要按当前配置重新跑 Week1 建立基线。接续结果只统计新增区间，完整约束见下节。
 
 ## 按天接续
 
@@ -54,9 +91,11 @@ GameBalancer 使用发布时从游戏源码编译的 `bundle/fish-runtime`，不
 
 2026-10-23 同步修复将已验收的图鉴、枪、蛋和鱼潮宿主接口接回当前游戏源码，同时使用当前游戏的关闭材料回退规则。模拟商店购买候选只包含已开放的神器，并在实际第四区入水、寻宝兽永久开放后可用；已拥有的关闭神器仍可通过源服务选择和使用。该门槛纳入报价缓存身份，解锁后立即刷新。修复及工具版本验证见 [同步修复记录](../../.scratch/fish-sync-audit-20261023/repair-verification.md)。
 
-Web 报告读取同源状态和交易回执，展示力量、双 Luck、钱包与待领金额、金币投资、杠铃购买及每日／每周成长操作。突破资助不等于突破完成；峰值仅指记录中的采样峰值。旧长场景按天采样，无法补出 5 分钟在线毛产出与精确停滞，缺失指标明确显示为未记录。可用 `igess report --run <运行目录>/output --out <运行目录>/report` 更新已有报告展示，无需重新模拟。
+Web 报告读取同源状态和交易回执，展示力量、双 Luck、钱包与待领金额、金币投资、杠铃购买及每日／每周成长操作。突破操作统一展示为“突破资助”，每次成功支付材料计一次，包含立即完成的突破；不另计突破完成，也不展示“垃圾佬境界”指标。原始状态和存档仍保留境界字段。峰值仅指记录中的采样峰值。旧长场景按天采样，无法补出 5 分钟在线毛产出与精确停滞，缺失指标明确显示为未记录。可用 `igess report --run <运行目录>/output --out <运行目录>/report` 更新已有报告展示，无需重新模拟。
 
 成长图同时纳入正常图鉴完成、新枪永久获得、新鱼种与新变异组合。新鱼种按 Fish ID 首次获得，新变异按 Fish ID＋非普通变异 ID 首次获得；首次即变异时展示两个标签，总次数只计一个收集事件，分类标签数可重叠。普通捕获与实际孵化共用永久解锁历史，卖出后重获不重计，鱼蛋入包不提前计入。领取枪、拥有枪与装备明细仍分别保留，新枪成长只按永久拥有计一次。
+
+成长图新增“进入新鱼池”：力量首次严格超过上一 FishRandomPool 的 `strengthUpperBound` 时计一个刺激点，上限相等仍属原池。按本次冻结的表保存池 ID、名称、门槛和观察力量；不要求投掷入水。初始已达池不计，跨多个新池各计一次，重生／续跑不会重计。时点是源状态首次观察达标的时间，不插值推算精确跨线秒数。新运行保存 `fish_pool_entered` 观察事件、`pool_growth` 本段基线和 checkpoint 的 `pool_milestones` 去重事实；旧报告没有这些事件时需重新模拟。
 
 新运行在 `source_profiles.collection_growth` 与行为产物中保存本段起始解锁／枪事实及冻结导表名称；checkpoint 继续时从恢复后的源状态建立基线，不重放历史成长。成长时点是源观察时点，同批多组合按稳定身份展示并注明未区分先后，不从曲线采样补造时间。旧新玩家完整事件可重生成；旧续跑缺起始历史时，新鱼种首次不推断，页面显示覆盖不完整。名称优先使用运行保存的快照名称，否则显示 ID。相邻在线时段共用边界秒时只归入后一个时段。规格与验收见[收集成长点](../../.scratch/fish-collection-growth-points/spec.md)。
 
@@ -87,7 +126,7 @@ IGESS 对源状态变化和成功回执做收入统计：加回消费，抵消�
 
 领取批次跨实际下线或鱼潮后继续；距离下线／鱼潮边界不足 2 秒时等待边界，保留未领取槽位。运行截断则保留剩余批次与当前动作剩余耗时，恢复不重复提交已尝试槽位。执行前余额清空、槽位移除或被冷却阻塞时直接跳过；源拒绝记事件并消耗本槽 2 秒，继续其他槽位，下轮再按源状态判断。运行清单记录批次策略、耗时和周期基准；适配器摘要随代码改变，旧代码身份 checkpoint 仍拒绝恢复。查看修复后的经济节奏需要新建模拟，旧报告重生成不会改变策略结果。
 
-该画像是新策略，不沿用旧 Python 后端的选鱼、出售保护、最高鱼雷等目标策略。普通同权候选按固定轮转选择，单项行为选择第一个满足源报价的目标；不合法目标由源服务拒绝。若配置旧 `behavior_target_policies`，运行会在预检中拒绝，避免误以为它生效。
+该画像是新策略，不沿用旧 Python 后端的选鱼、出售保护、最高鱼雷等目标策略。普通同权候选按固定轮转选择。神器和杠铃的目标 ID 按数值顺序选择，操作／冷却／checkpoint 身份仍为字符串，其他行为的目标顺序保持原样。神器候选读取源 `query_actions.torpedoes.previousTorpedoId`：0 表示无前置，其余必须已拥有；前置来自完整源目录的上一行，包含关闭商品，不按 ID 减一推断。报价缺此字段时明确报错；最终购买合法性、扣款和拒绝仍由源服务负责。若配置旧 `behavior_target_policies`，运行会在预检中拒绝，避免误以为它生效。
 
 卖鱼采用 `over_30_lowest_level_one_cps_backpack_v1`：背包与摸鱼厅的鱼合计严格超过 30 条时，在领取奖励／金币之后、其他普通行为之前逐条出售背包中资质最低的普通鱼，降到 30 条即停止。上阵鱼计入总数但不出售，神兽不作为可卖候选；无合法候选时继续其他行为。资质按一级 CPS（包含变异倍率、不含鱼等级提升）排序，同值取最小实例 ID。源 `query_actions.fishSales` 提供可售背包鱼的 `levelOneCps` 和 `materialAdded`，Python 精确比较报价，不重算经济公式。卖鱼权重缺失或为零时禁用；每条沿用画像的 `sell_fish` 耗时（默认 3 秒），材料结算及收入统计保持源回执，拒绝冷却与截断恢复沿用既有动作契约。运行清单记录卖鱼策略和保留数量，新策略效果需要重新模拟，旧报告不会随代码更新改变。
 
@@ -113,15 +152,21 @@ IGESS 对源状态变化和成功回执做收入统计：加回消费，抵消�
 
 ### 养成优先与鱼潮材料预留
 
-鱼潮开场采用 `growth_first_wallet_fraction_near_term_reserve_v1`：已满足条件且买得起的鱼厅扩容、神器、杠铃、突破资助及两类重生优先于鱼潮；单鱼反复升级不属于该入场拦截集合。养成线之间仍使用现有权重和轮转，领取、卖鱼、上阵及已开始的动作保持原调度。
+鱼潮开场采用 `growth_first_wallet_fraction_daily_income_near_term_reserve_v2`：已满足条件且买得起的鱼厅扩容、神器、杠铃、突破资助及两类重生优先于鱼潮；单鱼反复升级不属于该入场拦截集合。养成线之间仍使用现有权重和轮转，领取、卖鱼、上阵及已开始的动作保持原调度。
 
 没有可执行成长时，读取本场 `query_tide` 的 `materialCost` 源报价，得到整场费用。整场费用超过入场前材料余额的 25% 就跳过，恰好相等通过此项检查。每场重新读取余额和源报价，所有已入账材料均属于余额；这不是日消费限额，连续多场的累计消费可能超过某一时点余额的 25%。
 
-通过单场限额后，再检查近期成长预留：每条材料养成线仅取下一合法目标，以最近约 1800 秒累计在线收入估计未来最多 1800 秒能否攒够，预测范围受当天剩余在线时间限制。离线奖励和一次性图鉴奖励不进入收入估计。按既有权重和轮转选择一个近期目标；若余额不能同时覆盖目标价格及本场装弹费用，则跳过鱼潮。无有效观察或没有近期目标时，仍必须通过 25% 检查。两项检查均通过才尝试入场，合法性、扣款和奖励仍由源 Lua 负责。
+通过单场限额后，再检查近期成长预留：每条材料养成线仅取下一合法目标，以最近约 1800 秒累计在线收入估计未来最多 1800 秒能否攒够，预测范围受当天剩余在线时间限制。离线奖励和一次性图鉴奖励不进入收入估计。按既有权重和轮转选择一个近期目标；若余额不能同时覆盖目标价格及本场装弹费用，则跳过鱼潮。无有效观察或没有近期目标时，仍必须通过 25% 检查。
 
-跳过事件区分 `growth_action_ready`、`tide_material_budget_exceeded` 和 `growth_material_reserved`。单场限额回执附余额、整场费用、25%限额和比例；预留回执附目标、价格、已观察收入和预测窗口。金额使用精确十进制字符串。
+最后检查当日累计限额：`当日已付换弹材料 + 本场完整源报价 <= 当日已获得在线材料收入 × 15%`，相等允许。每日按模拟墙钟 `time // 86400` 分桶，预算不结转；初始钱包、昨日余额、离线奖励及尚未获得的未来收入都不能增加预算。这里的当日收入沿用 `SourceIncome.material`，包含加工、卖鱼和在线领取的图鉴材料奖励，与上文排除图鉴奖励的近期收入预测口径不同。日支出来自 `SourceIncome.tide_reload_material` 的实际净扣款，拒绝、无支出重试不增加，源退款释放额度。三项检查均通过才尝试入场，合法性、扣款和奖励仍由源 Lua 负责。
 
-运行清单 `tide_admission_policy` 保存比例、收入窗口及预留口径。checkpoint 的 `growth_tide_budget` 保存有界收入观察历史；25%限额由当前余额重新计算。新策略需从新玩家重跑，旧适配器 checkpoint 继续拒绝；同版本截断／恢复保持决策和源回执一致。验证见 `tests/test_fish_growth_priority.py`。这项修改不会自动更新 GameBalancer。
+跳过事件区分 `growth_action_ready`、`tide_material_budget_exceeded`、`growth_material_reserved` 和 `tide_daily_income_budget_exceeded`。单场限额回执附余额、整场费用、25%限额和比例；预留回执附目标、价格、已观察收入和预测窗口；日限额回执附从零起算的日索引、当日在线收入、已付换弹费用、本场报价和15%额度。金额使用精确十进制字符串。
+
+
+普通选择和鱼潮检查共用 `growth_options` 与数值目标顺序。未满足神器前置的报价不参与可执行判断；合法目标处于拒绝冷却时，继续其他行动，不以其后续商品绕过冷却。候选及真实 Lua 购买／恢复回归见 `tests/test_fish_growth_candidates.py`、`tests/test_fish_growth_candidates_source.py`。
+
+运行清单 `tide_admission_policy` 保存单场／每日比例、收入窗口及预留口径。checkpoint 的 `growth_tide_budget` 保存有界收入观察历史和 `daily` 的日索引、累计收入／支出起点及日内差值；普通重连和同日恢复不重置预算，跨自然日重新建立起点。25%限额由当前余额重新计算。新策略需从新玩家重跑，旧适配器 checkpoint 继续拒绝；同版本截断／恢复保持决策和源回执一致。验证见 `tests/test_fish_growth_priority.py`、`tests/test_fish_tide_daily_budget.py`。这项修改不会自动更新 GameBalancer。
+
 
 正式运行可用 `--until-seconds` 保存中途状态，再用同一场景或兼容的更长场景与 `--checkpoint-in` 继续。截止秒为场景内绝对秒，不改变场景或模型身份；不可早于恢复点，等于恢复点允许只读重新生成产物。此选项仅支持 fish_source。
 

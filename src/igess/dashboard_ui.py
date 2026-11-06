@@ -9,6 +9,7 @@ def dashboard_shell(content: str, project: str, mode: str) -> str:
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>IGESS Dashboard</title><style>{_CSS}</style></head>
 <body data-project="{html.escape(project, quote=True)}">
+<div class="dashboard-pane">
 <a class="skip-link" href="#workspace">Skip to content</a>
 <aside class="sidebar">
   <a class="brand" href="#overview"><span class="brand-mark">I</span> IGESS <span class="edition">STUDIO</span></a>
@@ -31,7 +32,17 @@ def dashboard_shell(content: str, project: str, mode: str) -> str:
     <div id="task-slot"></div>
     {content}
   </main>
-</div><script>{_SCRIPT}</script></body></html>'''
+</div>
+</div>
+<aside id="report-panel" aria-labelledby="report-title" hidden>
+  <header class="report-toolbar">
+    <div class="report-heading"><strong id="report-title">Report</strong><span id="report-status" role="status"></span></div>
+    <a id="report-open-tab" class="button" target="_blank" rel="noopener">Open in new tab ↗</a>
+    <button id="report-close" type="button" aria-label="Close report" title="Close report (Esc)">Close ×</button>
+  </header>
+  <iframe id="report-frame" title="Run report"></iframe>
+</aside>
+<script>{_SCRIPT}</script></body></html>'''
 
 
 def restart_controls(token, instance_id):
@@ -50,9 +61,7 @@ def restart_controls(token, instance_id):
 </dialog>'''
 
 
-
 _CSS = r'''
-.server-actions { display:flex; align-items:center; gap:12px; } .server-actions dialog { font-size:14px; }
 :root { color-scheme: dark; --bg:#171717; --panel:#1c1c1c; --raised:#232323; --line:#333; --text:#ededed; --muted:#a1a1aa; --green:#3ecf8e; }
 * { box-sizing:border-box; }
 body { margin:0; background:var(--bg); color:var(--text); font:14px/1.6 "Segoe UI",Arial,sans-serif; }
@@ -76,6 +85,7 @@ nav a:hover { text-decoration:none; color:var(--text); background:#202020; } nav
 .local-dot { display:inline-block; width:6px; height:6px; background:var(--green); border-radius:50%; margin-right:6px; }
 .workspace { margin-left:224px; min-width:0; } .topbar { height:60px; padding:0 36px; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; color:var(--muted); font-size:12px; }
 .topbar strong { font-weight:400; color:var(--text); } .separator { margin:0 15px; color:#555; } .environment { font:10px Consolas,monospace; letter-spacing:1px; border:1px solid var(--line); border-radius:4px; padding:3px 7px; }
+.server-actions { display:flex; align-items:center; gap:12px; } .server-actions dialog { font-size:14px; }
 main { max-width:1500px; padding:34px 36px 60px; margin:auto; }
 .page-heading { display:flex; justify-content:space-between; align-items:center; gap:20px; margin-bottom:28px; }
 .eyebrow { color:var(--muted); font-size:10px; letter-spacing:1.8px; } h1 { font-size:28px; line-height:1.3; font-weight:550; letter-spacing:-.8px; margin:7px 0; }
@@ -89,6 +99,10 @@ input,select { padding:9px 11px; border:1px solid #414141; border-radius:5px; co
 button,.button { display:inline-flex; justify-content:center; align-items:center; gap:12px; border:1px solid #454545; border-radius:5px; background:#2b2b2b; color:var(--text); padding:8px 13px; font-size:12px; font-weight:500; cursor:pointer; line-height:1.5; }
 button:hover,.button:hover { background:#353535; text-decoration:none; } .primary,form[action$="/formal"] button { background:#27764f; border-color:#329365; color:#f2fff8; } .primary:hover,form[action$="/formal"] button:hover { background:#318b60; }
 button:disabled { opacity:.45; cursor:not-allowed; }
+button.danger { color:#ffb6b6; border-color:#794343; background:#392525; } button.danger:hover { background:#4a2d2d; }
+dialog { color:var(--text); background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:24px; width:min(540px,calc(100% - 32px)); max-height:85vh; overflow:auto; }
+dialog p { overflow-wrap:anywhere; } dialog::backdrop { background:#0009; } .dialog-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:12px; margin-top:24px; }
+.history-cleanup { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; margin-top:20px; border-top:1px solid var(--line); padding-top:16px; } .history-cleanup p { margin:0; flex:1; min-width:220px; }
 .actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin-top:20px; }
 .actions form { padding:18px; background:#202020; border:1px solid var(--line); border-radius:6px; display:flex; flex-direction:column; align-items:stretch; justify-content:flex-end; gap:8px; }
 .actions form label { margin:0; } .actions form p { color:var(--muted); font-size:12px; }
@@ -114,6 +128,50 @@ tbody tr:last-child td { border-bottom:0; } tbody tr:hover { background:#222; } 
 @media(min-width:1250px) { .overview-grid { display:grid; grid-template-columns:minmax(0,1.6fr) minmax(260px,1fr); gap:20px; align-items:start; } }
 @media(max-width:1050px) { .sidebar { width:190px; } .workspace { margin-left:190px; } main { padding:24px; } .topbar { padding:0 24px; } .actions { grid-template-columns:1fr; } }
 @media(max-width:700px) { .sidebar { position:static; width:auto; padding:16px; border-right:0; border-bottom:1px solid var(--line); } .brand { max-width:180px; } .project-label,.project-name,.project-mode,.sidebar-footer { display:none; } nav { display:flex; flex-wrap:wrap; margin-top:16px; gap:4px; } nav a { padding:7px 10px; font-size:12px; } .workspace { margin-left:0; } .topbar { height:46px; padding:0 18px; } main { padding:24px 16px; } .page-heading { align-items:flex-start; flex-direction:column; } h1 { font-size:25px; } section { padding:18px; } #task-panel { display:block; } #task-panel form { margin-top:12px; } .history-toolbar > div { flex:1; } .history-toolbar select { width:100%; } }
+#report-panel { min-width:0; min-height:0; display:flex; flex-direction:column; background:var(--panel); }
+.report-toolbar { display:flex; flex-wrap:wrap; align-items:center; gap:10px; padding:12px 16px; border-bottom:1px solid var(--line); }
+.report-heading { flex:1; min-width:100px; overflow-wrap:anywhere; }
+#report-title { display:block; font-size:13px; } #report-status { font-size:11px; color:var(--muted); }
+#report-frame { flex:1; width:100%; min-height:0; border:0; background:var(--bg); }
+body.report-open { position:fixed; inset:0; height:100vh; height:100dvh; overflow:hidden; display:grid; grid-template-columns:clamp(340px,28vw,460px) minmax(0,1fr); }
+.report-open .dashboard-pane { min-height:0; min-width:0; overflow:auto; border-right:1px solid var(--line); }
+.report-open .sidebar { position:static; width:auto; padding:16px; border-right:0; border-bottom:1px solid var(--line); }
+.report-open .brand { max-width:180px; }
+.report-open .project-label,.report-open .project-name,.report-open .project-mode,.report-open .sidebar-footer { display:none; }
+.report-open nav { display:flex; flex-wrap:wrap; margin-top:12px; gap:4px; }
+.report-open nav a { padding:7px 8px; font-size:12px; gap:6px; }
+.report-open .workspace { margin-left:0; }
+.report-open .topbar { height:46px; padding:0 16px; }
+.report-open main { padding:20px 16px; }
+.report-open .page-heading { align-items:flex-start; flex-direction:column; gap:12px; margin-bottom:20px; }
+.report-open h1 { font-size:23px; }
+.report-open section { padding:16px; }
+.report-open .overview-grid { display:block; }
+.report-open .actions { grid-template-columns:1fr; }
+.report-open .counts { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.report-open #task-panel { display:block; }
+.report-open #task-panel form { margin-top:12px; }
+.report-open .history-toolbar { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
+.report-open .history-toolbar > div { min-width:0; }
+.report-open .history-toolbar .search-field { grid-column:1 / -1; }
+.report-open #clear-filters { grid-column:1 / -1; justify-self:start; }
+.report-open .history-toolbar select { width:100%; }
+.report-open .table-scroll table,.report-open .table-scroll tbody { display:block; }
+.report-open .table-scroll thead { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+.report-open tr[data-run] { display:flex; flex-wrap:wrap; padding:12px; gap:8px; border-bottom:1px solid var(--line); }
+.report-open tr[data-run]:last-child { border-bottom:0; }
+.report-open tr[data-run] td { display:block; min-width:0; max-width:100%; padding:0; border:0; }
+.run-duration { white-space:nowrap; }
+.report-open tr[data-run] .run-duration::before { content:'Duration: '; color:var(--muted); }
+.report-open tr[data-run] td:nth-child(1),.report-open tr[data-run] td:nth-child(2),.report-open tr[data-run] td:nth-child(6) { width:100%; }
+.report-open tr[data-run] td:nth-child(2)::before { content:'Scenario: '; color:var(--muted); }
+.report-open tr[data-run] td:nth-child(7) { align-self:center; margin-right:auto; }
+.report-open tr[data-run]:has([data-report-active]) { background:#1b2a23; box-shadow:inset 3px 0 var(--green); }
+@media(max-width:900px) {
+  body.report-open { grid-template-columns:minmax(0,1fr); grid-template-rows:36% minmax(0,1fr); }
+  .report-open .dashboard-pane { border-right:0; border-bottom:1px solid var(--line); }
+  .report-toolbar { padding:8px 12px; gap:8px; }
+}
 '''
 
 
@@ -135,6 +193,72 @@ _SCRIPT = r'''
   window.addEventListener('hashchange', navigate);
   navigate();
   const key = 'igess-dashboard:' + location.pathname + ':' + document.body.dataset.project;
+  const reportKey = key + ':report';
+  const reportPanel = document.querySelector('#report-panel');
+  const reportFrame = document.querySelector('#report-frame');
+  const dashboardPane = document.querySelector('.dashboard-pane');
+  const reportClose = document.querySelector('#report-close');
+  let reportOpener = null;
+  let dashboardScroll = 0;
+  function closeReport() {
+    if (reportPanel.hidden) return;
+    reportPanel.hidden = true;
+    document.body.classList.remove('report-open');
+    reportFrame.removeAttribute('src');
+    document.querySelectorAll('[data-report-active]').forEach(el => el.removeAttribute('data-report-active'));
+    try { sessionStorage.removeItem(reportKey); } catch (_) {}
+    reportOpener?.focus({preventScroll:true});
+    window.scrollTo(0, dashboardScroll);
+  }
+  function escapeReport(event) {
+    if (event.key === 'Escape' && !event.defaultPrevented && !document.querySelector('dialog[open]') && !event.target.closest?.('dialog[open]')) {
+      closeReport();
+    }
+  }
+  function openReport(link, focus = true) {
+    const url = new URL(link.href);
+    if (url.origin !== location.origin) return;
+    const firstOpen = reportPanel.hidden;
+    if (firstOpen) dashboardScroll = window.scrollY;
+    reportOpener = link;
+    const run = decodeURIComponent(url.pathname.split('/').at(-2));
+    document.querySelector('#report-title').textContent = 'Report · ' + run;
+    document.querySelector('#report-open-tab').href = url.href;
+    document.querySelector('#report-status').textContent = 'Loading report…';
+    reportFrame.title = 'Report · ' + run;
+    reportPanel.hidden = false;
+    document.body.classList.add('report-open');
+    document.querySelectorAll('[data-report-link]').forEach(el => el.toggleAttribute('data-report-active', el.href === url.href));
+    reportFrame.src = url.href;
+    if (firstOpen) {
+      window.scrollTo(0, 0);
+      dashboardPane.scrollTop = dashboardScroll;
+      link.scrollIntoView({block:'nearest'});
+    }
+    try { sessionStorage.setItem(reportKey, url.href); } catch (_) {}
+    if (focus) reportClose.focus({preventScroll:true});
+  }
+  document.addEventListener('click', event => {
+    const link = event.target.closest('a[data-report-link]');
+    if (!link || event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || link.target === '_blank') return;
+    if (new URL(link.href).origin !== location.origin) return;
+    event.preventDefault();
+    openReport(link);
+  });
+  reportClose.addEventListener('click', closeReport);
+  document.addEventListener('keydown', escapeReport);
+  reportFrame.addEventListener('load', () => {
+    if (reportPanel.hidden) return;
+    document.querySelector('#report-status').textContent = '';
+    try { reportFrame.contentDocument.addEventListener('keydown', escapeReport); } catch (_) {}
+  });
+  // Restore only reports still linked by this project's freshly rendered page.
+  try {
+    const reportUrl = sessionStorage.getItem(reportKey);
+    const link = [...document.querySelectorAll('[data-report-link]')].find(el => el.href === reportUrl);
+    if (link) openReport(link, false);
+    else if (document.querySelector('#history-search')) sessionStorage.removeItem(reportKey);
+  } catch (_) {}
   let saved = {};
   try { saved = JSON.parse(sessionStorage.getItem(key) || '{}') || {}; } catch (_) {}
   const controls = [...document.querySelectorAll('#history-search, #history-status, #history-kind, #scenario, #advice-scenario')];
@@ -218,6 +342,27 @@ _SCRIPT = r'''
       }
     } catch (_) { /* The response may be lost during shutdown; check the new instance. */ }
     await waitForService();
+  });
+  const cleanupDialog = document.querySelector('#clear-history-dialog');
+  document.querySelector('#clear-history')?.addEventListener('click', () => cleanupDialog.showModal());
+  document.querySelector('#cancel-clear-history')?.addEventListener('click', () => cleanupDialog.close());
+  cleanupDialog?.querySelector('form').addEventListener('submit', event => {
+    if (cleanupDialog.open) cleanupDialog.close();
+    else event.preventDefault();
+  });
+  const deleteDialog = document.querySelector('#delete-run-dialog');
+  document.querySelectorAll('[data-delete-run]').forEach(button => button.addEventListener('click', () => {
+    if (button.disabled) return;
+    deleteDialog.querySelector('#delete-run-name').textContent = button.dataset.deleteRun;
+    deleteDialog.querySelector('#delete-run-copies').textContent = button.dataset.runCopies;
+    deleteDialog.querySelector('[name=run_id]').value = button.dataset.deleteRun;
+    deleteDialog.querySelector('[name=run_digest]').value = button.dataset.runDigest;
+    deleteDialog.showModal();
+  }));
+  document.querySelector('#cancel-delete-run')?.addEventListener('click', () => deleteDialog.close());
+  deleteDialog?.querySelector('form').addEventListener('submit', event => {
+    if (deleteDialog.open) deleteDialog.close();
+    else event.preventDefault();
   });
   filter();
 })();

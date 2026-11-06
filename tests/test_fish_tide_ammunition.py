@@ -104,6 +104,9 @@ def test_insufficient_material_skips_before_any_payment(tmp_path):
 
 
 def test_formal_admission_and_report_use_damage_quote(tmp_path, monkeypatch):
+    from igess.fish_source_growth_policy import GrowthTideBudget
+    # This fixture tests source ammunition pricing with a starting wallet.
+    monkeypatch.setattr(GrowthTideBudget, 'skip_daily', lambda self, quote: None)
     import yaml
     from pathlib import Path
     from igess.authoring.service import AuthoringService

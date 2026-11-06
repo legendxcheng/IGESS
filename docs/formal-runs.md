@@ -14,6 +14,8 @@
 
 Generic 在工作流和工具包中的旧元数据格式继续保留；`model simulate` 的 Generic 正式运行继续携带模型摘要。不要为了让三个入口的 JSON 完全相同而删除这些既有差异。
 
+历史中的 `started_at` / `finished_at` 为 UTC 时间，`duration_seconds` 为实际执行秒数。计时从首次登记 `running` 到首次写入 `success/failed`，包含报告与失败诊断，不包括登记前的工作；同一 registry 使用单调时钟，更换实例则从持久化 UTC 起点计算。终态改写保留计时，旧记录缺失时显示未记录。advice 共用计时，结束状态还包括 `ok/needs_attention`。自动 smoke 在事务内单独覆盖 probe 至报告完成，随历史一起提交。
+
 ## 按运行 ID 定位失败
 
 源码开发入口失败时，详细诊断保存在项目根目录的 `.igess/diagnostics/<run_id>.json`。在运行 ID 分配前失败则使用 `attempt-<uuid>.json`，不额外创建运行记录。诊断目录已加入 Git 忽略规则。
@@ -49,7 +51,7 @@ Get-Content -LiteralPath '.igess/diagnostics/<run_id>.json' -Raw
 
 ## 验证与当前边界
 
-Fish Source 可显式使用 `--checkpoint-in` 接续到兼容的更长场景，例如 Day1 → Day2。模型与源输入摘要仍须完全一致，跨场景只允许延长时间并保持画像、初始状态、采样和输出契约；`compact_event_details` 可不同。`execution_window` 保存本段起止、来源场景与 checkpoint 路径，报告标记续跑区间。Dashboard 的历史起点通过当前项目 registry 解析，随后交给同一个正式执行器。恢复成本与命令见 [Fish README](../projects/fish_source/README.md)，跨进程等价回归见 `tests/test_fish_source_continuation.py`。
+Fish Source 可显式使用 `--resume-run-id <成功运行ID>` 或 `--checkpoint-in <路径>` 接续到兼容的更长场景，二者互斥。例如 Day1 → Day2，或 Week1 → Week2 → Week3 → Month1（7／14／21／28 天）。模型与源输入摘要仍须完全一致，跨场景只允许延长时间并保持画像、初始状态、采样和输出契约；`compact_event_details` 可不同。`execution_window` 保存本段起止、来源场景与 checkpoint 路径，报告标记续跑区间。CLI 与 Dashboard 的历史起点共用 `RunRegistry.checkpoint_for_run`，随后交给同一个正式执行器；CLI 可用 `--runs-root` 指定项目历史读写目录。恢复成本与命令见 [Fish README](../projects/fish_source/README.md)，跨进程等价回归见 `tests/test_fish_source_continuation.py`。
 
 `tests/test_formal_run.py` 验证旧入口引擎约束及失败保真；三个入口各自的测试覆盖响应兼容、相同 Generic 输入的产物等价、报告失败、Fish checkpoint 恢复和工具包依赖隔离。`tests/test_operator_toolkit.py` 还通过 Python 3.11 实际生成并检查工具包。
 

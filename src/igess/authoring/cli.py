@@ -13,6 +13,7 @@ from .change import MAX_CHANGE_SOURCE_BYTES
 from .live_report import run_live_report
 from .response import CommandResponse
 from .service import AuthoringService
+from ..run_registry import RunRegistry
 
 
 _EXIT_CODES = (
@@ -151,9 +152,18 @@ def add_model_parser(subparsers: argparse._SubParsersAction) -> argparse.Argumen
             "editing the scenario."
         ),
     )
-    simulate.add_argument(
+    continuation = simulate.add_mutually_exclusive_group()
+    continuation.add_argument(
         "--checkpoint-in",
         help="Optional engine checkpoint; Fish source can continue into a compatible longer scenario.",
+    )
+    continuation.add_argument(
+        "--resume-run-id",
+        help="Continue from a successful run ID in this project's history.",
+    )
+    simulate.add_argument(
+        "--runs-root",
+        help="Optional project history root to read and write; for Dashboard use its project subdirectory.",
     )
     simulate.add_argument(
         "--until-seconds", type=int,
@@ -228,9 +238,19 @@ def dispatch_model(args: argparse.Namespace) -> int:
                 format_name=format_name,
             )
     elif command == "simulate":
-        response = AuthoringService(args.project).simulate(
+        service = (
+            AuthoringService(
+                args.project,
+                registry_factory=lambda project: RunRegistry(
+                    args.runs_root, read_roots=project.read_run_roots(),
+                ),
+            )
+            if args.runs_root is not None else AuthoringService(args.project)
+        )
+        response = service.simulate(
             args.scenario,
             checkpoint_input=args.checkpoint_in,
+            resume_run_id=args.resume_run_id,
             until_seconds=args.until_seconds,
             overrides=args.override,
             profile_id=args.profile,

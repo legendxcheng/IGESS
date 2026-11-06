@@ -228,6 +228,11 @@ def test_formal_entrypoints_produce_equivalent_generic_simulation(tmp_path: Path
 
     assert authored.ok
     assert workflow.status == operator.status == "success"
+    for record in (workflow, operator):
+        assert record.duration_seconds is not None and record.duration_seconds >= 0
+        assert record.started_at and record.finished_at
+    authored_status = json.loads((Path(authored.result["output_dir"]).parent / "run_status.json").read_text())
+    assert authored_status["duration_seconds"] >= 0
     assert set(authored.result) == {
         "run_id", "kind", "scenario_id", "status", "output_dir", "report_index", "change_id",
     }
@@ -442,6 +447,8 @@ def test_automatic_smoke_is_correlated_attributable_and_pruned_only_after_apply(
     manifest = json.loads((run_dir / "output" / "run_manifest.json").read_text(encoding="utf-8"))
     report = json.loads((run_dir / "report" / "report_data.json").read_text(encoding="utf-8"))
     assert status["kind"] == "smoke"
+    assert status["started_at"] and status["finished_at"]
+    assert status["duration_seconds"] >= 0
     assert status["change_id"] == "change-4"
     assert status["model_digest"] == response.result["model_digest"]
     assert manifest["model_digest"] == response.result["model_digest"]

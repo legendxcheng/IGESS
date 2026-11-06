@@ -1,8 +1,0 @@
-{
-  "core_bytes_identical": true,
-  "checkpoint_history_identical": true,
-  "final_observation_identical": true,
-  "history_entries": 7573,
-  "baseline_seconds": 523.8628269000328,
-  "candidate_seconds": 228.942300900002
-}

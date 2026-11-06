@@ -11,6 +11,8 @@ commands, and Agent Analyst advice artifacts.
 
 Fish simulation now uses [projects/fish_source](projects/fish_source/README.md) exclusively. Current progress is tracked in its [RoadMap](projects/fish_source/RoadMap.md); the Python project `projects/fish` is retired and retained for historical reference.
 
+For platform development, start with the [IGESS platform code walkthrough](docs/code_walkthrough.md): module boundaries, execution paths, authoring transactions, artifacts, engine integration, and validation entry points.
+
 ## Agent-first Incremental Authoring
 
 The primary authoring workflow is Agent-assisted and incremental: Agent 一次协助填写一条规则，

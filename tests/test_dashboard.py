@@ -22,7 +22,7 @@ from igess.authoring.service import AuthoringService
 from igess.authoring.templates import initialize_authoring_project
 from igess.authoring.transactions import Transaction
 from igess.dashboard import create_dashboard_context, render_dashboard_home
-from igess.run_registry import RunRegistry
+from igess.run_registry import HistoryCleanupPreview, RunRegistry
 from igess.workflows import WorkflowService
 
 
@@ -287,6 +287,7 @@ def test_cli_dashboard_help_exposes_local_server_options():
 
 class _DashboardService:
     def __init__(self, tmp_path: Path):
+        self.project_root = tmp_path
         self.is_authoring = True
         self.calls: list[tuple[str, str]] = []
         report = tmp_path / "runs" / "smoke-1" / "report"
@@ -354,6 +355,12 @@ class _DashboardService:
     def list_runs(self):
         return list(self._runs)
 
+    def preview_run_deletions(self):
+        return {}
+
+    def preview_history_cleanup(self):
+        return HistoryCleanupPreview(0, "0" * 64)
+
     def latest_advice(self):
         return {"status": "ok", "summary": "Advice <safe>", "findings": []}
 
@@ -370,8 +377,13 @@ class _DashboardService:
 
 def test_authoring_dashboard_renders_read_only_observability_with_escaped_values(tmp_path):
     service = _DashboardService(tmp_path)
+    service._runs[0].duration_seconds = 65.25
 
     body = render_dashboard_home(service, None, None)
+
+    assert "<th>Duration</th>" in body
+    assert '<td class="run-duration">1 min 5 s</td>' in body
+    assert '<td class="run-duration">Not recorded</td>' in body
 
     assert 'class="state-badge ready"' in body
     assert "resource&lt;script&gt;" in body
@@ -925,6 +937,7 @@ def test_legacy_dashboard_advice_has_kind_and_canonical_model_digest(tmp_path):
     assert record.kind == "advice"
     assert record.version == 1
     assert record.run_id.endswith("-advice_day_1_progression")
+    assert record.duration_seconds is not None and record.duration_seconds >= 0
     assert record.model_digest.startswith("sha256:")
     assert len(record.model_digest) == 71
     assert "kind-advice" in render_dashboard_home(service, CONFIG, TABLES)

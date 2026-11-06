@@ -77,9 +77,14 @@ def _source_run(tmp_path: Path, *, record_income: bool = False) -> Path:
             },
         ),
         event(
+            35,
+            "start_breakthrough",
+            {"instant": True, "fromRealmId": 1, "toRealmId": 2},
+        ),
+        event(
             40,
             "start_breakthrough",
-            {"instant": False, "fromRealmId": 1, "toRealmId": 2},
+            {"instant": False, "fromRealmId": 2, "toRealmId": 3},
         ),
         event(60, "go_offline", {"online": False}),
         event(86400, "go_online", {"online": True}),
@@ -102,6 +107,7 @@ def _source_run(tmp_path: Path, *, record_income: bool = False) -> Path:
                     "money": row["spendable_money"],
                     "material": row["material"],
                     "strength": row["strength"],
+                    "trash_realm": row["trash_realm"],
                 },
                 "total_cps": "2",
             }
@@ -139,10 +145,18 @@ def test_source_report_restores_readable_panels_without_inventing_metrics(tmp_pa
     assert core["rows"][1]["fish_luck_current"]["exact_value"] is None
     assert core["summary"]["longest_fish_luck_stagnation_seconds"] is None
     growth = fish["persistent"]["profiles"]["default"]
-    assert growth["summary"]["total_progression_count"]["exact_value"] == "4"
-    assert [len(day["rows"]) for day in growth["days"]] == [3, 1]
+    assert growth["summary"]["total_progression_count"]["exact_value"] == "5"
+    assert [len(day["rows"]) for day in growth["days"]] == [4, 1]
     assert growth["rows"][-1]["active_time_seconds"] == 80
     assert growth["rows"][2]["progression_category"] == "breakthrough_funding"
+    funding = [row for row in growth["rows"] if row["progression_category"] == "breakthrough_funding"]
+    assert [row["item_id"] for row in funding] == ["breakthrough_funding:2", "breakthrough_funding:3"]
+    assert all(row["metric_id"] == "target_realm_id" for row in funding)
+    assert fish["actions"]["default"]["accepted_commands"]["start_breakthrough"] == 2
+    assert "trash_realm" not in report["overview"]["resource_ids"]
+    assert "trash_realm" not in report["overview"]["final_resources"]["default"]
+    assert all(row["resource_id"] != "trash_realm" for row in report["series"]["resources"])
+    assert json.loads((run / "timeline.json").read_text(encoding="utf-8"))[0]["resources"]["trash_realm"] == "2"
     investment = fish["investment"]["profiles"]["default"]
     assert investment["coin_spent"]["exact_value"] == "123456789012345678901234567890"
     assert investment["sale_material"]["exact_value"] == "40"
@@ -255,8 +269,16 @@ setImmediate(() => {
         ]
     )
     assert (
-        "突破资助（非完成）" in elements["[data-daily-progression-charts]"]["innerHTML"]
+        "突破资助" in elements["[data-daily-progression-charts]"]["innerHTML"]
     )
+    funding = next(series for series in rendered["options"]["daily-progression-chart-0"]["series"]
+                   if series["name"] == "突破资助")
+    assert len(funding["data"]) == 2
+    visible_copy = "\n".join(str(element.get(field, "")) for element in elements.values()
+                             for field in ("innerHTML", "textContent"))
+    assert "垃圾佬境界" not in visible_copy
+    assert "垃圾佬境界" not in json.dumps(rendered["options"], ensure_ascii=False)
+    assert "突破资助（非完成）" not in visible_copy
     assert "../run/events.json" in elements["[data-evidence]"]["innerHTML"]
     assert (
         rendered["options"]["luck-progression-chart"]["series"][0]["data"][1]["value"][

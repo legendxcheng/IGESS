@@ -24,7 +24,7 @@ from .linter import ConfigLinter
 from .loader import ConfigLoader
 from .outputs import OutputWriter
 from .reporting.static import generate_static_report
-from .run_registry import RunRecord, RunRegistry
+from .run_registry import HistoryCleanupPreview, RunRecord, RunRegistry
 
 
 _MAX_ADVICE_BYTES = 1024 * 1024
@@ -142,14 +142,7 @@ class WorkflowService:
 
     def checkpoint_for_run(self, run_id: str) -> Path:
         """Resolve a selected successful run within this project's registry."""
-        record = next((item for item in self.registry.list_runs() if item.run_id == run_id), None)
-        if record is None or record.status != "success":
-            raise ValueError("Choose a successful run from this project's history")
-        checkpoint = record.run_dir / "output" / "final_checkpoint.json"
-        if (not checkpoint.is_file()
-                or not checkpoint.resolve().is_relative_to(record.run_dir.resolve())):
-            raise ValueError("The selected run has no available checkpoint")
-        return checkpoint
+        return self.registry.checkpoint_for_run(run_id)
 
     def available_scenarios(self, config: str | Path) -> tuple[str, ...]:
         """Read scenario identities from the selected rules without running a model."""
@@ -398,6 +391,29 @@ class WorkflowService:
 
     def list_runs(self) -> list[RunRecord]:
         return self.registry.list_runs()
+
+    def preview_history_cleanup(self) -> HistoryCleanupPreview:
+        return self.registry.preview_history_cleanup()
+
+    def preview_run_deletions(self) -> dict[str, HistoryCleanupPreview]:
+        return self.registry.preview_run_deletions()
+
+    def delete_run(self, run_id: str, expected_digest: str) -> WorkflowResult:
+        result = self.registry.delete_run(run_id, expected_digest)
+        if result.retained:
+            return WorkflowResult(
+                ok=False,
+                message=f"Run {run_id}: deleted {result.deleted} stored copies; "
+                f"{result.retained} could not be safely deleted. Retained data can be retried with Clear history.",
+            )
+        return WorkflowResult(ok=True, message=f"Deleted run {run_id} and its reports and simulation outputs.")
+
+    def clear_history(self, expected_digest: str) -> WorkflowResult:
+        result = self.registry.clear_history(expected_digest)
+        message = f"Cleared {result.deleted} completed runs and their reports."
+        if result.retained:
+            message += f" {result.retained} records could not be safely deleted; their data was retained."
+        return WorkflowResult(ok=result.retained == 0, message=message)
 
     def _path(self, value: str | Path) -> Path:
         path = Path(value)

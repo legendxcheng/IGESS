@@ -1,0 +1,5799 @@
+{
+  "record_id": "PERM-28D-001",
+  "recorded_on": "2026-11-04",
+  "run_id": "20261103T154017869259Z-month_1_all_permanent",
+  "run_status": {
+    "change_id": null,
+    "duration_seconds": 4464.765999999996,
+    "engine_id": "fish_source",
+    "finished_at": "2026-11-03T16:54:42.635621+00:00",
+    "kind": "formal",
+    "message": "Run complete",
+    "model_digest": "sha256:f1383ac22cc0cb65702d6cc1de4a2c1f5e183ee6991b82a92b81cf3eb9c5ee4f",
+    "output_dir": "E:\\IGESS\\projects\\fish_source\\runs\\20261103T154017869259Z-month_1_all_permanent\\output",
+    "report_dir": "E:\\IGESS\\projects\\fish_source\\runs\\20261103T154017869259Z-month_1_all_permanent\\report",
+    "report_index": "E:\\IGESS\\projects\\fish_source\\runs\\20261103T154017869259Z-month_1_all_permanent\\report\\index.html",
+    "run_id": "20261103T154017869259Z-month_1_all_permanent",
+    "scenario_id": "month_1_all_permanent",
+    "started_at": "2026-11-03T15:40:17.874738+00:00",
+    "status": "success",
+    "version": 1
+  },
+  "identity_complete": true,
+  "manifest": {
+    "artifacts": [
+      "analysis.json",
+      "analysis.md",
+      "events.csv",
+      "events.json",
+      "payback.csv",
+      "timeline.csv",
+      "timeline.json",
+      "final_checkpoint.json",
+      "source_progression.json",
+      "source_behavior.json"
+    ],
+    "engine_id": "fish_source",
+    "execution_window": {
+      "accepted_commands_scope": "current_execution_segment",
+      "cumulative_fields": [
+        "wallet",
+        "online_acquisition",
+        "active_time_seconds",
+        "source_total_throws"
+      ],
+      "end_seconds": 2419200,
+      "event_scope": "current_execution_segment",
+      "requested_until_seconds": null,
+      "scenario_end_seconds": 2419200,
+      "start_seconds": 0
+    },
+    "model_digest": "sha256:f1383ac22cc0cb65702d6cc1de4a2c1f5e183ee6991b82a92b81cf3eb9c5ee4f",
+    "model_id": "fish",
+    "overrides": [],
+    "profiles": [
+      "default"
+    ],
+    "scenario_id": "month_1_all_permanent",
+    "schema_version": 1,
+    "source_profiles": {
+      "default": {
+        "collection_growth": {
+          "display_names": {
+            "fish": {
+              "1001": "利维坦",
+              "1002": "恶魔鲨",
+              "1003": "死神利维坦",
+              "1004": "天灾利维坦",
+              "1005": "鹏鳍鲨雕",
+              "1006": "锤尾邓氏鱼",
+              "1007": "翼冠王蛇",
+              "1008": "螭吻灵卫",
+              "101": "小白条",
+              "102": "小鲶鱼",
+              "103": "小翘嘴",
+              "104": "河豚",
+              "105": "鲤鱼",
+              "106": "草鱼",
+              "107": "金鱼",
+              "108": "邪恶鲤鱼",
+              "1101": "角背霜熊",
+              "1102": "熔岩犀牛",
+              "1103": "六耳猕猴",
+              "1104": "剑脊熔甲鱼",
+              "1105": "冥狮豺神",
+              "1106": "六牙霜象王",
+              "1107": "盘角炎猿",
+              "1108": "地狱三头犬",
+              "1201": "穷奇暴君",
+              "1202": "垂云鲲鲸",
+              "1203": "蝶冠星鳐",
+              "1204": "麒麟",
+              "1205": "鹿冠冰龙",
+              "1206": "玄鬃黑龙",
+              "1207": "宇宙龙",
+              "1208": "幽鲲星灵",
+              "1301": "星河龙王",
+              "1302": "Chicleteira Bicicleteira",
+              "1303": "Pot Hotspot",
+              "1304": "Krupuk Pagi Pagi",
+              "1305": "Beluga Beluga",
+              "1306": "Tralaledon",
+              "1307": "Anpali Babel",
+              "1308": "Ketchuru and Musturu",
+              "1401": "Los Primos",
+              "1402": "Mastodontico Telepiedone",
+              "1403": "Espresso Shockantoni",
+              "1404": "Ketupat Kepat",
+              "1405": "Professora 67",
+              "1406": "Astro Tim",
+              "1407": "Dumbelloni",
+              "1408": "Baba Yaga",
+              "1501": "Don Tiramisotto",
+              "1502": "Kicky",
+              "1503": "Smelloni Papayoni",
+              "1504": "Barbelloni Gymrattoni",
+              "1505": "Lucky Fella",
+              "1506": "Coinator Baconator",
+              "1507": "Dribbloni Spaghetti",
+              "1508": "Divinello Starblock",
+              "1601": "Divinello Starblock",
+              "2001": "玄武",
+              "2002": "白虎",
+              "2003": "朱雀",
+              "2004": "青龙",
+              "201": "幼年海龙王",
+              "202": "皇带鱼",
+              "203": "翻车鱼",
+              "204": "海狮",
+              "205": "牛马鱼",
+              "206": "鲤鱼王",
+              "207": "鼠鲨",
+              "208": "卡皮巴拉",
+              "301": "鳌鱼",
+              "302": "味真鲨",
+              "303": "龙舟鱼",
+              "304": "大眼仔",
+              "305": "安康鱼",
+              "306": "三文鱼",
+              "307": "龙鲤",
+              "308": "护士鲨",
+              "401": "邪恶鲨",
+              "402": "积石虎蛟",
+              "403": "冰魄鱼龙",
+              "404": "鲨雕",
+              "405": "海马",
+              "406": "钢齿鲨",
+              "407": "哈基鱼",
+              "408": "熔岩邓氏鲨",
+              "501": "金枪鱼",
+              "502": "赤目鱼龙",
+              "503": "大白鲨",
+              "504": "鲸鲨",
+              "505": "双髻鲨",
+              "506": "沧龙",
+              "507": "美人鱼",
+              "508": "何罗鱼",
+              "601": "长尾鲨",
+              "602": "海龙鳄",
+              "603": "独角鲸",
+              "604": "鲶鱼王",
+              "605": "虎鲸",
+              "606": "机械鲨MK-I",
+              "607": "地壳鲨",
+              "608": "蛇颈龙",
+              "701": "抹香鲸",
+              "702": "迷彩鲶",
+              "703": "幼年杀手鲨",
+              "704": "水晶鲨",
+              "705": "般若鲤",
+              "706": "沧鲨",
+              "707": "鳄鲨",
+              "708": "巨锤鲨",
+              "801": "恶霸鲨",
+              "802": "装甲邓氏鱼",
+              "803": "珍珍",
+              "804": "幽灵鲨",
+              "805": "螳螂鲨",
+              "806": "凜冬海龙王",
+              "807": "机械鲨MK-II",
+              "808": "辐射鲨",
+              "901": "核能鲨",
+              "902": "闪电鳄",
+              "903": "寒冰鲨",
+              "904": "巨齿鳄鲨",
+              "905": "电锯鲨",
+              "906": "魔法鲸",
+              "907": "棱甲酸触",
+              "908": "深渊符文鲨"
+            },
+            "gun": {
+              "10001": "BP_SQ1",
+              "10002": "BP_uzi",
+              "10003": "BP_ve",
+              "10004": "BP_p90",
+              "10005": "BP_s686",
+              "10006": "BP_s12k",
+              "10007": "BP_ak",
+              "10008": "BP_m16",
+              "10009": "BP_M4",
+              "10010": "BP_sks",
+              "10011": "BP_vss",
+              "10012": "BP_mk12",
+              "10013": "BP_ace32",
+              "10014": "BP_m200",
+              "10015": "BP_awm",
+              "10101": "BP_m134",
+              "10102": "BP_98k",
+              "10103": "BP_amr"
+            },
+            "mutation": {
+              "1": "正常",
+              "2": "黄金",
+              "3": "翡翠",
+              "4": "钻石",
+              "5": "星空",
+              "6": "熔融"
+            }
+          },
+          "initial_gun_facts": [],
+          "initial_unlocked_entries": [],
+          "version": 1
+        },
+        "first_times": {
+          "fish_tide_participated": {
+            "online_time_seconds": "13800",
+            "round_id": "room:0:round:155",
+            "time_seconds": 93000
+          },
+          "fish_tide_unlocked": {
+            "identity": "fish_tide_unlocked:any_owned_gun",
+            "kind": "fish_tide_unlocked",
+            "online_time_seconds": "8264",
+            "time_seconds": 87464
+          },
+          "gun_claimed": {
+            "identity": "gun_claimed:401",
+            "kind": "gun_claimed",
+            "online_time_seconds": "8264",
+            "time_seconds": 87464
+          },
+          "gun_equipped": {
+            "identity": "gun_equipped:10011",
+            "kind": "gun_equipped",
+            "online_time_seconds": "8266",
+            "time_seconds": 87466
+          },
+          "gun_owned": {
+            "identity": "gun_owned:10011",
+            "kind": "gun_owned",
+            "online_time_seconds": "8264",
+            "time_seconds": 87464
+          },
+          "gun_upgraded": {
+            "identity": "gun_upgraded:402",
+            "kind": "gun_upgraded",
+            "online_time_seconds": "15107",
+            "time_seconds": 173507
+          },
+          "normal_codex_completed": {
+            "identity": "normal_codex_completed:401",
+            "kind": "normal_codex_completed",
+            "online_time_seconds": "8237",
+            "time_seconds": 87437
+          },
+          "treasure_beast_unlocked": {
+            "online_time_seconds": "6003",
+            "time_seconds": 6003
+          }
+        },
+        "initial_active_time_seconds": 0,
+        "initial_online": true,
+        "lifecycle_gun_milestones": [
+          {
+            "identity": "normal_codex_completed:401",
+            "kind": "normal_codex_completed",
+            "online_time_seconds": "8237",
+            "time_seconds": 87437
+          },
+          {
+            "identity": "gun_claimed:401",
+            "kind": "gun_claimed",
+            "online_time_seconds": "8264",
+            "time_seconds": 87464
+          },
+          {
+            "identity": "gun_owned:10011",
+            "kind": "gun_owned",
+            "online_time_seconds": "8264",
+            "time_seconds": 87464
+          },
+          {
+            "identity": "fish_tide_unlocked:any_owned_gun",
+            "kind": "fish_tide_unlocked",
+            "online_time_seconds": "8264",
+            "time_seconds": 87464
+          },
+          {
+            "identity": "gun_equipped:10011",
+            "kind": "gun_equipped",
+            "online_time_seconds": "8266",
+            "time_seconds": 87466
+          },
+          {
+            "identity": "gun_upgraded:402",
+            "kind": "gun_upgraded",
+            "online_time_seconds": "15107",
+            "time_seconds": 173507
+          },
+          {
+            "identity": "normal_codex_completed:501",
+            "kind": "normal_codex_completed",
+            "online_time_seconds": "18604",
+            "time_seconds": 177004
+          },
+          {
+            "identity": "gun_claimed:501",
+            "kind": "gun_claimed",
+            "online_time_seconds": "18630",
+            "time_seconds": 177030
+          },
+          {
+            "identity": "gun_owned:10005",
+            "kind": "gun_owned",
+            "online_time_seconds": "18630",
+            "time_seconds": 177030
+          },
+          {
+            "identity": "gun_equipped:10005",
+            "kind": "gun_equipped",
+            "online_time_seconds": "18632",
+            "time_seconds": 177032
+          },
+          {
+            "identity": "gun_upgraded:502",
+            "kind": "gun_upgraded",
+            "online_time_seconds": "25939",
+            "time_seconds": 263539
+          },
+          {
+            "identity": "gun_upgraded:602",
+            "kind": "gun_upgraded",
+            "online_time_seconds": "32353",
+            "time_seconds": 349153
+          },
+          {
+            "identity": "normal_codex_completed:601",
+            "kind": "normal_codex_completed",
+            "online_time_seconds": "32755",
+            "time_seconds": 349555
+          },
+          {
+            "identity": "gun_claimed:601",
+            "kind": "gun_claimed",
+            "online_time_seconds": "32780",
+            "time_seconds": 349580
+          },
+          {
+            "identity": "gun_owned:10006",
+            "kind": "gun_owned",
+            "online_time_seconds": "32780",
+            "time_seconds": 349580
+          },
+          {
+            "identity": "gun_equipped:10006",
+            "kind": "gun_equipped",
+            "online_time_seconds": "32782",
+            "time_seconds": 349582
+          },
+          {
+            "identity": "gun_upgraded:102",
+            "kind": "gun_upgraded",
+            "online_time_seconds": "55900",
+            "time_seconds": 610300
+          },
+          {
+            "identity": "normal_codex_completed:701",
+            "kind": "normal_codex_completed",
+            "online_time_seconds": "57072",
+            "time_seconds": 611472
+          },
+          {
+            "identity": "gun_claimed:701",
+            "kind": "gun_claimed",
+            "online_time_seconds": "57096",
+            "time_seconds": 611496
+          },
+          {
+            "identity": "gun_owned:10008",
+            "kind": "gun_owned",
+            "online_time_seconds": "57096",
+            "time_seconds": 611496
+          },
+          {
+            "identity": "gun_equipped:10008",
+            "kind": "gun_equipped",
+            "online_time_seconds": "57098",
+            "time_seconds": 611498
+          },
+          {
+            "identity": "gun_upgraded:302",
+            "kind": "gun_upgraded",
+            "online_time_seconds": "59200",
+            "time_seconds": 692800
+          },
+          {
+            "identity": "gun_upgraded:702",
+            "kind": "gun_upgraded",
+            "online_time_seconds": "59298",
+            "time_seconds": 692898
+          },
+          {
+            "identity": "gun_upgraded:202",
+            "kind": "gun_upgraded",
+            "online_time_seconds": "61400",
+            "time_seconds": 695000
+          },
+          {
+            "identity": "normal_codex_completed:101",
+            "kind": "normal_codex_completed",
+            "online_time_seconds": "74430",
+            "time_seconds": 866430
+          },
+          {
+            "identity": "gun_claimed:101",
+            "kind": "gun_claimed",
+            "online_time_seconds": "74430",
+            "time_seconds": 866430
+          },
+          {
+            "identity": "gun_owned:10001",
+            "kind": "gun_owned",
+            "online_time_seconds": "74430",
+            "time_seconds": 866430
+          },
+          {
+            "identity": "normal_codex_completed:301",
+            "kind": "normal_codex_completed",
+            "online_time_seconds": "76920",
+            "time_seconds": 868920
+          },
+          {
+            "identity": "gun_claimed:301",
+            "kind": "gun_claimed",
+            "online_time_seconds": "76964",
+            "time_seconds": 868964
+          },
+          {
+            "identity": "gun_owned:10003",
+            "kind": "gun_owned",
+            "online_time_seconds": "76964",
+            "time_seconds": 868964
+          },
+          {
+            "identity": "normal_codex_completed:801",
+            "kind": "normal_codex_completed",
+            "online_time_seconds": "77925",
+            "time_seconds": 869925
+          },
+          {
+            "identity": "gun_claimed:801",
+            "kind": "gun_claimed",
+            "online_time_seconds": "77949",
+            "time_seconds": 869949
+          },
+          {
+            "identity": "gun_owned:10009",
+            "kind": "gun_owned",
+            "online_time_seconds": "77949",
+            "time_seconds": 869949
+          },
+          {
+            "identity": "gun_equipped:10009",
+            "kind": "gun_equipped",
+            "online_time_seconds": "77951",
+            "time_seconds": 869951
+          },
+          {
+            "identity": "gun_upgraded:802",
+            "kind": "gun_upgraded",
+            "online_time_seconds": "85569",
+            "time_seconds": 956769
+          },
+          {
+            "identity": "gun_upgraded:902",
+            "kind": "gun_upgraded",
+            "online_time_seconds": "94569",
+            "time_seconds": 1124169
+          },
+          {
+            "identity": "normal_codex_completed:901",
+            "kind": "normal_codex_completed",
+            "online_time_seconds": "95865",
+            "time_seconds": 1125465
+          },
+          {
+            "identity": "gun_claimed:901",
+            "kind": "gun_claimed",
+            "online_time_seconds": "95889",
+            "time_seconds": 1125489
+          },
+          {
+            "identity": "gun_owned:10007",
+            "kind": "gun_owned",
+            "online_time_seconds": "95889",
+            "time_seconds": 1125489
+          },
+          {
+            "identity": "gun_equipped:10007",
+            "kind": "gun_equipped",
+            "online_time_seconds": "95891",
+            "time_seconds": 1125491
+          },
+          {
+            "identity": "gun_upgraded:303",
+            "kind": "gun_upgraded",
+            "online_time_seconds": "146400",
+            "time_seconds": 1730400
+          },
+          {
+            "identity": "normal_codex_completed:201",
+            "kind": "normal_codex_completed",
+            "online_time_seconds": "152460",
+            "time_seconds": 1815660
+          },
+          {
+            "identity": "gun_claimed:201",
+            "kind": "gun_claimed",
+            "online_time_seconds": "152463",
+            "time_seconds": 1815663
+          },
+          {
+            "identity": "gun_owned:10002",
+            "kind": "gun_owned",
+            "online_time_seconds": "152463",
+            "time_seconds": 1815663
+          },
+          {
+            "identity": "gun_upgraded:903",
+            "kind": "gun_upgraded",
+            "online_time_seconds": "159007",
+            "time_seconds": 1901407
+          },
+          {
+            "identity": "gun_upgraded:1002",
+            "kind": "gun_upgraded",
+            "online_time_seconds": "159715",
+            "time_seconds": 1902115
+          },
+          {
+            "identity": "gun_upgraded:104",
+            "kind": "gun_upgraded",
+            "online_time_seconds": "159780",
+            "time_seconds": 1902180
+          },
+          {
+            "identity": "normal_codex_completed:1001",
+            "kind": "normal_codex_completed",
+            "online_time_seconds": "160588",
+            "time_seconds": 1902988
+          },
+          {
+            "identity": "gun_claimed:1001",
+            "kind": "gun_claimed",
+            "online_time_seconds": "160611",
+            "time_seconds": 1903011
+          },
+          {
+            "identity": "gun_owned:10013",
+            "kind": "gun_owned",
+            "online_time_seconds": "160611",
+            "time_seconds": 1903011
+          },
+          {
+            "identity": "gun_equipped:10013",
+            "kind": "gun_equipped",
+            "online_time_seconds": "160613",
+            "time_seconds": 1903013
+          }
+        ],
+        "permanent_privileges": {
+          "autoThrowUnlocked": true,
+          "collectAllMoneyUnlocked": false,
+          "grantedAt": 0,
+          "grantedItemIds": [
+            8310000,
+            8310001,
+            8310002,
+            8310003,
+            8310005,
+            8310008,
+            8310009,
+            8310010
+          ],
+          "items": [
+            {
+              "actionKey": "fish_hall_money_multiplier",
+              "actionParam": 2,
+              "id": 8310000,
+              "isForSale": true,
+              "name": "双倍金币",
+              "receipt": {
+                "alreadyOwned": false,
+                "itemId": 8310000
+              }
+            },
+            {
+              "actionKey": "trash_material_multiplier",
+              "actionParam": 2,
+              "id": 8310001,
+              "isForSale": true,
+              "name": "双倍资源",
+              "receipt": {
+                "alreadyOwned": false,
+                "itemId": 8310001
+              }
+            },
+            {
+              "actionKey": "throw_speed_multiplier",
+              "actionParam": 2,
+              "id": 8310002,
+              "isForSale": true,
+              "name": "双倍炸鱼速度",
+              "receipt": {
+                "alreadyOwned": false,
+                "itemId": 8310002
+              }
+            },
+            {
+              "actionKey": "trash_process_speed_multiplier",
+              "actionParam": 2,
+              "id": 8310003,
+              "isForSale": true,
+              "name": "双倍材料分解速度",
+              "receipt": {
+                "alreadyOwned": false,
+                "itemId": 8310003
+              }
+            },
+            {
+              "actionKey": "unlock_auto_throw",
+              "actionParam": 1,
+              "id": 8310005,
+              "isForSale": true,
+              "name": "自动炸鱼",
+              "receipt": {
+                "alreadyOwned": false,
+                "itemId": 8310005
+              }
+            },
+            {
+              "actionKey": "torpedo_power_multiplier",
+              "actionParam": 2,
+              "id": 8310008,
+              "isForSale": true,
+              "name": "双倍鱼雷威力",
+              "receipt": {
+                "alreadyOwned": false,
+                "itemId": 8310008
+              }
+            },
+            {
+              "actionKey": "mutation_luck_multiplier",
+              "actionParam": 2,
+              "id": 8310009,
+              "isForSale": true,
+              "name": "双倍变异鱼运气",
+              "receipt": {
+                "alreadyOwned": false,
+                "itemId": 8310009
+              }
+            },
+            {
+              "actionKey": "trash_luck_multiplier",
+              "actionParam": 2,
+              "id": 8310010,
+              "isForSale": true,
+              "name": "双倍寻宝运气",
+              "receipt": {
+                "alreadyOwned": false,
+                "itemId": 8310010
+              }
+            }
+          ],
+          "mode": "all_on_sale",
+          "modifiers": {
+            "ExerciseSpeedMultiplier": 1,
+            "FishHallMoneyMultiplier": 2,
+            "FishLuckMultiplier": 1,
+            "FishOutputMultiplier": 1,
+            "MutationChanceMultiplier": 2,
+            "ThrowSpeedMultiplier": 2,
+            "TorpedoPowerMultiplier": 2,
+            "TrashLuckMultiplier": 2,
+            "TrashMaterialMultiplier": 2,
+            "TrashOutputMultiplier": 1,
+            "TrashProcessSpeedMultiplier": 2,
+            "TrashTrainingSpeedMultiplier": 1
+          },
+          "paymentSimulated": false,
+          "version": 1
+        },
+        "pool_growth": {
+          "initial_seen_pool_ids": [],
+          "pools": [
+            {
+              "display_name": "洗脚大盆",
+              "pool_id": 2,
+              "previous_upper_bound": "2E+2"
+            },
+            {
+              "display_name": "幽都冥河",
+              "pool_id": 3,
+              "previous_upper_bound": "3E+3"
+            },
+            {
+              "display_name": "原谅海湾",
+              "pool_id": 4,
+              "previous_upper_bound": "3.0E+4"
+            },
+            {
+              "display_name": "火锅神湖",
+              "pool_id": 5,
+              "previous_upper_bound": "2.20E+5"
+            },
+            {
+              "display_name": "若木沧渊",
+              "pool_id": 6,
+              "previous_upper_bound": "2.5E+6"
+            },
+            {
+              "display_name": "玄鳞古河",
+              "pool_id": 7,
+              "previous_upper_bound": "2.8E+7"
+            },
+            {
+              "display_name": "奶茶大海",
+              "pool_id": 8,
+              "previous_upper_bound": "3.00E+8"
+            },
+            {
+              "display_name": "青丘灵湖",
+              "pool_id": 9,
+              "previous_upper_bound": "8.40E+8"
+            },
+            {
+              "display_name": "九野荒海",
+              "pool_id": 10,
+              "previous_upper_bound": "2.100E+9"
+            },
+            {
+              "display_name": "帝江血渊",
+              "pool_id": 11,
+              "previous_upper_bound": "7.500E+9"
+            },
+            {
+              "display_name": "太荒神洋",
+              "pool_id": 12,
+              "previous_upper_bound": "7.50E+10"
+            },
+            {
+              "display_name": "昆仑之墟",
+              "pool_id": 13,
+              "previous_upper_bound": "3.30E+11"
+            }
+          ],
+          "time_basis": "source_observation",
+          "version": 1
+        }
+      }
+    },
+    "source_runtime": {
+      "advance_mode": "equivalent_batch_v1",
+      "code_sha256": "7d81cc54eed9defe1372ee487044480e9774feebcb3cfcdf751ad914e6b0701f",
+      "codex_claim_policy": "stable_reward_id_one_second_v1",
+      "collect_interval_basis": "batch_start",
+      "collect_interval_seconds": 300,
+      "collect_policy": "stable_slot_batch_v1",
+      "collect_slot_seconds": 2,
+      "fish_keep_count": 30,
+      "fish_sell_policy": "over_30_lowest_level_one_cps_backpack_v1",
+      "generated_money_definition": "source_collected_slot_receipts_plus_current_unclaimed",
+      "gun_claim_seconds": 1,
+      "gun_equip_seconds": 1,
+      "gun_policy": "claim_stable_reward_id_then_highest_source_attack_v1",
+      "idle_seconds": 30,
+      "in_fishing_area": true,
+      "integration_code_sha256": "db9eb3a9c00a882ae94ba113786025af89f4952f4b681a5fed6438cd7726d486",
+      "landing_distance_cm": null,
+      "landing_policy": "source_natural_v1",
+      "lua_executable": "lua55",
+      "lua_version": "Lua 5.5",
+      "online_acquisition_definition": "observed_balance_increases_plus_receipt_spending_excludes_offline_claims",
+      "policy": "source_priority_v1",
+      "record_interval_seconds": 300,
+      "sampling_time_basis": "online",
+      "selected_export_root": "E:\\fish-oasis\\igess_export\\json",
+      "selected_export_sha256": "0043d3122cf66e373380597cdd607ab30a2c0b1582b4fc92fadbf0a14d2e632b",
+      "tide_admission_policy": {
+        "budget_basis": "current_material_wallet_before_admission",
+        "cost_basis": "source_round_damage_hp_ammunition_quote",
+        "daily_income": "observed_online_material_including_sales_and_codex_excluding_offline",
+        "daily_spending": "source_paid_reload_receipts_plus_full_round_quote",
+        "daily_window": "simulation_wall_day_86400_seconds_no_carry",
+        "horizon_online_seconds": 1800,
+        "income": "observed_online_material_excluding_codex_and_offline",
+        "income_window_online_seconds": 1800,
+        "max_daily_income_fraction": "0.15",
+        "max_material_fraction": "0.25",
+        "policy": "growth_first_wallet_fraction_daily_income_near_term_reserve_v2",
+        "reservation": "one_next_source_quoted_target_existing_weights_and_turn"
+      },
+      "tide_policy": {
+        "competition": "not_simulated",
+        "duration_seconds": 0,
+        "eggs": 5,
+        "gun_damage_affects_reload_count": true,
+        "gun_damage_affects_yield": false,
+        "initial_ammo": 0,
+        "leftover_ammo": "discarded_after_round",
+        "magazine_size": 30,
+        "model": "fixed_eggs_damage_hp_zero_time_v3",
+        "shot_policy": "sum_per_egg_ceiling_hp_over_attack_perfect_hits"
+      },
+      "tide_schedule": {
+        "interval_seconds": 600,
+        "policy": "absolute_opening_only_v1",
+        "room_origin_seconds": 0,
+        "spawn_window_seconds": 120
+      },
+      "timings_seconds": {
+        "adapter_total": 4456.551,
+        "checkpoint": 3.29,
+        "input_check": 0.202,
+        "process_close": 0.442,
+        "process_start": 1.206,
+        "source_execution": 4451.411
+      }
+    }
+  },
+  "checkpoint_identity": {
+    "engine_id": "fish_source",
+    "model_digest": "sha256:f1383ac22cc0cb65702d6cc1de4a2c1f5e183ee6991b82a92b81cf3eb9c5ee4f",
+    "profile_id": "default",
+    "root_random_seed": 2031507854,
+    "scenario_id": "month_1_all_permanent",
+    "simulated_time_seconds": 2419200
+  },
+  "active_time_seconds": 201600,
+  "source_session_origin": {
+    "fastAdvance": true,
+    "inFishingArea": true,
+    "permanentPrivilegeMode": "all_on_sale",
+    "randomSeed": 2031507854,
+    "startAt": 0
+  },
+  "metrics": {
+    "all_count": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "requested_end_seconds": 2419200,
+        "requested_start_seconds": 0,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {},
+      "evidence_selection": {
+        "dimensions": {},
+        "matched_count": 365,
+        "truncated": true
+      },
+      "metric_id": "growth.count",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "wall",
+      "unit": "count",
+      "value": 365,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "all_labels": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "requested_end_seconds": 2419200,
+        "requested_start_seconds": 0,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {},
+      "evidence_selection": {
+        "dimensions": {},
+        "matched_count": 365,
+        "truncated": true
+      },
+      "metric_id": "growth.labels",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "wall",
+      "unit": "count",
+      "value": 405,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "all_gap": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {},
+      "evidence_selection": {
+        "dimensions": {},
+        "matched_count": 2,
+        "observed_event_count": 365,
+        "rule": "growth.max_gap determining boundaries (first maximum on ties)",
+        "truncated": false
+      },
+      "metric_id": "growth.max_gap",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "online",
+      "unit": "seconds",
+      "value": 9319,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "core_gap": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {
+        "categories": [
+          "fish_pool",
+          "barbell",
+          "torpedo",
+          "strength_rebirth",
+          "fish_hall",
+          "treasure_beast",
+          "breakthrough_funding",
+          "trash_man_rebirth",
+          "gun_owned",
+          "gun_upgraded"
+        ]
+      },
+      "evidence_selection": {
+        "dimensions": {
+          "categories": [
+            "fish_pool",
+            "barbell",
+            "torpedo",
+            "strength_rebirth",
+            "fish_hall",
+            "treasure_beast",
+            "breakthrough_funding",
+            "trash_man_rebirth",
+            "gun_owned",
+            "gun_upgraded"
+          ]
+        },
+        "matched_count": 2,
+        "observed_event_count": 137,
+        "rule": "growth.max_gap determining boundaries (first maximum on ties)",
+        "truncated": false
+      },
+      "metric_id": "growth.max_gap",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "online",
+      "unit": "seconds",
+      "value": 10985,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "fish_pool": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "requested_end_seconds": 2419200,
+        "requested_start_seconds": 0,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {
+        "categories": [
+          "fish_pool"
+        ]
+      },
+      "evidence_selection": {
+        "dimensions": {
+          "categories": [
+            "fish_pool"
+          ]
+        },
+        "matched_count": 8,
+        "truncated": false
+      },
+      "metric_id": "growth.labels",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "wall",
+      "unit": "count",
+      "value": 8,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "barbell": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "requested_end_seconds": 2419200,
+        "requested_start_seconds": 0,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {
+        "categories": [
+          "barbell"
+        ]
+      },
+      "evidence_selection": {
+        "dimensions": {
+          "categories": [
+            "barbell"
+          ]
+        },
+        "matched_count": 12,
+        "truncated": false
+      },
+      "metric_id": "growth.labels",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "wall",
+      "unit": "count",
+      "value": 12,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "torpedo": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "requested_end_seconds": 2419200,
+        "requested_start_seconds": 0,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {
+        "categories": [
+          "torpedo"
+        ]
+      },
+      "evidence_selection": {
+        "dimensions": {
+          "categories": [
+            "torpedo"
+          ]
+        },
+        "matched_count": 15,
+        "truncated": false
+      },
+      "metric_id": "growth.labels",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "wall",
+      "unit": "count",
+      "value": 15,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "strength_rebirth": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "requested_end_seconds": 2419200,
+        "requested_start_seconds": 0,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {
+        "categories": [
+          "strength_rebirth"
+        ]
+      },
+      "evidence_selection": {
+        "dimensions": {
+          "categories": [
+            "strength_rebirth"
+          ]
+        },
+        "matched_count": 9,
+        "truncated": false
+      },
+      "metric_id": "growth.labels",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "wall",
+      "unit": "count",
+      "value": 9,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "fish_hall": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "requested_end_seconds": 2419200,
+        "requested_start_seconds": 0,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {
+        "categories": [
+          "fish_hall"
+        ]
+      },
+      "evidence_selection": {
+        "dimensions": {
+          "categories": [
+            "fish_hall"
+          ]
+        },
+        "matched_count": 25,
+        "truncated": false
+      },
+      "metric_id": "growth.labels",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "wall",
+      "unit": "count",
+      "value": 25,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "treasure_beast": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "requested_end_seconds": 2419200,
+        "requested_start_seconds": 0,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {
+        "categories": [
+          "treasure_beast"
+        ]
+      },
+      "evidence_selection": {
+        "dimensions": {
+          "categories": [
+            "treasure_beast"
+          ]
+        },
+        "matched_count": 1,
+        "truncated": false
+      },
+      "metric_id": "growth.labels",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "wall",
+      "unit": "count",
+      "value": 1,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "breakthrough_funding": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "requested_end_seconds": 2419200,
+        "requested_start_seconds": 0,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {
+        "categories": [
+          "breakthrough_funding"
+        ]
+      },
+      "evidence_selection": {
+        "dimensions": {
+          "categories": [
+            "breakthrough_funding"
+          ]
+        },
+        "matched_count": 35,
+        "truncated": false
+      },
+      "metric_id": "growth.labels",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "wall",
+      "unit": "count",
+      "value": 35,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "trash_man_rebirth": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "requested_end_seconds": 2419200,
+        "requested_start_seconds": 0,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {
+        "categories": [
+          "trash_man_rebirth"
+        ]
+      },
+      "evidence_selection": {
+        "dimensions": {
+          "categories": [
+            "trash_man_rebirth"
+          ]
+        },
+        "matched_count": 9,
+        "truncated": false
+      },
+      "metric_id": "growth.labels",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "wall",
+      "unit": "count",
+      "value": 9,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "new_fish_species": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "requested_end_seconds": 2419200,
+        "requested_start_seconds": 0,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {
+        "categories": [
+          "new_fish_species"
+        ]
+      },
+      "evidence_selection": {
+        "dimensions": {
+          "categories": [
+            "new_fish_species"
+          ]
+        },
+        "matched_count": 90,
+        "truncated": false
+      },
+      "metric_id": "growth.labels",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "wall",
+      "unit": "count",
+      "value": 90,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "new_fish_variant": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "requested_end_seconds": 2419200,
+        "requested_start_seconds": 0,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {
+        "categories": [
+          "new_fish_variant"
+        ]
+      },
+      "evidence_selection": {
+        "dimensions": {
+          "categories": [
+            "new_fish_variant"
+          ]
+        },
+        "matched_count": 167,
+        "truncated": true
+      },
+      "metric_id": "growth.labels",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "wall",
+      "unit": "count",
+      "value": 167,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "normal_codex_completed": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "requested_end_seconds": 2419200,
+        "requested_start_seconds": 0,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {
+        "categories": [
+          "normal_codex_completed"
+        ]
+      },
+      "evidence_selection": {
+        "dimensions": {
+          "categories": [
+            "normal_codex_completed"
+          ]
+        },
+        "matched_count": 10,
+        "truncated": false
+      },
+      "metric_id": "growth.labels",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "wall",
+      "unit": "count",
+      "value": 10,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "gun_owned": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "requested_end_seconds": 2419200,
+        "requested_start_seconds": 0,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {
+        "categories": [
+          "gun_owned"
+        ]
+      },
+      "evidence_selection": {
+        "dimensions": {
+          "categories": [
+            "gun_owned"
+          ]
+        },
+        "matched_count": 10,
+        "truncated": false
+      },
+      "metric_id": "growth.labels",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "wall",
+      "unit": "count",
+      "value": 10,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "gun_upgraded": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "requested_end_seconds": 2419200,
+        "requested_start_seconds": 0,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {
+        "categories": [
+          "gun_upgraded"
+        ]
+      },
+      "evidence_selection": {
+        "dimensions": {
+          "categories": [
+            "gun_upgraded"
+          ]
+        },
+        "matched_count": 13,
+        "truncated": false
+      },
+      "metric_id": "growth.labels",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "wall",
+      "unit": "count",
+      "value": 13,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "week_1": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "requested_end_seconds": 604800,
+        "requested_start_seconds": 0,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {
+        "week": 1
+      },
+      "evidence_selection": {
+        "dimensions": {
+          "week": 1
+        },
+        "matched_count": 169,
+        "truncated": true
+      },
+      "metric_id": "growth.count",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "wall",
+      "unit": "count",
+      "value": 169,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "week_2": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "requested_end_seconds": 1209600,
+        "requested_start_seconds": 604800,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {
+        "week": 2
+      },
+      "evidence_selection": {
+        "dimensions": {
+          "week": 2
+        },
+        "matched_count": 104,
+        "truncated": true
+      },
+      "metric_id": "growth.count",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "wall",
+      "unit": "count",
+      "value": 104,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "week_3": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "requested_end_seconds": 1814400,
+        "requested_start_seconds": 1209600,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {
+        "week": 3
+      },
+      "evidence_selection": {
+        "dimensions": {
+          "week": 3
+        },
+        "matched_count": 51,
+        "truncated": false
+      },
+      "metric_id": "growth.count",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "wall",
+      "unit": "count",
+      "value": 51,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "week_4": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "requested_end_seconds": 2419200,
+        "requested_start_seconds": 1814400,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {
+        "week": 4
+      },
+      "evidence_selection": {
+        "dimensions": {
+          "week": 4
+        },
+        "matched_count": 41,
+        "truncated": false
+      },
+      "metric_id": "growth.count",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "wall",
+      "unit": "count",
+      "value": 41,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "core_week_1": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "requested_end_seconds": 604800,
+        "requested_start_seconds": 0,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {
+        "categories": [
+          "fish_pool",
+          "barbell",
+          "torpedo",
+          "strength_rebirth",
+          "fish_hall",
+          "treasure_beast",
+          "breakthrough_funding",
+          "trash_man_rebirth",
+          "gun_owned",
+          "gun_upgraded"
+        ],
+        "week": 1
+      },
+      "evidence_selection": {
+        "dimensions": {
+          "categories": [
+            "fish_pool",
+            "barbell",
+            "torpedo",
+            "strength_rebirth",
+            "fish_hall",
+            "treasure_beast",
+            "breakthrough_funding",
+            "trash_man_rebirth",
+            "gun_owned",
+            "gun_upgraded"
+          ],
+          "week": 1
+        },
+        "matched_count": 80,
+        "truncated": false
+      },
+      "metric_id": "growth.count",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "wall",
+      "unit": "count",
+      "value": 80,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "core_week_2": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "requested_end_seconds": 1209600,
+        "requested_start_seconds": 604800,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {
+        "categories": [
+          "fish_pool",
+          "barbell",
+          "torpedo",
+          "strength_rebirth",
+          "fish_hall",
+          "treasure_beast",
+          "breakthrough_funding",
+          "trash_man_rebirth",
+          "gun_owned",
+          "gun_upgraded"
+        ],
+        "week": 2
+      },
+      "evidence_selection": {
+        "dimensions": {
+          "categories": [
+            "fish_pool",
+            "barbell",
+            "torpedo",
+            "strength_rebirth",
+            "fish_hall",
+            "treasure_beast",
+            "breakthrough_funding",
+            "trash_man_rebirth",
+            "gun_owned",
+            "gun_upgraded"
+          ],
+          "week": 2
+        },
+        "matched_count": 32,
+        "truncated": false
+      },
+      "metric_id": "growth.count",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "wall",
+      "unit": "count",
+      "value": 32,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "core_week_3": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "requested_end_seconds": 1814400,
+        "requested_start_seconds": 1209600,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {
+        "categories": [
+          "fish_pool",
+          "barbell",
+          "torpedo",
+          "strength_rebirth",
+          "fish_hall",
+          "treasure_beast",
+          "breakthrough_funding",
+          "trash_man_rebirth",
+          "gun_owned",
+          "gun_upgraded"
+        ],
+        "week": 3
+      },
+      "evidence_selection": {
+        "dimensions": {
+          "categories": [
+            "fish_pool",
+            "barbell",
+            "torpedo",
+            "strength_rebirth",
+            "fish_hall",
+            "treasure_beast",
+            "breakthrough_funding",
+            "trash_man_rebirth",
+            "gun_owned",
+            "gun_upgraded"
+          ],
+          "week": 3
+        },
+        "matched_count": 11,
+        "truncated": false
+      },
+      "metric_id": "growth.count",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "wall",
+      "unit": "count",
+      "value": 11,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "core_week_4": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "requested_end_seconds": 2419200,
+        "requested_start_seconds": 1814400,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {
+        "categories": [
+          "fish_pool",
+          "barbell",
+          "torpedo",
+          "strength_rebirth",
+          "fish_hall",
+          "treasure_beast",
+          "breakthrough_funding",
+          "trash_man_rebirth",
+          "gun_owned",
+          "gun_upgraded"
+        ],
+        "week": 4
+      },
+      "evidence_selection": {
+        "dimensions": {
+          "categories": [
+            "fish_pool",
+            "barbell",
+            "torpedo",
+            "strength_rebirth",
+            "fish_hall",
+            "treasure_beast",
+            "breakthrough_funding",
+            "trash_man_rebirth",
+            "gun_owned",
+            "gun_upgraded"
+          ],
+          "week": 4
+        },
+        "matched_count": 14,
+        "truncated": false
+      },
+      "metric_id": "growth.count",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "wall",
+      "unit": "count",
+      "value": 14,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "core_tail": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {
+        "categories": [
+          "fish_pool",
+          "barbell",
+          "torpedo",
+          "strength_rebirth",
+          "fish_hall",
+          "treasure_beast",
+          "breakthrough_funding",
+          "trash_man_rebirth",
+          "gun_owned",
+          "gun_upgraded"
+        ]
+      },
+      "evidence_selection": {
+        "dimensions": {
+          "categories": [
+            "fish_pool",
+            "barbell",
+            "torpedo",
+            "strength_rebirth",
+            "fish_hall",
+            "treasure_beast",
+            "breakthrough_funding",
+            "trash_man_rebirth",
+            "gun_owned",
+            "gun_upgraded"
+          ]
+        },
+        "matched_count": 1,
+        "observed_event_count": 137,
+        "rule": "growth.tail_wait determining boundaries (first maximum on ties)",
+        "truncated": false
+      },
+      "metric_id": "growth.tail_wait",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "online",
+      "unit": "seconds",
+      "value": 5021,
+      "value_status": "recorded",
+      "value_type": "integer"
+    }
+  },
+  "gap_evidence": {
+    "all_gap": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {},
+      "evidence": [
+        {
+          "artifact": "events.json",
+          "categories": [
+            "barbell"
+          ],
+          "content_digest": "sha256:a0cc2329ec6105db6178998cf79c123788efc732375776537ac7a32c89e6d57f",
+          "display_name": null,
+          "event_identity": "barbell:13",
+          "run_id": "20261103T154017869259Z-month_1_all_permanent",
+          "source_event_kind": "synthesize_barbell",
+          "wall_time_seconds": 2246460
+        },
+        {
+          "artifact": "events.json",
+          "categories": [
+            "trash_man_rebirth"
+          ],
+          "content_digest": "sha256:a0cc2329ec6105db6178998cf79c123788efc732375776537ac7a32c89e6d57f",
+          "display_name": null,
+          "event_identity": "",
+          "run_id": "20261103T154017869259Z-month_1_all_permanent",
+          "source_event_kind": "rebirth_trash_man",
+          "wall_time_seconds": 2334979
+        },
+        {
+          "artifact": "events.json",
+          "content_digest": "sha256:a0cc2329ec6105db6178998cf79c123788efc732375776537ac7a32c89e6d57f",
+          "pointer": "",
+          "run_id": "20261103T154017869259Z-month_1_all_permanent",
+          "selection": "online session boundaries"
+        },
+        {
+          "artifact": "run_manifest.json",
+          "content_digest": "sha256:34a3d5ff12c2a0ef700256e741c929a497613d772191209ba144ba2a431674c9",
+          "pointer": "/source_profiles",
+          "run_id": "20261103T154017869259Z-month_1_all_permanent",
+          "selection": "initial online state"
+        }
+      ],
+      "evidence_selection": {
+        "dimensions": {},
+        "matched_count": 2,
+        "observed_event_count": 365,
+        "rule": "growth.max_gap determining boundaries (first maximum on ties)",
+        "truncated": false
+      },
+      "metric_id": "growth.max_gap",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "online",
+      "unit": "seconds",
+      "value": 9319,
+      "value_status": "recorded",
+      "value_type": "integer"
+    },
+    "core_gap": {
+      "coverage": {
+        "complete": true,
+        "end_seconds": 2419200,
+        "start_seconds": 0
+      },
+      "definition_version": 1,
+      "dimensions": {
+        "categories": [
+          "fish_pool",
+          "barbell",
+          "torpedo",
+          "strength_rebirth",
+          "fish_hall",
+          "treasure_beast",
+          "breakthrough_funding",
+          "trash_man_rebirth",
+          "gun_owned",
+          "gun_upgraded"
+        ]
+      },
+      "evidence": [
+        {
+          "artifact": "events.json",
+          "categories": [
+            "breakthrough_funding"
+          ],
+          "content_digest": "sha256:a0cc2329ec6105db6178998cf79c123788efc732375776537ac7a32c89e6d57f",
+          "display_name": null,
+          "event_identity": "breakthrough_funding:34",
+          "run_id": "20261103T154017869259Z-month_1_all_permanent",
+          "source_event_kind": "start_breakthrough",
+          "wall_time_seconds": 1903964
+        },
+        {
+          "artifact": "events.json",
+          "categories": [
+            "breakthrough_funding"
+          ],
+          "content_digest": "sha256:a0cc2329ec6105db6178998cf79c123788efc732375776537ac7a32c89e6d57f",
+          "display_name": null,
+          "event_identity": "breakthrough_funding:35",
+          "run_id": "20261103T154017869259Z-month_1_all_permanent",
+          "source_event_kind": "start_breakthrough",
+          "wall_time_seconds": 1994149
+        },
+        {
+          "artifact": "events.json",
+          "content_digest": "sha256:a0cc2329ec6105db6178998cf79c123788efc732375776537ac7a32c89e6d57f",
+          "pointer": "",
+          "run_id": "20261103T154017869259Z-month_1_all_permanent",
+          "selection": "online session boundaries"
+        },
+        {
+          "artifact": "run_manifest.json",
+          "content_digest": "sha256:34a3d5ff12c2a0ef700256e741c929a497613d772191209ba144ba2a431674c9",
+          "pointer": "/source_profiles",
+          "run_id": "20261103T154017869259Z-month_1_all_permanent",
+          "selection": "initial online state"
+        }
+      ],
+      "evidence_selection": {
+        "dimensions": {
+          "categories": [
+            "fish_pool",
+            "barbell",
+            "torpedo",
+            "strength_rebirth",
+            "fish_hall",
+            "treasure_beast",
+            "breakthrough_funding",
+            "trash_man_rebirth",
+            "gun_owned",
+            "gun_upgraded"
+          ]
+        },
+        "matched_count": 2,
+        "observed_event_count": 137,
+        "rule": "growth.max_gap determining boundaries (first maximum on ties)",
+        "truncated": false
+      },
+      "metric_id": "growth.max_gap",
+      "profile_id": "default",
+      "reason": "",
+      "scope": "segment",
+      "time_basis": "online",
+      "unit": "seconds",
+      "value": 10985,
+      "value_status": "recorded",
+      "value_type": "integer"
+    }
+  },
+  "final_progression": {
+    "time_seconds": 2419200,
+    "spendable_money": "7910301943690225.59121164514027319245128095476783078167146356218121075285448414962670209110713874700193060065405320305169139583137291583345163176975215934221149478332356201615294111206821980886161327362060546875",
+    "unclaimed_money": "2412844557605326.2875573205060294233458672781923884173267528558581797353684609798109826904050684099042499666318096260506248527050355717946129838769010568814994985452804417136452030945292790420353412628173828125",
+    "collected_money": "386468016195509110.49613057672567404688987600017900069441660118007704336460954616507117949005734380146597430133887500462413405606883442111318591855156433637488187048719050047107526069112282129935920238494873046875",
+    "generated_money": "388880860753114436.78368789723170347023574327837138911174335403593522309997800714488216218046241221137022426797068463067475890877386999290779890242846539325638136903247094218472046378565210034139454364776611328125",
+    "material": "102957327465",
+    "online_money_acquired_cumulative": "388880860753291996.78368789723170347023574327837138911174335403593522309997800714488216218046241221137022426797068463067475890877386999290779890242846539325638136903247094218472046378565210034139454364776611328125",
+    "online_resource_acquired_cumulative": "195597481875.0",
+    "online_fish_sale_material_cumulative": "278501915",
+    "egg_inventory_count": "0",
+    "egg_hatched_count": "1080",
+    "egg_capacity_blocked": "0",
+    "fish_inventory_count": "31",
+    "fish_inventory_capacity": "200",
+    "online_tide_reload_material_cumulative": "1487002560",
+    "online_codex_money_cumulative": "177560",
+    "online_codex_material_cumulative": "317800",
+    "codex_unlocked_count": "255",
+    "codex_claimed_count": "234",
+    "strength": "800400001",
+    "fish_luck": "5095451637.193201856",
+    "trash_luck": "486056710.07126564",
+    "trash_realm": "11",
+    "treasure_beast_unlocked": "1",
+    "total_throws": "1639",
+    "strength_rebirth_count": "9",
+    "trash_man_rebirth_count": "9",
+    "deployed_fish": 30
+  },
+  "sampled_strength_peak": "1350000001",
+  "accepted_commands": {
+    "begin_throw_flight": 1639,
+    "claim_fish_reward": 234,
+    "claim_gun_reward": 10,
+    "claim_offline_reward": 27,
+    "collect_slot": 17193,
+    "complete_throw": 1639,
+    "complete_tide": 216,
+    "deploy_fish": 30,
+    "equip_gun": 7,
+    "finalize_throw_landing": 1639,
+    "go_offline": 28,
+    "go_online": 27,
+    "prepare_throw": 1639,
+    "purchase_torpedo": 15,
+    "rebirth_strength": 9,
+    "rebirth_trash_man": 9,
+    "select_throw_landing": 1639,
+    "sell_fish": 2688,
+    "start_breakthrough": 35,
+    "start_exercise": 1764,
+    "start_tide": 216,
+    "stop_exercise": 1764,
+    "synthesize_barbell": 12,
+    "upgrade_fish": 1702,
+    "upgrade_hall": 25
+  },
+  "rejected_commands": {},
+  "first_times": {
+    "treasure_beast_unlocked": {
+      "time_seconds": 6003,
+      "online_time_seconds": "6003"
+    },
+    "normal_codex_completed": {
+      "time_seconds": 87437,
+      "kind": "normal_codex_completed",
+      "identity": "normal_codex_completed:401",
+      "online_time_seconds": "8237"
+    },
+    "gun_claimed": {
+      "time_seconds": 87464,
+      "kind": "gun_claimed",
+      "identity": "gun_claimed:401",
+      "online_time_seconds": "8264"
+    },
+    "gun_owned": {
+      "time_seconds": 87464,
+      "kind": "gun_owned",
+      "identity": "gun_owned:10011",
+      "online_time_seconds": "8264"
+    },
+    "fish_tide_unlocked": {
+      "time_seconds": 87464,
+      "kind": "fish_tide_unlocked",
+      "identity": "fish_tide_unlocked:any_owned_gun",
+      "online_time_seconds": "8264"
+    },
+    "gun_equipped": {
+      "time_seconds": 87466,
+      "kind": "gun_equipped",
+      "identity": "gun_equipped:10011",
+      "online_time_seconds": "8266"
+    },
+    "fish_tide_participated": {
+      "time_seconds": 93000,
+      "online_time_seconds": "13800",
+      "round_id": "room:0:round:155"
+    },
+    "gun_upgraded": {
+      "time_seconds": 173507,
+      "kind": "gun_upgraded",
+      "identity": "gun_upgraded:402",
+      "online_time_seconds": "15107"
+    }
+  },
+  "pool_milestones": [
+    {
+      "time_seconds": 244,
+      "pool_id": 2,
+      "display_name": "洗脚大盆",
+      "previous_upper_bound": "2E+2",
+      "strength": "242",
+      "active_time_seconds": 244
+    },
+    {
+      "time_seconds": 1413,
+      "pool_id": 3,
+      "display_name": "幽都冥河",
+      "previous_upper_bound": "3E+3",
+      "strength": "3.17E+3",
+      "active_time_seconds": 1413
+    },
+    {
+      "time_seconds": 6000,
+      "pool_id": 4,
+      "display_name": "原谅海湾",
+      "previous_upper_bound": "3.0E+4",
+      "strength": "30966",
+      "active_time_seconds": 6000
+    },
+    {
+      "time_seconds": 176127,
+      "pool_id": 5,
+      "display_name": "火锅神湖",
+      "previous_upper_bound": "2.20E+5",
+      "strength": "230581",
+      "active_time_seconds": 17727
+    },
+    {
+      "time_seconds": 348666,
+      "pool_id": 6,
+      "display_name": "若木沧渊",
+      "previous_upper_bound": "2.5E+6",
+      "strength": "2503201",
+      "active_time_seconds": 31866
+    },
+    {
+      "time_seconds": 611466,
+      "pool_id": 7,
+      "display_name": "玄鳞古河",
+      "previous_upper_bound": "2.8E+7",
+      "strength": "28275801",
+      "active_time_seconds": 57066
+    },
+    {
+      "time_seconds": 1213971,
+      "pool_id": 8,
+      "display_name": "奶茶大海",
+      "previous_upper_bound": "3.00E+8",
+      "strength": "300016001",
+      "active_time_seconds": 105171
+    },
+    {
+      "time_seconds": 1820001,
+      "pool_id": 9,
+      "display_name": "青丘灵湖",
+      "previous_upper_bound": "8.40E+8",
+      "strength": "842120001",
+      "active_time_seconds": 156801
+    }
+  ],
+  "last_growth_operations": {
+    "purchase_torpedo": {
+      "scenario_id": "month_1_all_permanent",
+      "profile_id": "default",
+      "time_seconds": 1819389,
+      "kind": "purchase_torpedo",
+      "item_id": "16",
+      "details": {
+        "receipt": "{\"action\": \"purchase_torpedo\", \"materialBalance\": {\"coeff\": \"103097695\", \"exp\": 0, \"sign\": 1}, \"materialSpent\": {\"coeff\": \"61012\", \"exp\": 6, \"sign\": 1}, \"ownedIds\": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], \"requestId\": \"source:default:27373\", \"revision\": 177665, \"selectedId\": 16, \"torpedoId\": 16}"
+      }
+    },
+    "synthesize_barbell": {
+      "scenario_id": "month_1_all_permanent",
+      "profile_id": "default",
+      "time_seconds": 2246460,
+      "kind": "synthesize_barbell",
+      "item_id": "13",
+      "details": {
+        "receipt": "{\"action\": \"synthesize_barbell\", \"barbellId\": 13, \"currentCount\": 1, \"equippedId\": 13, \"moneyBalance\": {\"coeff\": \"8206037972714710340174545393410030550229291069158644890137038778581637823578049539640485090917350842291359237725029772618789698919519625917301192765715498569740961494478614923764325794763863086700439453125\", \"exp\": -189, \"sign\": 1}, \"moneySpent\": {\"coeff\": \"25\", \"exp\": 16, \"sign\": 1}, \"owned\": [{\"barbellId\": 1, \"count\": 1}, {\"barbellId\": 2, \"count\": 1}, {\"barbellId\": 3, \"count\": 1}, {\"barbellId\": 4, \"count\": 1}, {\"barbellId\": 5, \"count\": 1}, {\"barbellId\": 6, \"count\": 1}, {\"barbellId\": 7, \"count\": 1}, {\"barbellId\": 8, \"count\": 1}, {\"barbellId\": 9, \"count\": 1}, {\"barbellId\": 10, \"count\": 1}, {\"barbellId\": 11, \"count\": 1}, {\"barbellId\": 12, \"count\": 1}, {\"barbellId\": 13, \"count\": 1}], \"previousCount\": 0, \"requestId\": \"source:default:33217\", \"revision\": 213690}"
+      }
+    },
+    "upgrade_hall": {
+      "scenario_id": "month_1_all_permanent",
+      "profile_id": "default",
+      "time_seconds": 611656,
+      "kind": "upgrade_hall",
+      "item_id": "",
+      "details": {
+        "receipt": "{\"action\": \"upgrade_hall\", \"currentCapacity\": 30, \"currentUpgradeLevel\": 25, \"materialBalance\": {\"coeff\": \"779428\", \"exp\": 1, \"sign\": 1}, \"materialSpent\": {\"coeff\": \"43875\", \"exp\": 4, \"sign\": 1}, \"previousUpgradeLevel\": 24, \"requestId\": \"source:default:9060\", \"revision\": 63360}"
+      }
+    },
+    "rebirth_strength": {
+      "scenario_id": "month_1_all_permanent",
+      "profile_id": "default",
+      "time_seconds": 2162919,
+      "kind": "rebirth_strength",
+      "item_id": "",
+      "details": {
+        "receipt": "{\"action\": \"rebirth_strength\", \"committed\": true, \"newCompletedCount\": 9, \"newMaterialOutputMultiplier\": {\"coeff\": \"15\", \"exp\": 0, \"sign\": 1}, \"oldCompletedCount\": 8, \"oldMaterialOutputMultiplier\": {\"coeff\": \"135\", \"exp\": -1, \"sign\": 1}, \"persistence\": {\"code\": \"ok\", \"dirty\": false, \"ok\": true, \"retryable\": false}, \"requestId\": \"source:default:32435\", \"requirement\": {\"coeff\": \"135\", \"exp\": 7, \"sign\": 1}, \"revision\": 208666, \"settledAt\": 2162919, \"strengthAfter\": {\"coeff\": \"1\", \"exp\": 0, \"sign\": 1}, \"strengthBefore\": {\"coeff\": \"1350000001\", \"exp\": 0, \"sign\": 1}}"
+      }
+    },
+    "rebirth_trash_man": {
+      "scenario_id": "month_1_all_permanent",
+      "profile_id": "default",
+      "time_seconds": 2334979,
+      "kind": "rebirth_trash_man",
+      "item_id": "",
+      "details": {
+        "receipt": "{\"action\": \"rebirth_trash_man\", \"committed\": true, \"highestRealmId\": 36, \"newCompletedCount\": 9, \"newFishHallOutputMultiplier\": {\"coeff\": \"1\", \"exp\": 1, \"sign\": 1}, \"oldCompletedCount\": 8, \"oldFishHallOutputMultiplier\": {\"coeff\": \"9\", \"exp\": 0, \"sign\": 1}, \"persistence\": {\"code\": \"ok\", \"dirty\": false, \"ok\": true, \"retryable\": false}, \"realmAfter\": 1, \"realmBefore\": 36, \"requestId\": \"source:default:34922\", \"requirement\": 36, \"revision\": 224447, \"settledAt\": 2334979}"
+      }
+    },
+    "start_breakthrough": {
+      "scenario_id": "month_1_all_permanent",
+      "profile_id": "default",
+      "time_seconds": 2164260,
+      "kind": "start_breakthrough",
+      "item_id": "",
+      "details": {
+        "receipt": "{\"action\": \"start_trash_man_breakthrough\", \"breakthrough\": {\"active\": true, \"progressSeconds\": 0, \"targetRealmId\": 36}, \"fromRealmId\": 35, \"highestRealmId\": 35, \"instant\": false, \"materialBalance\": {\"coeff\": \"60410601245\", \"exp\": 0, \"sign\": 1}, \"materialSpent\": {\"coeff\": \"6834375\", \"exp\": 1, \"sign\": 1}, \"realmId\": 35, \"requestId\": \"source:default:32669\", \"revision\": 210212, \"toRealmId\": 36, \"unlocked\": true}"
+      }
+    }
+  },
+  "free_target_reference": {
+    "source": "E:/fish-oasis/docs/SettingValue.xlsx",
+    "sha256": "bdfce5ad1c5e09e83d4b1acffa60674be076c4b661271f186034a84bbe8e21a6",
+    "sheet": "Sheet1",
+    "range": "A4:AE15",
+    "purpose": "current free-player planning reference, not paid-player acceptance criteria",
+    "rows": [
+      {
+        "category": "fish_pool",
+        "name": "鱼区域",
+        "depth": "10",
+        "weight": "20",
+        "days_1_28": [
+          2,
+          1,
+          0,
+          1,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "total_28": 8
+      },
+      {
+        "category": "barbell",
+        "name": "杠铃更换／解锁",
+        "depth": "14",
+        "weight": "5",
+        "days_1_28": [
+          2,
+          1,
+          1,
+          0,
+          1,
+          0,
+          1,
+          0,
+          1,
+          0,
+          1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "total_28": 11
+      },
+      {
+        "category": "torpedo",
+        "name": "神器购买",
+        "depth": "21",
+        "weight": "5",
+        "days_1_28": [
+          0,
+          2,
+          1,
+          1,
+          0,
+          1,
+          0,
+          1,
+          0,
+          1,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0,
+          0,
+          1,
+          0
+        ],
+        "total_28": 13
+      },
+      {
+        "category": "strength_rebirth",
+        "name": "力量重生",
+        "depth": "10",
+        "weight": "10",
+        "days_1_28": [
+          0,
+          1,
+          1,
+          0,
+          1,
+          0,
+          1,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0
+        ],
+        "total_28": 8
+      },
+      {
+        "category": "fish_hall",
+        "name": "摸鱼厅扩容",
+        "depth": "25",
+        "weight": "3",
+        "days_1_28": [
+          4,
+          3,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          0,
+          1,
+          0,
+          1,
+          0,
+          1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0
+        ],
+        "total_28": 25
+      },
+      {
+        "category": "treasure_beast",
+        "name": "寻宝兽开放",
+        "depth": "1",
+        "weight": "20",
+        "days_1_28": [
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "total_28": 1
+      },
+      {
+        "category": "breakthrough_funding",
+        "name": "寻宝兽突破资助",
+        "depth": "79",
+        "weight": "5",
+        "days_1_28": [
+          0,
+          3,
+          3,
+          3,
+          2,
+          2,
+          2,
+          2,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          0,
+          1,
+          0
+        ],
+        "total_28": 35
+      },
+      {
+        "category": "trash_man_rebirth",
+        "name": "寻宝兽重生",
+        "depth": "20",
+        "weight": "10",
+        "days_1_28": [
+          0,
+          1,
+          0,
+          1,
+          0,
+          1,
+          0,
+          0,
+          1,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0
+        ],
+        "total_28": 8
+      },
+      {
+        "category": "new_fish_species",
+        "name": "新鱼种收集",
+        "depth": "76",
+        "weight": "2",
+        "days_1_28": [
+          20,
+          8,
+          5,
+          3,
+          3,
+          3,
+          3,
+          3,
+          1,
+          1,
+          2,
+          1,
+          1,
+          1,
+          1,
+          2,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "total_28": 70
+      },
+      {
+        "category": "new_fish_variant",
+        "name": "新变异组合收集",
+        "depth": "380",
+        "weight": "1",
+        "days_1_28": [
+          10,
+          10,
+          10,
+          9,
+          9,
+          9,
+          9,
+          9,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5
+        ],
+        "total_28": 175
+      },
+      {
+        "category": "gun_owned",
+        "name": "图鉴枪获得",
+        "depth": "12",
+        "weight": "10",
+        "days_1_28": [
+          1,
+          0,
+          1,
+          0,
+          1,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0
+        ],
+        "total_28": 7
+      },
+      {
+        "category": "gun_upgraded",
+        "name": "图鉴枪永久强化",
+        "depth": "60",
+        "weight": "5",
+        "days_1_28": [
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0,
+          1,
+          0,
+          1,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0
+        ],
+        "total_28": 10
+      }
+    ]
+  },
+  "matching_input_tables": {
+    "tbbarbell": [
+      {
+        "id": 1,
+        "name": "铁杠铃",
+        "strengthPerExercise": 1,
+        "price": {
+          "sign": 1,
+          "digits": "20",
+          "scale": 0
+        },
+        "rarityId": 1,
+        "timeCost": 0.5,
+        "imagePath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/Barbell/Barbell_Iron.Barbell_Iron')",
+        "description": "一截凡铁被汗水反复唤醒，握住它时，沉睡在臂膀里的力量便开始苏醒。",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Lifting/Barbell/Barbell_Iron.Barbell_Iron_C')"
+      },
+      {
+        "id": 2,
+        "name": "河豚杠铃",
+        "strengthPerExercise": 2,
+        "price": {
+          "sign": 1,
+          "digits": "75",
+          "scale": 2
+        },
+        "rarityId": 1,
+        "timeCost": 0.5,
+        "imagePath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/Barbell/Barbell_hetun.Barbell_hetun')",
+        "description": "圆滚河豚似乎藏着大海的脾气，举起它，潮声会把力量一寸寸推进筋骨。",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Lifting/Barbell/Barbell_hetun.Barbell_hetun_C')"
+      },
+      {
+        "id": 3,
+        "name": "水桶杠铃",
+        "strengthPerExercise": 4,
+        "price": {
+          "sign": 1,
+          "digits": "200",
+          "scale": 3
+        },
+        "rarityId": 2,
+        "timeCost": 0.5,
+        "imagePath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/Barbell/Barbell_WaterPot.Barbell_WaterPot')",
+        "description": "这只水桶盛着看不见的重量，摇晃间像把整口井都挂上双臂，锻炼可滋养力量。",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Lifting/Barbell/Barbell_WaterPot.Barbell_WaterPot_C')"
+      },
+      {
+        "id": 4,
+        "name": "大胃袋杠铃",
+        "strengthPerExercise": 25,
+        "price": {
+          "sign": 1,
+          "digits": "1000",
+          "scale": 4
+        },
+        "rarityId": 3,
+        "timeCost": 0.5,
+        "imagePath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/Barbell/Barbell_Liangzi.Barbell_Liangzi')",
+        "description": "大胃袋沉默地吞下所有轻视，举起它的人，会从每一次喘息里嚼出新的力量。",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Lifting/Barbell/Barbell_Liangzi.Barbell_Liangzi_C')"
+      },
+      {
+        "id": 5,
+        "name": "石头杠铃",
+        "strengthPerExercise": 50,
+        "price": {
+          "sign": 1,
+          "digits": "7000",
+          "scale": 6
+        },
+        "rarityId": 4,
+        "timeCost": 0.5,
+        "imagePath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/Barbell/Barbell_Stone.Barbell_Stone')",
+        "description": "山脚碎石也有倔脾气，双手托起的一刻，岩层般的力量便在体内垒高。",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Lifting/Barbell/Barbell_Stone.Barbell_Stone_C')"
+      },
+      {
+        "id": 6,
+        "name": "空投杠铃",
+        "strengthPerExercise": 90,
+        "price": {
+          "sign": 1,
+          "digits": "5000",
+          "scale": 7
+        },
+        "rarityId": 5,
+        "timeCost": 0.5,
+        "imagePath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/Barbell/Barbell_AirDrop.Barbell_AirDrop')",
+        "description": "从天而降的空投箱不只装补给，还压着胜利的重量，锻炼时力量随之开箱而出。",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Lifting/Barbell/Barbell_AirDrop.Barbell_AirDrop_C')"
+      },
+      {
+        "id": 7,
+        "name": "冰杠铃",
+        "strengthPerExercise": 200,
+        "price": {
+          "sign": 1,
+          "digits": "3500",
+          "scale": 9
+        },
+        "rarityId": 6,
+        "timeCost": 0.5,
+        "imagePath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/Barbell/Barbell_Ice.Barbell_Ice')",
+        "description": "寒冰封住锋芒，却封不住热血；每一次托举，都让力量在冷光中淬炼成形。",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Lifting/Barbell/Barbell_Ice.Barbell_Ice_C')"
+      },
+      {
+        "id": 8,
+        "name": "黄金杠铃",
+        "strengthPerExercise": 500,
+        "price": {
+          "sign": 1,
+          "digits": "45",
+          "scale": 12
+        },
+        "rarityId": 7,
+        "timeCost": 0.5,
+        "imagePath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/Barbell/Barbell_Gold.Barbell_Gold')",
+        "description": "黄金的光会骗过眼睛，真正沉重的是荣耀；举起它，力量也随金辉一同暴涨。",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Lifting/Barbell/Barbell_Gold.Barbell_Gold_C')"
+      },
+      {
+        "id": 9,
+        "name": "集装箱杠铃",
+        "strengthPerExercise": 1300,
+        "price": {
+          "sign": 1,
+          "digits": "240",
+          "scale": 12
+        },
+        "rarityId": 7,
+        "timeCost": 0.5,
+        "imagePath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/Barbell/Barbell_Container.Barbell_Container')",
+        "description": "这不是集装箱，是被压缩成方块的远航风暴，搬动它的人自会获得搬山之力。",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Lifting/Barbell/Barbell_Container.Barbell_Container_C')"
+      },
+      {
+        "id": 10,
+        "name": "游艇杠铃",
+        "strengthPerExercise": 3000,
+        "price": {
+          "sign": 1,
+          "digits": "600",
+          "scale": 12
+        },
+        "rarityId": 7,
+        "timeCost": 0.5,
+        "imagePath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/Barbell/Barbell_Ship.Barbell_Ship')",
+        "description": "游艇本该划开浪花，如今却被你举过头顶；每次锻炼，都像征服一片海。",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Lifting/Barbell/Barbell_Ship.Barbell_Ship_C')"
+      },
+      {
+        "id": 11,
+        "name": "头骨杠铃",
+        "strengthPerExercise": 8000,
+        "price": {
+          "sign": 1,
+          "digits": "1500",
+          "scale": 12
+        },
+        "rarityId": 7,
+        "timeCost": 0.5,
+        "imagePath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/Barbell/Barbell_Bone.Barbell_Bone')",
+        "description": "头骨凝视着胆怯者的手腕，唯有敢握住它的人，才能把恐惧炼成力量。",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Lifting/Barbell/Barbell_Bone.Barbell_Bone_C')"
+      },
+      {
+        "id": 12,
+        "name": "月球杠铃",
+        "strengthPerExercise": 20000,
+        "price": {
+          "sign": 1,
+          "digits": "25000",
+          "scale": 12
+        },
+        "rarityId": 7,
+        "timeCost": 0.5,
+        "imagePath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/Barbell/Barbell_Moon.Barbell_Moon')",
+        "description": "月球被缩成掌中重物，银白潮汐随呼吸起落，每一次托举都唤醒更深的力量。",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Lifting/Barbell/Barbell_Moon.Barbell_Moon_C')"
+      },
+      {
+        "id": 13,
+        "name": "地球杠铃",
+        "strengthPerExercise": 50000,
+        "price": {
+          "sign": 1,
+          "digits": "250000",
+          "scale": 12
+        },
+        "rarityId": 7,
+        "timeCost": 0.5,
+        "imagePath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/Barbell/Barbell_Earth.Barbell_Earth')",
+        "description": "地球在掌心低声轰鸣，山河与海浪都成了重量，举起它便能向世界借力。",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Lifting/Barbell/Barbell_Earth.Barbell_Earth_C')"
+      },
+      {
+        "id": 14,
+        "name": "太阳杠铃",
+        "strengthPerExercise": 125000,
+        "price": {
+          "sign": 1,
+          "digits": "625000",
+          "scale": 12
+        },
+        "rarityId": 7,
+        "timeCost": 0.5,
+        "imagePath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/Barbell/Barbell_Sun.Barbell_Sun')",
+        "description": "太阳坠入杠铃，炽光在臂弯间燃烧；能承受它的人，力量会像黎明般升起。",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Lifting/Barbell/Barbell_Sun.Barbell_Sun_C')"
+      },
+      {
+        "id": 15,
+        "name": "黑洞杠铃",
+        "strengthPerExercise": 313000,
+        "price": {
+          "sign": 1,
+          "digits": "1562500",
+          "scale": 12
+        },
+        "rarityId": 7,
+        "timeCost": 0.5,
+        "imagePath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/Barbell/Barbell_BlackHole.Barbell_BlackHole')",
+        "description": "黑洞把光与骄傲一并吞下，仍等你将它举起；每次锻炼，都从深渊夺回力量。",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Lifting/Barbell/Barbell_BlackHole.Barbell_BlackHole_C')"
+      }
+    ],
+    "tbtorpedo": [
+      {
+        "id": 1,
+        "rarityId": 1,
+        "power": {
+          "sign": 1,
+          "digits": "2",
+          "scale": 0
+        },
+        "name": "油桶",
+        "price": {
+          "sign": 1,
+          "digits": "1",
+          "scale": 1
+        },
+        "imagePath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/yulei/youtong.youtong')",
+        "description": "油桶满载不安分的火星，铁皮下每一滴都在等待号令；投出去，风都会绕着它燃烧。",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Torpedo/Torpedo__4.Torpedo__4_C')",
+        "preExplosionEffectPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Particles/WaterFog.WaterFog')",
+        "explosionEffectPaths": "/Game/Arts_Effect/ParticleSystems/Share/P_Explo_Oil.P_Explo_Oil",
+        "effectNotes": "",
+        "isOpen": true
+      },
+      {
+        "id": 2,
+        "rarityId": 2,
+        "power": {
+          "sign": 1,
+          "digits": "5",
+          "scale": 1
+        },
+        "name": "破坏灵珠",
+        "price": {
+          "sign": 1,
+          "digits": "2",
+          "scale": 4
+        },
+        "imagePath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/yulei/zhayao.zhayao')",
+        "description": "破坏灵珠安静得像一捆旧布，偏偏最会在沉默里积攒脾气；一点火光，便叫天地变色。",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Torpedo/Torpedo__5.Torpedo__5_C')",
+        "preExplosionEffectPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Particles/WaterFog.WaterFog')",
+        "explosionEffectPaths": "/Game/Arts_Effect/ParticleSystems/Grenade/P_C4_explode_sea_01.P_C4_explode_sea_01",
+        "effectNotes": "",
+        "isOpen": true
+      },
+      {
+        "id": 3,
+        "rarityId": 2,
+        "power": {
+          "sign": 1,
+          "digits": "4",
+          "scale": 2
+        },
+        "name": "TNT",
+        "price": {
+          "sign": 1,
+          "digits": "1",
+          "scale": 5
+        },
+        "imagePath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/yulei/TNT.TNT')",
+        "description": "TNT三个字母像刻在危险王冠上的纹章；它不需要解释，只等一声巨响替它加冕。",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Torpedo/Torpedo__6.Torpedo__6_C')",
+        "preExplosionEffectPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Particles/WaterFog.WaterFog')",
+        "explosionEffectPaths": "/Game/UGC/UGCGame/NPC/Arts_Players/Anim/Templete/CG033/Effect/Particle/P_CG033UG_ZombieBoss_Fireball_02.P_CG033UG_ZombieBoss_Fireball_02",
+        "effectNotes": "",
+        "isOpen": true
+      },
+      {
+        "id": 4,
+        "rarityId": 3,
+        "power": {
+          "sign": 1,
+          "digits": "3",
+          "scale": 4
+        },
+        "name": "C4",
+        "price": {
+          "sign": 1,
+          "digits": "25",
+          "scale": 5
+        },
+        "imagePath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/yulei/c4.c4')",
+        "description": "C4贴伏如影，冷静得近乎优雅；当它醒来，坚固之物也只能承认自己太脆。",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Torpedo/Torpedo__7.Torpedo__7_C')",
+        "preExplosionEffectPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Particles/WaterFog.WaterFog')",
+        "explosionEffectPaths": "/Game/Arts_Effect/ParticleSystems/Grenade/P_C4_explode_sea_01.P_C4_explode_sea_01",
+        "effectNotes": "",
+        "isOpen": true
+      },
+      {
+        "id": 5,
+        "rarityId": 3,
+        "power": {
+          "sign": 1,
+          "digits": "81",
+          "scale": 3
+        },
+        "name": "追踪灵珠",
+        "price": {
+          "sign": 1,
+          "digits": "525",
+          "scale": 4
+        },
+        "imagePath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/yulei/daodan.daodan')",
+        "description": "追踪灵珠拖着直指目标的意志，仿佛长空亲手写下的判词；所到之处，退路尽碎。",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Torpedo/Torpedo__8.Torpedo__8_C')",
+        "preExplosionEffectPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Particles/WaterFog.WaterFog')",
+        "explosionEffectPaths": "/Game/Arts_Timeliness/CG023_Version_SkyArena/Art_Effect/Particles/M_Cg23_Bao.M_Cg23_Bao",
+        "effectNotes": "",
+        "isOpen": true
+      },
+      {
+        "id": 6,
+        "rarityId": 4,
+        "power": {
+          "sign": 1,
+          "digits": "64",
+          "scale": 4
+        },
+        "name": "毁灭灵魂",
+        "price": {
+          "sign": 1,
+          "digits": "82",
+          "scale": 5
+        },
+        "imagePath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/yulei/hedan.hedan')",
+        "description": "毁灭灵魂将末日折叠成掌中重量，轻轻一掷，连勇气都会短暂失声。",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Torpedo/Torpedo__9.Torpedo__9_C')",
+        "preExplosionEffectPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Particles/WaterFog.WaterFog')",
+        "explosionEffectPaths": "/Game/Arts_Effect/ParticleSystems/Impacts/P_RPG_explode_01.P_RPG_explode_01",
+        "effectNotes": "",
+        "isOpen": true
+      },
+      {
+        "id": 7,
+        "rarityId": 4,
+        "power": {
+          "sign": 1,
+          "digits": "3",
+          "scale": 6
+        },
+        "name": "火箭",
+        "price": {
+          "sign": 1,
+          "digits": "27",
+          "scale": 6
+        },
+        "imagePath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/yulei/huojian.huojian')",
+        "description": "火箭背负烈焰升空，像把大地的不甘送向天穹；坠落时，轰鸣便是它的宣言。",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Torpedo/Torpedo__10.Torpedo__10_C')",
+        "preExplosionEffectPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Particles/WaterFog.WaterFog')",
+        "explosionEffectPaths": "/Game/UGC/Repository/Arts_Effect/GunFire/Particle/P_Repository_GunFire_Bomb_01.P_Repository_GunFire_Bomb_01",
+        "effectNotes": "",
+        "isOpen": true
+      },
+      {
+        "id": 8,
+        "rarityId": 5,
+        "power": {
+          "sign": 1,
+          "digits": "7",
+          "scale": 7
+        },
+        "name": "水缸",
+        "price": {
+          "sign": 1,
+          "digits": "40",
+          "scale": 6
+        },
+        "imagePath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/yulei/shuigang.shuigang')",
+        "description": "看似寻常水缸，腹中却压着一池怒浪；一经掷出，连平静水面都要替它让路。",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Torpedo/Torpedo__1.Torpedo__1_C')",
+        "preExplosionEffectPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Particles/WaterFog.WaterFog')",
+        "explosionEffectPaths": "/Game/Arts_Effect/ParticleSystems/Wolf/P_WereWolf02_Attack_02.P_WereWolf02_Attack_02",
+        "effectNotes": "",
+        "isOpen": true
+      },
+      {
+        "id": 9,
+        "rarityId": 5,
+        "power": {
+          "sign": 1,
+          "digits": "22",
+          "scale": 7
+        },
+        "name": "西瓜",
+        "price": {
+          "sign": 1,
+          "digits": "100",
+          "scale": 6
+        },
+        "imagePath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/yulei/xiguazhadan.xiguazhadan')",
+        "description": "这颗西瓜外皮青翠，内里却酝酿着甜味灾厄；落地刹那，夏日也会炸出雷声。",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Torpedo/Torpedo__2.Torpedo__2_C')",
+        "preExplosionEffectPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Particles/WaterFog.WaterFog')",
+        "explosionEffectPaths": "/Game/UGC/UGCGame/NPC/Arts_Players/Anim/Templete/CG033/Effect/Particle/P_CG033UG_ZombieBoss_PoisonMeteorites_02.P_CG033UG_ZombieBoss_PoisonMeteorites_02",
+        "effectNotes": "4,4,4",
+        "isOpen": true
+      },
+      {
+        "id": 10,
+        "rarityId": 6,
+        "power": {
+          "sign": 1,
+          "digits": "35",
+          "scale": 8
+        },
+        "name": "钢卷",
+        "price": {
+          "sign": 1,
+          "digits": "200",
+          "scale": 6
+        },
+        "imagePath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/yulei/gangjuan.gangjuan')",
+        "description": "钢卷层层收紧，像把工坊的铁怒卷成一枚沉默旋涡；松手之时，锋重齐鸣。",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Torpedo/Torpedo__3.Torpedo__3_C')",
+        "preExplosionEffectPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Particles/WaterFog.WaterFog')",
+        "explosionEffectPaths": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Particles/P_WaterPost.P_WaterPost')",
+        "effectNotes": "",
+        "isOpen": true
+      },
+      {
+        "id": 11,
+        "rarityId": 6,
+        "power": {
+          "sign": 1,
+          "digits": "95",
+          "scale": 9
+        },
+        "name": "辣椒",
+        "price": {
+          "sign": 1,
+          "digits": "300",
+          "scale": 6
+        },
+        "imagePath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/yulei/lajiao.lajiao')",
+        "description": "这根辣椒红得嚣张，辛辣在空气里磨刀；命中之后，连爆炸都带着灼舌的狠劲。",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Torpedo/Torpedo__11.Torpedo__11_C')",
+        "preExplosionEffectPath": "/Game/UGC/Repository/CG032/Oasis_Monster/Arts_Effect/Monster/Elements/Particle/P_CG032Elements_FireField_01.P_CG032Elements_FireField_01",
+        "explosionEffectPaths": "/Game/Arts_Effect/ParticleSystems/Share/P_Flame.P_Flame",
+        "effectNotes": "",
+        "isOpen": true
+      },
+      {
+        "id": 12,
+        "rarityId": 7,
+        "power": {
+          "sign": 1,
+          "digits": "542",
+          "scale": 9
+        },
+        "name": "河豚灵核",
+        "price": {
+          "sign": 1,
+          "digits": "800",
+          "scale": 6
+        },
+        "imagePath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/yulei/hetunzhadan.hetunzhadan')",
+        "description": "河豚灵核鼓着圆肚，像把大海的坏脾气全藏进皮囊；越是可爱，越叫人不敢小看。",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Torpedo/Torpedo__12.Torpedo__12_C')",
+        "preExplosionEffectPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Particles/WaterFog.WaterFog')",
+        "explosionEffectPaths": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Particles/P_WaterPost.P_WaterPost')",
+        "effectNotes": "",
+        "isOpen": true
+      },
+      {
+        "id": 13,
+        "rarityId": 7,
+        "power": {
+          "sign": 1,
+          "digits": "1",
+          "scale": 12
+        },
+        "name": "尖刺灵珠",
+        "price": {
+          "sign": 1,
+          "digits": "1000",
+          "scale": 6
+        },
+        "imagePath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/yulei/jiancishoulei.jiancishoulei')",
+        "description": "尖刺灵珠披满锋芒，安静时像一枚铁刺果；一旦绽开，四周都会记住它的棱角。",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Torpedo/Torpedo__13.Torpedo__13_C')",
+        "preExplosionEffectPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Particles/WaterFog.WaterFog')",
+        "explosionEffectPaths": "/Game/Arts_Effect/ParticleSystems/Impacts/P_M79_explode_02.P_M79_explode_02",
+        "effectNotes": "",
+        "isOpen": true
+      },
+      {
+        "id": 14,
+        "rarityId": 8,
+        "power": {
+          "sign": 1,
+          "digits": "786",
+          "scale": 11
+        },
+        "name": "我的刀盾",
+        "price": {
+          "sign": 1,
+          "digits": "1400",
+          "scale": 6
+        },
+        "imagePath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/yulei/daodungou.daodungou')",
+        "description": "我的刀盾把忠诚、獠牙与铁盾缝在一起；冲出去时，敌人会同时听见守护与进攻。",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Torpedo/Torpedo__14.Torpedo__14_C')",
+        "preExplosionEffectPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Particles/WaterFog.WaterFog')",
+        "explosionEffectPaths": "/Game/UGCLibrary/CG038/UGCGame/Skill/Arts_Effect/Particle/P_CG038UGC_Erwin_Skill01_01.P_CG038UGC_Erwin_Skill01_01",
+        "effectNotes": "",
+        "isOpen": true
+      },
+      {
+        "id": 15,
+        "rarityId": 8,
+        "power": {
+          "sign": 1,
+          "digits": "4",
+          "scale": 14
+        },
+        "name": "毒气灵珠",
+        "price": {
+          "sign": 1,
+          "digits": "24405",
+          "scale": 6
+        },
+        "imagePath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/yulei/duqidan.duqidan')",
+        "description": "毒气灵珠不急着怒吼，只让阴影慢慢爬满战场；等人察觉，呼吸已成它的领地。",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Torpedo/Torpedo__15.Torpedo__15_C')",
+        "preExplosionEffectPath": "/Game/UGC/UGCGame/Skill/Templete/CG032/Arts_Effect/Particle/P_CG032_MonsterSkill_Poison_01.P_CG032_MonsterSkill_Poison_01",
+        "explosionEffectPaths": "/Game/Arts_Effect/ParticleSystems/FX_PVE/P_Zombie6_Skill_02.P_Zombie6_Skill_02",
+        "effectNotes": " ",
+        "isOpen": true
+      },
+      {
+        "id": 16,
+        "rarityId": 9,
+        "power": {
+          "sign": 1,
+          "digits": "3",
+          "scale": 15
+        },
+        "name": "猫猫灵核",
+        "price": {
+          "sign": 1,
+          "digits": "61012",
+          "scale": 6
+        },
+        "imagePath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/yulei/maozhadan.maozhadan')",
+        "description": "猫猫灵核眯着无辜的眼，尾巴尖却藏着爆裂的坏心思；越软萌，越危险。",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Torpedo/Torpedo__16.Torpedo__16_C')",
+        "preExplosionEffectPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Particles/WaterFog.WaterFog')",
+        "explosionEffectPaths": "/Game/UGCLibrary/CG038/UGCGame/Skill/Arts_Effect/Particle/P_CG038UGC_Elendil_Skill01_03.P_CG038UGC_Elendil_Skill01_03",
+        "effectNotes": "",
+        "isOpen": true
+      },
+      {
+        "id": 17,
+        "rarityId": 9,
+        "power": {
+          "sign": 1,
+          "digits": "1",
+          "scale": 16
+        },
+        "name": "甲虫灵核",
+        "price": {
+          "sign": 1,
+          "digits": "152530",
+          "scale": 6
+        },
+        "imagePath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/yulei/jiachongzhadan.jiachongzhadan')",
+        "description": "甲虫灵核披着硬壳低伏前行，仿佛微小铠甲里困着雷霆；一撞，便让大地颤栗。",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Torpedo/Torpedo__17.Torpedo__17_C')",
+        "preExplosionEffectPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Particles/WaterFog.WaterFog')",
+        "explosionEffectPaths": "/Game/UGC/Repository/Arts_Effect/GunFire/Particle/P_Repository_GunFire_Bomb_01.P_Repository_GunFire_Bomb_01",
+        "effectNotes": "",
+        "isOpen": true
+      },
+      {
+        "id": 18,
+        "rarityId": 10,
+        "power": {
+          "sign": 1,
+          "digits": "75",
+          "scale": 16
+        },
+        "name": "触手灵核",
+        "price": {
+          "sign": 1,
+          "digits": "381325",
+          "scale": 6
+        },
+        "imagePath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/yulei/chushouzhadan.chushouzhadan')",
+        "description": "触手灵核像从深海噩梦里探出的礼物，缠住目标时，爆鸣才刚刚开始发芽。",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Torpedo/Torpedo__18.Torpedo__18_C')",
+        "preExplosionEffectPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Particles/WaterFog.WaterFog')",
+        "explosionEffectPaths": "/Game/UGC/Repository/CG034/Oasis_Monster/Arts_Effect/Monster/Octopuszombie/Particle/P_CG034_Octopuszombie_Skill_01.P_CG034_Octopuszombie_Skill_01",
+        "effectNotes": "8,8,8",
+        "isOpen": true
+      },
+      {
+        "id": 19,
+        "rarityId": 10,
+        "power": {
+          "sign": 1,
+          "digits": "28",
+          "scale": 17
+        },
+        "name": "冰霜灵核",
+        "price": {
+          "sign": 1,
+          "digits": "953312",
+          "scale": 6
+        },
+        "imagePath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/yulei/bingshuangzhadan.bingshuangzhadan')",
+        "description": "冰霜灵核含着一整个寒冬，裂开的瞬间，白雾会替它冻结敌人的惊呼。",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Torpedo/Torpedo__19.Torpedo__19_C')",
+        "preExplosionEffectPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Particles/WaterFog.WaterFog')",
+        "explosionEffectPaths": "/Game/UGCLibrary/CG038/UGCGame/Skill/Arts_Effect/Particle/P_CG038UGC_Tiuna_Skill01_03.P_CG038UGC_Tiuna_Skill01_03",
+        "effectNotes": "",
+        "isOpen": true
+      },
+      {
+        "id": 20,
+        "rarityId": 11,
+        "power": {
+          "sign": 1,
+          "digits": "85",
+          "scale": 18
+        },
+        "name": "熔岩灵核",
+        "price": {
+          "sign": 1,
+          "digits": "2383280",
+          "scale": 6
+        },
+        "imagePath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/yulei/rongyanzhadan.rongyanzhadan')",
+        "description": "熔岩灵核把地心火脉揉成一团，滚落之处，连石头都要重新学会燃烧。",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Torpedo/Torpedo__20.Torpedo__20_C')",
+        "preExplosionEffectPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Particles/WaterFog.WaterFog')",
+        "explosionEffectPaths": "/Game/UGC/Repository/CG037/Oasis_Monster/Arts_Effect/Monster/BOSS_NZ_X/Particle/P_CG037Monster_BOSS_NZ_Skill02_01.P_CG037Monster_BOSS_NZ_Skill02_01",
+        "effectNotes": "",
+        "isOpen": true
+      },
+      {
+        "id": 21,
+        "rarityId": 11,
+        "power": {
+          "sign": 1,
+          "digits": "7",
+          "scale": 20
+        },
+        "name": "问号盒子",
+        "price": {
+          "sign": 1,
+          "digits": "5958200",
+          "scale": 6
+        },
+        "imagePath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/yulei/wenhaohezi.wenhaohezi')",
+        "description": "问号盒子轻轻摇晃，没人知道命运在里面藏了什么；打开它，答案往往比问题更响。",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Torpedo/Torpedo__21.Torpedo__21_C')",
+        "preExplosionEffectPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Particles/WaterFog.WaterFog')",
+        "explosionEffectPaths": "/Game/Arts_Effect/ParticleSystems/Share/P_CarePackage_RaiseUp_01.P_CarePackage_RaiseUp_01",
+        "effectNotes": "",
+        "isOpen": true
+      },
+      {
+        "id": 22,
+        "rarityId": 12,
+        "power": {
+          "sign": 1,
+          "digits": "25",
+          "scale": 20
+        },
+        "name": "冰霜球",
+        "price": {
+          "sign": 1,
+          "digits": "14895500",
+          "scale": 6
+        },
+        "imagePath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/yulei/bingshuangqiu.bingshuangqiu')",
+        "description": "冰霜球晶莹得像冬夜月亮，实则封着刺骨寒潮；飞出去，冷意先替它宣战。",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Torpedo/Torpedo__22.Torpedo__22_C')",
+        "preExplosionEffectPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Particles/WaterFog.WaterFog')",
+        "explosionEffectPaths": "/Game/Arts_Effect/ParticleSystems/Share/P_bingdiao_djf03.P_bingdiao_djf03",
+        "effectNotes": "",
+        "isOpen": true
+      },
+      {
+        "id": 23,
+        "rarityId": 12,
+        "power": {
+          "sign": 1,
+          "digits": "35",
+          "scale": 21
+        },
+        "name": "熔岩球",
+        "price": {
+          "sign": 1,
+          "digits": "37238750",
+          "scale": 6
+        },
+        "imagePath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/yulei/rongyanqiu.rongyanqiu')",
+        "description": "熔岩球翻滚着赤红脉动，像一颗刚从火山心口摘下的果实；命中时，热浪即刻称王。",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Torpedo/Torpedo__23.Torpedo__23_C')",
+        "preExplosionEffectPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Particles/WaterFog.WaterFog')",
+        "explosionEffectPaths": "/Game/UGC/Repository/CG038/Oasis_Monster/Arts_Effect/Monster/LavaDog/Particle/P_CG038Monster_LavaDog_Attack01_01.P_CG038Monster_LavaDog_Attack01_01",
+        "effectNotes": "2,2,2|90,0,0",
+        "isOpen": false
+      },
+      {
+        "id": 24,
+        "rarityId": 12,
+        "power": {
+          "sign": 1,
+          "digits": "11",
+          "scale": 22
+        },
+        "name": "陨石",
+        "price": {
+          "sign": 1,
+          "digits": "93096875",
+          "scale": 6
+        },
+        "imagePath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/yulei/yunshi.yunshi')",
+        "description": "陨石自高天坠落，拖着星火与古老重量；凡被它选中的地方，都要记下一声天罚。",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Torpedo/Torpedo__24.Torpedo__24_C')",
+        "preExplosionEffectPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Particles/WaterFog.WaterFog')",
+        "explosionEffectPaths": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Test/xiaoguo/P_CG033UG_ZombieBoss_Meteorites_02.P_CG033UG_ZombieBoss_Meteorites_02')",
+        "effectNotes": "",
+        "isOpen": false
+      },
+      {
+        "id": 25,
+        "rarityId": 13,
+        "power": {
+          "sign": 1,
+          "digits": "22",
+          "scale": 23
+        },
+        "name": "电浆球",
+        "price": {
+          "sign": 1,
+          "digits": "232742187",
+          "scale": 6
+        },
+        "imagePath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/yulei/dianjiangzhadan.dianjiangzhadan')",
+        "description": "电浆球在掌中嘶鸣，蓝白光弧像被驯服的暴雷；掷出之后，空气都会被点亮。",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Torpedo/Torpedo__25.Torpedo__25_C')",
+        "preExplosionEffectPath": "/Game/UGC/Repository/CG038/Oasis_Monster/Arts_Effect/Monster/Executor/Particle/P_CG038Monster_Executor_Skill02_01.P_CG038Monster_Executor_Skill02_01",
+        "explosionEffectPaths": "/Game/UGC/UGCGame/Skill/Templete/CG034/SuperPeople/Arts_Effect/DragonBoy/Particle/P_CloudLightning_Outbreak_01.P_CloudLightning_Outbreak_01;/Game/UGC/Effect/particleSystems/model/particle/P_lightning_01.P_lightning_01",
+        "effectNotes": "10,10,10;10,10,10",
+        "isOpen": false
+      },
+      {
+        "id": 26,
+        "rarityId": 14,
+        "power": {
+          "sign": 1,
+          "digits": "3",
+          "scale": 25
+        },
+        "name": "黑洞",
+        "price": {
+          "sign": 1,
+          "digits": "581855467",
+          "scale": 6
+        },
+        "imagePath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/yulei/heidong.heidong')",
+        "description": "黑洞沉默得没有边界，连光也不敢久留；若它被抛出，战场便会短暂失去方向。",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Torpedo/Torpedo__26.Torpedo__26_C')",
+        "preExplosionEffectPath": "/Game/UGC/Repository/CG038/Oasis_Monster/Arts_Effect/Monster/BOSS_Inspector/Particle/P_CG038Monster_BOSS_Inspector_Skill02_05.P_CG038Monster_BOSS_Inspector_Skill02_05",
+        "explosionEffectPaths": "/Game/UGC/Repository/CG038/Oasis_Monster/Arts_Effect/Monster/BOSS_Inspector/Particle/P_CG038Monster_BOSS_Inspector_Attack01_01.P_CG038Monster_BOSS_Inspector_Attack01_01",
+        "effectNotes": "2,2,2|90,0,0",
+        "isOpen": false
+      }
+    ],
+    "tbfishhallupgrade": [
+      {
+        "id": 1,
+        "upgradePrice": {
+          "sign": 1,
+          "digits": "4",
+          "scale": 1
+        },
+        "slotQty": 5
+      },
+      {
+        "id": 2,
+        "upgradePrice": {
+          "sign": 1,
+          "digits": "8",
+          "scale": 1
+        },
+        "slotQty": 6
+      },
+      {
+        "id": 3,
+        "upgradePrice": {
+          "sign": 1,
+          "digits": "1",
+          "scale": 3
+        },
+        "slotQty": 7
+      },
+      {
+        "id": 4,
+        "upgradePrice": {
+          "sign": 1,
+          "digits": "3",
+          "scale": 3
+        },
+        "slotQty": 8
+      },
+      {
+        "id": 5,
+        "upgradePrice": {
+          "sign": 1,
+          "digits": "3",
+          "scale": 4
+        },
+        "slotQty": 9
+      },
+      {
+        "id": 6,
+        "upgradePrice": {
+          "sign": 1,
+          "digits": "5",
+          "scale": 4
+        },
+        "slotQty": 10
+      },
+      {
+        "id": 7,
+        "upgradePrice": {
+          "sign": 1,
+          "digits": "1",
+          "scale": 5
+        },
+        "slotQty": 11
+      },
+      {
+        "id": 8,
+        "upgradePrice": {
+          "sign": 1,
+          "digits": "32",
+          "scale": 5
+        },
+        "slotQty": 12
+      },
+      {
+        "id": 9,
+        "upgradePrice": {
+          "sign": 1,
+          "digits": "5",
+          "scale": 6
+        },
+        "slotQty": 13
+      },
+      {
+        "id": 10,
+        "upgradePrice": {
+          "sign": 1,
+          "digits": "6",
+          "scale": 6
+        },
+        "slotQty": 14
+      },
+      {
+        "id": 11,
+        "upgradePrice": {
+          "sign": 1,
+          "digits": "765",
+          "scale": 4
+        },
+        "slotQty": 15
+      },
+      {
+        "id": 12,
+        "upgradePrice": {
+          "sign": 1,
+          "digits": "11",
+          "scale": 6
+        },
+        "slotQty": 16
+      },
+      {
+        "id": 13,
+        "upgradePrice": {
+          "sign": 1,
+          "digits": "1200",
+          "scale": 4
+        },
+        "slotQty": 17
+      },
+      {
+        "id": 14,
+        "upgradePrice": {
+          "sign": 1,
+          "digits": "1300",
+          "scale": 4
+        },
+        "slotQty": 18
+      },
+      {
+        "id": 15,
+        "upgradePrice": {
+          "sign": 1,
+          "digits": "1400",
+          "scale": 4
+        },
+        "slotQty": 19
+      },
+      {
+        "id": 16,
+        "upgradePrice": {
+          "sign": 1,
+          "digits": "1500",
+          "scale": 4
+        },
+        "slotQty": 20
+      },
+      {
+        "id": 17,
+        "upgradePrice": {
+          "sign": 1,
+          "digits": "1600",
+          "scale": 4
+        },
+        "slotQty": 21
+      },
+      {
+        "id": 18,
+        "upgradePrice": {
+          "sign": 1,
+          "digits": "1800",
+          "scale": 4
+        },
+        "slotQty": 22
+      },
+      {
+        "id": 19,
+        "upgradePrice": {
+          "sign": 1,
+          "digits": "2000",
+          "scale": 4
+        },
+        "slotQty": 23
+      },
+      {
+        "id": 20,
+        "upgradePrice": {
+          "sign": 1,
+          "digits": "2400",
+          "scale": 4
+        },
+        "slotQty": 24
+      },
+      {
+        "id": 21,
+        "upgradePrice": {
+          "sign": 1,
+          "digits": "2880",
+          "scale": 4
+        },
+        "slotQty": 25
+      },
+      {
+        "id": 22,
+        "upgradePrice": {
+          "sign": 1,
+          "digits": "13000",
+          "scale": 4
+        },
+        "slotQty": 26
+      },
+      {
+        "id": 23,
+        "upgradePrice": {
+          "sign": 1,
+          "digits": "19500",
+          "scale": 4
+        },
+        "slotQty": 27
+      },
+      {
+        "id": 24,
+        "upgradePrice": {
+          "sign": 1,
+          "digits": "29250",
+          "scale": 4
+        },
+        "slotQty": 28
+      },
+      {
+        "id": 25,
+        "upgradePrice": {
+          "sign": 1,
+          "digits": "43875",
+          "scale": 4
+        },
+        "slotQty": 29
+      },
+      {
+        "id": 26,
+        "upgradePrice": {
+          "sign": 1,
+          "digits": "0",
+          "scale": 0
+        },
+        "slotQty": 30
+      }
+    ],
+    "tbstrengthrebirth": [
+      {
+        "id": 1,
+        "strengthRequirement": {
+          "sign": 1,
+          "digits": "4",
+          "scale": 4
+        },
+        "materialOutputMultiplier": 2
+      },
+      {
+        "id": 2,
+        "strengthRequirement": {
+          "sign": 1,
+          "digits": "12",
+          "scale": 4
+        },
+        "materialOutputMultiplier": 3
+      },
+      {
+        "id": 3,
+        "strengthRequirement": {
+          "sign": 1,
+          "digits": "20",
+          "scale": 4
+        },
+        "materialOutputMultiplier": 4
+      },
+      {
+        "id": 4,
+        "strengthRequirement": {
+          "sign": 1,
+          "digits": "120",
+          "scale": 4
+        },
+        "materialOutputMultiplier": 5
+      },
+      {
+        "id": 5,
+        "strengthRequirement": {
+          "sign": 1,
+          "digits": "360",
+          "scale": 4
+        },
+        "materialOutputMultiplier": 9
+      },
+      {
+        "id": 6,
+        "strengthRequirement": {
+          "sign": 1,
+          "digits": "650",
+          "scale": 4
+        },
+        "materialOutputMultiplier": 10.5
+      },
+      {
+        "id": 7,
+        "strengthRequirement": {
+          "sign": 1,
+          "digits": "7000",
+          "scale": 4
+        },
+        "materialOutputMultiplier": 12
+      },
+      {
+        "id": 8,
+        "strengthRequirement": {
+          "sign": 1,
+          "digits": "45000",
+          "scale": 4
+        },
+        "materialOutputMultiplier": 13.5
+      },
+      {
+        "id": 9,
+        "strengthRequirement": {
+          "sign": 1,
+          "digits": "135000",
+          "scale": 4
+        },
+        "materialOutputMultiplier": 15
+      },
+      {
+        "id": 10,
+        "strengthRequirement": {
+          "sign": 1,
+          "digits": "405000",
+          "scale": 4
+        },
+        "materialOutputMultiplier": 16.5
+      }
+    ],
+    "tbtrashmanrebirth": [
+      {
+        "id": 1,
+        "realmRequirement": 4,
+        "fishHallOutputMultiplier": 2
+      },
+      {
+        "id": 2,
+        "realmRequirement": 8,
+        "fishHallOutputMultiplier": 3
+      },
+      {
+        "id": 3,
+        "realmRequirement": 12,
+        "fishHallOutputMultiplier": 4
+      },
+      {
+        "id": 4,
+        "realmRequirement": 16,
+        "fishHallOutputMultiplier": 5
+      },
+      {
+        "id": 5,
+        "realmRequirement": 20,
+        "fishHallOutputMultiplier": 6
+      },
+      {
+        "id": 6,
+        "realmRequirement": 24,
+        "fishHallOutputMultiplier": 7
+      },
+      {
+        "id": 7,
+        "realmRequirement": 28,
+        "fishHallOutputMultiplier": 8
+      },
+      {
+        "id": 8,
+        "realmRequirement": 32,
+        "fishHallOutputMultiplier": 9
+      },
+      {
+        "id": 9,
+        "realmRequirement": 36,
+        "fishHallOutputMultiplier": 10
+      },
+      {
+        "id": 10,
+        "realmRequirement": 40,
+        "fishHallOutputMultiplier": 11
+      },
+      {
+        "id": 11,
+        "realmRequirement": 44,
+        "fishHallOutputMultiplier": 12
+      },
+      {
+        "id": 12,
+        "realmRequirement": 48,
+        "fishHallOutputMultiplier": 13
+      },
+      {
+        "id": 13,
+        "realmRequirement": 52,
+        "fishHallOutputMultiplier": 14
+      },
+      {
+        "id": 14,
+        "realmRequirement": 56,
+        "fishHallOutputMultiplier": 15
+      },
+      {
+        "id": 15,
+        "realmRequirement": 60,
+        "fishHallOutputMultiplier": 16
+      },
+      {
+        "id": 16,
+        "realmRequirement": 64,
+        "fishHallOutputMultiplier": 17
+      },
+      {
+        "id": 17,
+        "realmRequirement": 68,
+        "fishHallOutputMultiplier": 18
+      },
+      {
+        "id": 18,
+        "realmRequirement": 72,
+        "fishHallOutputMultiplier": 19
+      },
+      {
+        "id": 19,
+        "realmRequirement": 76,
+        "fishHallOutputMultiplier": 20
+      },
+      {
+        "id": 20,
+        "realmRequirement": 80,
+        "fishHallOutputMultiplier": 21
+      }
+    ],
+    "tbtrashmanrealm": [
+      {
+        "id": 1,
+        "name": "蛮兽境初期",
+        "monsterName": "石头萌主",
+        "decomposeSpeedMultiplier": 1,
+        "cultivationSecondsToNextRealm": 0,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "20",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_1.Beast_1')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST1.BP_BEAST1_C')"
+      },
+      {
+        "id": 2,
+        "name": "蛮兽境中期",
+        "monsterName": "石头萌主",
+        "decomposeSpeedMultiplier": 2.25,
+        "cultivationSecondsToNextRealm": 1,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "1000",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_1.Beast_1')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST1.BP_BEAST1_C')"
+      },
+      {
+        "id": 3,
+        "name": "蛮兽境后期",
+        "monsterName": "石头萌主",
+        "decomposeSpeedMultiplier": 3.5,
+        "cultivationSecondsToNextRealm": 2,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "50000",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_1.Beast_1')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST1.BP_BEAST1_C')"
+      },
+      {
+        "id": 4,
+        "name": "蛮兽境圆满",
+        "monsterName": "石头萌主",
+        "decomposeSpeedMultiplier": 4.75,
+        "cultivationSecondsToNextRealm": 5,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "3500000",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_1.Beast_1')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST1.BP_BEAST1_C')"
+      },
+      {
+        "id": 5,
+        "name": "启灵境初期",
+        "monsterName": "石来运转兽",
+        "decomposeSpeedMultiplier": 6,
+        "cultivationSecondsToNextRealm": 10,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "600000",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_2.Beast_2')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST2.BP_BEAST2_C')"
+      },
+      {
+        "id": 6,
+        "name": "启灵境中期",
+        "monsterName": "石来运转兽",
+        "decomposeSpeedMultiplier": 7.25,
+        "cultivationSecondsToNextRealm": 2400,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "900000",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_2.Beast_2')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST2.BP_BEAST2_C')"
+      },
+      {
+        "id": 7,
+        "name": "启灵境后期",
+        "monsterName": "石来运转兽",
+        "decomposeSpeedMultiplier": 8.5,
+        "cultivationSecondsToNextRealm": 270,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "1200000",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_2.Beast_2')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST2.BP_BEAST2_C')"
+      },
+      {
+        "id": 8,
+        "name": "启灵境圆满",
+        "monsterName": "石来运转兽",
+        "decomposeSpeedMultiplier": 9.75,
+        "cultivationSecondsToNextRealm": 430,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "6000000",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_2.Beast_2')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST2.BP_BEAST2_C')"
+      },
+      {
+        "id": 9,
+        "name": "妖气境初期",
+        "monsterName": "岩值爆表兽",
+        "decomposeSpeedMultiplier": 11,
+        "cultivationSecondsToNextRealm": 610,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "1000000",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_3.Beast_3')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST3.BP_BEAST3_C')"
+      },
+      {
+        "id": 10,
+        "name": "妖气境中期",
+        "monsterName": "岩值爆表兽",
+        "decomposeSpeedMultiplier": 12.25,
+        "cultivationSecondsToNextRealm": 810,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "4000000",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_3.Beast_3')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST3.BP_BEAST3_C')"
+      },
+      {
+        "id": 11,
+        "name": "妖气境后期",
+        "monsterName": "岩值爆表兽",
+        "decomposeSpeedMultiplier": 13.5,
+        "cultivationSecondsToNextRealm": 1030,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "7200000",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_3.Beast_3')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST3.BP_BEAST3_C')"
+      },
+      {
+        "id": 12,
+        "name": "妖气境圆满",
+        "monsterName": "岩值爆表兽",
+        "decomposeSpeedMultiplier": 14.75,
+        "cultivationSecondsToNextRealm": 1270,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "5000000",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_3.Beast_3')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST3.BP_BEAST3_C')"
+      },
+      {
+        "id": 13,
+        "name": "灵妖境初期",
+        "monsterName": "宝石商人",
+        "decomposeSpeedMultiplier": 16,
+        "cultivationSecondsToNextRealm": 1530,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "2000000",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_4.Beast_4')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST4.BP_BEAST4_C')"
+      },
+      {
+        "id": 14,
+        "name": "灵妖境中期",
+        "monsterName": "宝石商人",
+        "decomposeSpeedMultiplier": 17.25,
+        "cultivationSecondsToNextRealm": 1810,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "11000000",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_4.Beast_4')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST4.BP_BEAST4_C')"
+      },
+      {
+        "id": 15,
+        "name": "灵妖境后期",
+        "monsterName": "宝石商人",
+        "decomposeSpeedMultiplier": 18.5,
+        "cultivationSecondsToNextRealm": 2110,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "26500000",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_4.Beast_4')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST4.BP_BEAST4_C')"
+      },
+      {
+        "id": 16,
+        "name": "灵妖境圆满",
+        "monsterName": "宝石商人",
+        "decomposeSpeedMultiplier": 19.75,
+        "cultivationSecondsToNextRealm": 2200,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "12000000",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_4.Beast_4')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST4.BP_BEAST4_C')"
+      },
+      {
+        "id": 17,
+        "name": "妖丹境初期",
+        "monsterName": "玉叶兽",
+        "decomposeSpeedMultiplier": 21,
+        "cultivationSecondsToNextRealm": 2770,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "6000000",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_5.Beast_5')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST5.BP_BEAST5_C')"
+      },
+      {
+        "id": 18,
+        "name": "妖丹境中期",
+        "monsterName": "玉叶兽",
+        "decomposeSpeedMultiplier": 22.25,
+        "cultivationSecondsToNextRealm": 3130,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "9000000",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_5.Beast_5')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST5.BP_BEAST5_C')"
+      },
+      {
+        "id": 19,
+        "name": "妖丹境后期",
+        "monsterName": "玉叶兽",
+        "decomposeSpeedMultiplier": 23.5,
+        "cultivationSecondsToNextRealm": 3510,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "13500000",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_5.Beast_5')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST5.BP_BEAST5_C')"
+      },
+      {
+        "id": 20,
+        "name": "妖丹境圆满",
+        "monsterName": "玉叶兽",
+        "decomposeSpeedMultiplier": 24.75,
+        "cultivationSecondsToNextRealm": 3910,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "18000000",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_5.Beast_5')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST5.BP_BEAST5_C')"
+      },
+      {
+        "id": 21,
+        "name": "妖婴境初期",
+        "monsterName": "屎壳郎",
+        "decomposeSpeedMultiplier": 26,
+        "cultivationSecondsToNextRealm": 4330,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "9000000",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_6.Beast_6')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST6.BP_BEAST6_C')"
+      },
+      {
+        "id": 22,
+        "name": "妖婴境中期",
+        "monsterName": "屎壳郎",
+        "decomposeSpeedMultiplier": 27.25,
+        "cultivationSecondsToNextRealm": 4770,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "13500000",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_6.Beast_6')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST6.BP_BEAST6_C')"
+      },
+      {
+        "id": 23,
+        "name": "妖婴境后期",
+        "monsterName": "屎壳郎",
+        "decomposeSpeedMultiplier": 28.5,
+        "cultivationSecondsToNextRealm": 5230,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "20250000",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_6.Beast_6')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST6.BP_BEAST6_C')"
+      },
+      {
+        "id": 24,
+        "name": "妖婴境圆满",
+        "monsterName": "屎壳郎",
+        "decomposeSpeedMultiplier": 29.75,
+        "cultivationSecondsToNextRealm": 5710,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "27000000",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_6.Beast_6')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST6.BP_BEAST6_C')"
+      },
+      {
+        "id": 25,
+        "name": "化形境初期",
+        "monsterName": "只蛛侠",
+        "decomposeSpeedMultiplier": 31,
+        "cultivationSecondsToNextRealm": 6210,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "13500000",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_7.Beast_7')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST7.BP_BEAST7_C')"
+      },
+      {
+        "id": 26,
+        "name": "化形境中期",
+        "monsterName": "只蛛侠",
+        "decomposeSpeedMultiplier": 32.25,
+        "cultivationSecondsToNextRealm": 6730,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "20250000",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_7.Beast_7')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST7.BP_BEAST7_C')"
+      },
+      {
+        "id": 27,
+        "name": "化形境后期",
+        "monsterName": "只蛛侠",
+        "decomposeSpeedMultiplier": 33.5,
+        "cultivationSecondsToNextRealm": 7270,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "30375000",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_7.Beast_7')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST7.BP_BEAST7_C')"
+      },
+      {
+        "id": 28,
+        "name": "化形境圆满",
+        "monsterName": "只蛛侠",
+        "decomposeSpeedMultiplier": 34.75,
+        "cultivationSecondsToNextRealm": 7830,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "40500000",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_7.Beast_7')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST7.BP_BEAST7_C')"
+      },
+      {
+        "id": 29,
+        "name": "妖虚境初期",
+        "monsterName": "火焰领主",
+        "decomposeSpeedMultiplier": 36,
+        "cultivationSecondsToNextRealm": 8410,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "20250000",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_8.Beast_8')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST8.BP_BEAST8_C')"
+      },
+      {
+        "id": 30,
+        "name": "妖虚境中期",
+        "monsterName": "火焰领主",
+        "decomposeSpeedMultiplier": 37.25,
+        "cultivationSecondsToNextRealm": 9010,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "30375000",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_8.Beast_8')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST8.BP_BEAST8_C')"
+      },
+      {
+        "id": 31,
+        "name": "妖虚境后期",
+        "monsterName": "火焰领主",
+        "decomposeSpeedMultiplier": 38.5,
+        "cultivationSecondsToNextRealm": 9630,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "45562500",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_8.Beast_8')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST8.BP_BEAST8_C')"
+      },
+      {
+        "id": 32,
+        "name": "妖虚境圆满",
+        "monsterName": "火焰领主",
+        "decomposeSpeedMultiplier": 39.75,
+        "cultivationSecondsToNextRealm": 10270,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "60750000",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_8.Beast_8')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST8.BP_BEAST8_C')"
+      },
+      {
+        "id": 33,
+        "name": "妖尊境初期",
+        "monsterName": "雪狐",
+        "decomposeSpeedMultiplier": 41,
+        "cultivationSecondsToNextRealm": 10930,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "30375000",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_9.Beast_9')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST9.BP_BEAST9_C')"
+      },
+      {
+        "id": 34,
+        "name": "妖尊境中期",
+        "monsterName": "雪狐",
+        "decomposeSpeedMultiplier": 42.25,
+        "cultivationSecondsToNextRealm": 11610,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "45562500",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_9.Beast_9')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST9.BP_BEAST9_C')"
+      },
+      {
+        "id": 35,
+        "name": "妖尊境后期",
+        "monsterName": "雪狐",
+        "decomposeSpeedMultiplier": 43.5,
+        "cultivationSecondsToNextRealm": 12310,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "68343750",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_9.Beast_9')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST9.BP_BEAST9_C')"
+      },
+      {
+        "id": 36,
+        "name": "妖尊境圆满",
+        "monsterName": "雪狐",
+        "decomposeSpeedMultiplier": 44.75,
+        "cultivationSecondsToNextRealm": 13030,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "91125000",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_9.Beast_9')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST9.BP_BEAST9_C')"
+      },
+      {
+        "id": 37,
+        "name": "妖圣境初期",
+        "monsterName": "通通通撒胡",
+        "decomposeSpeedMultiplier": 46,
+        "cultivationSecondsToNextRealm": 13770,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "45562500",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_10.Beast_10')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST10.BP_BEAST10_C')"
+      },
+      {
+        "id": 38,
+        "name": "妖圣境中期",
+        "monsterName": "通通通撒胡",
+        "decomposeSpeedMultiplier": 47.25,
+        "cultivationSecondsToNextRealm": 14530,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "68343750",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_10.Beast_10')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST10.BP_BEAST10_C')"
+      },
+      {
+        "id": 39,
+        "name": "妖圣境后期",
+        "monsterName": "通通通撒胡",
+        "decomposeSpeedMultiplier": 48.5,
+        "cultivationSecondsToNextRealm": 15310,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "102515625",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_10.Beast_10')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST10.BP_BEAST10_C')"
+      },
+      {
+        "id": 40,
+        "name": "妖圣境圆满",
+        "monsterName": "通通通撒胡",
+        "decomposeSpeedMultiplier": 49.75,
+        "cultivationSecondsToNextRealm": 16110,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "136687500",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_10.Beast_10')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST10.BP_BEAST10_C')"
+      },
+      {
+        "id": 41,
+        "name": "妖劫境初期",
+        "monsterName": "渡鸦",
+        "decomposeSpeedMultiplier": 51,
+        "cultivationSecondsToNextRealm": 16930,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "68343750",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_11.Beast_11')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST11.BP_BEAST11_C')"
+      },
+      {
+        "id": 42,
+        "name": "妖劫境中期",
+        "monsterName": "渡鸦",
+        "decomposeSpeedMultiplier": 52.25,
+        "cultivationSecondsToNextRealm": 17770,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "102515625",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_11.Beast_11')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST11.BP_BEAST11_C')"
+      },
+      {
+        "id": 43,
+        "name": "妖劫境后期",
+        "monsterName": "渡鸦",
+        "decomposeSpeedMultiplier": 53.5,
+        "cultivationSecondsToNextRealm": 18630,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "153773437",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_11.Beast_11')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST11.BP_BEAST11_C')"
+      },
+      {
+        "id": 44,
+        "name": "妖劫境圆满",
+        "monsterName": "渡鸦",
+        "decomposeSpeedMultiplier": 54.75,
+        "cultivationSecondsToNextRealm": 19510,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "205031250",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_11.Beast_11')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST11.BP_BEAST11_C')"
+      },
+      {
+        "id": 45,
+        "name": "妖仙境初期",
+        "monsterName": "地狱双头犬",
+        "decomposeSpeedMultiplier": 56,
+        "cultivationSecondsToNextRealm": 20410,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "102515625",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_12.Beast_12')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST12.BP_BEAST12_C')"
+      },
+      {
+        "id": 46,
+        "name": "妖仙境中期",
+        "monsterName": "地狱双头犬",
+        "decomposeSpeedMultiplier": 57.25,
+        "cultivationSecondsToNextRealm": 21330,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "153773437",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_12.Beast_12')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST12.BP_BEAST12_C')"
+      },
+      {
+        "id": 47,
+        "name": "妖仙境后期",
+        "monsterName": "地狱双头犬",
+        "decomposeSpeedMultiplier": 58.5,
+        "cultivationSecondsToNextRealm": 22270,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "230660155",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_12.Beast_12')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST12.BP_BEAST12_C')"
+      },
+      {
+        "id": 48,
+        "name": "妖仙境圆满",
+        "monsterName": "地狱双头犬",
+        "decomposeSpeedMultiplier": 59.75,
+        "cultivationSecondsToNextRealm": 23230,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "307546875",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_12.Beast_12')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST12.BP_BEAST12_C')"
+      },
+      {
+        "id": 49,
+        "name": "地妖境初期",
+        "monsterName": "金毛狮王",
+        "decomposeSpeedMultiplier": 61,
+        "cultivationSecondsToNextRealm": 24210,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "153773437",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_13.Beast_13')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST13.BP_BEAST13_C')"
+      },
+      {
+        "id": 50,
+        "name": "地妖境中期",
+        "monsterName": "金毛狮王",
+        "decomposeSpeedMultiplier": 62.25,
+        "cultivationSecondsToNextRealm": 25210,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "230660155",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_13.Beast_13')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST13.BP_BEAST13_C')"
+      },
+      {
+        "id": 51,
+        "name": "地妖境后期",
+        "monsterName": "金毛狮王",
+        "decomposeSpeedMultiplier": 63.5,
+        "cultivationSecondsToNextRealm": 26230,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "345990232",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_13.Beast_13')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST13.BP_BEAST13_C')"
+      },
+      {
+        "id": 52,
+        "name": "地妖境圆满",
+        "monsterName": "金毛狮王",
+        "decomposeSpeedMultiplier": 64.75,
+        "cultivationSecondsToNextRealm": 27270,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "461320312",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_13.Beast_13')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST13.BP_BEAST13_C')"
+      },
+      {
+        "id": 53,
+        "name": "天妖境初期",
+        "monsterName": "紫薯精",
+        "decomposeSpeedMultiplier": 66,
+        "cultivationSecondsToNextRealm": 28330,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "230660155",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_14.Beast_14')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST14.BP_BEAST14_C')"
+      },
+      {
+        "id": 54,
+        "name": "天妖境中期",
+        "monsterName": "紫薯精",
+        "decomposeSpeedMultiplier": 67.25,
+        "cultivationSecondsToNextRealm": 29410,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "345990232",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_14.Beast_14')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST14.BP_BEAST14_C')"
+      },
+      {
+        "id": 55,
+        "name": "天妖境后期",
+        "monsterName": "紫薯精",
+        "decomposeSpeedMultiplier": 68.5,
+        "cultivationSecondsToNextRealm": 30510,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "518985348",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_14.Beast_14')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST14.BP_BEAST14_C')"
+      },
+      {
+        "id": 56,
+        "name": "天妖境圆满",
+        "monsterName": "紫薯精",
+        "decomposeSpeedMultiplier": 69.75,
+        "cultivationSecondsToNextRealm": 31630,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "691980468",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_14.Beast_14')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST14.BP_BEAST14_C')"
+      },
+      {
+        "id": 57,
+        "name": "金妖境初期",
+        "monsterName": "雪豹",
+        "decomposeSpeedMultiplier": 71,
+        "cultivationSecondsToNextRealm": 32770,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "345990232",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_15.Beast_15')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST15.BP_BEAST15_C')"
+      },
+      {
+        "id": 58,
+        "name": "金妖境中期",
+        "monsterName": "雪豹",
+        "decomposeSpeedMultiplier": 72.25,
+        "cultivationSecondsToNextRealm": 33930,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "518985348",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_15.Beast_15')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST15.BP_BEAST15_C')"
+      },
+      {
+        "id": 59,
+        "name": "金妖境后期",
+        "monsterName": "雪豹",
+        "decomposeSpeedMultiplier": 73.5,
+        "cultivationSecondsToNextRealm": 35110,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "778478022",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_15.Beast_15')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST15.BP_BEAST15_C')"
+      },
+      {
+        "id": 60,
+        "name": "金妖境圆满",
+        "monsterName": "雪豹",
+        "decomposeSpeedMultiplier": 74.75,
+        "cultivationSecondsToNextRealm": 36310,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "1037970702",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_15.Beast_15')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST15.BP_BEAST15_C')"
+      },
+      {
+        "id": 61,
+        "name": "太乙妖尊初期",
+        "monsterName": "火麒麟",
+        "decomposeSpeedMultiplier": 76,
+        "cultivationSecondsToNextRealm": 37310,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "518985348",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_16.Beast_16')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST16.BP_BEAST16_C')"
+      },
+      {
+        "id": 62,
+        "name": "太乙妖尊中期",
+        "monsterName": "火麒麟",
+        "decomposeSpeedMultiplier": 77.25,
+        "cultivationSecondsToNextRealm": 38430,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "778478022",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_16.Beast_16')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST16.BP_BEAST16_C')"
+      },
+      {
+        "id": 63,
+        "name": "太乙妖尊后期",
+        "monsterName": "火麒麟",
+        "decomposeSpeedMultiplier": 78.5,
+        "cultivationSecondsToNextRealm": 39550,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "1167717033",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_16.Beast_16')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST16.BP_BEAST16_C')"
+      },
+      {
+        "id": 64,
+        "name": "太乙妖尊圆满",
+        "monsterName": "火麒麟",
+        "decomposeSpeedMultiplier": 79.75,
+        "cultivationSecondsToNextRealm": 40670,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "1556956053",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_16.Beast_16')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST16.BP_BEAST16_C')"
+      },
+      {
+        "id": 65,
+        "name": "大罗妖圣初期",
+        "monsterName": "雪团子",
+        "decomposeSpeedMultiplier": 81,
+        "cultivationSecondsToNextRealm": 41790,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "778478022",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_17.Beast_17')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST17.BP_BEAST17_C')"
+      },
+      {
+        "id": 66,
+        "name": "大罗妖圣中期",
+        "monsterName": "雪团子",
+        "decomposeSpeedMultiplier": 82.25,
+        "cultivationSecondsToNextRealm": 42910,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "1167717033",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_17.Beast_17')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST17.BP_BEAST17_C')"
+      },
+      {
+        "id": 67,
+        "name": "大罗妖圣后期",
+        "monsterName": "雪团子",
+        "decomposeSpeedMultiplier": 83.5,
+        "cultivationSecondsToNextRealm": 44030,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "1751575549",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_17.Beast_17')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST17.BP_BEAST17_C')"
+      },
+      {
+        "id": 68,
+        "name": "大罗妖圣圆满",
+        "monsterName": "雪团子",
+        "decomposeSpeedMultiplier": 84.75,
+        "cultivationSecondsToNextRealm": 45150,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "2335434079",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_17.Beast_17')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST17.BP_BEAST17_C')"
+      },
+      {
+        "id": 69,
+        "name": "混元妖祖初期",
+        "monsterName": "大脚怪",
+        "decomposeSpeedMultiplier": 86,
+        "cultivationSecondsToNextRealm": 46270,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "1167717033",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_18.Beast_18')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST18.BP_BEAST18_C')"
+      },
+      {
+        "id": 70,
+        "name": "混元妖祖中期",
+        "monsterName": "大脚怪",
+        "decomposeSpeedMultiplier": 87.25,
+        "cultivationSecondsToNextRealm": 47390,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "1751575549",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_18.Beast_18')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST18.BP_BEAST18_C')"
+      },
+      {
+        "id": 71,
+        "name": "混元妖祖后期",
+        "monsterName": "大脚怪",
+        "decomposeSpeedMultiplier": 88.5,
+        "cultivationSecondsToNextRealm": 48510,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "2627363323",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_18.Beast_18')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST18.BP_BEAST18_C')"
+      },
+      {
+        "id": 72,
+        "name": "混元妖祖圆满",
+        "monsterName": "大脚怪",
+        "decomposeSpeedMultiplier": 89.75,
+        "cultivationSecondsToNextRealm": 49630,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "3503151118",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_18.Beast_18')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST18.BP_BEAST18_C')"
+      },
+      {
+        "id": 73,
+        "name": "妖王境初期",
+        "monsterName": "金刚",
+        "decomposeSpeedMultiplier": 91,
+        "cultivationSecondsToNextRealm": 50750,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "1751575549",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_19.Beast_19')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST19.BP_BEAST19_C')"
+      },
+      {
+        "id": 74,
+        "name": "妖王境中期",
+        "monsterName": "金刚",
+        "decomposeSpeedMultiplier": 92.25,
+        "cultivationSecondsToNextRealm": 51870,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "2627363323",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_19.Beast_19')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST19.BP_BEAST19_C')"
+      },
+      {
+        "id": 75,
+        "name": "妖王境后期",
+        "monsterName": "金刚",
+        "decomposeSpeedMultiplier": 93.5,
+        "cultivationSecondsToNextRealm": 52990,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "3941044984",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_19.Beast_19')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST19.BP_BEAST19_C')"
+      },
+      {
+        "id": 76,
+        "name": "妖王境圆满",
+        "monsterName": "金刚",
+        "decomposeSpeedMultiplier": 94.75,
+        "cultivationSecondsToNextRealm": 54110,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "5254726677",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_19.Beast_19')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST19.BP_BEAST19_C')"
+      },
+      {
+        "id": 77,
+        "name": "妖帝境初期",
+        "monsterName": "黑熊精",
+        "decomposeSpeedMultiplier": 96,
+        "cultivationSecondsToNextRealm": 55230,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "2627363323",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_20.Beast_20')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST20.BP_BEAST20_C')"
+      },
+      {
+        "id": 78,
+        "name": "妖帝境中期",
+        "monsterName": "黑熊精",
+        "decomposeSpeedMultiplier": 97.25,
+        "cultivationSecondsToNextRealm": 56350,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "3941044984",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_20.Beast_20')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST20.BP_BEAST20_C')"
+      },
+      {
+        "id": 79,
+        "name": "妖帝境后期",
+        "monsterName": "黑熊精",
+        "decomposeSpeedMultiplier": 98.5,
+        "cultivationSecondsToNextRealm": 57470,
+        "materialRequireToNextRealm": {
+          "sign": 1,
+          "digits": "5911567476",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_20.Beast_20')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST20.BP_BEAST20_C')"
+      },
+      {
+        "id": 80,
+        "name": "妖帝境圆满",
+        "monsterName": "黑熊精",
+        "decomposeSpeedMultiplier": 99.75,
+        "cultivationSecondsToNextRealm": 58590,
+        "materialRequireToNextRealm": {
+          "sign": 0,
+          "digits": "0",
+          "scale": 0
+        },
+        "portraitPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/beast/Beast_20.Beast_20')",
+        "bpPath": "UGCGameSystem.GetUGCResourcesFullPath('Asset/Blueprint/Prefabs/Monsters/BP_BEAST20.BP_BEAST20_C')"
+      }
+    ],
+    "tbfishrandompool": [
+      {
+        "id": 1,
+        "rarityId": 1,
+        "isOpen": true,
+        "strengthUpperBound": {
+          "sign": 1,
+          "digits": "2",
+          "scale": 2
+        },
+        "startLuck": {
+          "sign": 1,
+          "digits": "1",
+          "scale": 0
+        },
+        "endLuck": {
+          "sign": 1,
+          "digits": "2",
+          "scale": 1
+        },
+        "name": "门口小沟",
+        "textColor": "E7E7EAFF",
+        "textMaterial": "",
+        "bg": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/MainUI/Beijin1_1.Beijin1_1')"
+      },
+      {
+        "id": 2,
+        "rarityId": 2,
+        "isOpen": true,
+        "strengthUpperBound": {
+          "sign": 1,
+          "digits": "3",
+          "scale": 3
+        },
+        "startLuck": {
+          "sign": 1,
+          "digits": "3",
+          "scale": 1
+        },
+        "endLuck": {
+          "sign": 1,
+          "digits": "8",
+          "scale": 1
+        },
+        "name": "洗脚大盆",
+        "textColor": "CBEABEFF",
+        "textMaterial": "",
+        "bg": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/MainUI/Beijin1_7.Beijin1_7')"
+      },
+      {
+        "id": 3,
+        "rarityId": 3,
+        "isOpen": true,
+        "strengthUpperBound": {
+          "sign": 1,
+          "digits": "30",
+          "scale": 3
+        },
+        "startLuck": {
+          "sign": 1,
+          "digits": "4",
+          "scale": 2
+        },
+        "endLuck": {
+          "sign": 1,
+          "digits": "16",
+          "scale": 2
+        },
+        "name": "幽都冥河",
+        "textColor": "91C1EAFF",
+        "textMaterial": "",
+        "bg": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/MainUI/Beijin1_2.Beijin1_2')"
+      },
+      {
+        "id": 4,
+        "rarityId": 4,
+        "isOpen": true,
+        "strengthUpperBound": {
+          "sign": 1,
+          "digits": "220",
+          "scale": 3
+        },
+        "startLuck": {
+          "sign": 1,
+          "digits": "8",
+          "scale": 3
+        },
+        "endLuck": {
+          "sign": 1,
+          "digits": "32",
+          "scale": 3
+        },
+        "name": "原谅海湾",
+        "textColor": "D680E9FF",
+        "textMaterial": "",
+        "bg": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/MainUI/Beijin1_3.Beijin1_3')"
+      },
+      {
+        "id": 5,
+        "rarityId": 5,
+        "isOpen": true,
+        "strengthUpperBound": {
+          "sign": 1,
+          "digits": "25",
+          "scale": 5
+        },
+        "startLuck": {
+          "sign": 1,
+          "digits": "16",
+          "scale": 4
+        },
+        "endLuck": {
+          "sign": 1,
+          "digits": "64",
+          "scale": 4
+        },
+        "name": "火锅神湖",
+        "textColor": "FB9A6AFF",
+        "textMaterial": "",
+        "bg": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/MainUI/Beijin1_6.Beijin1_6')"
+      },
+      {
+        "id": 6,
+        "rarityId": 6,
+        "isOpen": true,
+        "strengthUpperBound": {
+          "sign": 1,
+          "digits": "28",
+          "scale": 6
+        },
+        "startLuck": {
+          "sign": 1,
+          "digits": "32",
+          "scale": 5
+        },
+        "endLuck": {
+          "sign": 1,
+          "digits": "128",
+          "scale": 5
+        },
+        "name": "若木沧渊",
+        "textColor": "FBE6AAFF",
+        "textMaterial": "",
+        "bg": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/MainUI/Beijin1_4.Beijin1_4')"
+      },
+      {
+        "id": 7,
+        "rarityId": 7,
+        "isOpen": true,
+        "strengthUpperBound": {
+          "sign": 1,
+          "digits": "300",
+          "scale": 6
+        },
+        "startLuck": {
+          "sign": 1,
+          "digits": "64",
+          "scale": 6
+        },
+        "endLuck": {
+          "sign": 1,
+          "digits": "256",
+          "scale": 6
+        },
+        "name": "玄鳞古河",
+        "textColor": "55A54BFF",
+        "textMaterial": "/Game/Arts/UI/UI_Mat/Font_Mat/16YearsOldGiftBag/16YearsOldGiftBag_Text1.16YearsOldGiftBag_Text1",
+        "bg": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/MainUI/Beijing2_1.Beijing2_1')"
+      },
+      {
+        "id": 8,
+        "rarityId": 8,
+        "isOpen": true,
+        "strengthUpperBound": {
+          "sign": 1,
+          "digits": "840",
+          "scale": 6
+        },
+        "startLuck": {
+          "sign": 1,
+          "digits": "128",
+          "scale": 7
+        },
+        "endLuck": {
+          "sign": 1,
+          "digits": "512",
+          "scale": 7
+        },
+        "name": "奶茶大海",
+        "textColor": "FEABC9FF",
+        "textMaterial": "/Game/Arts/UI/UI_Mat/Font_Mat/SoloMod_Font3_Inst.SoloMod_Font3_Inst",
+        "bg": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/MainUI/Beijing2_3.Beijing2_3')"
+      },
+      {
+        "id": 9,
+        "rarityId": 9,
+        "isOpen": true,
+        "strengthUpperBound": {
+          "sign": 1,
+          "digits": "2100",
+          "scale": 6
+        },
+        "startLuck": {
+          "sign": 1,
+          "digits": "256",
+          "scale": 8
+        },
+        "endLuck": {
+          "sign": 1,
+          "digits": "1024",
+          "scale": 8
+        },
+        "name": "青丘灵湖",
+        "textColor": "9B6B25FF",
+        "textMaterial": "/Game/Arts/UI/UI_Mat/Font_Mat/16YearsOldGiftBag/16YearsOldGiftBag_Text1.16YearsOldGiftBag_Text1",
+        "bg": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/MainUI/Beijing2_2.Beijing2_2')"
+      },
+      {
+        "id": 10,
+        "rarityId": 10,
+        "isOpen": true,
+        "strengthUpperBound": {
+          "sign": 1,
+          "digits": "7500",
+          "scale": 6
+        },
+        "startLuck": {
+          "sign": 1,
+          "digits": "512",
+          "scale": 9
+        },
+        "endLuck": {
+          "sign": 1,
+          "digits": "2048",
+          "scale": 9
+        },
+        "name": "九野荒海",
+        "textColor": "65E9A1FF",
+        "textMaterial": "/Game/UGC/UMGTemplate/FXMat/Temp_UIFont_Mat.Temp_UIFont_Mat",
+        "bg": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/MainUI/Beijing2_4.Beijing2_4')"
+      },
+      {
+        "id": 11,
+        "rarityId": 11,
+        "isOpen": true,
+        "strengthUpperBound": {
+          "sign": 1,
+          "digits": "750",
+          "scale": 8
+        },
+        "startLuck": {
+          "sign": 1,
+          "digits": "1024",
+          "scale": 10
+        },
+        "endLuck": {
+          "sign": 1,
+          "digits": "4096",
+          "scale": 10
+        },
+        "name": "帝江血渊",
+        "textColor": "AC0941FF",
+        "textMaterial": "/Game/Arts/UI/UI_Mat/Font_Mat/16YearsOldGiftBag/16YearsOldGiftBag_Text1.16YearsOldGiftBag_Text1",
+        "bg": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/MainUI/Beijing2_5.Beijing2_5')"
+      },
+      {
+        "id": 12,
+        "rarityId": 12,
+        "isOpen": true,
+        "strengthUpperBound": {
+          "sign": 1,
+          "digits": "330",
+          "scale": 9
+        },
+        "startLuck": {
+          "sign": 1,
+          "digits": "2048",
+          "scale": 11
+        },
+        "endLuck": {
+          "sign": 1,
+          "digits": "8192",
+          "scale": 11
+        },
+        "name": "太荒神洋",
+        "textColor": "5B8EF6FF",
+        "textMaterial": "/Game/UGC/UMGTemplate/FXMat/Temp_UIFont_Mat_Inst2.Temp_UIFont_Mat_Inst2",
+        "bg": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/MainUI/Beijing2_6.Beijing2_6')"
+      },
+      {
+        "id": 13,
+        "rarityId": 13,
+        "isOpen": false,
+        "strengthUpperBound": {
+          "sign": 1,
+          "digits": "900",
+          "scale": 9
+        },
+        "startLuck": {
+          "sign": 1,
+          "digits": "4096",
+          "scale": 12
+        },
+        "endLuck": {
+          "sign": 1,
+          "digits": "16384",
+          "scale": 12
+        },
+        "name": "昆仑之墟",
+        "textColor": "5574C3FF",
+        "textMaterial": "/Game/Arts/UI/UI_Mat/Font_Mat/16YearsOldGiftBag/16YearsOldGiftBag_Text3.16YearsOldGiftBag_Text3",
+        "bg": "UGCGameSystem.GetUGCResourcesFullPath('Asset/texture/UI/MainUI/Beijing2_7.Beijing2_7')"
+      }
+    ],
+    "tbcodexgunreward": [
+      {
+        "id": 101,
+        "fishRarityID": 1,
+        "fishMutationID": 1,
+        "gunId": 10001,
+        "rewardType": "gun_unlock",
+        "damageBonus": 0
+      },
+      {
+        "id": 102,
+        "fishRarityID": 1,
+        "fishMutationID": 2,
+        "gunId": 10001,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 5
+      },
+      {
+        "id": 103,
+        "fishRarityID": 1,
+        "fishMutationID": 3,
+        "gunId": 10001,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 10
+      },
+      {
+        "id": 104,
+        "fishRarityID": 1,
+        "fishMutationID": 4,
+        "gunId": 10001,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 20
+      },
+      {
+        "id": 105,
+        "fishRarityID": 1,
+        "fishMutationID": 5,
+        "gunId": 10001,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 25
+      },
+      {
+        "id": 106,
+        "fishRarityID": 1,
+        "fishMutationID": 6,
+        "gunId": 10001,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 40
+      },
+      {
+        "id": 201,
+        "fishRarityID": 2,
+        "fishMutationID": 1,
+        "gunId": 10002,
+        "rewardType": "gun_unlock",
+        "damageBonus": 0
+      },
+      {
+        "id": 202,
+        "fishRarityID": 2,
+        "fishMutationID": 2,
+        "gunId": 10002,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 5
+      },
+      {
+        "id": 203,
+        "fishRarityID": 2,
+        "fishMutationID": 3,
+        "gunId": 10002,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 10
+      },
+      {
+        "id": 204,
+        "fishRarityID": 2,
+        "fishMutationID": 4,
+        "gunId": 10002,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 20
+      },
+      {
+        "id": 205,
+        "fishRarityID": 2,
+        "fishMutationID": 5,
+        "gunId": 10002,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 25
+      },
+      {
+        "id": 206,
+        "fishRarityID": 2,
+        "fishMutationID": 6,
+        "gunId": 10002,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 40
+      },
+      {
+        "id": 301,
+        "fishRarityID": 3,
+        "fishMutationID": 1,
+        "gunId": 10003,
+        "rewardType": "gun_unlock",
+        "damageBonus": 0
+      },
+      {
+        "id": 302,
+        "fishRarityID": 3,
+        "fishMutationID": 2,
+        "gunId": 10003,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 5
+      },
+      {
+        "id": 303,
+        "fishRarityID": 3,
+        "fishMutationID": 3,
+        "gunId": 10003,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 10
+      },
+      {
+        "id": 304,
+        "fishRarityID": 3,
+        "fishMutationID": 4,
+        "gunId": 10003,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 20
+      },
+      {
+        "id": 305,
+        "fishRarityID": 3,
+        "fishMutationID": 5,
+        "gunId": 10003,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 25
+      },
+      {
+        "id": 306,
+        "fishRarityID": 3,
+        "fishMutationID": 6,
+        "gunId": 10003,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 40
+      },
+      {
+        "id": 401,
+        "fishRarityID": 4,
+        "fishMutationID": 1,
+        "gunId": 10011,
+        "rewardType": "gun_unlock",
+        "damageBonus": 0
+      },
+      {
+        "id": 402,
+        "fishRarityID": 4,
+        "fishMutationID": 2,
+        "gunId": 10011,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 5
+      },
+      {
+        "id": 403,
+        "fishRarityID": 4,
+        "fishMutationID": 3,
+        "gunId": 10011,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 10
+      },
+      {
+        "id": 404,
+        "fishRarityID": 4,
+        "fishMutationID": 4,
+        "gunId": 10011,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 20
+      },
+      {
+        "id": 405,
+        "fishRarityID": 4,
+        "fishMutationID": 5,
+        "gunId": 10011,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 25
+      },
+      {
+        "id": 406,
+        "fishRarityID": 4,
+        "fishMutationID": 6,
+        "gunId": 10011,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 40
+      },
+      {
+        "id": 501,
+        "fishRarityID": 5,
+        "fishMutationID": 1,
+        "gunId": 10005,
+        "rewardType": "gun_unlock",
+        "damageBonus": 0
+      },
+      {
+        "id": 502,
+        "fishRarityID": 5,
+        "fishMutationID": 2,
+        "gunId": 10005,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 5
+      },
+      {
+        "id": 503,
+        "fishRarityID": 5,
+        "fishMutationID": 3,
+        "gunId": 10005,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 10
+      },
+      {
+        "id": 504,
+        "fishRarityID": 5,
+        "fishMutationID": 4,
+        "gunId": 10005,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 20
+      },
+      {
+        "id": 505,
+        "fishRarityID": 5,
+        "fishMutationID": 5,
+        "gunId": 10005,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 25
+      },
+      {
+        "id": 506,
+        "fishRarityID": 5,
+        "fishMutationID": 6,
+        "gunId": 10005,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 40
+      },
+      {
+        "id": 601,
+        "fishRarityID": 6,
+        "fishMutationID": 1,
+        "gunId": 10006,
+        "rewardType": "gun_unlock",
+        "damageBonus": 0
+      },
+      {
+        "id": 602,
+        "fishRarityID": 6,
+        "fishMutationID": 2,
+        "gunId": 10006,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 5
+      },
+      {
+        "id": 603,
+        "fishRarityID": 6,
+        "fishMutationID": 3,
+        "gunId": 10006,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 10
+      },
+      {
+        "id": 604,
+        "fishRarityID": 6,
+        "fishMutationID": 4,
+        "gunId": 10006,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 20
+      },
+      {
+        "id": 605,
+        "fishRarityID": 6,
+        "fishMutationID": 5,
+        "gunId": 10006,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 25
+      },
+      {
+        "id": 606,
+        "fishRarityID": 6,
+        "fishMutationID": 6,
+        "gunId": 10006,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 40
+      },
+      {
+        "id": 701,
+        "fishRarityID": 7,
+        "fishMutationID": 1,
+        "gunId": 10008,
+        "rewardType": "gun_unlock",
+        "damageBonus": 0
+      },
+      {
+        "id": 702,
+        "fishRarityID": 7,
+        "fishMutationID": 2,
+        "gunId": 10008,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 5
+      },
+      {
+        "id": 703,
+        "fishRarityID": 7,
+        "fishMutationID": 3,
+        "gunId": 10008,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 10
+      },
+      {
+        "id": 704,
+        "fishRarityID": 7,
+        "fishMutationID": 4,
+        "gunId": 10008,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 20
+      },
+      {
+        "id": 705,
+        "fishRarityID": 7,
+        "fishMutationID": 5,
+        "gunId": 10008,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 25
+      },
+      {
+        "id": 706,
+        "fishRarityID": 7,
+        "fishMutationID": 6,
+        "gunId": 10008,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 40
+      },
+      {
+        "id": 801,
+        "fishRarityID": 8,
+        "fishMutationID": 1,
+        "gunId": 10009,
+        "rewardType": "gun_unlock",
+        "damageBonus": 0
+      },
+      {
+        "id": 802,
+        "fishRarityID": 8,
+        "fishMutationID": 2,
+        "gunId": 10009,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 5
+      },
+      {
+        "id": 803,
+        "fishRarityID": 8,
+        "fishMutationID": 3,
+        "gunId": 10009,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 10
+      },
+      {
+        "id": 804,
+        "fishRarityID": 8,
+        "fishMutationID": 4,
+        "gunId": 10009,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 20
+      },
+      {
+        "id": 805,
+        "fishRarityID": 8,
+        "fishMutationID": 5,
+        "gunId": 10009,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 25
+      },
+      {
+        "id": 806,
+        "fishRarityID": 8,
+        "fishMutationID": 6,
+        "gunId": 10009,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 40
+      },
+      {
+        "id": 901,
+        "fishRarityID": 9,
+        "fishMutationID": 1,
+        "gunId": 10007,
+        "rewardType": "gun_unlock",
+        "damageBonus": 0
+      },
+      {
+        "id": 902,
+        "fishRarityID": 9,
+        "fishMutationID": 2,
+        "gunId": 10007,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 5
+      },
+      {
+        "id": 903,
+        "fishRarityID": 9,
+        "fishMutationID": 3,
+        "gunId": 10007,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 10
+      },
+      {
+        "id": 904,
+        "fishRarityID": 9,
+        "fishMutationID": 4,
+        "gunId": 10007,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 20
+      },
+      {
+        "id": 905,
+        "fishRarityID": 9,
+        "fishMutationID": 5,
+        "gunId": 10007,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 25
+      },
+      {
+        "id": 906,
+        "fishRarityID": 9,
+        "fishMutationID": 6,
+        "gunId": 10007,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 40
+      },
+      {
+        "id": 1001,
+        "fishRarityID": 10,
+        "fishMutationID": 1,
+        "gunId": 10013,
+        "rewardType": "gun_unlock",
+        "damageBonus": 0
+      },
+      {
+        "id": 1002,
+        "fishRarityID": 10,
+        "fishMutationID": 2,
+        "gunId": 10013,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 5
+      },
+      {
+        "id": 1003,
+        "fishRarityID": 10,
+        "fishMutationID": 3,
+        "gunId": 10013,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 10
+      },
+      {
+        "id": 1004,
+        "fishRarityID": 10,
+        "fishMutationID": 4,
+        "gunId": 10013,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 20
+      },
+      {
+        "id": 1005,
+        "fishRarityID": 10,
+        "fishMutationID": 5,
+        "gunId": 10013,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 25
+      },
+      {
+        "id": 1006,
+        "fishRarityID": 10,
+        "fishMutationID": 6,
+        "gunId": 10013,
+        "rewardType": "gun_upgrade",
+        "damageBonus": 40
+      }
+    ]
+  },
+  "artifact_sha256": {
+    "output/run_manifest.json": "34a3d5ff12c2a0ef700256e741c929a497613d772191209ba144ba2a431674c9",
+    "output/events.json": "a0cc2329ec6105db6178998cf79c123788efc732375776537ac7a32c89e6d57f",
+    "output/timeline.json": "60f39f4c88fcaf8b50796d9d3641e6861deeebf6175356528ab5bc85427925c1",
+    "output/source_progression.json": "541c783ad1be48c15efa7ca8261cdebac29a4b1fc73fccd2559edc9f86795d99",
+    "output/source_behavior.json": "36e2e0a5766ebc5f223149b7d02e115cddbc44e21b53a7fa78074314f51b1017",
+    "output/final_checkpoint.json": "cb82e337155f94be39c09e46d7d8c712cf3bbe2c97715086b5592089671aa803",
+    "report/index.html": "ac6fbb9a3d36300d173958b30736c0f54df88c29deac334bc0bd74d866c824f6",
+    "run_status.json": "cedcc4c921285e0030f47c1c1244e4dc6f5200c21845308c28ee71e7bf1fc09d"
+  },
+  "evidence_note": "Public CLI metrics; other results are read-only extraction from existing run artifacts. Current input tables were verified against the run selected_export_sha256. No new simulation or target acceptance evaluation."
+}

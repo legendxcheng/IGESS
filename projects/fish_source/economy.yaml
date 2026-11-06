@@ -14,6 +14,14 @@ engine:
     idle_seconds: 30
     advance_mode: equivalent_batch_v1
     sampling_time_basis: online
+    permanent_privileges_by_scenario:
+      smoke_all_permanent: all_on_sale
+      month_1_all_permanent: all_on_sale
+      smoke_whale: all_on_sale
+      month_1_whale: all_on_sale
+    initial_loadout_by_scenario:
+      smoke_whale: whale_qinglong_29
+      month_1_whale: whale_qinglong_29
 formulas:
   exponential_cost:
     args:
@@ -198,6 +206,47 @@ player_profiles:
         seconds: 10
     luck: '1'
 scenarios:
+  smoke_whale:
+    duration_hours: '0.1666666666666667'
+    time_mode: tick
+    profiles: [default]
+    start_state: new_player
+    record_interval_seconds: 300
+    outputs: [resource_curve, purchase_timeline, unlock_timeline, prestige_timeline, bottleneck_report]
+  month_1_whale:
+    duration_hours: '672'
+    time_mode: tick
+    profiles: [default]
+    start_state: new_player
+    record_interval_seconds: 300
+    outputs: [resource_curve, purchase_timeline, unlock_timeline, prestige_timeline, bottleneck_report, compact_event_details]
+  smoke_all_permanent:
+    duration_hours: '0.1666666666666667'
+    time_mode: tick
+    profiles:
+    - default
+    start_state: new_player
+    record_interval_seconds: 300
+    outputs:
+    - resource_curve
+    - purchase_timeline
+    - unlock_timeline
+    - prestige_timeline
+    - bottleneck_report
+  month_1_all_permanent:
+    duration_hours: '672'
+    time_mode: tick
+    profiles:
+    - default
+    start_state: new_player
+    record_interval_seconds: 300
+    outputs:
+    - resource_curve
+    - purchase_timeline
+    - unlock_timeline
+    - prestige_timeline
+    - bottleneck_report
+    - compact_event_details
   smoke:
     duration_hours: '0.002777777777777778'
     time_mode: tick
@@ -303,8 +352,36 @@ scenarios:
     - prestige_timeline
     - bottleneck_report
     - compact_event_details
+  week_2_growth:
+    duration_hours: '336'
+    time_mode: tick
+    profiles:
+    - default
+    start_state: new_player
+    record_interval_seconds: 300
+    outputs:
+    - resource_curve
+    - purchase_timeline
+    - unlock_timeline
+    - prestige_timeline
+    - bottleneck_report
+    - compact_event_details
+  week_3_growth:
+    duration_hours: '504'
+    time_mode: tick
+    profiles:
+    - default
+    start_state: new_player
+    record_interval_seconds: 300
+    outputs:
+    - resource_curve
+    - purchase_timeline
+    - unlock_timeline
+    - prestige_timeline
+    - bottleneck_report
+    - compact_event_details
   month_1_growth:
-    duration_hours: '720'
+    duration_hours: '672'
     time_mode: tick
     profiles:
     - default

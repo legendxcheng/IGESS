@@ -58,7 +58,7 @@ function renderOverview(report) {
       kpiCard('两类重生', numericMarkup(overview.prestige_reset_count)),
       kpiCard('源规则拒绝', numericMarkup(overview.rejection_count)),
       ...Object.entries(overview.final_resources || {}).flatMap(([id, resources]) =>
-        ['money', 'unclaimed_money', 'material', 'trash_realm'].map(key =>
+        ['money', 'unclaimed_money', 'material'].map(key =>
           kpiCard(`${profileLabel(id)} · ${resourceLabel(key)}`, numericMarkup(resources[key]))
         )
       ),
@@ -355,10 +355,10 @@ function renderFishAcquisitionRateChart(profiles, logarithmic = false, interval 
   Object.entries(profiles).forEach(([profileId, profile]) => {
     const rows = profile.rate_rows || [];
     [
-      ['资源/秒', 'resource_per_second', '#16a34a'],
+      ['资源/秒', 'resource_per_second', '#3ecf8e'],
       ['卖鱼材料/秒', 'fish_sale_material_per_second', '#f59e0b'],
       ['加工材料/秒', 'trash_material_per_second', '#14b8a6'],
-      ['金币/秒', 'money_per_second', '#2563eb'],
+      ['金币/秒', 'money_per_second', '#60a5fa'],
     ].forEach(([label, field, color]) => {
       series.push({
         name: `${profileLabel(profileId)} · ${label}`,
@@ -384,8 +384,8 @@ function renderFishCumulativeOutputChart(profiles, logarithmic = false) {
   Object.entries(profiles).forEach(([profileId, profile]) => {
     const rows = profile.cumulative_rows || [];
     [
-      ['累计金币', 'money_acquired_cumulative', '#2563eb'],
-      ['累计资源', 'resource_acquired_cumulative', '#16a34a'],
+      ['累计金币', 'money_acquired_cumulative', '#60a5fa'],
+      ['累计资源', 'resource_acquired_cumulative', '#3ecf8e'],
       ['图鉴一次性金币', 'codex_money_cumulative', '#a855f7'],
       ['图鉴一次性材料', 'codex_material_cumulative', '#f97316'],
     ].forEach(([label, field, color]) => {
@@ -410,8 +410,8 @@ function renderFishCumulativeOutputChart(profiles, logarithmic = false) {
 
 function renderFishRemainingChart(profiles, logarithmic = false) {
   const series = Object.entries(profiles).flatMap(([profileId, profile]) => [
-    ['剩余资源', 'resource_remaining', '#16a34a'],
-    ['剩余金币', 'money_remaining', '#2563eb'],
+    ['剩余资源', 'resource_remaining', '#3ecf8e'],
+    ['剩余金币', 'money_remaining', '#60a5fa'],
   ].map(([label, field, color]) => ({
     name: `${profileLabel(profileId)} · ${label}`,
     type: 'line', showSymbol: false, connectNulls: false,
@@ -481,7 +481,7 @@ function fishBalanceLineOption(title, series, yAxisName, { logarithmic = false }
       subtext: logarithmic ? '同一纵轴比较数量级；零值请切换线性视图' : '线性视图包含零值',
       left: 'center',
       textStyle: { fontSize: 15 },
-      subtextStyle: { fontSize: 11, color: '#64748b' },
+      subtextStyle: { fontSize: 11, color: '#a8a8a8' },
     },
     tooltip: {
       trigger: 'axis',
@@ -647,6 +647,8 @@ function renderPersistentProgression(persistent) {
   }
   if (target) target.innerHTML += entries.map(([id, profile]) => profile.collection_coverage
     ? `<p class="section-note">${escapeHtml(profileLabel(id))}：${escapeHtml(profile.collection_coverage.note)}</p>` : '').join('');
+  if (target) target.innerHTML += entries.map(([id, profile]) => profile.pool_coverage
+    ? `<p class="section-note">${escapeHtml(profileLabel(id))}：${escapeHtml(profile.pool_coverage.note)}</p>` : '').join('');
   renderWeeklyProgressionCharts(profiles);
   renderDailyProgressionCharts(profiles);
   renderProgressionEventsTable(profiles);
@@ -810,6 +812,9 @@ function progressionLabels(row) {
 }
 
 function progressionIdentityLabel(row) {
+  if (row.pool_id != null) return `FishRandomPool ${row.pool_id}` +
+    (row.display_name ? ` · ${row.display_name}` : '') +
+    ` · 力量 > ${row.previous_upper_bound} · 观察力量 ${row.strength}（首次观察时点）`;
   if (row.fish_id != null) {
     const label = `鱼种 ${row.fish_id} · 变异 ${row.mutation_id}`;
     return label + (row.display_name ? ` · ${row.display_name}` : '') +
@@ -822,6 +827,7 @@ function progressionIdentityLabel(row) {
 
 function progressionCategoryLabel(category) {
   const labels = {
+    fish_pool: '进入新鱼池',
     treasure_beast: '寻宝兽开放',
     best_hall_fish: '摸鱼厅最优鱼',
     barbell: '杠铃',
@@ -829,7 +835,7 @@ function progressionCategoryLabel(category) {
     strength_rebirth: '力量转生',
     torpedo: '鱼雷 / 垃圾幸运值',
     trash_man_realm: '垃圾佬境界',
-    breakthrough_funding: '突破资助（非完成）',
+    breakthrough_funding: '突破资助',
     trash_man_rebirth: '垃圾佬转生',
     permanent_unlock: '永久解锁',
     gun_upgraded: '图鉴枪强化',
@@ -873,6 +879,7 @@ function progressionCategoryCountsMarkup(rows) {
 
 function progressionCategoryRank(category) {
   const order = [
+    'fish_pool',
     'new_fish_species',
     'new_fish_variant',
     'normal_codex_completed',
@@ -896,12 +903,13 @@ function progressionCategoryRank(category) {
 
 function progressionCategoryColor(category) {
   const colors = {
-    new_fish_species: '#2563eb',
-    new_fish_variant: '#db2777',
-    normal_codex_completed: '#d97706',
-    gun_owned: '#059669',
-    gun_upgraded: '#7c3aed',
-    fish_tide_unlocked: '#0891b2',
+    fish_pool: '#fb923c',
+    new_fish_species: '#60a5fa',
+    new_fish_variant: '#f472b6',
+    normal_codex_completed: '#fbbf24',
+    gun_owned: '#34d399',
+    gun_upgraded: '#a78bfa',
+    fish_tide_unlocked: '#22d3ee',
     treasure_beast: '#06b6d4',
     best_hall_fish: '#5470c6',
     barbell: '#91cc75',
@@ -909,10 +917,10 @@ function progressionCategoryColor(category) {
     strength_rebirth: '#ee6666',
     torpedo: '#73c0de',
     trash_man_realm: '#3ba272',
-    breakthrough_funding: '#8b5cf6',
+    breakthrough_funding: '#c4b5fd',
     trash_man_rebirth: '#fc8452',
     permanent_unlock: '#9a60b4',
-    other: '#6b7280',
+    other: '#a8a8a8',
   };
   return colors[category] || colors.other;
 }
@@ -1352,6 +1360,7 @@ function itemIdentityLabel(itemId) {
     strength_rebirth: '力量转生',
     trash_man_rebirth: '垃圾佬转生',
     trash_man_realm: '垃圾佬境界',
+    breakthrough_funding: '资助目标境界',
   };
   const prefix = labels[match[1]] || match[1];
   return `${prefix}：${match[2]}`;
@@ -1359,6 +1368,7 @@ function itemIdentityLabel(itemId) {
 
 function eventKindLabel(kind) {
   const labels = {
+    fish_pool_entered: '首次进入新鱼池',
     treasure_beast_unlocked: '寻宝兽开放',
     event: '事件',
     buy_generator: '购买生产器',
@@ -1402,7 +1412,7 @@ function eventKindLabel(kind) {
     upgrade_hall: '鱼厅扩容',
     rebirth_strength: '力量重生',
     rebirth_trash_man: '垃圾佬重生',
-    start_breakthrough: '资助突破',
+    start_breakthrough: '突破资助',
     start_exercise: '开始锻炼',
     stop_exercise: '停止锻炼',
     go_online: '上线',
@@ -1418,6 +1428,7 @@ function eventKindLabel(kind) {
 
 function metricLabel(metricId) {
   const labels = {
+    fish_pool_entered: '新鱼池达成',
     treasure_beast_unlocked: '寻宝兽开放状态',
     fish_hall_cps: '摸鱼厅每秒产出',
     barbell_strength_per_second: '杠铃每秒力量',
@@ -1492,6 +1503,52 @@ function replaceChart(id, option) {
   return chart;
 }
 
+// Shared by every chart, including dynamically created daily/weekly views.
+// Surface colors mirror report.css; series retain distinct semantic colors.
+function reportChartTheme() {
+  const axis = {
+    nameTextStyle: { color: '#a8a8a8' },
+    axisLine: { lineStyle: { color: '#505050' } },
+    axisTick: { lineStyle: { color: '#505050' } },
+    axisLabel: { color: '#a8a8a8' },
+    splitLine: { lineStyle: { color: '#363636' } },
+    minorSplitLine: { lineStyle: { color: '#292929' } },
+    splitArea: { areaStyle: { color: ['#1c1c1c', '#232323'] } },
+  };
+  return {
+    darkMode: true,
+    backgroundColor: 'transparent',
+    color: ['#3ecf8e', '#60a5fa', '#fbbf24', '#a78bfa', '#22d3ee', '#f472b6', '#fb923c', '#a3e635'],
+    textStyle: { color: '#ededed', fontFamily: 'Segoe UI, Arial, sans-serif' },
+    title: { top: 0, itemGap: 6, textStyle: { color: '#ededed', fontSize: 16 }, subtextStyle: { color: '#a8a8a8' } },
+    legend: { textStyle: { color: '#c7c7c7' }, inactiveColor: '#737373', pageTextStyle: { color: '#a8a8a8' } },
+    categoryAxis: axis,
+    valueAxis: axis,
+    logAxis: axis,
+    timeAxis: axis,
+    tooltip: {
+      backgroundColor: '#232323', borderColor: '#505050',
+      textStyle: { color: '#ededed' },
+    },
+    axisPointer: {
+      lineStyle: { color: '#a8a8a8' },
+      crossStyle: { color: '#a8a8a8' },
+      label: { color: '#ededed', backgroundColor: '#363636' },
+    },
+    dataZoom: {
+      bottom: 8, height: 22,
+      backgroundColor: '#181818', borderColor: '#363636',
+      fillerColor: 'rgba(62, 207, 142, 0.14)',
+      dataBackground: { lineStyle: { color: '#737373' }, areaStyle: { color: '#363636' } },
+      selectedDataBackground: { lineStyle: { color: '#3ecf8e' }, areaStyle: { color: '#245c43' } },
+      handleStyle: { color: '#363636', borderColor: '#a8a8a8' },
+      moveHandleStyle: { color: '#737373' },
+      emphasis: { handleStyle: { color: '#3ecf8e' }, moveHandleStyle: { color: '#3ecf8e' } },
+      textStyle: { color: '#a8a8a8' },
+    },
+  };
+}
+
 function mountChart(id, option) {
   const element = document.getElementById(id);
   if (!element) return null;
@@ -1499,7 +1556,7 @@ function mountChart(id, option) {
     element.innerHTML = '<div class="empty">没有可展示的数据。</div>';
     return null;
   }
-  const chart = echarts.init(element);
+  const chart = echarts.init(element, reportChartTheme());
   chart.setOption(option);
   charts.push({ id, chart });
   return chart;

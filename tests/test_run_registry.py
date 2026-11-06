@@ -46,6 +46,22 @@ def _write(
     )
 
 
+@pytest.mark.parametrize("status", ["failed", "running", "success"])
+def test_checkpoint_lookup_requires_success_and_existing_checkpoint(tmp_path, status):
+    registry = RunRegistry(tmp_path / "runs")
+    record = _write(registry, "previous-week", kind="formal", status=status)
+    with pytest.raises(ValueError):
+        registry.checkpoint_for_run(record.run_id)
+    record.output_dir.mkdir(parents=True, exist_ok=True)
+    checkpoint = record.output_dir / "final_checkpoint.json"
+    checkpoint.write_text("{}", encoding="utf-8")
+    if status == "success":
+        assert registry.checkpoint_for_run(record.run_id) == checkpoint
+    else:
+        with pytest.raises(ValueError, match="successful run"):
+            registry.checkpoint_for_run(record.run_id)
+
+
 def test_authoring_status_is_schema_versioned_and_attributable(tmp_path: Path) -> None:
     registry = RunRegistry(tmp_path / "runs")
     run_dir = registry.new_run_dir("smoke", kind="smoke", change_id="rule-1")
@@ -74,6 +90,9 @@ def test_authoring_status_is_schema_versioned_and_attributable(tmp_path: Path) -
         "scenario_id": "smoke",
         "status": "success",
         "version": 1,
+        "started_at": None,
+        "finished_at": None,
+        "duration_seconds": None,
     }
     assert record.version == 1
     assert record.kind == "smoke"
@@ -101,6 +120,66 @@ def test_authoring_status_accepts_the_canonical_project_model_digest(tmp_path: P
     assert digest.startswith("sha256:")
     assert record.model_digest == digest
     assert registry.list_runs() == [record]
+
+
+@pytest.mark.parametrize("kind,status", [("formal", "success"), ("formal", "failed"), ("advice", "ok"), ("advice", "needs_attention"), ("advice", "failed")])
+def test_duration_survives_reload_and_terminal_rewrites(tmp_path, monkeypatch, kind, status):
+    ticks = iter([100.0, 165.25])
+    monkeypatch.setattr(registry_module, "monotonic", lambda: next(ticks))
+    registry = RunRegistry(tmp_path / "runs")
+    running = _write(registry, "timed", kind=kind, status="running")
+    assert running.started_at is not None
+    assert running.finished_at is running.duration_seconds is None
+    # Progress writes must not restart the clock.
+    _write(registry, "timed", kind=kind, status="running")
+    complete = _write(registry, "timed", kind=kind, status=status)
+    assert complete.started_at == running.started_at
+    assert complete.finished_at is not None
+    assert complete.duration_seconds == 65.25
+    reloaded = RunRegistry(registry.runs_root)
+    assert reloaded.list_runs() == [complete]
+    rewritten = _write(reloaded, "timed", kind=kind, status="failed")
+    assert rewritten.started_at == complete.started_at
+    assert rewritten.finished_at == complete.finished_at
+    assert rewritten.duration_seconds == 65.25
+
+
+def test_new_registry_can_finish_persisted_running_timing(tmp_path, monkeypatch):
+    from datetime import datetime, timezone
+
+    class Clock(datetime):
+        current = datetime(2026, 10, 28, tzinfo=timezone.utc)
+
+        @classmethod
+        def now(cls, tz=None):
+            return cls.current
+
+    monkeypatch.setattr(registry_module, "datetime", Clock)
+    registry = RunRegistry(tmp_path / "runs")
+    started = _write(registry, "timed", kind="formal", status="running")
+    Clock.current = datetime(2026, 10, 28, 0, 1, 5, tzinfo=timezone.utc)
+    complete = _write(RunRegistry(registry.runs_root), "timed", kind="formal")
+    assert complete.started_at == started.started_at
+    assert complete.duration_seconds == 65
+
+
+@pytest.mark.parametrize("duration", [None, -1, "bad", True, float("nan"), float("inf")])
+def test_missing_or_invalid_duration_keeps_history_readable(tmp_path, duration):
+    registry = RunRegistry(tmp_path / "runs")
+    record = _write(registry, "old", kind="formal")
+    payload = json.loads(record.status_path.read_text())
+    payload.update(duration_seconds=duration, started_at="invalid", finished_at="invalid")
+    record.status_path.write_text(json.dumps(payload))
+    [loaded] = registry.list_runs()
+    assert loaded.duration_seconds is loaded.started_at is loaded.finished_at is None
+    assert registry_module.format_run_duration(loaded) == "Not recorded"
+
+
+@pytest.mark.parametrize("seconds,label", [(0, "<1 s"), (0.9, "<1 s"), (2.5, "2 s"), (65.25, "1 min 5 s"), (3661, "1 h 1 min 1 s")])
+def test_duration_display(seconds, label):
+    from types import SimpleNamespace
+
+    assert registry_module.format_run_duration(SimpleNamespace(duration_seconds=seconds)) == label
 
 
 @pytest.mark.parametrize("kind", ["smoke", "formal", "advice"])
@@ -160,6 +239,9 @@ def test_legacy_status_loads_with_compatibility_defaults_and_paths(tmp_path: Pat
     assert record.kind == "formal"
     assert record.change_id is None
     assert record.model_digest is None
+    assert record.started_at is None
+    assert record.finished_at is None
+    assert record.duration_seconds is None
     assert record.run_dir == run_dir
     assert record.output_dir == Path(payload["output_dir"])
     assert record.report_dir == Path(payload["report_dir"])

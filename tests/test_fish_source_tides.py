@@ -13,6 +13,14 @@ from igess.fish_source_runtime import FishSourceRuntime
 ROOT=Path(__file__).resolve().parents[1]
 SOURCE=Path(os.environ.get('FISH_SOURCE_ROOT',str(ROOT.parent/'fish-oasis')))
 
+
+@pytest.fixture(autouse=True)
+def isolate_tide_lifecycle_from_daily_income(monkeypatch):
+    # These archives start with a wallet, not earned income. Daily admission and
+    # real income/recovery are covered in test_fish_tide_daily_budget.py.
+    from igess.fish_source_growth_policy import GrowthTideBudget
+    monkeypatch.setattr(GrowthTideBudget, 'skip_daily', lambda self, quote: None)
+
 def tide_export(data):
     # Lifecycle fixtures deliberately hold the numerical workload at six reloads.
     # The separate ammunition suite varies HP/attack and asserts dynamic counts.

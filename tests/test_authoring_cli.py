@@ -98,6 +98,8 @@ def test_model_help_owns_exact_nested_arguments_defaults_examples_and_exit_codes
         "scenario",
         "profile",
         "checkpoint_in",
+        "resume_run_id",
+        "runs_root",
         "until_seconds",
         "override",
         "json",
@@ -153,6 +155,27 @@ def test_model_parser_is_red_without_disturbing_legacy_help():
     assert "apply" in model.stdout
     assert "simulate" in model.stdout
     assert "watch" in model.stdout
+
+
+def test_model_resume_rejects_conflicting_checkpoint_sources():
+    result = run_cli("model", "simulate", "--checkpoint-in", "checkpoint.json",
+                     "--resume-run-id", "previous-week", "--json")
+    assert result.returncode == 2
+    assert "not allowed with argument" in result.stderr
+
+
+def test_model_resume_unknown_run_is_structured_failure(tmp_path):
+    root = tmp_path / "model"
+    assert run_cli("model", "init", "--out", str(root)).returncode == 0
+    original_runs = set((root / "runs").iterdir())
+    result = run_cli("model", "simulate", "--project", str(root),
+                     "--resume-run-id", "missing-week", "--json")
+    payload = json_result(result)
+    assert result.returncode == 1
+    assert payload["ok"] is False
+    assert payload["command"] == "model.simulate"
+    assert "Traceback" not in result.stdout + result.stderr
+    assert set((root / "runs").iterdir()) == original_runs
 
 
 def test_model_init_human_and_json_return_exact_paths(tmp_path: Path):

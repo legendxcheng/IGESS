@@ -4,6 +4,8 @@
 IGESS 源码的 Agent。仓库根目录是 IGESS 工具本体；具体游戏项目应放在独立
 项目目录中，避免把工具代码、样例数据和真实项目输出混在一起。
 
+执行前先查 [模拟执行接口](agents/simulation-interfaces.md)，按任务和引擎选择入口。本文的逐条建模、`Datas/` 源表和旧批量流程主要面向 Generic；Fish 使用 `projects/fish_source` 与 `fish_sim`，正式运行走 `model simulate`，已有结果分析走 `runs/metrics/targets`。仅分析已有报告时直接查询历史，无需执行下文的导表、检查和新模拟流程。
+
 ## 首要工作流：一条规则，一次反馈
 
 IGESS 的首要用户熟悉 Python，并由 Agent 协作完成模型。这里不设计面向
@@ -118,6 +120,8 @@ IGESS 会与当前规则合并后再验证。
 缺项继续补规则。
 
 自动 smoke 是一条规则后的快速反馈，不是平衡性结论。手动执行
+`model simulate` 可用 `--resume-run-id <成功运行ID>` 或 `--checkpoint-in <路径>` 指定恢复起点（二者互斥），自定义项目历史读写目录使用 `--runs-root`。引擎负责恢复兼容校验；Fish 的逐周接续示例见[项目 README](../projects/fish_source/README.md#按周跑测与运行-id-接续)。
+
 `model simulate` 会从锁定的 source snapshot 临时导出并生成标准 output/report，
 统一登记为 `kind=formal`；它不改正式源表，也不会冒充 apply 的自动 smoke。
 

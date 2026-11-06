@@ -1,12 +1,23 @@
 :root {
-  color-scheme: light;
+  color-scheme: dark;
+  --report-bg: #121212;
+  --report-panel: #1c1c1c;
+  --report-raised: #232323;
+  --report-hover: #2a2a2a;
+  --report-border: #363636;
+  --report-border-strong: #505050;
+  --report-text: #ededed;
+  --report-muted: #a8a8a8;
+  --report-accent: #3ecf8e;
+  --report-accent-bg: #17392b;
   font-family: Segoe UI, Arial, sans-serif;
-  background: #f5f7fa;
-  color: #17202a;
+  background: var(--report-bg);
+  color: var(--report-text);
 }
 
 body {
   margin: 0;
+  line-height: 1.6;
 }
 
 main {
@@ -30,15 +41,15 @@ h2 {
 }
 
 .band {
-  background: #fff;
-  border: 1px solid #d8dee6;
+  background: var(--report-panel);
+  border: 1px solid var(--report-border);
   border-radius: 6px;
   margin: 14px 0;
   padding: 18px;
 }
 
 .section-note {
-  color: #5d6875;
+  color: var(--report-muted);
   font-size: 13px;
   margin: 0 0 12px;
 }
@@ -58,15 +69,15 @@ h2 {
 
 .kpi-card {
   min-width: 0;
-  border: 1px solid #dce4ed;
+  border: 1px solid var(--report-border);
   border-radius: 6px;
-  background: #f9fbfd;
+  background: var(--report-raised);
   padding: 14px;
 }
 
 .kpi-card h3 {
   margin: 0 0 8px;
-  color: #536273;
+  color: var(--report-muted);
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -74,7 +85,7 @@ h2 {
 }
 
 .kpi-card .kpi-value {
-  color: #17202a;
+  color: var(--report-text);
   font-size: 20px;
   font-variant-numeric: tabular-nums;
   font-weight: 700;
@@ -82,7 +93,7 @@ h2 {
 
 .kpi-card .kpi-detail {
   margin: 7px 0 0;
-  color: #536273;
+  color: var(--report-muted);
   font-size: 13px;
 }
 
@@ -96,7 +107,7 @@ h2 {
   align-items: baseline;
   justify-content: space-between;
   gap: 8px;
-  color: #536273;
+  color: var(--report-muted);
 }
 
 .kpi-card .kpi-pair .kpi-value {
@@ -115,14 +126,14 @@ h2 {
 
 .kpi-card .exact-values {
   margin-top: 10px;
-  color: #536273;
+  color: var(--report-muted);
   font-size: 12px;
 }
 
 .kpi-card .exact-value {
   display: inline-block;
   margin-left: 7px;
-  color: #536273;
+  color: var(--report-muted);
   font-size: 11px;
   vertical-align: middle;
 }
@@ -141,7 +152,7 @@ h2 {
 }
 
 .metric {
-  border: 1px solid #e3e8ef;
+  border: 1px solid var(--report-border);
   border-radius: 6px;
   padding: 12px;
 }
@@ -163,22 +174,22 @@ h2 {
 }
 
 .chart-list-heading {
-  color: #334155;
+  color: var(--report-text);
   font-size: 16px;
   margin: 22px 0 0;
 }
 
 .weekly-chart-card,
 .daily-chart-card {
-  border: 1px solid #dce4ed;
+  border: 1px solid var(--report-border);
   border-radius: 6px;
-  background: #f9fbfd;
+  background: var(--report-raised);
   padding: 12px 14px 4px;
 }
 
 .weekly-chart-card h3,
 .daily-chart-card h3 {
-  color: #334155;
+  color: var(--report-text);
   font-size: 14px;
   margin: 0 0 4px;
 }
@@ -192,10 +203,10 @@ h2 {
 
 .progression-category-count {
   align-items: center;
-  background: #fff;
-  border: 1px solid #dce4ed;
+  background: var(--report-panel);
+  border: 1px solid var(--report-border);
   border-radius: 999px;
-  color: #475569;
+  color: var(--report-muted);
   display: inline-flex;
   font-size: 12px;
   gap: 5px;
@@ -203,7 +214,7 @@ h2 {
 }
 
 .progression-category-count strong {
-  color: #0f172a;
+  color: var(--report-text);
 }
 
 .progression-category-count-dot {
@@ -213,7 +224,7 @@ h2 {
 }
 
 .progression-category-counts-empty {
-  color: #64748b;
+  color: var(--report-muted);
   font-size: 12px;
   margin: 8px 0 2px;
 }
@@ -237,7 +248,7 @@ h2 {
 
 .data-table th,
 .data-table td {
-  border-bottom: 1px solid #e1e6ec;
+  border-bottom: 1px solid var(--report-border);
   padding: 8px 10px;
   text-align: left;
   vertical-align: top;
@@ -245,7 +256,7 @@ h2 {
 }
 
 .data-table th {
-  background: #f6f8fa;
+  background: var(--report-raised);
   position: sticky;
   top: 0;
   z-index: 1;
@@ -259,24 +270,28 @@ h2 {
 }
 
 .controls button {
-  border: 1px solid #8aa0b8;
-  background: #edf4fb;
+  border: 1px solid var(--report-border-strong);
+  background: var(--report-raised);
   border-radius: 4px;
   padding: 6px 10px;
   cursor: pointer;
+  color: var(--report-text);
+  font: inherit;
+  font-size: 13px;
 }
 
 .controls button.active {
-  background: #d4e9fb;
-  border-color: #477da8;
+  background: var(--report-accent-bg);
+  border-color: var(--report-accent);
+  color: var(--report-accent);
   font-weight: 700;
 }
 
 .empty {
-  border: 1px dashed #b8c4d1;
+  border: 1px dashed var(--report-border-strong);
   border-radius: 6px;
   padding: 16px;
-  color: #536273;
+  color: var(--report-muted);
 }
 
 table {
@@ -287,7 +302,7 @@ table {
 
 th,
 td {
-  border-bottom: 1px solid #e3e8ef;
+  border-bottom: 1px solid var(--report-border);
   padding: 8px;
   text-align: left;
 }
@@ -304,4 +319,59 @@ details {
 
 code {
   overflow-wrap: anywhere;
+}
+
+/* Keep all interactive states legible against the dark report surfaces. */
+a {
+  color: var(--report-accent);
+  text-underline-offset: 3px;
+}
+
+a:hover {
+  color: #79e2b0;
+}
+
+.controls button:hover {
+  background: var(--report-hover);
+  border-color: var(--report-muted);
+}
+
+.controls button.active:hover {
+  background: var(--report-accent-bg);
+  border-color: var(--report-accent);
+}
+
+:where(a, button, summary):focus-visible {
+  outline: 2px solid var(--report-accent);
+  outline-offset: 3px;
+}
+
+summary {
+  cursor: pointer;
+}
+
+th {
+  color: var(--report-muted);
+  font-weight: 600;
+}
+
+tbody tr:hover {
+  background: var(--report-hover);
+}
+
+::selection {
+  color: var(--report-text);
+  background: #245c43;
+}
+
+* {
+  scrollbar-color: var(--report-border-strong) var(--report-panel);
+}
+
+@media (max-width: 600px) {
+  main { padding: 12px; }
+  h1 { font-size: 24px; overflow-wrap: anywhere; }
+  .band { padding: 14px; }
+  .grid, [data-diagnostics] { grid-template-columns: minmax(0, 1fr); }
+  .kpi-grid { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
 }

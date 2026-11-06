@@ -103,6 +103,7 @@ def project_source_behavior(
             accepted[kind] += 1
     return {
         "collection_growth": scope.get("collection_growth"),
+        "pool_growth": scope.get("pool_growth"),
         "first_times": scope.get("first_times", {}),
         "lifecycle_gun_milestones": scope.get("lifecycle_gun_milestones", []),
         "gun_milestones": gun_milestones,

@@ -136,6 +136,8 @@ def test_operator_runs_reports_compares_and_keeps_input_out_of_history(tmp_path:
     )
 
     assert first.record.status == "success"
+    assert first.record.duration_seconds is not None and first.record.duration_seconds >= 0
+    assert "<th>耗时</th>" in render_operator_home(service, WorkbenchView(), "token")
     assert first.record.report_index.is_file()
     assert second.record.status == "success"
     assert second.comparison_index is not None and second.comparison_index.is_file()

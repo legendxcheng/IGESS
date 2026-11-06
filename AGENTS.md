@@ -1,5 +1,18 @@
 ## Agent skills
 
+### Simulation interfaces for execution agents
+
+Before running a simulation, continuing a checkpoint, inspecting existing runs, extracting metrics, evaluating targets, or regenerating reports, read [IGESS simulation interfaces](docs/agents/simulation-interfaces.md). Use the public CLI and its structured responses:
+
+- Readiness and available scenarios: `igess model status --json` (executes a readiness probe).
+- Formal simulation and continuation: `igess model simulate --json`; continue by successful `--resume-run-id` or `--checkpoint-in` (mutually exclusive).
+- Existing run identity, status and artifact paths: `igess runs list/show/artifacts --json`.
+- Metric definitions and recorded values: `igess metrics describe/extract --json`.
+- Versioned target evaluation: `igess targets evaluate --json`.
+- Report regeneration and artifact comparison: `igess report/compare/gate` (read existing simulation outputs; write derived reports).
+
+The linked interface catalog specifies required arguments, effects, engine limits and completion checks. For existing-result analysis, start with `runs`; `model status` is not a history query. Domain skills define game rules, player strategies and tuning decisions; IGESS owns execution, run identity, artifacts and metric contracts. For platform development or missing capabilities, read [code walkthrough](docs/code_walkthrough.md).
+
 ### Issue tracker
 
 Issues and specs are tracked as local Markdown files under `.scratch/`. See `docs/agents/issue-tracker.md`.

@@ -6,8 +6,10 @@
 
 | 要改什么 | 先看哪里／检索词 | 对应验证 |
 | --- | --- | --- |
+| 大 R 初始枪与神兽、上阵策略 | engine 的 `initial_loadout_by_scenario`；`fish_source_loadout.py` 选择普通鱼参照与神兽槽位；源 `InitialLoadout.lua` 建立库存，`Guns.lua` 注入原生持有列表供 `GunStatsService`，`Tides.lua` 报价与扣费共用同一统计服务 | `tests/test_fish_source_whale.py`，核对初始基线、源倍率、报价／实际扣费与跨进程恢复 |
+| 开局永久特权、在售范围与恢复 | engine 的 `permanent_privileges_by_scenario`；runtime 的 `permanent_privilege_mode`；源 `simulation/PermanentPrivileges.lua` 调用 `ItemGMService.GrantPrivilege`，`cli.lua` 保存 origin 并提供只读 `query_permanent_privileges`；manifest `source_profiles.*.permanent_privileges` | `tests/test_fish_source_privileges.py`，核对商品明细、实际 Modifier、只读查询与跨进程恢复 |
 | 显式独立 CLI 的后台交接、完成通知与恢复 | Skill 的 `scripts/run_background.py`、`references/background-runs.md`；只包装公共 CLI，回执不替代正式运行验证 | `python -m pytest .agents/skills/fish_sim/scripts/test_run_background.py -q`（模拟 CLI 响应，不运行 Fish） |
-| 场景时长、在线窗口、权重、行动耗时、采样 | `projects/fish_source/economy.yaml`：`scenarios`（Day1～Day6 为从零开始的累计场景）、`session_patterns`、`behavior_weights`、`behavior_durations`；命令见项目 README | `tests/test_fish_source_formal.py` |
+| 场景时长、在线窗口、权重、行动耗时、采样 | `projects/fish_source/economy.yaml`：`scenarios`（Day1～Day6、Week1～Week3、Month1 为累计场景，Month1 是四周）、`session_patterns`、`behavior_weights`、`behavior_durations`；命令见项目 README | `tests/test_fish_source_formal.py`、`tests/test_fish_source_continuation.py` |
 | 引擎准备、能力检查、身份与策略 | `src/igess/fish_source_engine.py`：`FishSourceEngineAdapter.prepare`、`_REQUIRED_OPERATIONS`、`_integration_code_digest` | `tests/test_fish_source_current_rules.py`、`tests/test_fish_source_formal.py` |
 | 玩家选行为、动作互斥、时间推进、截断恢复 | 同文件 `_ProfileRun`：`_choose`、`_act`、`execute`、`_advance_to`、`_continue_throw`、`_continue_tide`、`checkpoint` | `tests/test_fish_source_natural_landing.py`、`tests/test_fish_source_tides.py`、`tests/test_fish_source_joint.py` |
 | 超过三十条按一级 CPS 卖背包鱼 | `fish_source_engine.py`：`_FISH_KEEP_COUNT`、`_choose`、清单 `fish_sell_policy`；源 `simulation/Query.lua` 的 `fishSales` 提供 `levelOneCps` 与 `materialAdded`，沿用源 `sell_fish` 和 `SourceIncome` | `tests/test_fish_source_sales.py`、`tests/test_fish_source_income.py` |
@@ -16,13 +18,15 @@
 | 图鉴领取、枪选择与里程碑 | `fish_source_engine.py` 的 `_choose`、`_observe_codex`；`src/igess/fish_source_guns.py` 的 `choose_gun_action`、`GunMilestones` | `tests/test_fish_source_codex.py`、`tests/test_fish_source_guns.py` |
 | 蛋和鱼潮观察、去重、报告行 | `src/igess/fish_source_eggs.py`、`src/igess/fish_source_tides.py`；实际调度仍在 `_ProfileRun`，开场同秒开始／完成、0 秒占用；源 `Tides.lua` 提供同秒截止 | `tests/test_fish_source_eggs.py`、`tests/test_fish_source_tides.py` |
 | 鱼潮攻击力／HP 装弹估算与只读报价 | 源 `simulation/Tides.lua` 的 `Quote`／`Start`，`Eggs.lua` 的 `Preview`／`Grant`；`query_tide(roundId)` 不写 replay；逐蛋精确取整、30 发一匣，回执 `ammunition` | `tests/test_fish_tide_ammunition.py`、源 `tests/simulation_tides_test.lua`、`tests/simulation_partial_tide_cli_test.py` |
-| 养成优先、25% 单场限额及近期成长预留 | `src/igess/fish_source_growth_policy.py`：`growth_options`、`GrowthTideBudget`；engine 的 `execute`、`tide_admission_policy`；checkpoint `growth_tide_budget` 保存有界收入历史；契约见项目 README | `tests/test_fish_growth_priority.py`、`tests/test_fish_source_tides.py`、`tests/test_fish_source_continuation.py` |
+| 养成优先、25% 单场／15% 当日收入限额及近期成长预留 | `src/igess/fish_source_growth_policy.py`：`growth_options`、`GrowthTideBudget.observe_daily/skip_daily`；engine 在源观察后更新日内计数，`execute` 统一入场；checkpoint `growth_tide_budget` 保存有界收入历史和每日累计起点；契约见项目 README | `tests/test_fish_growth_priority.py`、`tests/test_fish_tide_daily_budget.py`、`tests/test_fish_source_tides.py`、`tests/test_fish_source_continuation.py` |
+| 神器合法候选与神器／杠铃数字 ID 排序 | `fish_source_growth_policy.py`：`growth_options`、`target_order`；engine 的 `_choose`；源 `simulation/Query.lua` 提供完整目录 `previousTorpedoId`，购买校验在 `Application/TorpedoProgression/TorpedoProgressionCommand.lua` | `tests/test_fish_growth_candidates.py`、`tests/test_fish_growth_candidates_source.py`；源 `tests/simulation_torpedo_quote_prerequisites_test.lua` |
 | 在线收入核算、消费回补、领取转账、退款 | `src/igess/fish_source_income.py`：`SourceIncome.observe`；`src/igess/fish_source_numbers.py`：`source_decimal` | `tests/test_fish_source_income.py`、`tests/test_fish_source_joint.py` |
 | 成长和行为 JSON 产物 | `src/igess/fish_source_reports.py`：`write_source_progression_artifacts`、`project_source_behavior` | `tests/test_source_fish_reporting.py` |
 | Web 报告指标及曲线 | `src/igess/reporting/source_fish.py`：`build_source_projection`；页面继续追踪 `view_model.py`、`static.py`、`assets/report.js`、`assets/report.css` | `tests/test_source_fish_reporting.py`、`tests/test_reporting_view_model.py` |
 | 收集成长、双标签去重、旧报告首次覆盖 | `src/igess/reporting/source_collection.py`：`CollectionGrowth`；`fish_source_engine.py` 的 `collection_growth` 起始基线、`fish_source_runtime.py` 的冻结名称；源 archive 与 `GunMilestones` 负责续跑历史 | `tests/test_fish_collection_reporting.py`、`tests/test_fish_collection_formal.py` |
+| 力量进入新 FishRandomPool 成长点 | `src/igess/fish_source_pools.py`：`PoolMilestones`；runtime 的 `pool_growth_thresholds` 冻结名称／门槛；engine 观察与 checkpoint；`reporting/source_fish.py` 的 `fish_pool_entered` 投影 | `tests/test_fish_pool_growth.py` |
 | 正式运行、历史终态、报告失败 | `src/igess/authoring/service.py` → `formal_run.py` → `engines.py`；开发工作流 `workflows.py`，历史 `run_registry.py` | `tests/test_formal_run.py`、`tests/test_run_registry.py` |
-| 按天接续到更长场景、选择历史起点 | `fish_source_engine.py` 的 checkpoint 兼容校验与 `execution_window`；`workflows.py` 的 `checkpoint_for_run`；`dashboard.py` → `dashboard_tasks.py` → `dashboard_task_worker.py` | `tests/test_fish_source_continuation.py` |
+| 按天／周接续到更长场景、按运行 ID 选择历史起点 | `fish_source_engine.py` 的 checkpoint 兼容校验与 `execution_window`；`run_registry.py` 的 `checkpoint_for_run` 供 `AuthoringService.simulate`／`WorkflowService` 共用；CLI 参数在 `authoring/cli.py`；`dashboard.py` → `dashboard_tasks.py` → `dashboard_task_worker.py` | `tests/test_fish_source_continuation.py`、`tests/test_authoring_cli.py`、`tests/test_run_registry.py` |
 | Agent 提交到已运行的 Dashboard | `.agents/skills/fish_sim/scripts/run_dashboard.py`；HTTP 表单准入与 `/task` 在 `src/igess/dashboard.py`；用法见 `references/dashboard-runs.md` | `tests/test_fish_dashboard_client.py` |
 | Dashboard 每任务加载源码、进程失败与子进程回收 | `src/igess/dashboard_tasks.py`、`dashboard_task_worker.py`、`dashboard_process_tree.py`；契约见 `docs/dashboard-task-processes.md` | `tests/test_dashboard_task_processes.py` |
 | 编译交付运行包、依赖表、运行包身份 | `src/igess/fish_source_package.py`；平台打包 `operator_export.py`、`operator_runtime.py` | `tests/test_fish_source_package.py`、`tests/test_fish_source_toolkit.py` |
@@ -87,5 +91,7 @@ rg -n 'claim_fish_reward|start_tide|selected_export_sha256' src/igess tests -g '
 
 
 ## 运行查询、指标和目标对照
+
+执行 Agent 先查 [平台接口索引](../../../../docs/agents/simulation-interfaces.md) 选择 CLI；本节的代码入口用于扩展或修复平台能力。
 
 已有运行分析先看 src/igess/analysis_api/service.py（AnalysisService）及 docs/analysis-api.md；Fish 指标在 fish_metrics.py 复用现有成长投影，目标协议在 targets.py。公共回归为 tests/test_analysis_api.py，使用冻结运行产物，不依赖长模拟。修改指标需同步定义版本、覆盖/证据口径及文档；不要在 CLI 复制领域计数。

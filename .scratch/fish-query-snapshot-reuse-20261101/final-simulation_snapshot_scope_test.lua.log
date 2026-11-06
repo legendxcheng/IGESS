@@ -1,8 +1,0 @@
-[Warning][RankingProgressRecorder] stage=progress_rejected source=online_material_production rankId=4 code=ranking_config_manager_unavailable detail=nil
-[Warning][RankingProgressRecorder] stage=progress_rejected source=online_material_production rankId=4 code=ranking_config_manager_unavailable detail=nil
-simulation snapshot scope isolation passed
-lua55: tests/simulation_snapshot_scope_test.lua:103: barbell_progression_archive_invalid
-stack traceback:
-	[C]: in global 'assert'
-	tests/simulation_snapshot_scope_test.lua:103: in main chunk
-	[C]: in ?
