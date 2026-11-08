@@ -10,6 +10,16 @@
 
 神兽同种倍率及精确参照产出乘积由源规则作有界缓存，依赖完整大数、数量及配置；动态结算照旧。大 R 上阵与卖鱼在同一次决策中复用动作报价，不增加或删减业务行动。缓存不写入存档，旧源码／适配器身份的 checkpoint 仍拒绝跨版本恢复。维护边界和专项测试见源 `simulation/README.md` 的“神兽纯产出缓存”。
 
+## 一键最佳资质换阵
+
+免费、永久特权和大 R 统一使用 `source_best_potential_layout_v1`。模拟玩家在领取奖励／金币后、卖鱼前读取源 `query_actions.bestPotentialLayout`；只有 `changed=true` 才调用 `apply_best_potential_layout`，一次点击占 1 秒。查询与执行分别复用游戏 `FishHallLayoutPlanner.BuildPlayerRequestedBestPotentialPlan` 和 `FishHallService.ApplyBestPotentialLayout`，Python 不复制排序或产出公式。
+
+源规则先排神兽，普通鱼按一级产出（含变异、不含已升级等级）降序；同值优先已上阵鱼，再按原槽位、库存顺序和实例 ID 稳定排序，并按排名分配槽位。高等级旧鱼可以被当前收入较低、资质更高的新鱼替换，不保留旧等级或返还培养费用。大 R 不再预留第 1 槽普通鱼：29 只青龙在容量不足 30 时可能占满鱼厅，没有普通参照时产出为零；达到 30 槽后可保留 29 青龙及一条最佳资质普通鱼。
+
+换阵经源事务一次提交，结算、合法性及幂等仍由游戏服务处理。失败沿用 60 秒冷却，入选背包鱼在冷却期也不出售；只升级当前已上阵且仍被源计划选中的鱼，使用原升级报价、预算和权重。不存在分步撤回／部署计划或额外培养资金。计划随鱼库存、等级、部署和鱼厅容量变化刷新，复用本次动作报价；查询不写 replay。截断恢复沿用动作身份和剩余耗时，旧源码／适配器 checkpoint 继续拒绝跨版本恢复。
+
+回归见 `tests/test_fish_source_hall.py`、`test_fish_source_sales.py` 和 `test_fish_source_whale.py`；更新技能、源码与适配器不代表历史月报已改变或 GameBalancer 已发布。
+
 ## 开局拥有全部在售永久特权
 
 `smoke_all_permanent` 为 600 秒验证，`month_1_all_permanent` 为完整 28 天、每天在线 2 小时。两者继续使用 `default` 画像及其种子派生，基础行动权重、采样、鱼潮预算与免费场景一致。`engine.source_runtime.permanent_privileges_by_scenario` 按场景选择 `all_on_sale`；源宿主从本次冻结 `tbitemgm` 筛选 `isPrivilege=true`、非限时且 `isForSale=true` 的条目，在第 0 秒通过真实 `ItemGMService.GrantPrivilege` 建立权益。商品 ID、名称、源回执与实际 Modifier 写入 manifest 的 `source_profiles.default.permanent_privileges`。
@@ -128,7 +138,7 @@ IGESS 对源状态变化和成功回执做收入统计：加回消费，抵消�
 
 该画像是新策略，不沿用旧 Python 后端的选鱼、出售保护、最高鱼雷等目标策略。普通同权候选按固定轮转选择。神器和杠铃的目标 ID 按数值顺序选择，操作／冷却／checkpoint 身份仍为字符串，其他行为的目标顺序保持原样。神器候选读取源 `query_actions.torpedoes.previousTorpedoId`：0 表示无前置，其余必须已拥有；前置来自完整源目录的上一行，包含关闭商品，不按 ID 减一推断。报价缺此字段时明确报错；最终购买合法性、扣款和拒绝仍由源服务负责。若配置旧 `behavior_target_policies`，运行会在预检中拒绝，避免误以为它生效。
 
-卖鱼采用 `over_30_lowest_level_one_cps_backpack_v1`：背包与摸鱼厅的鱼合计严格超过 30 条时，在领取奖励／金币之后、其他普通行为之前逐条出售背包中资质最低的普通鱼，降到 30 条即停止。上阵鱼计入总数但不出售，神兽不作为可卖候选；无合法候选时继续其他行为。资质按一级 CPS（包含变异倍率、不含鱼等级提升）排序，同值取最小实例 ID。源 `query_actions.fishSales` 提供可售背包鱼的 `levelOneCps` 和 `materialAdded`，Python 精确比较报价，不重算经济公式。卖鱼权重缺失或为零时禁用；每条沿用画像的 `sell_fish` 耗时（默认 3 秒），材料结算及收入统计保持源回执，拒绝冷却与截断恢复沿用既有动作契约。运行清单记录卖鱼策略和保留数量，新策略效果需要重新模拟，旧报告不会随代码更新改变。
+卖鱼采用 `over_30_lowest_level_one_cps_backpack_v1`：背包与摸鱼厅的鱼合计严格超过 30 条时，在领取奖励／金币及最佳资质换阵之后、其他普通行为之前逐条出售背包中资质最低的普通鱼，降到 30 条即停止。上阵鱼计入总数但不出售，源换阵计划入选的背包鱼也受保护，神兽不作为可卖候选；无合法候选时继续其他行为。资质按一级 CPS（包含变异倍率、不含鱼等级提升）排序，同值取最小实例 ID。源 `query_actions.fishSales` 提供可售背包鱼的 `levelOneCps` 和 `materialAdded`，Python 精确比较报价，不重算经济公式。卖鱼权重缺失或为零时禁用；每条沿用画像的 `sell_fish` 耗时（默认 3 秒），材料结算及收入统计保持源回执，拒绝冷却与截断恢复沿用既有动作契约。运行清单记录卖鱼策略和保留数量，新策略效果需要重新模拟，旧报告不会随代码更新改变。
 
 这套宿主覆盖普通鱼数值链，不模拟 UE 世界碰撞、网络复制、真实玩家路线和 DS。`advance_mode: equivalent_batch_v1` 只在区间内没有定时任务和活动 buff 时合并生产事务，保留逐秒模式的最终回执、revision 与状态；`accurate` 可作为逐秒对照。早期 1 天同源正式运行中快速模式约 20 秒、逐秒模式约 53 秒，四份核心业务产物逐字节一致；旧 Python 正式运行约 1.6 秒，但策略语义不同，不能把耗时比当成严格同工作量比值。7 天和 30 天配置中沿用的 `compact_event_details` 标记目前不压缩同源回执。
 

@@ -66,12 +66,12 @@ s.fish.items[7].level=50
 """)
     _, read, _ = run(target)
     # Normal 101 has CPS 2 despite its upgrades; jade 101 beats normal 102.
-    # Hall fish 1 has the lowest quality too, but remains deployed.
-    assert [s["instanceId"] for s in sales(read("events.json"))] == [7, 8]
+    # The source potential layout first removes low-quality hall fish 1.
+    assert [s["instanceId"] for s in sales(read("events.json"))] == [1, 7]
 
 
 def test_sale_selection_uses_exact_source_prices_across_all_inventory_pages(tmp_path, monkeypatch):
-    target = sales_project(tmp_path, monkeypatch, count=51, duration=3, body="""
+    target = sales_project(tmp_path, monkeypatch, count=51, duration=4, body="""
 s.fish.items[51].fishId=101
 """)
     path = target / "selected/tbfish.json"

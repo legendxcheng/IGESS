@@ -26,7 +26,8 @@ def chooser(ids=range(1, 16), owned=range(1, 9)):
     ids = list(ids)
     quotes = [{"torpedoId": i, "previousTorpedoId": ids[n - 1] if n else 0,
                "resource": "material", "cost": dto(100)} for n, i in enumerate(ids)]
-    actions = {"torpedoes": quotes, "barbells": [], "fishUpgrades": []}
+    actions = {"torpedoes": quotes, "barbells": [], "fishUpgrades": [],
+               "bestPotentialLayout": {"changed": False, "selectedInstanceIds": []}}
     runner.runtime = SimpleNamespace(request=lambda _: actions)
     runner.inputs = SimpleNamespace(collect_interval_seconds=300, fishing_area=True)
     runner.profile = SimpleNamespace(behavior_weights={

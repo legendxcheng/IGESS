@@ -8,7 +8,6 @@ import yaml
 
 from igess.authoring.service import AuthoringService
 from igess.fish_source_engine import _unpack_session
-from igess.fish_source_loadout import choose_loadout_hall_action
 from igess.fish_source_numbers import source_decimal
 from igess.fish_source_runtime import FishSourceRuntime, FishSourceRuntimeError
 from test_fish_source_formal import FISH_SOURCE, _project
@@ -42,25 +41,6 @@ def test_unknown_loadout_rejected():
             runtime.create(start_at=0, initial_loadout_mode='free_money')
 
 
-def test_hall_policy_reserves_reference_and_replaces_it_before_selling():
-    def dto(n): return {'sign': 1, 'coeff': str(n), 'exp': 0}
-    state = {'inventory': {'items': [
-        {'instanceId': 1, 'hallSlot': 0}, {'instanceId': 30, 'hallSlot': 1},
-        {'instanceId': 31, 'hallSlot': 0},
-    ]}, 'hall': {'currentLevel': {'capacity': 5}}}
-    actions = {'hallCandidates': [
-        {'instanceId': 1, 'isBeast': True, 'currentRate': dto(0)},
-        {'instanceId': 30, 'isBeast': False, 'currentRate': dto(10)},
-        {'instanceId': 31, 'isBeast': False, 'currentRate': dto(20)},
-    ]}
-    allowed = lambda *_: True
-    assert choose_loadout_hall_action(state, actions, allowed)[2] == {'op': 'withdraw_fish', 'instanceId': 30}
-    state['inventory']['items'][1]['hallSlot'] = 0
-    assert choose_loadout_hall_action(state, actions, allowed)[2] == {'op': 'deploy_fish', 'instanceId': 31, 'slot': 1}
-    state['inventory']['items'][2]['hallSlot'] = 1
-    assert choose_loadout_hall_action(state, actions, allowed)[2] == {'op': 'deploy_fish', 'instanceId': 1, 'slot': 2}
-
-
 def test_whale_formal_source_stats_and_continuation(tmp_path, monkeypatch):
     from igess.fish_source_growth_policy import GrowthTideBudget
     original_skip = GrowthTideBudget.skip
@@ -81,6 +61,14 @@ def test_whale_formal_source_stats_and_continuation(tmp_path, monkeypatch):
     rows = json.loads(codex.read_text(encoding='utf-8'))
     rows = [r for r in rows if not (102 <= r['fishId'] <= 108 and r['mutationId'] == 1)]
     codex.write_text(json.dumps(rows), encoding='utf-8')
+    # Unlock full capacity cheaply in this fixture so beast-first layout can
+    # include its ordinary reference during this short ammunition test.
+    hall = project / 'production_snapshot/json/tbfishhallupgrade.json'
+    rows = json.loads(hall.read_text(encoding='utf-8'))
+    for row in rows:
+        if row['slotQty'] < 30:
+            row['upgradePrice'] = {'sign': 1, 'digits': '1', 'scale': 0}
+    hall.write_text(json.dumps(rows), encoding='utf-8')
     # Keep this fixture's first paid magazine affordable under real admission.
     for filename, field in [('tbgun.json', 'reloadResourceCost'), ('tbegg.json', 'baseHp')]:
         table = project / 'production_snapshot/json' / filename
@@ -131,7 +119,7 @@ def test_whale_formal_source_stats_and_continuation(tmp_path, monkeypatch):
         deployed = [f for f in state['inventory']['items'] if f['hallSlot'] > 0]
         normal = [f for f in deployed if f['fishId'] != 2004]
         beasts = [f for f in deployed if f['fishId'] == 2004]
-        assert len(normal) == 1 and normal[0]['hallSlot'] == 1 and len(beasts) > 0
+        assert len(normal) == 1 and normal[0]['hallSlot'] == 30 and len(beasts) > 0
         assert sum(f['fishId'] == 2004 for f in state['inventory']['items']) == 29
         multiplier = Decimal('2.5') + Decimal('0.1') * (len(beasts) - 1)
         assert all(source_decimal(f['authoritativeMultiplier']) == multiplier for f in beasts)

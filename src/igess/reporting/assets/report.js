@@ -1404,6 +1404,7 @@ function eventKindLabel(kind) {
     finalize_throw_landing: '确定落点',
     complete_throw: '完整投掷',
     deploy_fish: '摆放鱼',
+    apply_best_potential_layout: '一键最佳资质',
     collect_slot: '领取鱼厅收入',
     upgrade_fish: '鱼升级',
     sell_fish: '卖鱼',

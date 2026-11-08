@@ -6,12 +6,13 @@
 
 | 要改什么 | 先看哪里／检索词 | 对应验证 |
 | --- | --- | --- |
-| 大 R 初始枪与神兽、上阵策略 | engine 的 `initial_loadout_by_scenario`；`fish_source_loadout.py` 选择普通鱼参照与神兽槽位；源 `InitialLoadout.lua` 建立库存，`Guns.lua` 注入原生持有列表供 `GunStatsService`，`Tides.lua` 报价与扣费共用同一统计服务 | `tests/test_fish_source_whale.py`，核对初始基线、源倍率、报价／实际扣费与跨进程恢复 |
+| 大 R 初始枪与神兽、上阵策略 | engine 的 `initial_loadout_by_scenario`；`fish_source_engine.py` 统一使用源最佳资质计划与一键命令（策略见 README）；源 `InitialLoadout.lua` 建立库存，`Guns.lua` 注入原生持有列表供 `GunStatsService`，`Tides.lua` 报价与扣费共用同一统计服务 | `tests/test_fish_source_whale.py`，核对初始基线、源倍率、报价／实际扣费与跨进程恢复 |
 | 开局永久特权、在售范围与恢复 | engine 的 `permanent_privileges_by_scenario`；runtime 的 `permanent_privilege_mode`；源 `simulation/PermanentPrivileges.lua` 调用 `ItemGMService.GrantPrivilege`，`cli.lua` 保存 origin 并提供只读 `query_permanent_privileges`；manifest `source_profiles.*.permanent_privileges` | `tests/test_fish_source_privileges.py`，核对商品明细、实际 Modifier、只读查询与跨进程恢复 |
 | 显式独立 CLI 的后台交接、完成通知与恢复 | Skill 的 `scripts/run_background.py`、`references/background-runs.md`；只包装公共 CLI，回执不替代正式运行验证 | `python -m pytest .agents/skills/fish_sim/scripts/test_run_background.py -q`（模拟 CLI 响应，不运行 Fish） |
 | 场景时长、在线窗口、权重、行动耗时、采样 | `projects/fish_source/economy.yaml`：`scenarios`（Day1～Day6、Week1～Week3、Month1 为累计场景，Month1 是四周）、`session_patterns`、`behavior_weights`、`behavior_durations`；命令见项目 README | `tests/test_fish_source_formal.py`、`tests/test_fish_source_continuation.py` |
 | 引擎准备、能力检查、身份与策略 | `src/igess/fish_source_engine.py`：`FishSourceEngineAdapter.prepare`、`_REQUIRED_OPERATIONS`、`_integration_code_digest` | `tests/test_fish_source_current_rules.py`、`tests/test_fish_source_formal.py` |
 | 玩家选行为、动作互斥、时间推进、截断恢复 | 同文件 `_ProfileRun`：`_choose`、`_act`、`execute`、`_advance_to`、`_continue_throw`、`_continue_tide`、`checkpoint` | `tests/test_fish_source_natural_landing.py`、`tests/test_fish_source_tides.py`、`tests/test_fish_source_joint.py` |
+| 一键最佳资质换阵 | `fish_source_engine.py` 的 `_choose`；源 `Query.lua.bestPotentialLayout`、`Host/cli.apply_best_potential_layout` → 游戏 `FishHallLayoutPlanner` 与 `FishHallService.ApplyBestPotentialLayout` | `tests/test_fish_source_hall.py`、卖鱼及大 R 回归 |
 | 超过三十条按一级 CPS 卖背包鱼 | `fish_source_engine.py`：`_FISH_KEEP_COUNT`、`_choose`、清单 `fish_sell_policy`；源 `simulation/Query.lua` 的 `fishSales` 提供 `levelOneCps` 与 `materialAdded`，沿用源 `sell_fish` 和 `SourceIncome` | `tests/test_fish_source_sales.py`、`tests/test_fish_source_income.py` |
 | 鱼厅金币全部领取、每槽耗时、批次恢复 | 同文件 `_next_collection`、`pending_collect_slots`、`last_collect`；`_act` 提交后移除槽位，`pending_action` 保留剩余耗时；清单 `collect_policy` | `tests/test_fish_source_collection.py`、`tests/test_fish_source_income.py` |
 | Lua 启动、JSON 请求、冻结输入、摘要、replay | `src/igess/fish_source_runtime.py`：`FishSourceRuntime`、`request`、`_freeze_source`、`checkpoint`、`restore` | `tests/test_fish_source_formal.py`、`tests/test_fish_source_joint.py` |

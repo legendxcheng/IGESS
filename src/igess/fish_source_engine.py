@@ -30,7 +30,6 @@ from .fish_source_runtime import (
     source_code_digest,
     source_runtime_entry,
 )
-from .fish_source_loadout import choose_loadout_hall_action
 from .fish_source_income import SourceIncome
 from .fish_source_numbers import source_decimal
 from .schema import EconomyModel, Event, SimulationResult, TimelineRow
@@ -47,7 +46,7 @@ _REQUIRED_OPERATIONS = frozenset({
     "query", "query_actions", "query_codex", "claim_fish_reward", "advance", "checkpoint", "restore",
     "claim_gun_reward", "equip_gun", "grant_random_egg", "settle_eggs", "query_tide", "start_tide", "complete_tide",
     "go_online", "go_offline", "claim_offline_reward", "collect_slot",
-    "deploy_fish", "prepare_throw", "begin_throw_flight",
+    "deploy_fish", "apply_best_potential_layout", "prepare_throw", "begin_throw_flight",
     "select_throw_landing", "finalize_throw_landing", "complete_throw",
     "sell_fish", "upgrade_fish", "upgrade_hall", "purchase_torpedo",
     "synthesize_barbell", "start_exercise", "stop_exercise",
@@ -90,7 +89,7 @@ def _affords(wallet: Mapping[str, Any], quote: Mapping[str, Any]) -> bool:
 
 def _integration_code_digest() -> str:
     digest = hashlib.sha256()
-    for name in ("fish_source_engine.py", "fish_source_runtime.py", "fish_source_observation.py", "fish_source_reports.py", "fish_source_income.py", "fish_source_guns.py", "fish_source_eggs.py", "fish_source_tides.py", "fish_source_numbers.py", "fish_source_pools.py", "fish_source_growth_policy.py", "fish_source_loadout.py"):
+    for name in ("fish_source_engine.py", "fish_source_runtime.py", "fish_source_observation.py", "fish_source_reports.py", "fish_source_income.py", "fish_source_guns.py", "fish_source_eggs.py", "fish_source_tides.py", "fish_source_numbers.py", "fish_source_pools.py", "fish_source_growth_policy.py"):
         path = Path(__file__).parent / name
         if not path.is_file():
             path = path.with_suffix(".pyc")
@@ -315,6 +314,9 @@ class FishSourceEngineAdapter:
                 "lua_executable": lua_executable,
                 "policy": _SOURCE_POLICY,
                 "fish_sell_policy": "over_30_lowest_level_one_cps_backpack_v1",
+                "fish_hall_policy": "source_best_potential_layout_v1",
+                "fish_hall_action_seconds": 1,
+                "fish_upgrade_policy": "deployed_selected_fish_only_v1",
                 "fish_keep_count": _FISH_KEEP_COUNT,
                 "tide_policy": TIDE_POLICY,
                 "tide_admission_policy": GROWTH_TIDE_POLICY,
@@ -564,6 +566,8 @@ class _ProfileRun:
         )
         if loadout_mode and self.initial_loadout.get("mode") != loadout_mode:
             raise EngineAdapterError("fish_source_loadout_mismatch", "Source starting inventory differs from scenario")
+        # Hall decisions belong to the simulation, not the purchase receipt.
+        self.initial_loadout["hallPolicy"] = "source_best_potential_layout_v1"
         self.permanent_privileges = (
             runtime.request({"op": "query_permanent_privileges"}) if privilege_mode
             else {"mode": "none", "items": [], "paymentSimulated": False, "version": 1}
@@ -796,25 +800,25 @@ class _ProfileRun:
             if self.pending_collect_slots:
                 self.last_collect = int(state["time"])
                 return self._next_collection()
-        actions = None
-        if self.initial_loadout["mode"] != "none":
-            actions = self.runtime.request({"op": "query_actions"})
-            hall_action = choose_loadout_hall_action(state, actions, self._allowed)
-            if hall_action:
-                return hall_action
+        actions = self.runtime.request({"op": "query_actions"})
+        if "bestPotentialLayout" not in actions:
+            raise EngineAdapterError("fish_source_hall_plan_missing", "Source runtime must provide bestPotentialLayout")
+        plan = actions["bestPotentialLayout"]
+        selected = set(plan["selectedInstanceIds"])
+        if plan["changed"] and self._allowed("apply_best_potential_layout"):
+            return "apply_best_potential_layout", "", {"op": "apply_best_potential_layout"}
         sell_weight = self.profile.behavior_weights.get("sell_fish")
         if (
             state["inventory"]["total"] > _FISH_KEEP_COUNT
             and sell_weight is not None
             and Decimal(sell_weight.to_decimal_string()) > 0
         ):
-            if actions is None:
-                actions = self.runtime.request({"op": "query_actions"})
             if "fishSales" not in actions:
                 raise EngineAdapterError("fish_source_sale_quotes_missing", "Source runtime must provide fishSales")
             sellable = (
                 item for item in actions["fishSales"]
-                if self._allowed("sell_fish", str(item["instanceId"]))
+                if item["instanceId"] not in selected
+                and self._allowed("sell_fish", str(item["instanceId"]))
             )
             # Lua supplies level-one CPS including mutation, without level gains.
             item = min(sellable, key=lambda item: (
@@ -824,16 +828,7 @@ class _ProfileRun:
                 return "sell_fish", str(item["instanceId"]), {
                     "op": "sell_fish", "instanceId": item["instanceId"],
                 }
-        occupied = {item.get("hallSlot") for item in inventory if item.get("hallSlot", 0) > 0}
-        for item in inventory if self.initial_loadout["mode"] == "none" else []:
-            if item.get("hallSlot", 0) == 0:
-                for slot in range(1, state["hall"]["currentLevel"]["capacity"] + 1):
-                    if slot not in occupied and self._allowed("deploy_fish", str(item["instanceId"])):
-                        return "deploy_fish", str(item["instanceId"]), {
-                            "op": "deploy_fish", "instanceId": item["instanceId"], "slot": slot,
-                        }
-        if actions is None:
-            actions = self.runtime.request({"op": "query_actions"})
+        upgrade_targets = selected & {item["instanceId"] for item in inventory if item.get("hallSlot", 0) > 0}
         weights = self.profile.behavior_weights
         candidates: list[tuple[Decimal, str, str, dict[str, Any]]] = []
 
@@ -850,7 +845,7 @@ class _ProfileRun:
                 payload = dict(option.payload)
                 add(option.behavior, payload.pop("op"), option.target, **payload)
         for quote in actions["fishUpgrades"]:
-            if _affords(wallet, quote):
+            if quote["instanceId"] in upgrade_targets and _affords(wallet, quote):
                 add("upgrade_fish", "upgrade_fish", str(quote["instanceId"]), instanceId=quote["instanceId"])
         if state["inventory"]["total"] < state["inventory"]["capacity"] and self.inputs.fishing_area:
             add("manual_throw", "manual_throw")
@@ -886,7 +881,7 @@ class _ProfileRun:
         start = int(self.state["time"])
         if behavior == "collect_slot":
             duration = 2
-        elif behavior in ("deploy_fish", "withdraw_fish", "claim_fish_reward", "claim_gun_reward", "equip_gun"):
+        elif behavior in ("apply_best_potential_layout", "deploy_fish", "withdraw_fish", "claim_fish_reward", "claim_gun_reward", "equip_gun"):
             duration = 1
         else:
             duration = self._duration(behavior)
