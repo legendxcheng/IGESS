@@ -1,0 +1,461 @@
+{
+  "run_id": "20261109T130825973714Z-day_1_growth",
+  "status": "success",
+  "identity_complete": true,
+  "input_identity_verified": true,
+  "all_artifacts_present": true,
+  "artifact_sha256": {
+    "run_manifest.json": "1817550136d47907a689311e098dfb270d02ba4636a52e5b79bca519833a2a9c",
+    "analysis.json": "62d8832d5eba2ed408cb346b6693ac93ad6bac33184c671fd2eb0d56b5fb0e15",
+    "analysis.md": "04a5955dfb74e18670bb2d560dc1aa84b2fa56658411a91222dd92e70ec4b225",
+    "events.csv": "b4b3f00e2cb591be2797ea050edda70d5d7ea4f505a1f0fa2295e0b561bb07ed",
+    "events.json": "a74c8435a96f8ae10b51ebd044a55d60ae77ce65dcefd1ff9f3dedb6a678055b",
+    "payback.csv": "b2823140829f2e26c1f3ee5cb71b091b112834ef1dde5e0e1a34825abc0905a8",
+    "timeline.csv": "48ca952918f23c67852299ac3c3ea07936f69f7ba21343c9f780b2e9b6dfb0ab",
+    "timeline.json": "258c0fbb91d24729e88e7519f5187de5c97a7058bc3458640ea2f7c24b7edf9d",
+    "final_checkpoint.json": "f683cf7fd4699fa0d31bae1ed625409b4a8c3389dc80c68bc2763fe977d8a79c",
+    "source_progression.json": "891656bbfcffe7cbea927cb10a2b8c7b51f55bc6af1068c5f9493e4b0ccf3794",
+    "source_behavior.json": "5f11604777be2c86a2ebe56e7a2d27035fcd5260556edf7e6bec8eeb9206f939",
+    "run_status.json": "f51f4e424ab12979b11daf921f648bca32b086fceae29137be3cae08e0fe083f",
+    "report": "d7f243506347460f0416dc2441b768d96364c34484e5a75f2013ed1a868f7025"
+  },
+  "source_repository": "E:/fish-oasis",
+  "source_commit": "d44055ccd38dec894d59f7ba3103313728be299d",
+  "baseline_name": "FREE-DAY1-INCREMENTAL-001",
+  "finished_at": "2026-11-09T13:08:49.910485+00:00",
+  "scenario_id": "day_1_growth",
+  "profile_id": "default",
+  "seed": 2031507854,
+  "online_seconds": 7200,
+  "daily_2h_verified": true,
+  "rejected_commands": {},
+  "comparison_run_id": "20261109T125317993344Z-day_1_growth",
+  "review_status": "complete",
+  "target_evaluation_status": "passed",
+  "evaluation_status": "passed",
+  "evaluation_summary": {
+    "total": 10,
+    "evaluated": 10,
+    "passed": 10,
+    "failed": 0,
+    "not_evaluable": 0,
+    "not_applicable": 0
+  },
+  "all_target_coverage_complete": true,
+  "target_sha256": "bdfce5ad1c5e09e83d4b1acffa60674be076c4b661271f186034a84bbe8e21a6",
+  "target_definition": {
+    "schema_version": 1,
+    "target_set_id": "settingvalue-day1-review",
+    "version": "bdfce5ad1c5e09e83d4b1acffa60674be076c4b661271f186034a84bbe8e21a6",
+    "source": "{\"workbook\": \"E:\\\\fish-oasis\\\\docs\\\\SettingValue.xlsx\", \"sha256\": \"bdfce5ad1c5e09e83d4b1acffa60674be076c4b661271f186034a84bbe8e21a6\", \"interpretation\": \"Day1 blank cells mean no event planned; species/variants observational, excluded from pass/fail.\"}",
+    "targets": [
+      {
+        "target_id": "fish_pool",
+        "metric_id": "growth.count",
+        "profile_id": "default",
+        "dimensions": {
+          "categories": [
+            "fish_pool"
+          ],
+          "day": 1
+        },
+        "unit": "count",
+        "time_basis": "wall",
+        "scope": "segment",
+        "aggregation": "value",
+        "operator": "eq",
+        "value": 2
+      },
+      {
+        "target_id": "barbell",
+        "metric_id": "growth.count",
+        "profile_id": "default",
+        "dimensions": {
+          "categories": [
+            "barbell"
+          ],
+          "day": 1
+        },
+        "unit": "count",
+        "time_basis": "wall",
+        "scope": "segment",
+        "aggregation": "value",
+        "operator": "eq",
+        "value": 2
+      },
+      {
+        "target_id": "torpedo",
+        "metric_id": "growth.count",
+        "profile_id": "default",
+        "dimensions": {
+          "categories": [
+            "torpedo"
+          ],
+          "day": 1
+        },
+        "unit": "count",
+        "time_basis": "wall",
+        "scope": "segment",
+        "aggregation": "value",
+        "operator": "eq",
+        "value": 0
+      },
+      {
+        "target_id": "strength_rebirth",
+        "metric_id": "growth.count",
+        "profile_id": "default",
+        "dimensions": {
+          "categories": [
+            "strength_rebirth"
+          ],
+          "day": 1
+        },
+        "unit": "count",
+        "time_basis": "wall",
+        "scope": "segment",
+        "aggregation": "value",
+        "operator": "eq",
+        "value": 0
+      },
+      {
+        "target_id": "fish_hall",
+        "metric_id": "growth.count",
+        "profile_id": "default",
+        "dimensions": {
+          "categories": [
+            "fish_hall"
+          ],
+          "day": 1
+        },
+        "unit": "count",
+        "time_basis": "wall",
+        "scope": "segment",
+        "aggregation": "value",
+        "operator": "eq",
+        "value": 4
+      },
+      {
+        "target_id": "treasure_beast",
+        "metric_id": "growth.count",
+        "profile_id": "default",
+        "dimensions": {
+          "categories": [
+            "treasure_beast"
+          ],
+          "day": 1
+        },
+        "unit": "count",
+        "time_basis": "wall",
+        "scope": "segment",
+        "aggregation": "value",
+        "operator": "eq",
+        "value": 0
+      },
+      {
+        "target_id": "breakthrough_funding",
+        "metric_id": "growth.count",
+        "profile_id": "default",
+        "dimensions": {
+          "categories": [
+            "breakthrough_funding"
+          ],
+          "day": 1
+        },
+        "unit": "count",
+        "time_basis": "wall",
+        "scope": "segment",
+        "aggregation": "value",
+        "operator": "eq",
+        "value": 0
+      },
+      {
+        "target_id": "trash_man_rebirth",
+        "metric_id": "growth.count",
+        "profile_id": "default",
+        "dimensions": {
+          "categories": [
+            "trash_man_rebirth"
+          ],
+          "day": 1
+        },
+        "unit": "count",
+        "time_basis": "wall",
+        "scope": "segment",
+        "aggregation": "value",
+        "operator": "eq",
+        "value": 0
+      },
+      {
+        "target_id": "gun_owned",
+        "metric_id": "growth.count",
+        "profile_id": "default",
+        "dimensions": {
+          "categories": [
+            "gun_owned"
+          ],
+          "day": 1
+        },
+        "unit": "count",
+        "time_basis": "wall",
+        "scope": "segment",
+        "aggregation": "value",
+        "operator": "eq",
+        "value": 1
+      },
+      {
+        "target_id": "gun_upgraded",
+        "metric_id": "growth.count",
+        "profile_id": "default",
+        "dimensions": {
+          "categories": [
+            "gun_upgraded"
+          ],
+          "day": 1
+        },
+        "unit": "count",
+        "time_basis": "wall",
+        "scope": "segment",
+        "aggregation": "value",
+        "operator": "eq",
+        "value": 0
+      }
+    ]
+  },
+  "category_comparison": [
+    {
+      "category": "fish_pool",
+      "target": 2,
+      "actual": 2,
+      "status": "passed"
+    },
+    {
+      "category": "barbell",
+      "target": 2,
+      "actual": 2,
+      "status": "passed"
+    },
+    {
+      "category": "torpedo",
+      "target": 0,
+      "actual": 0,
+      "status": "passed"
+    },
+    {
+      "category": "strength_rebirth",
+      "target": 0,
+      "actual": 0,
+      "status": "passed"
+    },
+    {
+      "category": "fish_hall",
+      "target": 4,
+      "actual": 4,
+      "status": "passed"
+    },
+    {
+      "category": "treasure_beast",
+      "target": 0,
+      "actual": 0,
+      "status": "passed"
+    },
+    {
+      "category": "breakthrough_funding",
+      "target": 0,
+      "actual": 0,
+      "status": "passed"
+    },
+    {
+      "category": "trash_man_rebirth",
+      "target": 0,
+      "actual": 0,
+      "status": "passed"
+    },
+    {
+      "category": "gun_owned",
+      "target": 1,
+      "actual": 1,
+      "status": "passed"
+    },
+    {
+      "category": "gun_upgraded",
+      "target": 0,
+      "actual": 0,
+      "status": "passed"
+    }
+  ],
+  "daily_core_growth": [
+    {
+      "day": 1,
+      "count": 9,
+      "target_count": 9,
+      "score": 72,
+      "target_score": 72
+    }
+  ],
+  "observation_only": {
+    "new_fish_species": {
+      "actual": 25,
+      "reference": 20
+    },
+    "new_fish_variant": {
+      "actual": 13,
+      "reference": 10
+    },
+    "score_including_collection": 135,
+    "reference_score_including_collection": 122
+  },
+  "max_core_online_gap_seconds": 2357,
+  "core_tail_wait_seconds": 1088,
+  "max_all_online_gap_seconds": 518,
+  "source_runtime": {
+    "advance_mode": "equivalent_batch_v1",
+    "code_sha256": "e860c5dbe42fcaa9c26ddd9232179af0e9fb4bca647150ffacdce1cd300a5ab0",
+    "codex_claim_policy": "stable_reward_id_one_second_v1",
+    "collect_interval_basis": "batch_start",
+    "collect_interval_seconds": 300,
+    "collect_policy": "stable_slot_batch_v1",
+    "collect_slot_seconds": 2,
+    "fish_hall_action_seconds": 1,
+    "fish_hall_policy": "source_best_potential_layout_v1",
+    "fish_keep_count": 30,
+    "fish_sell_policy": "over_30_lowest_level_one_cps_backpack_v1",
+    "fish_upgrade_policy": "deployed_selected_fish_only_v1",
+    "generated_money_definition": "source_collected_slot_receipts_plus_current_unclaimed",
+    "gun_claim_seconds": 1,
+    "gun_equip_seconds": 1,
+    "gun_policy": "claim_stable_reward_id_then_highest_source_attack_v1",
+    "idle_seconds": 30,
+    "in_fishing_area": true,
+    "integration_code_sha256": "e9e8e16dbba01676130086416195bccd476333a39c647049f7ddd6c75ca2852c",
+    "landing_distance_cm": null,
+    "landing_policy": "source_natural_v1",
+    "lua_executable": "lua55",
+    "lua_version": "Lua 5.5",
+    "online_acquisition_definition": "observed_balance_increases_plus_receipt_spending_excludes_offline_claims",
+    "policy": "source_priority_v1",
+    "record_interval_seconds": 300,
+    "sampling_time_basis": "online",
+    "selected_export_root": "E:\\fish-oasis\\igess_export\\json",
+    "selected_export_sha256": "5fcd58f8d081abc5b25ccaa43f38ac3b1aa2d8b00a78a90290104188d533218c",
+    "tide_admission_policy": {
+      "budget_basis": "current_material_wallet_before_admission",
+      "cost_basis": "source_round_damage_hp_ammunition_quote",
+      "daily_income": "observed_online_material_including_sales_and_codex_excluding_offline",
+      "daily_spending": "source_paid_reload_receipts_plus_full_round_quote",
+      "daily_window": "simulation_wall_day_86400_seconds_no_carry",
+      "horizon_online_seconds": 1800,
+      "income": "observed_online_material_excluding_codex_and_offline",
+      "income_window_online_seconds": 1800,
+      "max_daily_income_fraction": "0.15",
+      "max_material_fraction": "0.25",
+      "policy": "growth_first_wallet_fraction_daily_income_near_term_reserve_v2",
+      "reservation": "one_next_source_quoted_target_existing_weights_and_turn"
+    },
+    "tide_policy": {
+      "competition": "not_simulated",
+      "duration_seconds": 0,
+      "eggs": 5,
+      "gun_damage_affects_reload_count": true,
+      "gun_damage_affects_yield": false,
+      "initial_ammo": 0,
+      "leftover_ammo": "discarded_after_round",
+      "magazine_size": 30,
+      "model": "fixed_eggs_damage_hp_zero_time_v3",
+      "shot_policy": "sum_per_egg_ceiling_hp_over_attack_perfect_hits"
+    },
+    "tide_schedule": {
+      "interval_seconds": 600,
+      "policy": "absolute_opening_only_v1",
+      "room_origin_seconds": 0,
+      "spawn_window_seconds": 120
+    },
+    "timings_seconds": {
+      "adapter_total": 23.682,
+      "checkpoint": 0.062,
+      "input_check": 0.202,
+      "process_close": 0.371,
+      "process_start": 1.219,
+      "source_execution": 21.827
+    }
+  },
+  "execution_window": {
+    "accepted_commands_scope": "current_execution_segment",
+    "cumulative_fields": [
+      "wallet",
+      "online_acquisition",
+      "active_time_seconds",
+      "source_total_throws"
+    ],
+    "end_seconds": 86400,
+    "event_scope": "current_execution_segment",
+    "requested_until_seconds": null,
+    "scenario_end_seconds": 86400,
+    "start_seconds": 0
+  },
+  "final_state": {
+    "time_seconds": 86400,
+    "spendable_money": "615243728.4076208482942808852822480503164115361869335174560546875",
+    "unclaimed_money": "490455863.664257757849734488397874798693010234273970127105712890625",
+    "collected_money": "1958883020.4091416235528219924599824253164115361869335174560546875",
+    "generated_money": "2449338884.073399381402556480857857224009421770460903644561767578125",
+    "material": "4.851E+4",
+    "online_money_acquired_cumulative": "2449356124.0733993814025564808578572240094217704609036445617675781250",
+    "online_resource_acquired_cumulative": "81530",
+    "online_fish_sale_material_cumulative": "71170",
+    "egg_inventory_count": "0",
+    "egg_hatched_count": "5",
+    "egg_capacity_blocked": "0",
+    "fish_inventory_count": "30",
+    "fish_inventory_capacity": "200",
+    "online_tide_reload_material_cumulative": "1920",
+    "online_codex_money_cumulative": "17240",
+    "online_codex_material_cumulative": "10360",
+    "codex_unlocked_count": "36",
+    "codex_claimed_count": "35",
+    "strength": "106878",
+    "fish_luck": "1381.752330666603172",
+    "trash_luck": "2.578087997951765",
+    "trash_realm": "1",
+    "treasure_beast_unlocked": "0",
+    "total_throws": "65",
+    "strength_rebirth_count": "0",
+    "trash_man_rebirth_count": "0",
+    "deployed_fish": 9
+  },
+  "milestones": {
+    "barbell_purchase_seconds": [
+      709,
+      2003
+    ],
+    "new_pool_seconds": [
+      971,
+      2650
+    ],
+    "hall_expansion_seconds": [
+      129,
+      139,
+      2312,
+      6112
+    ],
+    "first_gun_seconds": 5007,
+    "tide_seconds": 6600,
+    "hatched_eggs": 5
+  },
+  "final_calibration": {
+    "barbell_id4_price": "2000000000",
+    "hall_upgrade_id4_price": "30000",
+    "hall_upgrade_id5_price": "100000",
+    "pool_upper_bounds_first_three": [
+      "2000",
+      "20000",
+      "200000"
+    ],
+    "strength_rebirth_first_requirement": "250000"
+  },
+  "limitations": [
+    "Fixed single seed; collection counts observational; gun timing not a multi-seed guarantee.",
+    "Core gap 44:10-83:27 remains 39m17s; count alignment is not uniform pacing acceptance.",
+    "Only Day1 validated; Day2 and later curve require subsequent runs."
+  ],
+  "next_step_recommendation": "Keep this baseline and validate Day2 with unchanged inputs; no continuation submitted as part of the Git commit."
+}
