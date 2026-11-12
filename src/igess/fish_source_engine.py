@@ -20,7 +20,10 @@ from .engines import EngineAdapterError, EngineExecution, PreparedEngine
 from .fish_source_eggs import EggObservations
 from .fish_source_tides import TIDE_POLICY, TideObservations
 from .fish_source_guns import GunMilestones, choose_gun_action
-from .fish_source_growth_policy import GROWTH_TIDE_POLICY, GrowthTideBudget, growth_options, target_order
+from .fish_source_growth_policy import (
+    GROWTH_TIDE_POLICY, REBIRTH_POLICY, GrowthTideBudget, growth_options,
+    immediate_rebirth, target_order,
+)
 from .fish_source_pools import PoolMilestones
 from .fish_source_runtime import (
     FishSourceRejection,
@@ -117,6 +120,7 @@ class _SourceInputs:
     room_origin_seconds: int
     permanent_privileges_by_scenario: dict[str, str]
     initial_loadout_by_scenario: dict[str, str]
+    monthly_card_by_scenario: dict[str, str]
 
 
 class FishSourceEngineAdapter:
@@ -192,6 +196,12 @@ class FishSourceEngineAdapter:
             for key, mode in permanent_privileges.items()
         ):
             raise EngineAdapterError("fish_source_privileges_invalid", "Invalid scenario permanent privileges")
+        monthly_cards = source_settings.get("monthly_card_by_scenario", {})
+        if not isinstance(monthly_cards, dict) or any(
+            key not in model.scenarios or mode != "monthly_once"
+            for key, mode in monthly_cards.items()
+        ):
+            raise EngineAdapterError("fish_source_monthly_card_invalid", "Invalid scenario monthly card")
         initial_loadouts = source_settings.get("initial_loadout_by_scenario", {})
         if not isinstance(initial_loadouts, dict) or any(
             key not in model.scenarios or mode != "whale_qinglong_29"
@@ -267,6 +277,8 @@ class FishSourceEngineAdapter:
                 missing = sorted(_REQUIRED_OPERATIONS - set(capabilities.get("actions", [])))
                 if permanent_privileges and capabilities.get("permanentPrivilegesVersion") != 1:
                     missing.append("permanentPrivilegesVersion=1")
+                if monthly_cards and capabilities.get("monthlyCardVersion") != 1:
+                    missing.append("monthlyCardVersion=1")
                 if initial_loadouts and capabilities.get("initialLoadoutVersion") != 1:
                     missing.append("initialLoadoutVersion=1")
                 versions = ("tideScheduleVersion", "naturalLandingVersion", "inventoryProjectionVersion")
@@ -301,7 +313,7 @@ class FishSourceEngineAdapter:
             collect_interval, idle_seconds,
             advance_mode == "equivalent_batch_v1",
             sampling_time_basis, room_origin,
-            dict(permanent_privileges), dict(initial_loadouts),
+            dict(permanent_privileges), dict(initial_loadouts), dict(monthly_cards),
         )
         metadata = {
             "engine_id": self.engine_id,
@@ -313,6 +325,7 @@ class FishSourceEngineAdapter:
                 "lua_version": "Lua 5.5",
                 "lua_executable": lua_executable,
                 "policy": _SOURCE_POLICY,
+                "rebirth_policy": REBIRTH_POLICY,
                 "fish_sell_policy": "over_30_lowest_level_one_cps_backpack_v1",
                 "fish_hall_policy": "source_best_potential_layout_v1",
                 "fish_hall_action_seconds": 1,
@@ -464,6 +477,9 @@ class FishSourceEngineAdapter:
                     "pool_growth": runner.pool_milestones.scope,
                     "permanent_privileges": runner.permanent_privileges,
                     "initial_loadout": runner.initial_loadout,
+                    "monthly_card": runner.monthly_card,
+                    "monthly_card_final": runner.runtime.request({"op": "query_monthly_card"})
+                        if runner.monthly_card_mode else {"mode": "none"},
                 }
                 executed = time.perf_counter()
                 timings["source_execution"] += executed - entered
@@ -532,6 +548,9 @@ class _ProfileRun:
             dict(existing.behavior_state.get("online_acquisition", {})) if existing else None
         )
         self.growth_tide_budget = GrowthTideBudget(existing.behavior_state.get("growth_tide_budget") if existing else None)
+        self.monthly_card_mode = inputs.monthly_card_by_scenario.get(scenario_id)
+        if existing is not None and inputs.monthly_card_by_scenario.get(existing.scenario_id) != self.monthly_card_mode:
+            raise EngineAdapterError("fish_source_checkpoint_monthly_card_mismatch", "Cannot change monthly card when continuing")
         loadout_mode = inputs.initial_loadout_by_scenario.get(scenario_id)
         if existing is not None and inputs.initial_loadout_by_scenario.get(existing.scenario_id) != loadout_mode:
             raise EngineAdapterError("fish_source_checkpoint_loadout_mismatch", "Cannot change initial inventory when continuing")
@@ -547,6 +566,7 @@ class _ProfileRun:
                 fast_advance=inputs.fast_advance,
                 **({"permanent_privilege_mode": privilege_mode} if privilege_mode else {}),
                 **({"initial_loadout_mode": loadout_mode} if loadout_mode else {}),
+                **({"monthly_card_mode": self.monthly_card_mode} if self.monthly_card_mode else {}),
             )
         else:
             self.state = runtime.restore(_unpack_session(existing.engine_state))
@@ -560,6 +580,9 @@ class _ProfileRun:
             self.pending_action = existing.behavior_state.get("pending_action")
             self.pending_tide = existing.behavior_state.get("pending_tide")
             self.next_tide_at = existing.behavior_state["next_tide_at"]
+        self.monthly_card = runtime.request({"op": "query_monthly_card"}) if self.monthly_card_mode else {"mode": "none"}
+        if self.monthly_card_mode and self.monthly_card.get("mode") != self.monthly_card_mode:
+            raise EngineAdapterError("fish_source_monthly_card_mismatch", "Source monthly card differs from scenario")
         self.initial_loadout = (
             runtime.request({"op": "query_initial_loadout"}) if loadout_mode
             else {"mode": "none", "paymentSimulated": False, "version": 1}
@@ -771,11 +794,18 @@ class _ProfileRun:
 
     def _choose(self) -> tuple[str, str, dict[str, Any]] | None:
         state = self.state
+        rebirth = immediate_rebirth(state, self.profile.behavior_weights, self._allowed)
+        if rebirth is not None:
+            return rebirth
         # Finish this finite batch before choosing other ordinary work. New
         # production in an already visited slot belongs to the next batch.
         collection = self._next_collection()
         if collection is not None:
             return collection
+        if self.monthly_card_mode and self._allowed("claim_monthly_card", "2"):
+            card_state = self.runtime.request({"op": "query_monthly_card"})
+            if any(card["cardId"] == 2 and card["canClaim"] for card in card_state["snapshot"]["cards"]):
+                return "claim_monthly_card", "2", {"op": "claim_monthly_card"}
         gun_action = choose_gun_action(state, self._allowed)
         claims = []
         if gun_action is not None and gun_action[0] == "claim_gun_reward":
@@ -881,7 +911,7 @@ class _ProfileRun:
         start = int(self.state["time"])
         if behavior == "collect_slot":
             duration = 2
-        elif behavior in ("apply_best_potential_layout", "deploy_fish", "withdraw_fish", "claim_fish_reward", "claim_gun_reward", "equip_gun"):
+        elif behavior in ("claim_monthly_card", "apply_best_potential_layout", "deploy_fish", "withdraw_fish", "claim_fish_reward", "claim_gun_reward", "equip_gun"):
             duration = 1
         else:
             duration = self._duration(behavior)

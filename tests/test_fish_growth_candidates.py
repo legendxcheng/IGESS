@@ -11,6 +11,7 @@ from test_fish_growth_priority import Weight, budget, decide, dto, state, option
 
 def chooser(ids=range(1, 16), owned=range(1, 9)):
     runner = object.__new__(_ProfileRun)
+    runner.monthly_card_mode = None
     runner.state = state(wallet=1000, reload=25)
     runner.state.update({
         "time": 0, "codex": {"claimableRewards": []},

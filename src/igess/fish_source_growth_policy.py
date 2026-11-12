@@ -23,6 +23,22 @@ GROWTH_TIDE_POLICY = {
     "cost_basis": "source_round_damage_hp_ammunition_quote",
 }
 
+REBIRTH_POLICY = "source_eligible_trash_then_strength_first_v1"
+
+
+def immediate_rebirth(state, weights, allowed):
+    """At an idle decision boundary, execute a source-legal rebirth first."""
+    for behavior, section, op in (
+        ("trash_man_rebirth", "trashMan", "rebirth_trash_man"),
+        ("strength_rebirth", "strength", "rebirth_strength"),
+    ):
+        weight = weights.get(behavior)
+        if (weight is not None and Decimal(weight.to_decimal_string()) > 0
+                and state.get("rebirth", {}).get(section, {}).get("eligible", False)
+                and allowed(op, "")):
+            return behavior, "", {"op": op}
+    return None
+
 
 
 @dataclass(frozen=True)
@@ -135,6 +151,9 @@ class GrowthTideBudget:
             self.samples.pop(0)
 
     def skip(self, state, options, weights, allowed, turn, remaining_online, *, tide_quote=None):
+        rebirth = immediate_rebirth(state, weights, allowed)
+        if rebirth is not None:
+            return {"reason": "growth_action_ready", "growthBehavior": rebirth[0], "growthTarget": rebirth[1]}
         enabled = []
         for option in options:
             configured = weights.get(option.behavior)

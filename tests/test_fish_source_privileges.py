@@ -61,7 +61,10 @@ def test_purchased_throw_speed_changes_real_source_flight():
     free, paid = plans
     assert free["throwSpeedMultiplier"] == 1 and paid["throwSpeedMultiplier"] == 2
     assert free["naturalLanding"]["distanceCm"] == paid["naturalLanding"]["distanceCm"]
-    assert paid["naturalLanding"]["flightSeconds"] * 2 == free["naturalLanding"]["flightSeconds"]
+    # The host rounds each flight up to a whole millisecond.
+    free_ms = round(free["naturalLanding"]["flightSeconds"] * 1000)
+    paid_ms = round(paid["naturalLanding"]["flightSeconds"] * 1000)
+    assert paid_ms == (free_ms + 1) // 2
     assert paid["fishLuck"] == free["fishLuck"]  # In-sale privileges do not include Fish Luck.
 
 
@@ -88,7 +91,9 @@ def test_paid_formal_run_matches_continuation_and_cannot_resume_as_free(tmp_path
     assert full_read("timeline.json")[-1] == continued_read("timeline.json")[-1]
     assert _unpack_session(a["engine_state"]) == _unpack_session(b["engine_state"])
     benefits = full_read("run_manifest.json")["source_profiles"]["default"]["permanent_privileges"]
-    assert benefits["mode"] == "all_on_sale" and len(benefits["items"]) == 8
+    rows = json.loads((project / "production_snapshot/json/tbitemgm.json").read_text("utf-8"))
+    expected = sorted(r["id"] for r in rows if r["isPrivilege"] and not r["isTimedBuff"] and r["isForSale"])
+    assert benefits["mode"] == "all_on_sale" and benefits["grantedItemIds"] == expected
     assert a["root_random_seed"] == 2031507854
     assert _unpack_session(a["engine_state"])["origin"]["permanentPrivilegeMode"] == "all_on_sale"
     response = service.simulate("month_1_growth", checkpoint_input=partial / "final_checkpoint.json", until_seconds=600)

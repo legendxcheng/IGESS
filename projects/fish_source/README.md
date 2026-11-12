@@ -4,11 +4,35 @@
 
 免费、付费及不同玩家策略的历史报表统一登记在 [模拟报表记录](docs/simulation-reports.md)，保留固定运行 ID、输入身份、关键指标与比较口径。
 
+## 月卡加全部在售永久特权
+
+`month_1_monthly_all_permanent` 为 28 天、每天在线 2 小时，`smoke_monthly_all_permanent` 为 600 秒验证。开局购买一次月卡，叠加 `all_on_sale` 的全部在售永久特权，沿用 `default` 画像、种子、养成和鱼潮策略。只购买月卡，不包含周卡、终身卡、付费枪或神兽。
+
+`monthly_card_by_scenario: monthly_once` 接到源 `DailyRewardCardService` 的购买到账与每日领取，以及 `RewardDeliveryService` 的发奖事务。卡的可售状态以冻结 `tb_dailyrewardcard` 为准；`tbitemgm` 中卡片注册项的 `isForSale=false` 表示不在普通特权商店售卖，不表示卡已停售。有效期、权益定义与奖励数量由所选导表决定；当前月卡为 30 天双倍锻炼频率，单次力量不变，购买及每日领取各发 2 张交易券。
+
+模拟原生背包为交易券提供足够容量；票券按源回执入包并保留，不消费，也不折算成金币、材料或抽奖收益。每日领取在空闲决策点执行，沿用达标重生及未完成收钱批次的优先级，点击耗时 1 秒；源业务日为 UTC+8，不离线补领。真实支付渠道、原生背包容量竞争和购买意愿不在模拟范围。
+
+manifest 的 `source_profiles.default.monthly_card` 保存本段起始月卡快照，`monthly_card_final` 保存最终权益、购买／每日领取账本与交易券库存；永久权益另见 `permanent_privileges`。checkpoint.origin 保存月卡模式，恢复重建开局购买并回放源操作；跨月卡组合禁止接续，旧代码身份需新建基线。月卡只读查询允许离线执行，领取仍要求在线；CLI 和 Host 两层接口权限须同步。查询不写回放；有效期判断和锻炼效果由源服务执行，不硬设倍率。
+
+通过 Dashboard 提交：`python .agents/skills/fish_sim/scripts/run_dashboard.py submit --scenario month_1_monthly_all_permanent`。定向回归：`tests/test_fish_source_monthly_card.py`，覆盖购买发奖、业务日边界、重复领取、到期、真实锻炼收益、跨进程恢复与正式运行续跑。
+
+## 枪械交付与装备恢复
+
+枪械交付维护：模拟 Host 保存时必须执行源 `ArchiveSaveGate.Check`，确保月卡发奖后释放保存屏障。图鉴拥有权益不等于原生枪已到账；装备意图会先通过源服务恢复该枪的待完成交付，再执行装备，不重复发放或绕过未知回执隔离。回归见 `tests/test_fish_source_gun_delivery.py` 及源 `simulation/README.md` 的“枪械交付与装备恢复”；新代码需从新玩家建立正式基线，旧报告不因此改变。
+
 ## 大 R 初始购买场景
 
 `month_1_whale` 为 28 天、每天在线 2 小时，`smoke_whale` 为 600 秒验证。开局拥有最强配置付费枪、29 只青龙和全部在售永久特权；具体源规则、上阵策略与比较限制见 [大 R 场景](docs/whale-scenario.md)。提交仍使用 Dashboard，正式完成后再登记报表。
 
 神兽同种倍率及精确参照产出乘积由源规则作有界缓存，依赖完整大数、数量及配置；动态结算照旧。大 R 上阵与卖鱼在同一次决策中复用动作报价，不增加或删减业务行动。缓存不写入存档，旧源码／适配器身份的 checkpoint 仍拒绝跨版本恢复。维护边界和专项测试见源 `simulation/README.md` 的“神兽纯产出缓存”。
+
+## 达标优先重生
+
+`source_priority_v1` 在每个空闲决策点先执行源服务判定 `eligible=true` 的重生，优先于收钱批次、领奖、换阵、购买和继续资助。两类重生同时合法时先寻宝兽、再力量；完成一次后重新读取源状态。画像中该行为须启用，失败仍遵守既有拒绝冷却。鱼潮入场沿用相同优先级并记录 `growth_action_ready`。
+
+“立即”指已开始的投掷、动作或鱼潮完成后的第一个可操作点；不打断源事务，也不绕过在线、突破中等源资格限制。被重生暂时中断的收钱批次保留未领取槽位。寻宝兽返祖门槛仍由源表的 4、8、12、16……决定；达标后不会因同权重轮转先发起下一境界资助。
+
+manifest 记录 `rebirth_policy=source_eligible_trash_then_strength_first_v1`。旧策略 checkpoint 不兼容，需要从新玩家建立基线。回归见 `tests/test_fish_source_rebirth_priority.py`、成长优先、收钱和续跑测试；历史运行仍保留原策略证据。
 
 ## 一键最佳资质换阵
 

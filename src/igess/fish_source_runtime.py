@@ -282,6 +282,7 @@ class FishSourceRuntime:
         fast_advance: bool = False,
         permanent_privilege_mode: str | None = None,
         initial_loadout_mode: str | None = None,
+        monthly_card_mode: str | None = None,
     ) -> dict[str, Any]:
         if self.source_digest is None:
             raise FishSourceRuntimeError("simulation_session_closed")
@@ -295,6 +296,10 @@ class FishSourceRuntime:
         }
         if initial_state is not None:
             command["initialState"] = initial_state
+        if monthly_card_mode is not None:
+            if (self.capabilities or {}).get("monthlyCardVersion") != 1:
+                raise FishSourceRuntimeError("simulation_monthly_card_unavailable")
+            command["monthlyCardMode"] = monthly_card_mode
         if initial_loadout_mode is not None:
             if (self.capabilities or {}).get("initialLoadoutVersion") != 1:
                 raise FishSourceRuntimeError("simulation_initial_loadout_unavailable")
