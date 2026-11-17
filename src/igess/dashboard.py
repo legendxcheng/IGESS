@@ -6,7 +6,10 @@ import json
 import mimetypes
 import re
 import secrets
+from collections import deque
 from collections.abc import Mapping, Sequence
+from copy import deepcopy
+from datetime import datetime, timezone
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path, PurePosixPath
@@ -27,7 +30,7 @@ _SAMPLE_CONFIG = "examples/shelldiver_v0/economy.yaml"
 _SAMPLE_TABLES = "examples/shelldiver_v0/luban_exports"
 _MAX_FORM_BYTES = 64 * 1024
 _MAX_REPORT_BYTES = 32 * 1024 * 1024
-_MUTATION_PATHS = frozenset({"/smoke", "/formal", "/run", "/advise", "/refresh", "/clear-history", "/delete-run"})
+_MUTATION_PATHS = frozenset({"/smoke", "/formal", "/run", "/advise", "/refresh", "/clear-history", "/delete-run", "/queue"})
 
 
 def create_dashboard_context(
@@ -193,6 +196,7 @@ def _authoring_content(
 
       </div>
     </section>
+    {_queue_form(scenarios, csrf_token)}
     {_history_panel(runs, service, csrf_token)}
     <section data-view="advice">
       <h2>Latest advice</h2>
@@ -261,7 +265,26 @@ def _legacy_content(
       </form>
       {_advice_panel(advice)}
     </section>
+    {_queue_form(scenarios, csrf_token)}
     {_history_panel(runs, service, csrf_token)}"""
+
+
+def _queue_form(scenarios, token):
+    disabled = "" if scenarios else "disabled data-unavailable"
+    return f'''<section data-view="runs"><h2>Simulation queue</h2>
+      <p>Tasks run in the order submitted. A failed task does not stop later tasks.
+      You can add more tasks while a simulation is running.</p>
+      <form id="queue-form" action="/queue" method="post">
+        {_csrf_input(token)}
+        <button id="queue-add" type="button" {disabled}>Add selected scenario to batch</button>
+        <label for="queue-scenarios">Batch order — one scenario per line</label>
+        <textarea id="queue-scenarios" name="scenarios" rows="6" required
+          placeholder="Select a scenario above and add it here. Repeat to build a batch."></textarea>
+        <p class="hint">Each entry starts a new simulation. Edit the lines to reorder or remove entries.
+        Pending tasks are kept for this service session; they are not restored after a service shutdown.</p>
+        <button type="submit" data-queue-submit {disabled}>Submit batch to queue</button>
+        <p id="queue-feedback" role="status"></p>
+      </form></section>'''
 
 
 def _history_panel(runs: Sequence[object], service: WorkflowService, csrf_token: str) -> str:
@@ -436,6 +459,10 @@ class _DashboardRuntime:
         self.revision = 0
         self.stopping = False
         self.workers = set()
+        self.pending = deque()
+        self.queue_tasks = []
+        self.draining = False
+        self.scenarios = ()
         self.refresh()
 
     def _start_worker(self, target, *args):
@@ -460,6 +487,9 @@ class _DashboardRuntime:
     def close(self):
         with self.lock:
             self.stopping = True
+            for item in self.pending:
+                item.update(state="cancelled", message="Dashboard stopped before this task started.")
+            self.pending.clear()
             workers = list(self.workers)
         self.task_runner.close()
         for worker in workers:
@@ -469,7 +499,8 @@ class _DashboardRuntime:
         with self.lock:
             elapsed = self.task.get("duration_seconds", round(monotonic() - self.started, 1) if self.started else 0)
             return {**self.task, "elapsed_seconds": elapsed,
-                    "refreshing": self.refreshing, "revision": self.revision}
+                    "refreshing": self.refreshing, "revision": self.revision,
+                    "queue": deepcopy(self.queue_tasks), "queued_count": len(self.pending)}
 
     def refresh(self):
         with self.lock:
@@ -489,11 +520,14 @@ class _DashboardRuntime:
             page = render_dashboard_home(self.service, self.config, self.tables,
                                          csrf_token=self.token, status_response=response, check_snapshot=check)
             status = check["status"]
+            scenarios = _string_sequence(payload.get("result", {}).get("available_scenarios")) if payload else tuple(check.get("scenarios", ()))
         except Exception as error:  # noqa: BLE001 - retain a visible refresh error.
             status = {"ok": False, "message": str(error)}
             page = dashboard_shell('<section><h2>Model check failed</h2><p class="failed">' + _e(error) + '</p></section>', str(getattr(self.service, 'project_root', 'Local project')), 'Project unavailable')
+            scenarios = ()
         with self.lock:
             self.page, self.status = page, status
+            self.scenarios = scenarios
             self.revision += 1
             pending = self.refresh_pending
             self.refresh_pending = False
@@ -502,20 +536,74 @@ class _DashboardRuntime:
             self._refresh()
 
     def submit(self, path, scenario, *, history_digest=None, run_id=None, resume_run_id=None):
-        if not self.guard.acquire(blocking=False):
-            return False
+        return self._admit([dict(action=path, scenario=scenario, history_digest=history_digest,
+                                 target_run_id=run_id, resume_run_id=resume_run_id)], append=False) is not None
+
+    def enqueue(self, scenarios):
+        """Validate the entire batch before accepting any entry, in request order."""
         with self.lock:
-            self.started = monotonic()
-            message = "Deleting confirmed run…" if path == "/delete-run" else "Clearing confirmed history…" if path == "/clear-history" else "Task accepted; executing workflow (including any project lock wait)."
-            self.task = {"state": "running", "message": message,
-                         "scenario": scenario, "action": path}
+            available = self.scenarios
+        if not scenarios or len(scenarios) > 100 or any(s not in available for s in scenarios):
+            raise ValueError("Submit 1-100 configured scenarios; no tasks were added.")
+        return self._admit([dict(action="/formal", scenario=s) for s in scenarios], append=True)
+
+    def _admit(self, requests, *, append):
+        with self.lock:
+            if self.stopping or (self.draining and (not append or self.task.get("action") in {"/delete-run", "/clear-history"})):
+                return None
+            start = not self.draining
+            if start and not self.guard.acquire(blocking=False):
+                return None
+            accepted = [{**request, "task_id": secrets.token_hex(16), "state": "queued",
+                         "message": "Waiting for earlier tasks.",
+                         "submitted_at": datetime.now(timezone.utc).isoformat()} for request in requests]
+            self.pending.extend(accepted)
+            self.queue_tasks.extend(accepted)
+            self.draining = True
+            if start:
+                self.task = {"state": "running", "message": "Tasks accepted; starting queue.",
+                             "action": requests[0]["action"], "scenario": requests[0]["scenario"]}
+                self.started = monotonic()
+            receipt = deepcopy(accepted)
+        if not start:
+            return receipt
         try:
-            self._start_worker(self._execute, path, scenario, history_digest, run_id, resume_run_id)
+            self._start_worker(self._drain)
         except Exception as error:
             with self.lock:
+                for item in self.pending:
+                    item.update(state="failed", message=str(error))
+                self.pending.clear()
                 self.task = {"state": "failed", "message": str(error)}
-            self.guard.release()
-        return True
+                self.draining = False
+                self.guard.release()
+        return receipt
+
+    def _drain(self):
+        while True:
+            with self.lock:
+                if not self.pending:
+                    self.draining = False
+                    self.guard.release()
+                    break
+                item = self.pending.popleft()
+                self.started = monotonic()
+                item.update(state="running", message="Executing workflow (including any project lock wait).",
+                            started_at=datetime.now(timezone.utc).isoformat())
+                self.task = item
+            outcome = self._execute(item["action"], item["scenario"], item.get("history_digest"),
+                                    item.get("target_run_id"), item.get("resume_run_id"))
+            with self.lock:
+                item.update(outcome)
+                item["duration_seconds"] = round(monotonic() - self.started, 1)
+                item["finished_at"] = datetime.now(timezone.utc).isoformat()
+                # Keep /task busy between entries; per-entry terminal states remain in queue.
+                self.task = {**item, "state": "running"} if self.pending else dict(item)
+                if not self.pending:
+                    self.draining = False
+                    self.guard.release()
+                    break
+        self.refresh()
 
     def _execute(self, path, scenario, history_digest=None, run_id=None, resume_run_id=None):
         outcome = {"state": "failed", "message": "Worker interrupted; check run history before retrying."}
@@ -523,11 +611,11 @@ class _DashboardRuntime:
             if path == "/delete-run":
                 result = self.service.delete_run(run_id, history_digest)
                 outcome = {"state": "success" if result.ok else "failed", "message": result.message}
-                return
+                return outcome
             if path == "/clear-history":
                 result = self.service.clear_history(history_digest)
                 outcome = {"state": "success" if result.ok else "failed", "message": result.message}
-                return
+                return outcome
             options = {"resume_run_id": resume_run_id} if resume_run_id else {}
             outcome = self.task_runner.run("advise" if path == "/advise" else "simulate", scenario, **options)
             diagnostic_id = outcome.get("diagnostic", {}).get("details", {}).get("diagnostic_id")
@@ -542,14 +630,7 @@ class _DashboardRuntime:
                     pass  # The workflow failure and diagnostic identifier remain visible.
         except Exception as error:  # noqa: BLE001 - expose exceptions as task failures.
             outcome = {"state": "failed", "message": f"{type(error).__name__}: {error}"}
-        finally:
-            try:
-                self.refresh()
-            finally:
-                with self.lock:
-                    self.task.update(outcome)
-                    self.task["duration_seconds"] = round(monotonic() - self.started, 1)
-                    self.guard.release()
+        return outcome
 
     def home(self):
         task = self.snapshot()
@@ -571,7 +652,7 @@ class _DashboardRuntime:
             panel += '<p>' + _e(task["log_warning"]) + '</p>'
         if task.get("state") == "success" and task.get("run_id"):
             panel += '<p><a data-report-link href="/reports/' + _e(task['run_id']) + '/index.html">Open completed report</a></p>'
-        panel += '</section>'
+        panel += '<h3>Task queue <span id="queue-count"></span></h3><ol id="queue-items"></ol></section>'
         script = """<script>
 const revision = REVISION;
 let previousState = STATE;
@@ -580,14 +661,68 @@ function displayTask(t) {
   document.querySelector('#task-state').className = t.state;
   document.querySelector('#task-message').textContent = t.message;
   document.querySelector('#task-time').textContent = 'Elapsed: ' + (t.duration_seconds ?? t.elapsed_seconds) + ' s' + (t.refreshing ? ' — refreshing model snapshot in background' : ' — model snapshot is cached');
-  document.querySelectorAll('button[type=submit], [data-mutation]').forEach(b => b.disabled = t.state === 'running' || b.hasAttribute('data-unavailable') || b.hasAttribute('data-empty-history'));
+  document.querySelectorAll('button[type=submit], [data-mutation]').forEach(b => b.disabled = (b.hasAttribute('data-queue-submit') ? queueSubmitting : t.state === 'running') || b.hasAttribute('data-unavailable') || b.hasAttribute('data-empty-history'));
+  document.querySelector('#queue-count').textContent = '— ' + t.queued_count + ' waiting';
+  const list = document.querySelector('#queue-items');
+  list.replaceChildren();
+  for (const task of t.queue || []) {
+    const row = document.createElement('li');
+    row.textContent = task.scenario + ' — ' + task.state + (task.state === 'failed' ? ': ' + task.message : '');
+    if (task.run_id && /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(task.run_id)) {
+      const link = document.createElement('a');
+      link.href = new URL('reports/' + task.run_id + '/index.html', location.href).pathname;
+      link.textContent = ' Open report';
+      link.setAttribute('data-report-link', '');
+      row.append(link);
+    }
+    list.append(row);
+  }
 }
 document.querySelectorAll('form').forEach(f => f.addEventListener('submit', event => {
+  if (f.id === 'queue-form') return;
   if (event.defaultPrevented) return;
   f.action = new URL(f.action).pathname + location.hash;
   document.querySelector('#task-message').textContent = 'Submitting task…';
   document.querySelectorAll('button[type=submit]').forEach(b => b.disabled = true);
 }));
+const batch = document.querySelector('#queue-scenarios');
+let queueSubmitting = false;
+document.querySelector('#queue-add')?.addEventListener('click', () => {
+  const scenario = document.querySelector('#scenario')?.value;
+  if (scenario && batch) batch.value = (batch.value.trim() ? batch.value.trim() + '\\n' : '') + scenario;
+});
+document.querySelector('#queue-form')?.addEventListener('submit', async event => {
+  event.preventDefault();
+  if (queueSubmitting) return;
+  queueSubmitting = true;
+  const form = event.currentTarget;
+  const body = new URLSearchParams(new FormData(form));
+  const controls = [batch, ...form.querySelectorAll('button')];
+  controls.forEach(control => control.disabled = true);
+  const feedback = document.querySelector('#queue-feedback');
+  feedback.textContent = 'Submitting batch…';
+  try {
+    const r = await fetch(form.action, {
+      method: 'POST', body,
+      headers: {'Accept': 'application/json'}, signal: AbortSignal.timeout(10000)
+    });
+    if (!r.ok) {
+      if ([400, 403, 409, 413, 503].includes(r.status)) {
+        feedback.textContent = 'Batch rejected (HTTP ' + r.status + '). No tasks were added. Check the scenario names and service status.';
+        return;
+      }
+      throw Error('HTTP ' + r.status);
+    }
+    const receipt = await r.json();
+    feedback.textContent = receipt.tasks.length + ' tasks accepted.';
+    batch.value = '';
+  } catch (error) {
+    feedback.textContent = 'Batch acceptance could not be confirmed. Check the task queue before retrying. ' + error.message;
+  } finally {
+    queueSubmitting = false;
+    controls.forEach(control => control.disabled = control.hasAttribute('data-unavailable'));
+  }
+});
 async function poll() {
   if (window.dashboardRestarting) { setTimeout(poll, 1000); return; }
   try {
@@ -599,7 +734,7 @@ async function poll() {
     if (serverInstance && t.instance_id && serverInstance !== t.instance_id) { location.reload(); return; }
     document.querySelector('#connection-state').textContent = '';
     displayTask(t);
-    if (t.revision !== revision || (previousState === 'running' && t.state !== 'running')) { location.reload(); return; }
+    if (!queueSubmitting && !batch?.value.trim() && (t.revision !== revision || (previousState === 'running' && t.state !== 'running'))) { location.reload(); return; }
     previousState = t.state;
   } catch (e) { document.querySelector('#connection-state').textContent = 'Cannot reach dashboard. Task outcome is unknown; do not resubmit. ' + e.message; }
   setTimeout(poll, 1000);
@@ -718,7 +853,7 @@ def _handler(
                 return page
             # Only known application routes are mounted; report-relative assets
             # keep resolving within their own project-qualified report directory.
-            for route in ("status", "task", "reports/", "diagnostics/", "refresh", "smoke", "formal", "run", "advise", "clear-history", "delete-run"):
+            for route in ("status", "task", "reports/", "diagnostics/", "refresh", "smoke", "formal", "run", "advise", "clear-history", "delete-run", "queue"):
                 page = page.replace('href="/' + route, 'href="' + self.prefix + '/' + route)
                 page = page.replace('action="/' + route, 'action="' + self.prefix + '/' + route)
             page = page.replace("fetch('/task'", "fetch('" + self.prefix + "/task'")
@@ -746,7 +881,7 @@ def _handler(
             if parsed.path == "/":
                 self._send_html(self._home())
                 return
-            if parsed.path == "/task":
+            if parsed.path in {"/task", "/queue"}:
                 self._send_json({**self.runtime.snapshot(), "instance_id": instance_id})
                 return
             if parsed.path.startswith("/diagnostics/"):
@@ -861,6 +996,27 @@ def _handler(
                 self.send_header("Location", self.prefix + "/")
                 self.end_headers()
                 return
+            if parsed.path == "/queue":
+                if form.get("resume_run_id", [""])[0]:
+                    self.send_error(HTTPStatus.BAD_REQUEST, "Batch tasks start independently; use formal for continuation")
+                    return
+                scenarios = [line.strip() for line in form.get("scenarios", [""])[0].splitlines() if line.strip()]
+                try:
+                    with runtime_lock:
+                        accepted = None if restart_requested else self.runtime.enqueue(scenarios)
+                except ValueError as error:
+                    self.send_error(HTTPStatus.BAD_REQUEST, str(error))
+                    return
+                if accepted is None:
+                    self.send_error(HTTPStatus.CONFLICT, "Dashboard is stopping or history mutation is active")
+                    return
+                if "application/json" in self.headers.get("Accept", ""):
+                    self._send_json({"ok": True, "instance_id": instance_id, "tasks": accepted}, status=HTTPStatus.ACCEPTED)
+                else:
+                    self.send_response(HTTPStatus.SEE_OTHER)
+                    self.send_header("Location", self.prefix + "/#runs")
+                    self.end_headers()
+                return
             if parsed.path in {"/clear-history", "/delete-run"}:
                 single = parsed.path == "/delete-run"
                 digest = form.get("run_digest" if single else "history_digest", [""])[0]
@@ -933,9 +1089,9 @@ def _handler(
                 payload = {**self.runtime.status, "cached": True, "refreshing": self.runtime.refreshing}
             self._send_json(payload)
 
-        def _send_json(self, payload) -> None:
+        def _send_json(self, payload, *, status=HTTPStatus.OK) -> None:
             body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-            self.send_response(HTTPStatus.OK)
+            self.send_response(status)
             self.send_header("Cache-Control", "no-store")
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))

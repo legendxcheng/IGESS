@@ -58,7 +58,7 @@ def test_configuration_dashboard_unavailable_scenarios_disable_actions(tmp_path,
     path.write_text("[invalid yaml" if invalid else yaml.safe_dump(config), encoding="utf-8")
     service = WorkflowService(project_root=".", runs_root=tmp_path / "runs")
     body = render_dashboard_home(service, path, TABLES)
-    assert body.count('disabled data-unavailable') == 2
+    assert body.count('disabled data-unavailable') == 4
     assert body.count('No scenarios available</option>') == 2
     assert 'Dashboard unavailable' not in body
 
@@ -487,6 +487,13 @@ def test_dashboard_mutations_require_post_and_redirect_home(tmp_path):
             response.read()
             assert response.status == HTTPStatus.SEE_OTHER
             assert response.getheader("Location") == "/"
+            deadline = time.monotonic() + 3
+            while time.monotonic() < deadline:
+                connection.request("GET", "/task")
+                task_response = connection.getresponse()
+                if json.loads(task_response.read())["state"] != "running":
+                    break
+                time.sleep(.01)
             assert service.calls[-1] == expected
 
         connection.request("GET", "/status")
@@ -576,6 +583,9 @@ def test_dashboard_post_rejects_csrf_origin_host_and_concurrent_mutations(tmp_pa
             )
             == HTTPStatus.SEE_OTHER
         )
+        deadline = time.monotonic() + 3
+        while not service.calls and time.monotonic() < deadline:
+            time.sleep(.01)
         assert service.calls == [("formal", "smoke")]
     finally:
         server.shutdown()

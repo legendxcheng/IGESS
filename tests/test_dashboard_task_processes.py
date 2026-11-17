@@ -168,6 +168,43 @@ def test_worker_crash_finishes_only_its_run_and_allows_retry(live):
     live.run()
 
 
+def test_batch_runs_in_fresh_processes_in_order_and_continues_after_failure(live):
+    # First child fails after registration; subsequent children must still produce reports.
+    simulator = live.package / "simulator.py"
+    source = simulator.read_text(encoding="utf-8")
+    simulator.write_text(source.replace(
+        'def run_scenario(self, scenario_id: str) -> SimulationResult:',
+        '''def run_scenario(self, scenario_id: str) -> SimulationResult:
+        import os
+        from pathlib import Path
+        marker = Path("batch-children.txt")
+        previous = marker.read_text() if marker.exists() else ""
+        marker.write_text(previous + str(os.getpid()) + "\\n")
+        if not previous:
+            raise RuntimeError("First batch entry fails")
+'''), encoding="utf-8")
+    live.start()
+    page = live.request(live.prefix + "/")[2]
+    token = re.search(r'name="_csrf" value="([^"]+)"', page)[1]
+    code, _, body = live.request(live.prefix + "/queue", {
+        "_csrf": token, "scenarios": "\n".join([live.scenario] * 3),
+    }, {"Accept": "application/json"})
+    assert code == 202
+    receipt = json.loads(body)
+    tasks = live.wait_idle()["queue"]
+    assert [t["task_id"] for t in tasks] == [t["task_id"] for t in receipt["tasks"]]
+    assert [t["state"] for t in tasks] == ["failed", "success", "success"]
+    assert len(set((live.project / "batch-children.txt").read_text().splitlines())) == 3
+    for before, after in zip(tasks, tasks[1:]):
+        assert before["finished_at"] <= after["started_at"]
+    for task in tasks:
+        run = live.history / live.prefix.split("/")[-1] / task["run_id"]
+        assert json.loads((run / "run_status.json").read_text())["status"] == task["state"]
+        if task["state"] == "success":
+            assert (run / "report/index.html").is_file()
+            assert live.request(live.prefix + "/reports/" + task["run_id"] + "/index.html")[0] == 200
+
+
 @pytest.mark.parametrize("crash", [False, True])
 def test_worker_completion_reaps_its_descendants(live, crash):
     simulator = live.package / "simulator.py"

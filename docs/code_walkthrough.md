@@ -83,6 +83,8 @@ flowchart TD
 
 模拟、分析与模型检查通过 [dashboard_tasks.py](../src/igess/dashboard_tasks.py) 每次启动独立解释器，由 [dashboard_task_worker.py](../src/igess/dashboard_task_worker.py) 加载当前源码并进入原有工作流。网页线程只负责监督和显示，不执行缓存的模型逻辑。任务回执独立于日志，运行归属用于异常终态恢复；Windows Job Object／POSIX 进程组由 [dashboard_process_tree.py](../src/igess/dashboard_process_tree.py) 管理。完整职责、失败与更新边界见 [Dashboard 任务执行说明](dashboard-task-processes.md)。
 
+Dashboard 的 `_DashboardRuntime.enqueue → _admit → _drain → _execute` 提供项目内 FIFO 模拟队列。Runs & reports 的 Simulation queue 支持按行编排多个场景并一次提交，运行中可继续追加；`POST /p/<project-key>/queue` 原子接收一批场景，`GET /p/<project-key>/queue`（或 `/task`）返回各项独立的 `task_id`、状态和完成后的 `run_id`。同批次不交错，同一项目一次执行一项，上一项的进程回收与结果归并完成后才启动下一项；失败后继续，跨项目仍可并行。队列排空前持有项目操作互斥，阻止历史删除和服务重启。原单项接口保留忙时拒绝行为；批量任务均从场景起点独立执行，不自动串联 checkpoint。待执行项只保存在当前服务会话，源码和输入在实际执行时读取，正式运行的产物继续持久化到历史库。协议与边界见[批量任务队列](dashboard-task-processes.md#批量任务队列)，测试见 `tests/test_dashboard_queue.py`。
+
 Dashboard 的离线页面外壳、样式与浏览器交互位于 [dashboard_ui.py](../src/igess/dashboard_ui.py)，服务端数据片段仍由 `dashboard.py` 生成。界面分为 Overview、Runs & reports、Analyst；历史搜索与状态/类型筛选仅作用于已加载记录，不执行模型检查。场景选择和筛选按项目保存在当前浏览器标签页的 `sessionStorage` 中，存储不可用时仍可正常操作。运行状态轮询保留在 `_DashboardRuntime.home`，空场景的提交禁用不能被轮询重新启用。此界面不改变执行工具包的调优工作台。
 
 历史、Latest smoke 和任务完成提示的报告链接带 `data-report-link`，普通点击在同页右侧 iframe 展开报告，Dashboard 重排为可独立滚动的左栏，历史表改为紧凑卡片。关闭按钮或 Esc 收起报告并恢复原页滚动位置，表单与筛选不重建；可直接点击另一条报告切换，也可使用工具栏的新标签页入口或浏览器修饰键打开独立页面。宽度不超过 900px 时改为上下分栏。报告继续使用原项目限定 URL，资源相对路径和服务端路径校验不变；当前报告按项目保存在标签页会话中，轮询引起的整页刷新后仅在该报告仍有链接时恢复，关闭后清除记录。

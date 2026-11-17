@@ -95,7 +95,9 @@ h2 { font-size:16px; font-weight:550; margin:0 0 16px; letter-spacing:-.2px; } h
 p { margin:8px 0 14px; } li { margin:6px 0; overflow-wrap:anywhere; } ul { padding-left:20px; }
 code { font:12px/1.6 Consolas,monospace; color:#b7bec6; overflow-wrap:anywhere; }
 label { display:block; color:#c5c5c5; font-size:12px; margin-bottom:7px; }
-input,select { padding:9px 11px; border:1px solid #414141; border-radius:5px; color:var(--text); background:#191919; min-width:0; max-width:100%; }
+input,select,textarea { padding:9px 11px; border:1px solid #414141; border-radius:5px; color:var(--text); background:#191919; min-width:0; max-width:100%; }
+#queue-scenarios { width:100%; box-sizing:border-box; resize:vertical; font:13px/1.6 Consolas,monospace; }
+#queue-add { margin-bottom:14px; } #queue-items { grid-column:1 / -1; max-height:260px; overflow:auto; margin:0; padding-left:24px; font-size:12px; }
 button,.button { display:inline-flex; justify-content:center; align-items:center; gap:12px; border:1px solid #454545; border-radius:5px; background:#2b2b2b; color:var(--text); padding:8px 13px; font-size:12px; font-weight:500; cursor:pointer; line-height:1.5; }
 button:hover,.button:hover { background:#353535; text-decoration:none; } .primary,form[action$="/formal"] button { background:#27764f; border-color:#329365; color:#f2fff8; } .primary:hover,form[action$="/formal"] button:hover { background:#318b60; }
 button:disabled { opacity:.45; cursor:not-allowed; }

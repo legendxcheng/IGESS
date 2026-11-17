@@ -136,6 +136,45 @@ def test_restart_waits_for_model_refresh(workspace):
     assert request(port, "/server/restart", form)[0] == 200
 
 
+def test_queued_batches_are_project_local_and_block_restart_until_drained(workspace):
+    port, services, restart, form = workspace
+    first, second, release_first, release_second = Event(), Event(), Event(), Event()
+    calls = []
+
+    def run(scenario):
+        calls.append(scenario)
+        entered, release = (first, release_first) if len(calls) == 1 else (second, release_second)
+        entered.set()
+        assert release.wait(10)
+        return CommandResponse("model.simulate", True, "done", "completed")
+
+    services["alpha"].run_authoring_scenario = run
+    page = request(port, "/p/alpha/")[1]
+    token = re.search(r'name="_csrf" value="([^"]+)"', page)[1]
+    assert 'action="/p/alpha/queue"' in page
+    try:
+        assert request(port, "/p/alpha/queue", {"_csrf": token, "scenarios": "smoke\nsmoke"})[0] == 303
+        assert first.wait(2)
+        assert request(port, "/server/restart", form)[0] == 409
+        assert json.loads(request(port, "/p/beta/queue")[1])["queue"] == []
+        assert request(port, "/p/beta/queue", {"_csrf": token, "scenarios": "smoke"})[0] == 403
+        beta_page = request(port, "/p/beta/")[1]
+        beta_token = re.search(r'name="_csrf" value="([^"]+)"', beta_page)[1]
+        assert request(port, "/p/beta/queue", {"_csrf": beta_token, "scenarios": "smoke"})[0] == 303
+        wait_until(lambda: json.loads(request(port, "/p/beta/task")[1])["state"] == "success")
+        release_first.set()
+        assert second.wait(2)
+        assert request(port, "/server/restart", form)[0] == 409
+        assert not restart.is_set()
+    finally:
+        release_first.set()
+        release_second.set()
+    wait_until(lambda: json.loads(request(port, "/p/alpha/task")[1])["state"] == "success")
+    wait_until(lambda: not json.loads(request(port, "/p/alpha/task")[1])["refreshing"])
+    assert calls == ["smoke", "smoke"]
+    assert request(port, "/server/restart", form)[0] == 200
+
+
 def test_supervisor_restarts_real_process_and_keeps_launch_options(tmp_path, monkeypatch):
     repo = Path(__file__).resolve().parents[1]
     project = tmp_path / "workspace"

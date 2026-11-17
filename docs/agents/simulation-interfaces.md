@@ -26,6 +26,8 @@ IGESS 提供执行、运行身份、产物查询、指标提取和目标对照�
 
 查询指定 Dashboard 历史时，`runs/metrics/targets --runs-root` 应传该项目的实际历史根；多项目 Dashboard 的 `--runs-root` 则是各项目历史的父目录。默认查询规则及覆盖状态定义以 [运行分析接口](../analysis-api.md) 为准。
 
+一次提交多个独立模拟任务可使用正在运行的 Dashboard：`POST /p/<project-key>/queue` 按顺序批量入队，`GET /p/<project-key>/queue` 查询逐项状态；接口、项目 token 和接收回执见[批量任务队列](../dashboard-task-processes.md#批量任务队列)。队列只保存在当前服务会话，按 `instance_id + task_id` 归属任务；全部完成后仍通过上述 `runs` 接口核验每个 `run_id`，不能以最后一项成功代替整批成功。原单项 CLI 保持不变。
+
 ## 执行顺序与完成条件
 
 ### 用户要求分析已有结果

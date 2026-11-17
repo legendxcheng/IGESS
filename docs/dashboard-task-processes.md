@@ -22,12 +22,52 @@ Windows 工作解释器在执行项目代码前等待服务许可。服务将实
 
 ## 保持的行为
 
-- 同一项目的重复提交被拒绝，不同项目保留独立任务能力。
+- 原单项接口在同一项目忙碌时拒绝提交；批量队列入口支持追加，不同项目保留独立任务能力。
 - 刷新网页、关闭标签页或切换项目不会取消后台任务。
 - 有任务或模型检查时，服务重启仍被拒绝；历史清理沿用现有确认与互斥。
 - 项目、配置、导表、运行目录与兼容历史读取规则保持原样。
 - 历史列举、报告读取和历史清理继续使用原服务接口。
 - 仅本机监听及 Host、Origin、CSRF 和报告路径校验不变。浏览器不能提交任意脚本命令。
+
+## 批量任务队列
+
+在 **Runs & reports → Simulation queue** 中，先在上方选择场景，点击 **Add selected scenario to batch**，重复添加；也可直接填写场景名，每行一个。修改行顺序或删除行后，点击 **Submit batch to queue** 一次提交。每批 1–100 项，允许同一场景重复执行。运行中可以再提交一批，追加在已有等待项之后。Task queue 展示每项状态及报告入口。
+
+- 每个项目一个 FIFO 队列，批次按服务接收顺序追加，同批次连续入队。跨项目队列独立，可以同时运行。
+- 接收前校验整批场景是否存在于当前缓存模型快照；有非法项则整批拒绝，不部分入队。配置变更后先刷新模型快照。
+- 每项仍启动独立 Python 进程，完成正式运行、报告、结果归并和进程回收后才启动下一项。某项失败后继续后续项，不自动重试。
+- 每项从场景定义的起点独立执行；批量入口不接受 `resume_run_id`，不会把前一项的结果自动当作后一项的 checkpoint。单项续跑继续使用原 `/formal` 接口。
+- 队列未排空时，历史清理、单次删除与服务重启仍被拒绝。刷新网页、关闭标签页不取消队列；服务受控关闭时，未开始的任务取消。
+- 待执行队列和任务回执保存在服务内存中，不承诺服务重启或崩溃后的恢复。已执行的正式运行继续按原规则保存到运行历史库。每项在真正开始时读取当前源码和输入，入队不是冻结输入的操作。
+
+### HTTP 接口
+
+项目模式使用 `/p/<project-key>` 前缀；单项目 handler 使用无前缀路由。请求沿用项目表单的 `_csrf`、本机 Host 和同源 Origin 校验。
+
+`POST /p/<project-key>/queue` 使用 `application/x-www-form-urlencoded`：
+
+| 字段 | 含义 |
+| --- | --- |
+| `_csrf` | 当前项目表单 token |
+| `scenarios` | 按顺序排列的场景名，以换行分隔；忽略空行和首尾空白 |
+
+发送 `Accept: application/json` 时返回 HTTP **202**：
+
+```json
+{
+  "ok": true,
+  "instance_id": "server-instance",
+  "tasks": [
+    {"task_id": "unique-task-id", "action": "/formal", "scenario": "analytic_smoke", "state": "queued", "message": "Waiting for earlier tasks.", "submitted_at": "2026-11-17T00:00:00+00:00"}
+  ]
+}
+```
+
+普通表单提交返回 303 到当前项目的 `/#runs`。非法批次返回 400；历史操作期间或服务停止期间不能入队（409/503）；请求安全校验失败返回 403。接收回执只表示任务已入队，可能尚未启动，不能当作模拟成功。
+
+`GET /p/<project-key>/queue` 和 `/task` 返回相同快照：顶层兼容当前任务状态，并增加 `queue`（本服务会话的任务列表）和 `queued_count`。每项有独立 `task_id`，状态为 `queued/running/success/failed/cancelled`，启动和完成后追加 `started_at/finished_at/duration_seconds`；实际运行回执提供 `run_id` 和已有诊断字段。以提交回执的 **instance_id + task_id** 查找自己的任务，不以最后一项状态或最新 run 猜测整批结果。全部目标项终结后逐项核对状态，再用 `igess runs show/artifacts --json` 核验正式运行产物。顶层成功不代表队列中的每项均成功。
+
+HTTP 超时不自动重发。先查询当前会话队列核对接收情况；服务身份变化时旧队列回执不可继续作为新会话的任务身份。
 
 ## 仍需重启或重生成的情况
 
@@ -39,4 +79,4 @@ Dashboard 页面、路由、任务启动组件或不兼容的控制协议更新�
 
 真实进程验收位于 `tests/test_dashboard_task_processes.py`，覆盖同一服务内的代码与报告更新、旧字节码、模型检查刷新、进程崩溃、后代回收、导入失败修复、authoring、自定义历史根、跨项目并发、启动失败、回传异常及大量日志。旧 HTTP 路由测试使用明确注入的任务替身，不作为新代码加载的验收证据。
 
-执行 `python -m pytest tests/test_dashboard_task_processes.py` 后，按范围补充 Dashboard、正式运行和历史清理回归。浏览器与实际 Fish/Lua smoke 的环境和结果应单独记录。
+执行 `python -m pytest tests/test_dashboard_task_processes.py tests/test_dashboard_queue.py` 后，按范围补充 Dashboard、正式运行和历史清理回归。队列测试覆盖原子批量接收、FIFO、并发提交、运行中追加、失败后继续、独立回执、启动失败恢复及关闭时取消；真实进程测试验证批次使用独立 PID 和持久化报告。浏览器与实际 Fish/Lua smoke 的环境和结果应单独记录。
