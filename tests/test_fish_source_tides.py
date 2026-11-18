@@ -337,7 +337,7 @@ def test_invalid_execution_cutoff_is_diagnosed_without_reserving_run(tmp_path, u
 
 def test_exercise_settles_and_ordinary_actions_resume_same_second_after_tide(tmp_path, monkeypatch):
     fixture_player(monkeypatch)
-    target = configured_project(tmp_path, 151, origin=31, weights={"exercise_barbell": "1"})
+    target = configured_project(tmp_path, 215, interval=300, origin=31, weights={"exercise_barbell": "1"})
     output, behavior, events, _ = formal(target)
     at_opening = [e["kind"] for e in events if e["time_seconds"] == 31]
     assert at_opening.index("stop_exercise") < at_opening.index("start_tide")
@@ -345,8 +345,25 @@ def test_exercise_settles_and_ordinary_actions_resume_same_second_after_tide(tmp
     assert at_opening.index("start_tide") < at_opening.index("complete_tide") < at_opening.index("collect_slot")
     assert any(e["kind"] == "start_exercise" and e["time_seconds"] == 33 for e in events)
     rows = json.loads((output / "timeline.json").read_text(encoding="utf-8"))
-    strengths = {r["resources"]["strength"] for r in rows if 31 <= r["time_seconds"] <= 151}
+    assert any(e["kind"] == "stop_exercise" and e["time_seconds"] == 213 for e in events)
+    strengths = {r["resources"]["strength"] for r in rows if 31 <= r["time_seconds"] <= 215}
     assert len(strengths) > 1
+
+
+@pytest.mark.parametrize("boundary", ["tide", "logout"])
+def test_throw_group_stops_after_two_throws_at_session_boundary(tmp_path, boundary):
+    target = configured_project(
+        tmp_path, 61, origin=60 if boundary == "tide" else 1000,
+        online=60 if boundary == "logout" else 7200, weights={"manual_throw": "1"},
+    )
+    _, _, events, checkpoint = formal(target)
+    assert [e["time_seconds"] for e in events if e["kind"] == "prepare_throw"] == [0, 30]
+    assert sum(e["kind"] == "complete_throw" for e in events) == 2
+    assert checkpoint["behavior_state"]["throws_remaining"] == 0
+    if boundary == "tide":
+        assert any(e["kind"] == "claim_fish_reward" and e["time_seconds"] == 60 for e in events)
+    else:
+        assert any(e["kind"] == "go_offline" and e["time_seconds"] == 60 for e in events)
 
 
 @pytest.mark.parametrize("behavior", ["manual_throw", "exercise_barbell"])

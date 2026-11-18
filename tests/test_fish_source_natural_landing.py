@@ -47,6 +47,42 @@ def test_formal_throw_uses_source_natural_target_and_real_flight_time(tmp_path):
     assert progression["profiles"]["default"][0]["treasure_beast_unlocked"] == "0"
 
 
+def test_five_individual_throws_then_three_minutes_exercise_with_mid_batch_resume(tmp_path):
+    target = project(tmp_path)
+    path = target / "economy.yaml"
+    config = yaml.safe_load(path.read_text(encoding="utf-8"))
+    config["engine"]["source_runtime"]["room_origin_seconds"] = 1000
+    config["scenarios"]["smoke"].update(duration_hours="0.1", record_interval_seconds=60)
+    config["player_profiles"]["default"]["behavior_weights"] = {"manual_throw": "1", "exercise_barbell": "1"}
+    path.write_text(yaml.safe_dump(config), encoding="utf-8")
+    service = AuthoringService(target)
+
+    def simulate(**options):
+        result = service.simulate("smoke", **options)
+        assert result.ok, result.details
+        return Path(result.result["output_dir"])
+
+    def read(output, name):
+        return json.loads((output / name).read_text(encoding="utf-8"))
+
+    full = simulate()
+    events = read(full, "events.json")
+    training_start = next(e["time_seconds"] for e in events if e["kind"] == "start_exercise")
+    training_stop = next(e["time_seconds"] for e in events if e["kind"] == "stop_exercise")
+    assert training_stop - training_start == 180
+    throws = [e for e in events if e["time_seconds"] < training_start and e["kind"] == "complete_throw"]
+    assert len({e["item_id"] for e in throws}) == len(throws) == 5
+    assert [e["time_seconds"] for e in events if e["kind"] == "prepare_throw"][:5] == [0, 30, 60, 90, 120]
+    assert read(full, "run_manifest.json")["source_runtime"]["throw_batch_size"] == 5
+
+    first = simulate(until_seconds=60)
+    progress = read(first, "final_checkpoint.json")["behavior_state"]
+    assert progress["pending_throw"] is None and progress["throws_remaining"] == 3
+    resumed = simulate(checkpoint_input=first / "final_checkpoint.json")
+    assert read(first, "events.json") + read(resumed, "events.json") == events
+    assert read(resumed, "final_checkpoint.json") == read(full, "final_checkpoint.json")
+
+
 def initial_state(strength="3000000000"):
     code = ('package.path="./?.lua;./proj/?.lua;"..package.path; '
             'local s=require("Script.Domain.Player.PlayerArchiveSchema").New(0); '

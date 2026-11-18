@@ -111,6 +111,7 @@ class _SourceInputs:
     landing_distance_cm: int | None
     collect_interval_seconds: int
     idle_seconds: int
+    throw_batch_size: int
     fast_advance: bool
     sampling_time_basis: str
     room_origin_seconds: int
@@ -184,6 +185,7 @@ class FishSourceEngineAdapter:
         landing_distance = source_settings.get("landing_distance_cm")
         collect_interval = source_settings.get("collect_interval_seconds", 300)
         idle_seconds = source_settings.get("idle_seconds", 30)
+        throw_batch_size = source_settings.get("throw_batch_size", 1)
         advance_mode = source_settings.get("advance_mode", "accurate")
         sampling_time_basis = source_settings.get("sampling_time_basis", "wall")
         permanent_privileges = source_settings.get("permanent_privileges_by_scenario", {})
@@ -200,13 +202,13 @@ class FishSourceEngineAdapter:
             raise EngineAdapterError("fish_source_monthly_card_invalid", "Invalid scenario monthly card")
         initial_loadouts = source_settings.get("initial_loadout_by_scenario", {})
         if not isinstance(initial_loadouts, dict) or any(
-            key not in model.scenarios or mode != "whale_qinglong_29"
+            key not in model.scenarios or mode not in ("whale_qinglong_29", "qinglong_29")
             for key, mode in initial_loadouts.items()
         ):
             raise EngineAdapterError("fish_source_loadout_invalid", "Invalid scenario starting loadout")
         if type(fishing_area) is not bool or any(
             type(value) is not int or value <= 0
-            for value in (collect_interval, idle_seconds)
+            for value in (collect_interval, idle_seconds, throw_batch_size)
         ) or (landing_distance is not None and (type(landing_distance) is not int or landing_distance <= 0)):
             raise EngineAdapterError("fish_source_policy_invalid", "Invalid source player policy setting")
         if advance_mode not in ("accurate", "equivalent_batch_v1"):
@@ -306,7 +308,7 @@ class FishSourceEngineAdapter:
         inputs = _SourceInputs(
             project_root, data_root, code_digest, data_digest, integration_digest,
             lua_executable, fishing_area, landing_distance,
-            collect_interval, idle_seconds,
+            collect_interval, idle_seconds, throw_batch_size,
             advance_mode == "equivalent_batch_v1",
             sampling_time_basis, room_origin,
             dict(permanent_privileges), dict(initial_loadouts), dict(monthly_cards),
@@ -322,6 +324,7 @@ class FishSourceEngineAdapter:
                 "lua_executable": lua_executable,
                 "policy": _SOURCE_POLICY,
                 "rebirth_policy": REBIRTH_POLICY,
+                "throw_batch_size": throw_batch_size,
                 "fish_sell_policy": "over_30_lowest_level_one_cps_backpack_v1",
                 "fish_hall_policy": "source_best_potential_layout_v1",
                 "fish_hall_action_seconds": 1,
@@ -536,6 +539,7 @@ class _ProfileRun:
         self.pending_tide: dict[str, Any] | None = None
         self.next_tide_at = inputs.room_origin_seconds
         self.pending_throw: dict[str, Any] | None = None
+        self.throws_remaining = 0
         self.pending_action: dict[str, Any] | None = None
         self.last_receipt: dict[str, Any] = {}
         self.gun_milestones = GunMilestones(existing.behavior_state.get("gun_milestones") if existing else None)
@@ -573,6 +577,7 @@ class _ProfileRun:
             self.blocked = dict(existing.behavior_state.get("blocked", {}))
             self.active_time_seconds = int(existing.behavior_state.get("active_time_seconds", 0))
             self.pending_throw = existing.behavior_state.get("pending_throw")
+            self.throws_remaining = int(existing.behavior_state["throws_remaining"])
             self.pending_action = existing.behavior_state.get("pending_action")
             self.pending_tide = existing.behavior_state.get("pending_tide")
             self.next_tide_at = existing.behavior_state["next_tide_at"]
@@ -792,7 +797,13 @@ class _ProfileRun:
         state = self.state
         rebirth = immediate_rebirth(state, self.profile.behavior_weights, self._allowed)
         if rebirth is not None:
+            self.throws_remaining = 0
             return rebirth
+        can_throw = state["inventory"]["total"] < state["inventory"]["capacity"] and self.inputs.fishing_area
+        if self.throws_remaining:
+            if can_throw:
+                return "manual_throw", "manual_throw", {"op": "manual_throw"}
+            self.throws_remaining = 0
         # Finish this finite batch before choosing other ordinary work. New
         # production in an already visited slot belongs to the next batch.
         collection = self._next_collection()
@@ -874,7 +885,7 @@ class _ProfileRun:
             quote = fish_upgrade_quote(state, actions, self._allowed)
             if quote is not None:
                 add("upgrade_fish", "upgrade_fish", str(quote["instanceId"]), instanceId=quote["instanceId"])
-        if state["inventory"]["total"] < state["inventory"]["capacity"] and self.inputs.fishing_area:
+        if can_throw:
             add("manual_throw", "manual_throw")
         add("exercise_barbell", "exercise_barbell")
         if not candidates:
@@ -924,6 +935,8 @@ class _ProfileRun:
             if self._command("prepare_throw", target=throw_id, requestId=throw_id):
                 plan = self.last_receipt["naturalLanding"]
                 if self._command("begin_throw_flight", target=throw_id, requestId=throw_id):
+                    # The current flight has its own checkpoint. Count only future throws.
+                    self.throws_remaining = (self.throws_remaining or self.inputs.throw_batch_size) - 1
                     landing_at = start + max(1, math.ceil(plan["flightSeconds"]))
                     self.pending_throw = {
                         "request_id": throw_id, "landing_at": landing_at,
@@ -932,6 +945,7 @@ class _ProfileRun:
                     }
                     self._continue_throw(min(limit, self.end))
                     return
+            self.throws_remaining = 0
             self._wait_until(end)
         elif behavior == "upgrade_fish":
             # Commit each level through Lua at the batch start. Only the shared
@@ -981,12 +995,14 @@ class _ProfileRun:
             if self.state["time"] < pending["landing_at"]:
                 return
             throw_id = pending["request_id"]
-            if (
+            completed = (
                 self._command("select_throw_landing", target=throw_id, requestId=throw_id,
                               distanceCm=pending["distance_cm"])
                 and self._command("finalize_throw_landing", target=throw_id, requestId=throw_id)
-            ):
-                self._command("complete_throw", target=throw_id, requestId=throw_id)
+                and self._command("complete_throw", target=throw_id, requestId=throw_id)
+            )
+            if not completed:
+                self.throws_remaining = 0
             pending["landed"] = True
         self._advance(min(pending["end_at"], limit))
         if self.state["time"] >= pending["end_at"]:
@@ -1041,6 +1057,7 @@ class _ProfileRun:
                 if self.state["online"] and not self._command("go_offline"):
                     raise EngineAdapterError("fish_source_session_failed", "Source rejected go_offline")
                 self.pending_throw = None
+                self.throws_remaining = 0
                 self.pending_action = None
                 while self.next_tide_at < day_end:
                     self._skip_tide(self.next_tide_at, "offline")
@@ -1063,6 +1080,7 @@ class _ProfileRun:
             if self.pending_tide and self.pending_tide["endsAt"] <= now:
                 self._continue_tide(now)
             if now == self.next_tide_at:
+                self.throws_remaining = 0
                 round_id = self._round_id(now)
                 self.next_tide_at += self.tide_interval
                 self.growth_tide_budget.observe(self.active_time_seconds, self.income.totals)
@@ -1124,6 +1142,7 @@ class _ProfileRun:
                 "pending_collect_slots": self.pending_collect_slots,
                 "blocked": self.blocked,
                 "pending_throw": self.pending_throw,
+                "throws_remaining": self.throws_remaining,
                 "pending_action": self.pending_action,
                 "pending_tide": self.pending_tide,
                 "next_tide_at": self.next_tide_at,

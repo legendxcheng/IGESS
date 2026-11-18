@@ -1,8 +1,12 @@
 # Fish 代码导航
 
+月卡＋全特权＋29 青龙、不含付费枪：`economy.yaml` 的 `month_1_monthly_qinglong_29` → `fish_source_engine.py` 初始库存模式校验 → 源 `simulation/InitialLoadout.lua` 的 `qinglong_29`。查询返回 `gunCount=0`，origin 保留组合身份；回归为 `tests/test_fish_source_monthly_qinglong.py`。
+
 以下路径相对 IGESS 根目录，`<source>` 来自 `projects/fish_source/economy.yaml` 中的 `engine.source_runtime.project_root`。按任务只读相关行指向的模块；符号若已迁移，用 `rg` 追踪调用方并修正本导航。
 
 ## IGESS 模拟侧
+
+卖价压缩：源 `Domain/Fishing/FishSalePricePolicy.lua` → `FishEconomyRules.CalculateSellPrice` → 原库存出售服务及 `simulation/Query.lua.fishSales`；回归为源 `tests/fish_sale_price_policy_test.lua` 和 IGESS `tests/test_fish_source_sales.py`。公式、精度与调优阶段见项目 README“卖鱼价格压缩”。
 
 | 要改什么 | 先看哪里／检索词 | 对应验证 |
 | --- | --- | --- |
@@ -13,6 +17,7 @@
 | 场景时长、在线窗口、权重、行动耗时、采样 | `projects/fish_source/economy.yaml`：`scenarios`（Day1～Day6、Week1～Week3、Month1 为累计场景，Month1 是四周）、`session_patterns`、`behavior_weights`、`behavior_durations`；命令见项目 README | `tests/test_fish_source_formal.py`、`tests/test_fish_source_continuation.py` |
 | 引擎准备、能力检查、身份与策略 | `src/igess/fish_source_engine.py`：`FishSourceEngineAdapter.prepare`、`_REQUIRED_OPERATIONS`、`_integration_code_digest` | `tests/test_fish_source_current_rules.py`、`tests/test_fish_source_formal.py` |
 | 玩家选行为、动作互斥、时间推进、截断恢复 | 同文件 `_ProfileRun`：`_choose`、`_act`、`execute`、`_advance_to`、`_continue_throw`、`_continue_tide`、`checkpoint` | `tests/test_fish_source_natural_landing.py`、`tests/test_fish_source_tides.py`、`tests/test_fish_source_joint.py` |
+| 连投与锻炼分组 | `economy.yaml` 的 `throw_batch_size` 与锻炼耗时；`_ProfileRun.throws_remaining` 保存当前一投之后尚未发起的次数 | `tests/test_fish_source_natural_landing.py` 的五投、锻炼耗时和组间隙恢复，以及鱼潮边界回归 |
 | 达标优先重生 | `fish_source_growth_policy.py`：`immediate_rebirth`、`REBIRTH_POLICY`；engine `_choose` 先于收钱与普通行为选择，`GrowthTideBudget.skip` 复用；manifest `rebirth_policy` | `tests/test_fish_source_rebirth_priority.py`，成长优先、收钱及续跑回归；契约见 README“达标优先重生” |
 | 一键最佳资质换阵 | `fish_source_engine.py` 的 `_choose`；源 `Query.lua.bestPotentialLayout`、`Host/cli.apply_best_potential_layout` → 游戏 `FishHallLayoutPlanner` 与 `FishHallService.ApplyBestPotentialLayout` | `tests/test_fish_source_hall.py`、卖鱼及大 R 回归 |
 | 主力鱼连续升级与半小时杠铃存钱 | `fish_source_growth_policy.py`：`FISH_UPGRADE_POLICY`、`fish_upgrade_quote`、`reserve_money_for_barbell`；engine `_choose` 做批前判断，`_act` 在源逐级扣款后等待整批 3 秒，manifest 保存口径 | `tests/test_fish_source_upgrades.py`：源排序前两条、精确门槛、批内花完、满级／拒绝、鱼潮／下线、跨进程恢复；并跑换阵、收钱和成长回归 |

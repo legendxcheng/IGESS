@@ -4,6 +4,12 @@
 
 免费、付费及不同玩家策略的历史报表统一登记在 [模拟报表记录](docs/simulation-reports.md)，保留固定运行 ID、输入身份、关键指标与比较口径。
 
+## 连投五次与三分钟锻炼
+
+普通策略选中炸鱼后连续投 5 次。每投默认占用 30 秒，使用独立请求、自然飞行和源随机结算；飞行较长时等到实际落地。组内跳过普通行为轮选，收钱、领奖、换阵和卖鱼等到组后重新判断。满包、源投掷拒绝或达标优先重生会提前结束本组。鱼潮开场和实际下线清除剩余次数，各自按已有规则处理在途动作。运行截断保留当前投掷及剩余次数，恢复后接着本组执行。
+
+锻炼每组 180 秒，沿用源开始／停止锻炼结算；遇鱼潮或下线在边界停止。组长见 `economy.yaml` 的 `engine.source_runtime.throw_batch_size` 和画像下的 `behavior_durations.exercise_barbell.seconds`。manifest 记录 `source_runtime.throw_batch_size`，报表按实际完成的投掷计数。此策略更新后从新玩家建立比较基线。
+
 ## 月卡加全部在售永久特权
 
 `month_1_monthly_all_permanent` 为 28 天、每天在线 2 小时，`smoke_monthly_all_permanent` 为 600 秒验证。开局购买一次月卡，叠加 `all_on_sale` 的全部在售永久特权，沿用 `default` 画像、种子、养成和鱼潮策略。只购买月卡，不包含周卡、终身卡、付费枪或神兽。
@@ -22,6 +28,10 @@ manifest 的 `source_profiles.default.monthly_card` 保存本段起始月卡快�
 
 ## 大 R 初始购买场景
 
+`month_1_monthly_qinglong_29` 是 2026-11-13 确认的青龙对比场景：在月卡＋全部在售永久特权基础上，仅增加 29 只青龙，不附赠付费枪。运行 28 天、每天在线 2 小时，沿用 `default` 画像、种子和一键最佳资质换阵；对应 `smoke_monthly_qinglong_29` 为 600 秒验证。源初始库存模式为 `qinglong_29`，manifest 应为 `fishCount=29`、`gunCount=0`，月卡和永久权益分别记录。回归见 `tests/test_fish_source_monthly_qinglong.py`；跨初始库存组合不能续跑，旧源码 checkpoint 仍按身份校验拒绝。
+
+本场景沿用源神兽优先的换阵规则：鱼厅不足 30 槽时可能全部上阵青龙，缺少普通参照鱼时 CPS 为零。该行为作为跑测观察项，不为了提高大 R 产出另设普通鱼保留位。新增模式涉及源码／适配器身份变化，比较上轮时须披露版本，并核对变化范围。
+
 `month_1_whale` 为 28 天、每天在线 2 小时，`smoke_whale` 为 600 秒验证。开局拥有最强配置付费枪、29 只青龙和全部在售永久特权；具体源规则、上阵策略与比较限制见 [大 R 场景](docs/whale-scenario.md)。提交仍使用 Dashboard，正式完成后再登记报表。
 
 神兽同种倍率及精确参照产出乘积由源规则作有界缓存，依赖完整大数、数量及配置；动态结算照旧。大 R 上阵与卖鱼在同一次决策中复用动作报价，不增加或删减业务行动。缓存不写入存档，旧源码／适配器身份的 checkpoint 仍拒绝跨版本恢复。维护边界和专项测试见源 `simulation/README.md` 的“神兽纯产出缓存”。
@@ -33,6 +43,12 @@ manifest 的 `source_profiles.default.monthly_card` 保存本段起始月卡快�
 “立即”指已开始的投掷、动作或鱼潮完成后的第一个可操作点；不打断源事务，也不绕过在线、突破中等源资格限制。被重生暂时中断的收钱批次保留未领取槽位。寻宝兽返祖门槛仍由源表的 4、8、12、16……决定；达标后不会因同权重轮转先发起下一境界资助。
 
 manifest 记录 `rebirth_policy=source_eligible_trash_then_strength_first_v1`。旧策略 checkpoint 不兼容，需要从新玩家建立基线。回归见 `tests/test_fish_source_rebirth_priority.py`、成长优先、收钱和续跑测试；历史运行仍保留原策略证据。
+
+## 卖鱼价格压缩
+
+源 `FishEconomyRules.CalculateSellPrice` 经 `FishSalePricePolicy` 统一报价与结算：令 `P` 为一级产出（含变异）乘源出售倍率，`P <= 7000` 时保留原价，超过时为 `7000 * (P / 7000)^(1/4)`，最终向下取整。大数四次方根采用精确十进制比较，超出钱包有效位数时向下截断。鱼等级、鱼厅金币产出、出售排序和动作耗时不因此改变。旧源码 checkpoint 需重建基线。源回归为 `tests/fish_sale_price_policy_test.lua`，IGESS 实际到账与恢复回归为 `tests/test_fish_source_sales.py`。
+
+2026-11-17 已基于削价后的免费首月报告实施第一版分解产出候选：`Trash.baseMaterialPerSecond` 的 ID 1～5 保持，ID 6 提至 2 倍、ID 7 提至 3 倍、ID 8～13 提至 4 倍，后续保留原公式递增（含未开放行的公式联动）。材料养成成本保持。逐行改值、预算、导出核验及待验收节点见 [本轮记录](../../.scratch/fish-trash-material-20261117/verification.md)。此候选尚不代表整月节奏恢复；旧流水静态换算不代表新运行的捕获、购买及成长结果。
 
 ## 一键最佳资质换阵
 

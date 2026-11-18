@@ -121,6 +121,26 @@ def test_sale_weight_zero_keeps_behavior_disabled(tmp_path, monkeypatch):
     assert not sales(read("events.json"))
 
 
+def test_compressed_sale_settles_and_resumes_without_duplicate_income(tmp_path, monkeypatch):
+    target = sales_project(tmp_path, monkeypatch, count=31, duration=8)
+    path = target / "selected/tbfish.json"
+    rows = json.loads(path.read_text(encoding="utf-8"))
+    for row in rows:
+        if row["id"] == 102:
+            row["baseMoneyPerSecond"] = {"sign": 1, "digits": "7", "scale": 6}
+    path.write_text(json.dumps(rows), encoding="utf-8")
+    _, expected, _ = run(target)
+    first, before, _ = run(target, until_seconds=1)
+    _, after, _ = run(target, checkpoint_input=first / "final_checkpoint.json")
+    assert before("events.json") + after("events.json") == expected("events.json")
+    receipts = sales(expected("events.json"))
+    assert len(receipts) == 1
+    assert source_decimal(receipts[0]["materialAdded"]) == Decimal(70000)
+    final = after("timeline.json")[-1]
+    assert Decimal(final["resources"]["online_fish_sale_material_cumulative"]) == 70000
+    assert final == expected("timeline.json")[-1]
+
+
 def test_source_sale_quotes_are_read_only_and_refresh_after_deployment_and_sale():
     state = archive("""
 s.fish.items={

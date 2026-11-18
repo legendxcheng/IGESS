@@ -25,7 +25,7 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def _project(tmp_path: Path) -> Path:
+def _project(tmp_path: Path, *, duration_hours: str = "0.025") -> Path:
     origin = ROOT / "projects" / "fish_source"
     project = tmp_path / "fish_source"
     project.mkdir()
@@ -36,7 +36,7 @@ def _project(tmp_path: Path) -> Path:
     config["engine"]["source_runtime"].update(
         project_root=str(FISH_SOURCE), data_root="production_snapshot/json", advance_mode="accurate",
     )
-    config["scenarios"]["smoke"]["duration_hours"] = "0.025"
+    config["scenarios"]["smoke"]["duration_hours"] = duration_hours
     (project / "economy.yaml").write_text(
         yaml.safe_dump(config, allow_unicode=True), encoding="utf-8",
     )
@@ -59,7 +59,8 @@ def test_source_model_status_accepts_the_current_source_policy(tmp_path: Path) -
 def test_formal_source_smoke_uses_lua_receipts_and_writes_report(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    project = _project(tmp_path)
+    # Include the first deployment and its production after a full throw group.
+    project = _project(tmp_path, duration_hours="0.05")
     freeze_source = FishSourceRuntime._freeze_source
 
     def checked_freeze(runtime: FishSourceRuntime) -> Path:

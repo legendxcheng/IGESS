@@ -18,7 +18,7 @@ def test_formal_codex_claims_are_explicit_one_second_actions_and_separate_income
     path = project / 'economy.yaml'
     config = yaml.safe_load(path.read_text(encoding='utf-8'))
     config['engine']['source_runtime'].update(project_root=str(SOURCE), data_root=str(SOURCE / 'igess_export/json'))
-    config['scenarios']['smoke']['duration_hours'] = '0.025'
+    config['scenarios']['smoke']['duration_hours'] = '0.05'  # Includes claims after five throws.
     config['scenarios']['smoke']['record_interval_seconds'] = 1
     config['player_profiles']['default']['behavior_weights'] = {'manual_throw': '1'}
     path.write_text(yaml.safe_dump(config, allow_unicode=True), encoding='utf-8')

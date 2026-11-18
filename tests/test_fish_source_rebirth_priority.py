@@ -30,10 +30,12 @@ def test_rebirth_precedes_funding_purchases_rewards_and_pending_collection(turn)
 
 def test_both_rebirths_precede_other_work_in_stable_order():
     runner, _ = chooser()
+    runner.throws_remaining = 4
     runner.profile.behavior_weights.update(trash_man_rebirth=Weight(1),strength_rebirth=Weight(1))
     runner.state['rebirth']['trashMan']['eligible'] = True
     runner.state['rebirth']['strength']['eligible'] = True
     assert runner._choose()[0] == 'trash_man_rebirth'
+    assert runner.throws_remaining == 0
     runner.state['rebirth']['trashMan']['eligible'] = False
     assert runner._choose()[0] == 'strength_rebirth'
 

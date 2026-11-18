@@ -10,14 +10,19 @@ engine:
     data_root: ../../../fish-oasis/igess_export/json
     lua_executable: lua55
     in_fishing_area: true
+    throw_batch_size: 5
     collect_interval_seconds: 300
     idle_seconds: 30
     advance_mode: equivalent_batch_v1
     sampling_time_basis: online
     monthly_card_by_scenario:
+      smoke_monthly_qinglong_29: monthly_once
+      month_1_monthly_qinglong_29: monthly_once
       smoke_monthly_all_permanent: monthly_once
       month_1_monthly_all_permanent: monthly_once
     permanent_privileges_by_scenario:
+      smoke_monthly_qinglong_29: all_on_sale
+      month_1_monthly_qinglong_29: all_on_sale
       smoke_monthly_all_permanent: all_on_sale
       month_1_monthly_all_permanent: all_on_sale
       smoke_all_permanent: all_on_sale
@@ -25,6 +30,8 @@ engine:
       smoke_whale: all_on_sale
       month_1_whale: all_on_sale
     initial_loadout_by_scenario:
+      smoke_monthly_qinglong_29: qinglong_29
+      month_1_monthly_qinglong_29: qinglong_29
       smoke_whale: whale_qinglong_29
       month_1_whale: whale_qinglong_29
 formulas:
@@ -141,7 +148,7 @@ player_profiles:
         seconds: 10
       exercise_barbell:
         type: fixed
-        seconds: 60
+        seconds: 180
       strength_rebirth:
         type: fixed
         seconds: 5
@@ -199,7 +206,7 @@ player_profiles:
         seconds: 10
       exercise_barbell:
         type: fixed
-        seconds: 60
+        seconds: 180
       strength_rebirth:
         type: fixed
         seconds: 5
@@ -211,6 +218,20 @@ player_profiles:
         seconds: 10
     luck: '1'
 scenarios:
+  smoke_monthly_qinglong_29:
+    duration_hours: '0.1666666666666667'
+    time_mode: tick
+    profiles: [default]
+    start_state: new_player
+    record_interval_seconds: 300
+    outputs: [resource_curve, purchase_timeline, unlock_timeline, prestige_timeline, bottleneck_report]
+  month_1_monthly_qinglong_29:
+    duration_hours: '672'
+    time_mode: tick
+    profiles: [default]
+    start_state: new_player
+    record_interval_seconds: 300
+    outputs: [resource_curve, purchase_timeline, unlock_timeline, prestige_timeline, bottleneck_report, compact_event_details]
   smoke_monthly_all_permanent:
     duration_hours: '0.1666666666666667'
     time_mode: tick

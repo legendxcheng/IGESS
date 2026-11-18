@@ -25,6 +25,8 @@ description: 在 IGESS 中开发 projects/fish_source 同源 Lua 模拟，回答
 
 ## 数值调优协作
 
+青龙增益对比使用 `month_1_monthly_qinglong_29`：月卡＋全部在售永久特权＋29 只青龙，不含付费枪；源模式 `qinglong_29`。不要与带最强付费枪的旧 `month_1_whale` 混用。核对 manifest 的 `fishCount=29`、`gunCount=0`、月卡与永久权益，留意神兽优先换阵在无普通参照鱼时的零产出。配置与回归见 README、`tests/test_fish_source_monthly_qinglong.py`。
+
 固定流程为：**跑报表 → 分析报表 → 给出建议 → 人类决定 → Agent 改表并导出**，再进入下一轮报表验证。报表默认由用户运行，用户明确委托时 Agent 代跑；用户说“看结果”“验证这轮”不意味着重新模拟。Agent 负责分析、建议及决定后的生产改表；人类负责选择调整方案。建议交付后等待人类决定，已有明确选择则直接执行其范围，无需重复确认；用户只要求分析时保持只读。
 
 ### 长跑测：提交到已运行的 IGESS，等待人类唤醒
@@ -81,6 +83,8 @@ Fish 是以摸鱼／炸鱼为主题的增量养成游戏，包含随机收集、
 
 ## 保持同源边界
 
+- 卖价压缩沿源 `FishSalePricePolicy`，公式和回归见项目 README 的“卖鱼价格压缩”。分析须使用源报价／回执，不能再将一级 CPS 直接乘出售倍率当最终卖价。卖价改变后重建基线；先削卖价的运行不表示分解或成本已调整，下一轮提升分解须按人类选定范围执行。
+
 - 枪械交付、月卡组合或装备持续拒绝时，读源 `simulation/README.md` 的“枪械交付与装备恢复”。核对领枪的内部 delivery 回执、nativeInventory、实际装备与鱼潮；`ownedGunIds` 只证明权益。Host 保存须执行源保存屏障，重试使用源交付服务，不清锁或直接补枪。回归入口为 `tests/test_fish_source_gun_delivery.py`，并覆盖枪械、月卡及跨进程恢复。
 
 - Python 负责玩家意图、行动耗时、上下线、采样、协议与产物；Lua 负责合法性、价格、扣款、奖励、生产和重生。新增行为接入源操作，避免在 Python 复制经济公式或直接改余额。
@@ -88,6 +92,7 @@ Fish 是以摸鱼／炸鱼为主题的增量养成游戏，包含随机收集、
 - 寻宝兽突破成本由 `TrashManRealm.materialRequireToNextRealm` 配置，允许相邻成本下降或持平；源规则只要求非满级成本为合法正数、满级为零，不强制“三小一大”或全局递增。调整节奏仍由人类决定，境界顺序、分解速度和返祖校验独立保留。
 - `source_priority_v1` 是模拟玩家策略，不等同于真实玩家或旧 Python 策略。行为权重、操作耗时、在线窗口、自然落点与固定距离对照均须保留可归因身份。
 - 两类重生达标后在下一空闲决策点优先执行，同时合法时先寻宝兽后力量；资格与扣款仍由源服务决定。分析重生偏移、调整策略或续跑前，读 README 的“达标优先重生”，核对 manifest 的 `rebirth_policy`，保留画像禁用、拒绝冷却和已提交动作的恢复边界。回归入口 `tests/test_fish_source_rebirth_priority.py`；旧策略 checkpoint 需重建基线。
+- 炸鱼每组 5 投，锻炼每组 180 秒。分析投掷次数、组内延后的普通操作、鱼潮截断或续跑时，读 README“连投五次与三分钟锻炼”，核对 manifest 的 `throw_batch_size` 和画像耗时。
 - 神器候选使用源报价 `previousTorpedoId` 检查前置拥有；神器／杠铃按数值 ID 排序，操作与恢复身份仍为字符串。修改候选时同时验证普通选择、鱼潮预留、拒绝冷却及恢复；完整目录／关闭商品契约见项目 README，回归见 `tests/test_fish_growth_candidates*.py`。
 - 鱼潮在原绝对周期的开场同秒开始／完成，随后立即继续普通动作，孵化按即时入包时间计；0 分钟是快速打蛋的模拟假设。旧源码／适配器 checkpoint 仍需重建基线。鱼潮采用养成优先、单场余额 25%、30 分钟近期成长预留及当日在线材料收入 15% 累计上限。每日入场必须满足“已付换弹费用加本场完整源报价不超过当日已获得在线材料收入的15%”；日收入包含加工、卖鱼和图鉴材料奖励，排除离线奖励，按模拟自然日重置且不结转。近期成长预测仍排除图鉴奖励。分析材料分配时读取 README 的“养成优先与鱼潮材料预留”，核对 `tide_admission_policy`、三类预算／预留跳过回执及 checkpoint `growth_tide_budget.daily`。修改策略运行 `tests/test_fish_growth_priority.py`、`tests/test_fish_tide_daily_budget.py`、`tests/test_fish_tide_ammunition.py` 及鱼潮／恢复回归；策略改变后重建基线，不复用旧适配器 checkpoint。
 - 所有画像先按游戏源“一键最佳资质”换阵，再卖鱼；源排序、1 秒点击耗时及恢复见项目 README 的“一键最佳资质换阵”。换阵拒绝冷却期间保护入选背包鱼。修改时运行 `tests/test_fish_source_hall.py`、卖鱼和大 R 回归。

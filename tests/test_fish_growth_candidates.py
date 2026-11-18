@@ -35,10 +35,21 @@ def chooser(ids=range(1, 16), owned=range(1, 9)):
         "purchase_torpedo": Weight("1e100"), "manual_throw": Weight(1), "exercise_barbell": Weight(1),
     })
     runner.pending_collect_slots = []
+    runner.throws_remaining = 0
     runner.last_collect = 0
     runner.blocked = {}
     runner.behavior_turn = 0
     return runner, actions
+
+
+def test_throw_batch_yields_to_ordinary_work_when_inventory_fills():
+    runner, _ = chooser()
+    runner.throws_remaining = 3
+    assert runner._choose()[0] == "manual_throw"
+    assert runner.behavior_turn == 0
+    runner.state["inventory"].update(total=200, capacity=200)
+    assert runner._choose()[0] == "purchase_torpedo"
+    assert runner.throws_remaining == 0
 
 
 def test_real_chooser_buys_nine_before_ten():
