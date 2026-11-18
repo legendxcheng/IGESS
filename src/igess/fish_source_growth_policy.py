@@ -25,6 +25,52 @@ GROWTH_TIDE_POLICY = {
 
 REBIRTH_POLICY = "source_eligible_trash_then_strength_first_v1"
 
+FISH_UPGRADE_POLICY = {
+    "policy": "top_two_potential_spend_all_batch_v1",
+    "targets": "source_selected_deployed_ordinary_top_two_in_potential_order",
+    "selection": "strongest_affordable_then_second",
+    "batch_seconds": 3,
+    "barbell_horizon_seconds": 1800,
+    "barbell_budget": "wallet_plus_unclaimed_plus_current_hall_cps_times_horizon",
+    "reservation_check": "before_batch_only",
+    "settlement": "source_single_level_commands_at_batch_start",
+}
+
+
+def fish_upgrade_quote(state, actions, allowed):
+    """Use the source potential ranking, including max-level fish in the top two."""
+    ordinary = {row["instanceId"] for row in actions["hallCandidates"] if not row["isBeast"]}
+    ranked = [key for key in actions["bestPotentialLayout"]["selectedInstanceIds"] if key in ordinary][:2]
+    deployed = {row["instanceId"] for row in state["inventory"]["items"] if row["hallSlot"] > 0}
+    quotes = {row["instanceId"]: row for row in actions["fishUpgrades"]}
+    money = source_decimal(state["wallet"]["money"])
+    for key in ranked:
+        quote = quotes.get(key)
+        if (key in deployed and quote is not None and allowed("upgrade_fish", str(key))
+                and money >= source_decimal(quote["cost"])):
+            return quote
+    return None
+
+
+def reserve_money_for_barbell(state, actions, weights, allowed):
+    """Reserve for the next numeric catalog entry using current source production."""
+    weight = weights.get("synthesize_barbell")
+    if weight is None or Decimal(weight.to_decimal_string()) <= 0:
+        return False
+    owned = {row["barbellId"] for row in state["barbell"]["owned"]}
+    target = min((row for row in actions["barbells"] if row["barbellId"] not in owned),
+                 key=lambda row: row["barbellId"], default=None)
+    if target is None or not allowed("synthesize_barbell", str(target["barbellId"])):
+        return False
+    price = source_decimal(target["cost"])
+    money = source_decimal(state["wallet"]["money"])
+    unclaimed = source_decimal(state["unclaimedMoney"])
+    cps = source_decimal(state["hall"]["currentRatePerSecond"])
+    values = [price, money, unclaimed, cps]
+    with localcontext() as ctx:
+        ctx.prec = max(80, max(v.adjusted() for v in values) - min(v.as_tuple().exponent for v in values) + 8)
+        return price <= money + unclaimed + cps * FISH_UPGRADE_POLICY["barbell_horizon_seconds"]
+
 
 def immediate_rebirth(state, weights, allowed):
     """At an idle decision boundary, execute a source-legal rebirth first."""

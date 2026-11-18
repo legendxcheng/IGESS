@@ -21,8 +21,8 @@ from .fish_source_eggs import EggObservations
 from .fish_source_tides import TIDE_POLICY, TideObservations
 from .fish_source_guns import GunMilestones, choose_gun_action
 from .fish_source_growth_policy import (
-    GROWTH_TIDE_POLICY, REBIRTH_POLICY, GrowthTideBudget, growth_options,
-    immediate_rebirth, target_order,
+    FISH_UPGRADE_POLICY, GROWTH_TIDE_POLICY, REBIRTH_POLICY, GrowthTideBudget, growth_options,
+    fish_upgrade_quote, immediate_rebirth, reserve_money_for_barbell, target_order,
 )
 from .fish_source_pools import PoolMilestones
 from .fish_source_runtime import (
@@ -84,10 +84,6 @@ def _unpack_session(payload: Mapping[str, Any]) -> dict[str, Any]:
 
 def _number(dto: Mapping[str, Any]) -> str:
     return str(source_decimal(dto))
-
-
-def _affords(wallet: Mapping[str, Any], quote: Mapping[str, Any]) -> bool:
-    return source_decimal(wallet[quote["resource"]]) >= source_decimal(quote["cost"])
 
 
 def _integration_code_digest() -> str:
@@ -329,7 +325,7 @@ class FishSourceEngineAdapter:
                 "fish_sell_policy": "over_30_lowest_level_one_cps_backpack_v1",
                 "fish_hall_policy": "source_best_potential_layout_v1",
                 "fish_hall_action_seconds": 1,
-                "fish_upgrade_policy": "deployed_selected_fish_only_v1",
+                "fish_upgrade_policy": FISH_UPGRADE_POLICY,
                 "fish_keep_count": _FISH_KEEP_COUNT,
                 "tide_policy": TIDE_POLICY,
                 "tide_admission_policy": GROWTH_TIDE_POLICY,
@@ -820,7 +816,6 @@ class _ProfileRun:
         if gun_action is not None:
             return gun_action
         wallet = state["wallet"]
-        inventory = state["inventory"]["items"]
         slots = state["hall"]["slotBalances"]
         if state["time"] - self.last_collect >= self.inputs.collect_interval_seconds:
             self.pending_collect_slots = sorted(
@@ -858,7 +853,6 @@ class _ProfileRun:
                 return "sell_fish", str(item["instanceId"]), {
                     "op": "sell_fish", "instanceId": item["instanceId"],
                 }
-        upgrade_targets = selected & {item["instanceId"] for item in inventory if item.get("hallSlot", 0) > 0}
         weights = self.profile.behavior_weights
         candidates: list[tuple[Decimal, str, str, dict[str, Any]]] = []
 
@@ -874,8 +868,11 @@ class _ProfileRun:
             if option.affordable(wallet):
                 payload = dict(option.payload)
                 add(option.behavior, payload.pop("op"), option.target, **payload)
-        for quote in actions["fishUpgrades"]:
-            if quote["instanceId"] in upgrade_targets and _affords(wallet, quote):
+        upgrade_weight = weights.get("upgrade_fish")
+        if (upgrade_weight is not None and Decimal(upgrade_weight.to_decimal_string()) > 0
+                and not reserve_money_for_barbell(state, actions, weights, self._allowed)):
+            quote = fish_upgrade_quote(state, actions, self._allowed)
+            if quote is not None:
                 add("upgrade_fish", "upgrade_fish", str(quote["instanceId"]), instanceId=quote["instanceId"])
         if state["inventory"]["total"] < state["inventory"]["capacity"] and self.inputs.fishing_area:
             add("manual_throw", "manual_throw")
@@ -911,6 +908,8 @@ class _ProfileRun:
         start = int(self.state["time"])
         if behavior == "collect_slot":
             duration = 2
+        elif behavior == "upgrade_fish":
+            duration = FISH_UPGRADE_POLICY["batch_seconds"]
         elif behavior in ("claim_monthly_card", "apply_best_potential_layout", "deploy_fish", "withdraw_fish", "claim_fish_reward", "claim_gun_reward", "equip_gun"):
             duration = 1
         else:
@@ -933,6 +932,17 @@ class _ProfileRun:
                     }
                     self._continue_throw(min(limit, self.end))
                     return
+            self._wait_until(end)
+        elif behavior == "upgrade_fish":
+            # Commit each level through Lua at the batch start. Only the shared
+            # foreground time remains pending, so continuation cannot buy twice.
+            while self._command("upgrade_fish", target=target, instanceId=payload["instanceId"]):
+                actions = self.runtime.request({"op": "query_actions"})
+                quote = fish_upgrade_quote(self.state, actions, self._allowed)
+                if quote is None:
+                    break
+                target = str(quote["instanceId"])
+                payload = {"instanceId": quote["instanceId"]}
             self._wait_until(end)
         elif behavior == "exercise_barbell":
             if self._command("start_exercise"):
